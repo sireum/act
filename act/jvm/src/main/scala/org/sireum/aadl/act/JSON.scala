@@ -49,6 +49,7 @@ object JSON {
         case o: Procedure => return printProcedure(o)
         case o: Method => return printMethod(o)
         case o: Parameter => return printParameter(o)
+        case o: TODO => return printTODO(o)
       }
     }
 
@@ -63,8 +64,8 @@ object JSON {
     @pure def printComposition(o: Composition): ST = {
       return printObject(ISZ(
         ("type", st""""Composition""""),
-        ("groups", printISZ(F, o.groups, printASTObjectTODO _)),
-        ("exports", printISZ(F, o.exports, printASTObjectTODO _)),
+        ("groups", printISZ(F, o.groups, printTODO _)),
+        ("exports", printISZ(F, o.exports, printTODO _)),
         ("instances", printISZ(F, o.instances, printInstance _)),
         ("connections", printISZ(F, o.connections, printConnection _))
       ))
@@ -85,16 +86,16 @@ object JSON {
         ("control", printB(o.control)),
         ("hardware", printB(o.hardware)),
         ("name", printString(o.name)),
-        ("mutexes", printISZ(F, o.mutexes, printASTObjectTODO _)),
-        ("binarySimaphores", printISZ(F, o.binarySimaphores, printASTObjectTODO _)),
-        ("semaphores", printISZ(F, o.semaphores, printASTObjectTODO _)),
-        ("dataports", printISZ(F, o.dataports, printASTObjectTODO _)),
-        ("emits", printISZ(F, o.emits, printASTObjectTODO _)),
+        ("mutexes", printISZ(F, o.mutexes, printTODO _)),
+        ("binarySimaphores", printISZ(F, o.binarySimaphores, printTODO _)),
+        ("semaphores", printISZ(F, o.semaphores, printTODO _)),
+        ("dataports", printISZ(F, o.dataports, printTODO _)),
+        ("emits", printISZ(F, o.emits, printTODO _)),
         ("uses", printISZ(F, o.uses, printUses _)),
-        ("consumes", printISZ(F, o.consumes, printASTObjectTODO _)),
+        ("consumes", printISZ(F, o.consumes, printTODO _)),
         ("provides", printISZ(F, o.provides, printProvides _)),
-        ("includes", printISZ(F, o.includes, printASTObjectTODO _)),
-        ("attributes", printISZ(F, o.attributes, printASTObjectTODO _))
+        ("includes", printISZ(F, o.includes, printTODO _)),
+        ("attributes", printISZ(F, o.attributes, printTODO _))
       ))
     }
 
@@ -186,6 +187,12 @@ object JSON {
       ))
     }
 
+    @pure def printTODO(o: TODO): ST = {
+      return printObject(ISZ(
+        ("type", st""""TODO"""")
+      ))
+    }
+
   }
 
   @record class Parser(input: String) {
@@ -196,7 +203,7 @@ object JSON {
     }
 
     def parseASTObject(): ASTObject = {
-      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter"))
+      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "TODO"))
       t.native match {
         case "Assembly" => val r = parseAssemblyT(T); return r
         case "Composition" => val r = parseCompositionT(T); return r
@@ -208,7 +215,8 @@ object JSON {
         case "Procedure" => val r = parseProcedureT(T); return r
         case "Method" => val r = parseMethodT(T); return r
         case "Parameter" => val r = parseParameterT(T); return r
-        case _ => val r = parseParameterT(T); return r
+        case "TODO" => val r = parseTODOT(T); return r
+        case _ => val r = parseTODOT(T); return r
       }
     }
 
@@ -240,10 +248,10 @@ object JSON {
         parser.parseObjectType("Composition")
       }
       parser.parseObjectKey("groups")
-      val groups = parser.parseISZ(parseASTObjectTODO _)
+      val groups = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("exports")
-      val exports = parser.parseISZ(parseASTObjectTODO _)
+      val exports = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("instances")
       val instances = parser.parseISZ(parseInstance _)
@@ -294,34 +302,34 @@ object JSON {
       val name = parser.parseString()
       parser.parseObjectNext()
       parser.parseObjectKey("mutexes")
-      val mutexes = parser.parseISZ(parseASTObjectTODO _)
+      val mutexes = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("binarySimaphores")
-      val binarySimaphores = parser.parseISZ(parseASTObjectTODO _)
+      val binarySimaphores = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("semaphores")
-      val semaphores = parser.parseISZ(parseASTObjectTODO _)
+      val semaphores = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("dataports")
-      val dataports = parser.parseISZ(parseASTObjectTODO _)
+      val dataports = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("emits")
-      val emits = parser.parseISZ(parseASTObjectTODO _)
+      val emits = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("uses")
       val uses = parser.parseISZ(parseUses _)
       parser.parseObjectNext()
       parser.parseObjectKey("consumes")
-      val consumes = parser.parseISZ(parseASTObjectTODO _)
+      val consumes = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("provides")
       val provides = parser.parseISZ(parseProvides _)
       parser.parseObjectNext()
       parser.parseObjectKey("includes")
-      val includes = parser.parseISZ(parseASTObjectTODO _)
+      val includes = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("attributes")
-      val attributes = parser.parseISZ(parseASTObjectTODO _)
+      val attributes = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       return Component(control, hardware, name, mutexes, binarySimaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
     }
@@ -528,6 +536,18 @@ object JSON {
           parser.parseException(i, s"Invalid element name '$s' for Direction.")
           return Direction.byOrdinal(0).get
       }
+    }
+
+    def parseTODO(): TODO = {
+      val r = parseTODOT(F)
+      return r
+    }
+
+    def parseTODOT(typeParsed: B): TODO = {
+      if (!typeParsed) {
+        parser.parseObjectType("TODO")
+      }
+      return TODO()
     }
 
     def eof(): B = {
@@ -778,6 +798,24 @@ object JSON {
       return r
     }
     val r = to(s, fParameter _)
+    return r
+  }
+
+  def fromTODO(o: TODO, isCompact: B): String = {
+    val st = Printer.printTODO(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toTODO(s: String): Either[TODO, Json.ErrorMsg] = {
+    def fTODO(parser: Parser): TODO = {
+      val r = parser.parseTODO()
+      return r
+    }
+    val r = to(s, fTODO _)
     return r
   }
 

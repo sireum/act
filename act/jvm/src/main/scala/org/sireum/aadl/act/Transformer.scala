@@ -115,6 +115,13 @@ object Transformer {
            case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[ASTObject]())
           }
           return r
+        case o: TODO =>
+          val r: PreResult[Context, ASTObject] = preTODO(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: ASTObject)) => PreResult(preCtx, continu, Some[ASTObject](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type ASTObject")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[ASTObject]())
+          }
+          return r
       }
     }
 
@@ -163,6 +170,10 @@ object Transformer {
     }
 
     @pure def preParameter(ctx: Context, o: Parameter): PreResult[Context, Parameter] = {
+      return PreResult(ctx, T, None())
+    }
+
+    @pure def preTODO(ctx: Context, o: TODO): PreResult[Context, TODO] = {
       return PreResult(ctx, T, None())
     }
 
@@ -238,6 +249,13 @@ object Transformer {
            case Result(postCtx, _) => Result(postCtx, None[ASTObject]())
           }
           return r
+        case o: TODO =>
+          val r: Result[Context, ASTObject] = postTODO(ctx, o) match {
+           case Result(postCtx, Some(result: ASTObject)) => Result(postCtx, Some[ASTObject](result))
+           case Result(_, Some(_)) => halt("Can only produce object of type ASTObject")
+           case Result(postCtx, _) => Result(postCtx, None[ASTObject]())
+          }
+          return r
       }
     }
 
@@ -289,6 +307,10 @@ object Transformer {
       return Result(ctx, None())
     }
 
+    @pure def postTODO(ctx: Context, o: TODO): Result[Context, TODO] = {
+      return Result(ctx, None())
+    }
+
   }
 
   @pure def transformISZ[Context, T](ctx: Context, s: IS[Z, T], f: (Context, T) => Result[Context, T] @pure): Result[Context, IS[Z, T]] = {
@@ -328,12 +350,14 @@ import Transformer._
           else
             Result(r0.ctx, None())
         case o2: Composition =>
-          val r0: Result[Context, IS[Z, Instance]] = transformISZ(ctx, o2.instances, transformInstance _)
-          val r1: Result[Context, IS[Z, Connection]] = transformISZ(r0.ctx, o2.connections, transformConnection _)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-            Result(r1.ctx, Some(o2(instances = r0.resultOpt.getOrElse(o2.instances), connections = r1.resultOpt.getOrElse(o2.connections))))
+          val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.groups, transformTODO _)
+          val r1: Result[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.exports, transformTODO _)
+          val r2: Result[Context, IS[Z, Instance]] = transformISZ(r1.ctx, o2.instances, transformInstance _)
+          val r3: Result[Context, IS[Z, Connection]] = transformISZ(r2.ctx, o2.connections, transformConnection _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty)
+            Result(r3.ctx, Some(o2(groups = r0.resultOpt.getOrElse(o2.groups), exports = r1.resultOpt.getOrElse(o2.exports), instances = r2.resultOpt.getOrElse(o2.instances), connections = r3.resultOpt.getOrElse(o2.connections))))
           else
-            Result(r1.ctx, None())
+            Result(r3.ctx, None())
         case o2: Instance =>
           val r0: Result[Context, Component] = transformComponent(ctx, o2.component)
           if (hasChanged || r0.resultOpt.nonEmpty)
@@ -341,12 +365,20 @@ import Transformer._
           else
             Result(r0.ctx, None())
         case o2: Component =>
-          val r0: Result[Context, IS[Z, Uses]] = transformISZ(ctx, o2.uses, transformUses _)
-          val r1: Result[Context, IS[Z, Provides]] = transformISZ(r0.ctx, o2.provides, transformProvides _)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-            Result(r1.ctx, Some(o2(uses = r0.resultOpt.getOrElse(o2.uses), provides = r1.resultOpt.getOrElse(o2.provides))))
+          val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.mutexes, transformTODO _)
+          val r1: Result[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.binarySimaphores, transformTODO _)
+          val r2: Result[Context, IS[Z, TODO]] = transformISZ(r1.ctx, o2.semaphores, transformTODO _)
+          val r3: Result[Context, IS[Z, TODO]] = transformISZ(r2.ctx, o2.dataports, transformTODO _)
+          val r4: Result[Context, IS[Z, TODO]] = transformISZ(r3.ctx, o2.emits, transformTODO _)
+          val r5: Result[Context, IS[Z, Uses]] = transformISZ(r4.ctx, o2.uses, transformUses _)
+          val r6: Result[Context, IS[Z, TODO]] = transformISZ(r5.ctx, o2.consumes, transformTODO _)
+          val r7: Result[Context, IS[Z, Provides]] = transformISZ(r6.ctx, o2.provides, transformProvides _)
+          val r8: Result[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.includes, transformTODO _)
+          val r9: Result[Context, IS[Z, TODO]] = transformISZ(r8.ctx, o2.attributes, transformTODO _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
+            Result(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySimaphores = r1.resultOpt.getOrElse(o2.binarySimaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), includes = r8.resultOpt.getOrElse(o2.includes), attributes = r9.resultOpt.getOrElse(o2.attributes))))
           else
-            Result(r1.ctx, None())
+            Result(r9.ctx, None())
         case o2: Connection =>
           val r0: Result[Context, Connector] = transformConnector(ctx, o2.connector)
           val r1: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.from_ends, transformConnectionEnd _)
@@ -378,6 +410,11 @@ import Transformer._
           else
             Result(r0.ctx, None())
         case o2: Parameter =>
+          if (hasChanged)
+            Result(ctx, Some(o2))
+          else
+            Result(ctx, None())
+        case o2: TODO =>
           if (hasChanged)
             Result(ctx, Some(o2))
           else
@@ -433,12 +470,14 @@ import Transformer._
     val r: Result[Context, Composition] = if (preR.continu) {
       val o2: Composition = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: Result[Context, IS[Z, Instance]] = transformISZ(ctx, o2.instances, transformInstance _)
-      val r1: Result[Context, IS[Z, Connection]] = transformISZ(r0.ctx, o2.connections, transformConnection _)
-      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-        Result(r1.ctx, Some(o2(instances = r0.resultOpt.getOrElse(o2.instances), connections = r1.resultOpt.getOrElse(o2.connections))))
+      val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.groups, transformTODO _)
+      val r1: Result[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.exports, transformTODO _)
+      val r2: Result[Context, IS[Z, Instance]] = transformISZ(r1.ctx, o2.instances, transformInstance _)
+      val r3: Result[Context, IS[Z, Connection]] = transformISZ(r2.ctx, o2.connections, transformConnection _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty)
+        Result(r3.ctx, Some(o2(groups = r0.resultOpt.getOrElse(o2.groups), exports = r1.resultOpt.getOrElse(o2.exports), instances = r2.resultOpt.getOrElse(o2.instances), connections = r3.resultOpt.getOrElse(o2.connections))))
       else
-        Result(r1.ctx, None())
+        Result(r3.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       Result(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -488,12 +527,20 @@ import Transformer._
     val r: Result[Context, Component] = if (preR.continu) {
       val o2: Component = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: Result[Context, IS[Z, Uses]] = transformISZ(ctx, o2.uses, transformUses _)
-      val r1: Result[Context, IS[Z, Provides]] = transformISZ(r0.ctx, o2.provides, transformProvides _)
-      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-        Result(r1.ctx, Some(o2(uses = r0.resultOpt.getOrElse(o2.uses), provides = r1.resultOpt.getOrElse(o2.provides))))
+      val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.mutexes, transformTODO _)
+      val r1: Result[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.binarySimaphores, transformTODO _)
+      val r2: Result[Context, IS[Z, TODO]] = transformISZ(r1.ctx, o2.semaphores, transformTODO _)
+      val r3: Result[Context, IS[Z, TODO]] = transformISZ(r2.ctx, o2.dataports, transformTODO _)
+      val r4: Result[Context, IS[Z, TODO]] = transformISZ(r3.ctx, o2.emits, transformTODO _)
+      val r5: Result[Context, IS[Z, Uses]] = transformISZ(r4.ctx, o2.uses, transformUses _)
+      val r6: Result[Context, IS[Z, TODO]] = transformISZ(r5.ctx, o2.consumes, transformTODO _)
+      val r7: Result[Context, IS[Z, Provides]] = transformISZ(r6.ctx, o2.provides, transformProvides _)
+      val r8: Result[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.includes, transformTODO _)
+      val r9: Result[Context, IS[Z, TODO]] = transformISZ(r8.ctx, o2.attributes, transformTODO _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
+        Result(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySimaphores = r1.resultOpt.getOrElse(o2.binarySimaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), includes = r8.resultOpt.getOrElse(o2.includes), attributes = r9.resultOpt.getOrElse(o2.attributes))))
       else
-        Result(r1.ctx, None())
+        Result(r9.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       Result(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -715,6 +762,32 @@ import Transformer._
     val hasChanged: B = r.resultOpt.nonEmpty
     val o2: Parameter = r.resultOpt.getOrElse(o)
     val postR: Result[Context, Parameter] = pp.postParameter(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return Result(postR.ctx, Some(o2))
+    } else {
+      return Result(postR.ctx, None())
+    }
+  }
+
+  @pure def transformTODO(ctx: Context, o: TODO): Result[Context, TODO] = {
+    val preR: PreResult[Context, TODO] = pp.preTODO(ctx, o)
+    val r: Result[Context, TODO] = if (preR.continu) {
+      val o2: TODO = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        Result(ctx, Some(o2))
+      else
+        Result(ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      Result(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      Result(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: TODO = r.resultOpt.getOrElse(o)
+    val postR: Result[Context, TODO] = pp.postTODO(r.ctx, o2)
     if (postR.resultOpt.nonEmpty) {
       return postR
     } else if (hasChanged) {

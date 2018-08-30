@@ -6,12 +6,6 @@ import org.sireum._
 
 @sig trait ASTObject
 
-object ASTObject{
-  type TODO = String
-}
-
-import ASTObject._
-
 @datatype class Assembly(configuration: String,
                          composition: Composition) extends ASTObject
 
@@ -80,3 +74,5 @@ import ASTObject._
   'In
   'Out
 }
+
+@datatype class TODO () extends ASTObject

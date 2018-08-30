@@ -60,6 +60,8 @@ object MsgPack {
 
     val Parameter: Z = -21
 
+    val TODO: Z = -20
+
   }
 
   object Writer {
@@ -84,6 +86,7 @@ object MsgPack {
         case o: Procedure => writeProcedure(o)
         case o: Method => writeMethod(o)
         case o: Parameter => writeParameter(o)
+        case o: TODO => writeTODO(o)
       }
     }
 
@@ -95,8 +98,8 @@ object MsgPack {
 
     def writeComposition(o: Composition): Unit = {
       writer.writeZ(Constants.Composition)
-      writer.writeISZ(o.groups, writeASTObjectTODO _)
-      writer.writeISZ(o.exports, writeASTObjectTODO _)
+      writer.writeISZ(o.groups, writeTODO _)
+      writer.writeISZ(o.exports, writeTODO _)
       writer.writeISZ(o.instances, writeInstance _)
       writer.writeISZ(o.connections, writeConnection _)
     }
@@ -113,16 +116,16 @@ object MsgPack {
       writer.writeB(o.control)
       writer.writeB(o.hardware)
       writer.writeString(o.name)
-      writer.writeISZ(o.mutexes, writeASTObjectTODO _)
-      writer.writeISZ(o.binarySimaphores, writeASTObjectTODO _)
-      writer.writeISZ(o.semaphores, writeASTObjectTODO _)
-      writer.writeISZ(o.dataports, writeASTObjectTODO _)
-      writer.writeISZ(o.emits, writeASTObjectTODO _)
+      writer.writeISZ(o.mutexes, writeTODO _)
+      writer.writeISZ(o.binarySimaphores, writeTODO _)
+      writer.writeISZ(o.semaphores, writeTODO _)
+      writer.writeISZ(o.dataports, writeTODO _)
+      writer.writeISZ(o.emits, writeTODO _)
       writer.writeISZ(o.uses, writeUses _)
-      writer.writeISZ(o.consumes, writeASTObjectTODO _)
+      writer.writeISZ(o.consumes, writeTODO _)
       writer.writeISZ(o.provides, writeProvides _)
-      writer.writeISZ(o.includes, writeASTObjectTODO _)
-      writer.writeISZ(o.attributes, writeASTObjectTODO _)
+      writer.writeISZ(o.includes, writeTODO _)
+      writer.writeISZ(o.attributes, writeTODO _)
     }
 
     def writeUses(o: Uses): Unit = {
@@ -190,6 +193,10 @@ object MsgPack {
       writer.writeZ(o.ordinal)
     }
 
+    def writeTODO(o: TODO): Unit = {
+      writer.writeZ(Constants.TODO)
+    }
+
     def result: ISZ[U8] = {
       return writer.result
     }
@@ -224,9 +231,10 @@ object MsgPack {
         case Constants.Procedure => val r = readProcedureT(T); return r
         case Constants.Method => val r = readMethodT(T); return r
         case Constants.Parameter => val r = readParameterT(T); return r
+        case Constants.TODO => val r = readTODOT(T); return r
         case _ =>
           reader.error(i, s"$t is not a valid type of ASTObject.")
-          val r = readParameterT(T)
+          val r = readTODOT(T)
           return r
       }
     }
@@ -254,8 +262,8 @@ object MsgPack {
       if (!typeParsed) {
         reader.expectZ(Constants.Composition)
       }
-      val groups = reader.readISZ(readASTObjectTODO _)
-      val exports = reader.readISZ(readASTObjectTODO _)
+      val groups = reader.readISZ(readTODO _)
+      val exports = reader.readISZ(readTODO _)
       val instances = reader.readISZ(readInstance _)
       val connections = reader.readISZ(readConnection _)
       return Composition(groups, exports, instances, connections)
@@ -288,16 +296,16 @@ object MsgPack {
       val control = reader.readB()
       val hardware = reader.readB()
       val name = reader.readString()
-      val mutexes = reader.readISZ(readASTObjectTODO _)
-      val binarySimaphores = reader.readISZ(readASTObjectTODO _)
-      val semaphores = reader.readISZ(readASTObjectTODO _)
-      val dataports = reader.readISZ(readASTObjectTODO _)
-      val emits = reader.readISZ(readASTObjectTODO _)
+      val mutexes = reader.readISZ(readTODO _)
+      val binarySimaphores = reader.readISZ(readTODO _)
+      val semaphores = reader.readISZ(readTODO _)
+      val dataports = reader.readISZ(readTODO _)
+      val emits = reader.readISZ(readTODO _)
       val uses = reader.readISZ(readUses _)
-      val consumes = reader.readISZ(readASTObjectTODO _)
+      val consumes = reader.readISZ(readTODO _)
       val provides = reader.readISZ(readProvides _)
-      val includes = reader.readISZ(readASTObjectTODO _)
-      val attributes = reader.readISZ(readASTObjectTODO _)
+      val includes = reader.readISZ(readTODO _)
+      val attributes = reader.readISZ(readTODO _)
       return Component(control, hardware, name, mutexes, binarySimaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
     }
 
@@ -429,6 +437,18 @@ object MsgPack {
     def readDirectionType(): Direction.Type = {
       val r = reader.readZ()
       return Direction.byOrdinal(r).get
+    }
+
+    def readTODO(): TODO = {
+      val r = readTODOT(F)
+      return r
+    }
+
+    def readTODOT(typeParsed: B): TODO = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.TODO)
+      }
+      return TODO()
     }
 
   }
@@ -635,6 +655,21 @@ object MsgPack {
       return r
     }
     val r = to(data, fParameter _)
+    return r
+  }
+
+  def fromTODO(o: TODO, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeTODO(o)
+    return w.result
+  }
+
+  def toTODO(data: ISZ[U8]): Either[TODO, MessagePack.ErrorMsg] = {
+    def fTODO(reader: Reader): TODO = {
+      val r = reader.readTODO()
+      return r
+    }
+    val r = to(data, fTODO _)
     return r
   }
 
