@@ -1,16 +1,22 @@
 // #Sireum
 
-package org.sireum.aadl.biji
+package org.sireum.aadl.act
 
 import org.sireum._
 
 @sig trait ASTObject
 
+object ASTObject{
+  type TODO = String
+}
+
+import ASTObject._
+
 @datatype class Assembly(configuration: String,
                          composition: Composition) extends ASTObject
 
-@datatype class Composition(groups: ISZ[String],
-                            exports: ISZ[String],
+@datatype class Composition(groups: ISZ[TODO],
+                            exports: ISZ[TODO],
                             instances: ISZ[Instance],
                             connections: ISZ[Connection]) extends ASTObject
 
@@ -22,16 +28,16 @@ import org.sireum._
                           hardware: B,
                           name: String,
 
-                          mutexes: ISZ[String],
-                          binarySimaphores: ISZ[String],
-                          semaphores: ISZ[String],
-                          dataports: ISZ[String],
-                          emits: ISZ[String],
+                          mutexes: ISZ[TODO],
+                          binarySimaphores: ISZ[TODO],
+                          semaphores: ISZ[TODO],
+                          dataports: ISZ[TODO],
+                          emits: ISZ[TODO],
                           uses: ISZ[Uses],
-                          consumes: ISZ[String],
+                          consumes: ISZ[TODO],
                           provides: ISZ[Provides],
-                          includes: ISZ[String],
-                          attributes: ISZ[String]) extends ASTObject
+                          includes: ISZ[TODO],
+                          attributes: ISZ[TODO]) extends ASTObject
 
 @datatype class Uses(name: String,
                      optional: B,

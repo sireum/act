@@ -1,11 +1,11 @@
-package org.sireum.aadl.biji
+package org.sireum.aadl.act
 
 import org.sireum.aadl.ir
 import java.io.File
 import org.sireum.cli.Sireum.path2fileOpt
 import org.sireum.{B, F, T, Z, ISZ, Either, String, Some}
 
-object Biji {
+object Act {
 
   def main(args: Array[scala.Predef.String]): Unit = {
     val inputFile = path2fileOpt("input file", Some(args(0)), F)

@@ -26,9 +26,9 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// This file is auto-generated from BijiAst.scala
+// This file is auto-generated from ActAst.scala
 
-package org.sireum.aadl.biji
+package org.sireum.aadl.act
 
 import org.sireum._
 
@@ -95,8 +95,8 @@ object MsgPack {
 
     def writeComposition(o: Composition): Unit = {
       writer.writeZ(Constants.Composition)
-      writer.writeISZ(o.groups, writer.writeString _)
-      writer.writeISZ(o.exports, writer.writeString _)
+      writer.writeISZ(o.groups, writeASTObjectTODO _)
+      writer.writeISZ(o.exports, writeASTObjectTODO _)
       writer.writeISZ(o.instances, writeInstance _)
       writer.writeISZ(o.connections, writeConnection _)
     }
@@ -113,16 +113,16 @@ object MsgPack {
       writer.writeB(o.control)
       writer.writeB(o.hardware)
       writer.writeString(o.name)
-      writer.writeISZ(o.mutexes, writer.writeString _)
-      writer.writeISZ(o.binarySimaphores, writer.writeString _)
-      writer.writeISZ(o.semaphores, writer.writeString _)
-      writer.writeISZ(o.dataports, writer.writeString _)
-      writer.writeISZ(o.emits, writer.writeString _)
+      writer.writeISZ(o.mutexes, writeASTObjectTODO _)
+      writer.writeISZ(o.binarySimaphores, writeASTObjectTODO _)
+      writer.writeISZ(o.semaphores, writeASTObjectTODO _)
+      writer.writeISZ(o.dataports, writeASTObjectTODO _)
+      writer.writeISZ(o.emits, writeASTObjectTODO _)
       writer.writeISZ(o.uses, writeUses _)
-      writer.writeISZ(o.consumes, writer.writeString _)
+      writer.writeISZ(o.consumes, writeASTObjectTODO _)
       writer.writeISZ(o.provides, writeProvides _)
-      writer.writeISZ(o.includes, writer.writeString _)
-      writer.writeISZ(o.attributes, writer.writeString _)
+      writer.writeISZ(o.includes, writeASTObjectTODO _)
+      writer.writeISZ(o.attributes, writeASTObjectTODO _)
     }
 
     def writeUses(o: Uses): Unit = {
@@ -254,8 +254,8 @@ object MsgPack {
       if (!typeParsed) {
         reader.expectZ(Constants.Composition)
       }
-      val groups = reader.readISZ(reader.readString _)
-      val exports = reader.readISZ(reader.readString _)
+      val groups = reader.readISZ(readASTObjectTODO _)
+      val exports = reader.readISZ(readASTObjectTODO _)
       val instances = reader.readISZ(readInstance _)
       val connections = reader.readISZ(readConnection _)
       return Composition(groups, exports, instances, connections)
@@ -288,16 +288,16 @@ object MsgPack {
       val control = reader.readB()
       val hardware = reader.readB()
       val name = reader.readString()
-      val mutexes = reader.readISZ(reader.readString _)
-      val binarySimaphores = reader.readISZ(reader.readString _)
-      val semaphores = reader.readISZ(reader.readString _)
-      val dataports = reader.readISZ(reader.readString _)
-      val emits = reader.readISZ(reader.readString _)
+      val mutexes = reader.readISZ(readASTObjectTODO _)
+      val binarySimaphores = reader.readISZ(readASTObjectTODO _)
+      val semaphores = reader.readISZ(readASTObjectTODO _)
+      val dataports = reader.readISZ(readASTObjectTODO _)
+      val emits = reader.readISZ(readASTObjectTODO _)
       val uses = reader.readISZ(readUses _)
-      val consumes = reader.readISZ(reader.readString _)
+      val consumes = reader.readISZ(readASTObjectTODO _)
       val provides = reader.readISZ(readProvides _)
-      val includes = reader.readISZ(reader.readString _)
-      val attributes = reader.readISZ(reader.readString _)
+      val includes = reader.readISZ(readASTObjectTODO _)
+      val attributes = reader.readISZ(readASTObjectTODO _)
       return Component(control, hardware, name, mutexes, binarySimaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
     }
 

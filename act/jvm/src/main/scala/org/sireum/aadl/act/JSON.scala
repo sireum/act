@@ -26,9 +26,9 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// This file is auto-generated from BijiAst.scala
+// This file is auto-generated from ActAst.scala
 
-package org.sireum.aadl.biji
+package org.sireum.aadl.act
 
 import org.sireum._
 import org.sireum.Json.Printer._
@@ -63,8 +63,8 @@ object JSON {
     @pure def printComposition(o: Composition): ST = {
       return printObject(ISZ(
         ("type", st""""Composition""""),
-        ("groups", printISZ(T, o.groups, printString _)),
-        ("exports", printISZ(T, o.exports, printString _)),
+        ("groups", printISZ(F, o.groups, printASTObjectTODO _)),
+        ("exports", printISZ(F, o.exports, printASTObjectTODO _)),
         ("instances", printISZ(F, o.instances, printInstance _)),
         ("connections", printISZ(F, o.connections, printConnection _))
       ))
@@ -85,16 +85,16 @@ object JSON {
         ("control", printB(o.control)),
         ("hardware", printB(o.hardware)),
         ("name", printString(o.name)),
-        ("mutexes", printISZ(T, o.mutexes, printString _)),
-        ("binarySimaphores", printISZ(T, o.binarySimaphores, printString _)),
-        ("semaphores", printISZ(T, o.semaphores, printString _)),
-        ("dataports", printISZ(T, o.dataports, printString _)),
-        ("emits", printISZ(T, o.emits, printString _)),
+        ("mutexes", printISZ(F, o.mutexes, printASTObjectTODO _)),
+        ("binarySimaphores", printISZ(F, o.binarySimaphores, printASTObjectTODO _)),
+        ("semaphores", printISZ(F, o.semaphores, printASTObjectTODO _)),
+        ("dataports", printISZ(F, o.dataports, printASTObjectTODO _)),
+        ("emits", printISZ(F, o.emits, printASTObjectTODO _)),
         ("uses", printISZ(F, o.uses, printUses _)),
-        ("consumes", printISZ(T, o.consumes, printString _)),
+        ("consumes", printISZ(F, o.consumes, printASTObjectTODO _)),
         ("provides", printISZ(F, o.provides, printProvides _)),
-        ("includes", printISZ(T, o.includes, printString _)),
-        ("attributes", printISZ(T, o.attributes, printString _))
+        ("includes", printISZ(F, o.includes, printASTObjectTODO _)),
+        ("attributes", printISZ(F, o.attributes, printASTObjectTODO _))
       ))
     }
 
@@ -240,10 +240,10 @@ object JSON {
         parser.parseObjectType("Composition")
       }
       parser.parseObjectKey("groups")
-      val groups = parser.parseISZ(parser.parseString _)
+      val groups = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("exports")
-      val exports = parser.parseISZ(parser.parseString _)
+      val exports = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("instances")
       val instances = parser.parseISZ(parseInstance _)
@@ -294,34 +294,34 @@ object JSON {
       val name = parser.parseString()
       parser.parseObjectNext()
       parser.parseObjectKey("mutexes")
-      val mutexes = parser.parseISZ(parser.parseString _)
+      val mutexes = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("binarySimaphores")
-      val binarySimaphores = parser.parseISZ(parser.parseString _)
+      val binarySimaphores = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("semaphores")
-      val semaphores = parser.parseISZ(parser.parseString _)
+      val semaphores = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("dataports")
-      val dataports = parser.parseISZ(parser.parseString _)
+      val dataports = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("emits")
-      val emits = parser.parseISZ(parser.parseString _)
+      val emits = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("uses")
       val uses = parser.parseISZ(parseUses _)
       parser.parseObjectNext()
       parser.parseObjectKey("consumes")
-      val consumes = parser.parseISZ(parser.parseString _)
+      val consumes = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("provides")
       val provides = parser.parseISZ(parseProvides _)
       parser.parseObjectNext()
       parser.parseObjectKey("includes")
-      val includes = parser.parseISZ(parser.parseString _)
+      val includes = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("attributes")
-      val attributes = parser.parseISZ(parser.parseString _)
+      val attributes = parser.parseISZ(parseASTObjectTODO _)
       parser.parseObjectNext()
       return Component(control, hardware, name, mutexes, binarySimaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
     }

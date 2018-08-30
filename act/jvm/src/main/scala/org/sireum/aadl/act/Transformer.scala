@@ -26,9 +26,9 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// This file is auto-generated from BijiAst.scala
+// This file is auto-generated from ActAst.scala
 
-package org.sireum.aadl.biji
+package org.sireum.aadl.act
 
 import org.sireum._
 

@@ -1,2 +1,2 @@
-# biji
-AADL to CAmkES
+# ACT
+AADL to CAmkES Tool

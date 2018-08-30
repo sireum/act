@@ -1,4 +1,4 @@
-package org.sireum.aadl.biji
+package org.sireum.aadl.act
 
 import java.io.{File, BufferedWriter, FileWriter}
 import org.sireum.{B}

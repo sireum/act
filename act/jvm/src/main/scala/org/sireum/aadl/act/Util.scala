@@ -1,6 +1,6 @@
 // #Sireum
 
-package org.sireum.aadl.biji
+package org.sireum.aadl.act
 
 import org.sireum._
 import org.sireum.ops._
