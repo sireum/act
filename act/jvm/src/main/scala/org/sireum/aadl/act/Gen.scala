@@ -156,6 +156,13 @@ import scala.meta.internal.semanticdb3.Scala.Descriptor
       }
     }
 
+    var binarySemaphores: ISZ[BinarySemaphore] = ISZ()
+    val binSem = Util.getDiscreetPropertyValue[ir.ValueProp](c.properties, "camkes::Binary_Semaphore")
+    binSem match {
+      case Some(v) =>
+        binarySemaphores = binarySemaphores :+ BinarySemaphore(v.value)
+      case _ =>
+    }
 
     return Component(
       control = uses.nonEmpty,
@@ -163,7 +170,7 @@ import scala.meta.internal.semanticdb3.Scala.Descriptor
       name = id,
 
       mutexes = ISZ(),
-      binarySimaphores = ISZ(),
+      binarySemaphores = binarySemaphores,
       semaphores = ISZ(),
 
       dataports = ISZ(),

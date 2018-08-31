@@ -23,7 +23,7 @@ import org.sireum._
                           name: String,
 
                           mutexes: ISZ[TODO],
-                          binarySimaphores: ISZ[TODO],
+                          binarySemaphores: ISZ[BinarySemaphore],
                           semaphores: ISZ[TODO],
                           dataports: ISZ[TODO],
                           emits: ISZ[TODO],
@@ -74,5 +74,7 @@ import org.sireum._
   'In
   'Out
 }
+
+@datatype class BinarySemaphore(name: String) extends ASTObject
 
 @datatype class TODO () extends ASTObject

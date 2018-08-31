@@ -100,6 +100,7 @@ import org.sireum._
     var name = i.component.name
     var provides : ISZ[ST] = ISZ()
     var uses: ISZ[ST] = ISZ()
+    var binSems: ISZ[ST] = ISZ()
 
     for(p <- i.component.provides) {
       provides = provides :+ st"""provides ${p.procedure} ${p.name};"""
@@ -109,11 +110,16 @@ import org.sireum._
       uses = uses :+ st"""uses ${p.procedure} ${p.name};"""
     }
 
+    for(p <- i.component.binarySemaphores) {
+      binSems = binSems :+ st"""has binary_semaphore ${p.name};"""
+    }
+
     val st =
       st"""component ${name} {
           |  ${if(i.component.control) "control;" else ""}
           |  ${(provides, "\n")}
           |  ${(uses, "\n")}
+          |  ${(binSems, "\n")}
           |}
           """
 

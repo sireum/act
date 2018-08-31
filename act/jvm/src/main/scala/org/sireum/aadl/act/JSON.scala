@@ -49,6 +49,7 @@ object JSON {
         case o: Procedure => return printProcedure(o)
         case o: Method => return printMethod(o)
         case o: Parameter => return printParameter(o)
+        case o: BinarySemaphore => return printBinarySemaphore(o)
         case o: TODO => return printTODO(o)
       }
     }
@@ -87,7 +88,7 @@ object JSON {
         ("hardware", printB(o.hardware)),
         ("name", printString(o.name)),
         ("mutexes", printISZ(F, o.mutexes, printTODO _)),
-        ("binarySimaphores", printISZ(F, o.binarySimaphores, printTODO _)),
+        ("binarySemaphores", printISZ(F, o.binarySemaphores, printBinarySemaphore _)),
         ("semaphores", printISZ(F, o.semaphores, printTODO _)),
         ("dataports", printISZ(F, o.dataports, printTODO _)),
         ("emits", printISZ(F, o.emits, printTODO _)),
@@ -187,6 +188,13 @@ object JSON {
       ))
     }
 
+    @pure def printBinarySemaphore(o: BinarySemaphore): ST = {
+      return printObject(ISZ(
+        ("type", st""""BinarySemaphore""""),
+        ("name", printString(o.name))
+      ))
+    }
+
     @pure def printTODO(o: TODO): ST = {
       return printObject(ISZ(
         ("type", st""""TODO"""")
@@ -203,7 +211,7 @@ object JSON {
     }
 
     def parseASTObject(): ASTObject = {
-      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "TODO"))
+      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "BinarySemaphore", "TODO"))
       t.native match {
         case "Assembly" => val r = parseAssemblyT(T); return r
         case "Composition" => val r = parseCompositionT(T); return r
@@ -215,6 +223,7 @@ object JSON {
         case "Procedure" => val r = parseProcedureT(T); return r
         case "Method" => val r = parseMethodT(T); return r
         case "Parameter" => val r = parseParameterT(T); return r
+        case "BinarySemaphore" => val r = parseBinarySemaphoreT(T); return r
         case "TODO" => val r = parseTODOT(T); return r
         case _ => val r = parseTODOT(T); return r
       }
@@ -304,8 +313,8 @@ object JSON {
       parser.parseObjectKey("mutexes")
       val mutexes = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
-      parser.parseObjectKey("binarySimaphores")
-      val binarySimaphores = parser.parseISZ(parseTODO _)
+      parser.parseObjectKey("binarySemaphores")
+      val binarySemaphores = parser.parseISZ(parseBinarySemaphore _)
       parser.parseObjectNext()
       parser.parseObjectKey("semaphores")
       val semaphores = parser.parseISZ(parseTODO _)
@@ -331,7 +340,7 @@ object JSON {
       parser.parseObjectKey("attributes")
       val attributes = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
-      return Component(control, hardware, name, mutexes, binarySimaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
+      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
     }
 
     def parseUses(): Uses = {
@@ -536,6 +545,21 @@ object JSON {
           parser.parseException(i, s"Invalid element name '$s' for Direction.")
           return Direction.byOrdinal(0).get
       }
+    }
+
+    def parseBinarySemaphore(): BinarySemaphore = {
+      val r = parseBinarySemaphoreT(F)
+      return r
+    }
+
+    def parseBinarySemaphoreT(typeParsed: B): BinarySemaphore = {
+      if (!typeParsed) {
+        parser.parseObjectType("BinarySemaphore")
+      }
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
+      parser.parseObjectNext()
+      return BinarySemaphore(name)
     }
 
     def parseTODO(): TODO = {
@@ -798,6 +822,24 @@ object JSON {
       return r
     }
     val r = to(s, fParameter _)
+    return r
+  }
+
+  def fromBinarySemaphore(o: BinarySemaphore, isCompact: B): String = {
+    val st = Printer.printBinarySemaphore(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toBinarySemaphore(s: String): Either[BinarySemaphore, Json.ErrorMsg] = {
+    def fBinarySemaphore(parser: Parser): BinarySemaphore = {
+      val r = parser.parseBinarySemaphore()
+      return r
+    }
+    val r = to(s, fBinarySemaphore _)
     return r
   }
 

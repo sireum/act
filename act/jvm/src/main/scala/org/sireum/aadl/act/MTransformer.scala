@@ -101,6 +101,10 @@ object MTransformer {
 
   val PostResultParameter: MOption[Parameter] = MNone()
 
+  val PreResultBinarySemaphore: PreResult[BinarySemaphore] = PreResult(T, MNone())
+
+  val PostResultBinarySemaphore: MOption[BinarySemaphore] = MNone()
+
   val PreResultTODO: PreResult[TODO] = PreResult(T, MNone())
 
   val PostResultTODO: MOption[TODO] = MNone()
@@ -183,6 +187,13 @@ import MTransformer._
          case PreResult(continu, _) => PreResult(continu, MNone[ASTObject]())
         }
         return r
+      case o: BinarySemaphore =>
+        val r: PreResult[ASTObject] = preBinarySemaphore(o) match {
+         case PreResult(continu, MSome(r: ASTObject)) => PreResult(continu, MSome[ASTObject](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type ASTObject")
+         case PreResult(continu, _) => PreResult(continu, MNone[ASTObject]())
+        }
+        return r
       case o: TODO =>
         val r: PreResult[ASTObject] = preTODO(o) match {
          case PreResult(continu, MSome(r: ASTObject)) => PreResult(continu, MSome[ASTObject](r))
@@ -239,6 +250,10 @@ import MTransformer._
 
   def preParameter(o: Parameter): PreResult[Parameter] = {
     return PreResultParameter
+  }
+
+  def preBinarySemaphore(o: BinarySemaphore): PreResult[BinarySemaphore] = {
+    return PreResultBinarySemaphore
   }
 
   def preTODO(o: TODO): PreResult[TODO] = {
@@ -317,6 +332,13 @@ import MTransformer._
          case _ => MNone[ASTObject]()
         }
         return r
+      case o: BinarySemaphore =>
+        val r: MOption[ASTObject] = postBinarySemaphore(o) match {
+         case MSome(result: ASTObject) => MSome[ASTObject](result)
+         case MSome(_) => halt("Can only produce object of type ASTObject")
+         case _ => MNone[ASTObject]()
+        }
+        return r
       case o: TODO =>
         val r: MOption[ASTObject] = postTODO(o) match {
          case MSome(result: ASTObject) => MSome[ASTObject](result)
@@ -375,6 +397,10 @@ import MTransformer._
     return PostResultParameter
   }
 
+  def postBinarySemaphore(o: BinarySemaphore): MOption[BinarySemaphore] = {
+    return PostResultBinarySemaphore
+  }
+
   def postTODO(o: TODO): MOption[TODO] = {
     return PostResultTODO
   }
@@ -408,7 +434,7 @@ import MTransformer._
             MNone()
         case o2: Component =>
           val r0: MOption[IS[Z, TODO]] = transformISZ(o2.mutexes, transformTODO _)
-          val r1: MOption[IS[Z, TODO]] = transformISZ(o2.binarySimaphores, transformTODO _)
+          val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
           val r2: MOption[IS[Z, TODO]] = transformISZ(o2.semaphores, transformTODO _)
           val r3: MOption[IS[Z, TODO]] = transformISZ(o2.dataports, transformTODO _)
           val r4: MOption[IS[Z, TODO]] = transformISZ(o2.emits, transformTODO _)
@@ -418,7 +444,7 @@ import MTransformer._
           val r8: MOption[IS[Z, TODO]] = transformISZ(o2.includes, transformTODO _)
           val r9: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
           if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
-            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySimaphores = r1.getOrElse(o2.binarySimaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), includes = r8.getOrElse(o2.includes), attributes = r9.getOrElse(o2.attributes)))
+            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), includes = r8.getOrElse(o2.includes), attributes = r9.getOrElse(o2.attributes)))
           else
             MNone()
         case o2: Connection =>
@@ -452,6 +478,11 @@ import MTransformer._
           else
             MNone()
         case o2: Parameter =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+        case o2: BinarySemaphore =>
           if (hasChanged)
             MSome(o2)
           else
@@ -570,7 +601,7 @@ import MTransformer._
       val o2: Component = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: MOption[IS[Z, TODO]] = transformISZ(o2.mutexes, transformTODO _)
-      val r1: MOption[IS[Z, TODO]] = transformISZ(o2.binarySimaphores, transformTODO _)
+      val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
       val r2: MOption[IS[Z, TODO]] = transformISZ(o2.semaphores, transformTODO _)
       val r3: MOption[IS[Z, TODO]] = transformISZ(o2.dataports, transformTODO _)
       val r4: MOption[IS[Z, TODO]] = transformISZ(o2.emits, transformTODO _)
@@ -580,7 +611,7 @@ import MTransformer._
       val r8: MOption[IS[Z, TODO]] = transformISZ(o2.includes, transformTODO _)
       val r9: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
       if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
-        MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySimaphores = r1.getOrElse(o2.binarySimaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), includes = r8.getOrElse(o2.includes), attributes = r9.getOrElse(o2.attributes)))
+        MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), includes = r8.getOrElse(o2.includes), attributes = r9.getOrElse(o2.attributes)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -804,6 +835,32 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Parameter = r.getOrElse(o)
     val postR: MOption[Parameter] = postParameter(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformBinarySemaphore(o: BinarySemaphore): MOption[BinarySemaphore] = {
+    val preR: PreResult[BinarySemaphore] = preBinarySemaphore(o)
+    val r: MOption[BinarySemaphore] = if (preR.continu) {
+      val o2: BinarySemaphore = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: BinarySemaphore = r.getOrElse(o)
+    val postR: MOption[BinarySemaphore] = postBinarySemaphore(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {

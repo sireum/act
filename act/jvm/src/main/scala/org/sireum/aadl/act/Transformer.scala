@@ -115,6 +115,13 @@ object Transformer {
            case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[ASTObject]())
           }
           return r
+        case o: BinarySemaphore =>
+          val r: PreResult[Context, ASTObject] = preBinarySemaphore(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: ASTObject)) => PreResult(preCtx, continu, Some[ASTObject](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type ASTObject")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[ASTObject]())
+          }
+          return r
         case o: TODO =>
           val r: PreResult[Context, ASTObject] = preTODO(ctx, o) match {
            case PreResult(preCtx, continu, Some(r: ASTObject)) => PreResult(preCtx, continu, Some[ASTObject](r))
@@ -170,6 +177,10 @@ object Transformer {
     }
 
     @pure def preParameter(ctx: Context, o: Parameter): PreResult[Context, Parameter] = {
+      return PreResult(ctx, T, None())
+    }
+
+    @pure def preBinarySemaphore(ctx: Context, o: BinarySemaphore): PreResult[Context, BinarySemaphore] = {
       return PreResult(ctx, T, None())
     }
 
@@ -249,6 +260,13 @@ object Transformer {
            case Result(postCtx, _) => Result(postCtx, None[ASTObject]())
           }
           return r
+        case o: BinarySemaphore =>
+          val r: Result[Context, ASTObject] = postBinarySemaphore(ctx, o) match {
+           case Result(postCtx, Some(result: ASTObject)) => Result(postCtx, Some[ASTObject](result))
+           case Result(_, Some(_)) => halt("Can only produce object of type ASTObject")
+           case Result(postCtx, _) => Result(postCtx, None[ASTObject]())
+          }
+          return r
         case o: TODO =>
           val r: Result[Context, ASTObject] = postTODO(ctx, o) match {
            case Result(postCtx, Some(result: ASTObject)) => Result(postCtx, Some[ASTObject](result))
@@ -304,6 +322,10 @@ object Transformer {
     }
 
     @pure def postParameter(ctx: Context, o: Parameter): Result[Context, Parameter] = {
+      return Result(ctx, None())
+    }
+
+    @pure def postBinarySemaphore(ctx: Context, o: BinarySemaphore): Result[Context, BinarySemaphore] = {
       return Result(ctx, None())
     }
 
@@ -366,7 +388,7 @@ import Transformer._
             Result(r0.ctx, None())
         case o2: Component =>
           val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.mutexes, transformTODO _)
-          val r1: Result[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.binarySimaphores, transformTODO _)
+          val r1: Result[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
           val r2: Result[Context, IS[Z, TODO]] = transformISZ(r1.ctx, o2.semaphores, transformTODO _)
           val r3: Result[Context, IS[Z, TODO]] = transformISZ(r2.ctx, o2.dataports, transformTODO _)
           val r4: Result[Context, IS[Z, TODO]] = transformISZ(r3.ctx, o2.emits, transformTODO _)
@@ -376,7 +398,7 @@ import Transformer._
           val r8: Result[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.includes, transformTODO _)
           val r9: Result[Context, IS[Z, TODO]] = transformISZ(r8.ctx, o2.attributes, transformTODO _)
           if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
-            Result(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySimaphores = r1.resultOpt.getOrElse(o2.binarySimaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), includes = r8.resultOpt.getOrElse(o2.includes), attributes = r9.resultOpt.getOrElse(o2.attributes))))
+            Result(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), includes = r8.resultOpt.getOrElse(o2.includes), attributes = r9.resultOpt.getOrElse(o2.attributes))))
           else
             Result(r9.ctx, None())
         case o2: Connection =>
@@ -410,6 +432,11 @@ import Transformer._
           else
             Result(r0.ctx, None())
         case o2: Parameter =>
+          if (hasChanged)
+            Result(ctx, Some(o2))
+          else
+            Result(ctx, None())
+        case o2: BinarySemaphore =>
           if (hasChanged)
             Result(ctx, Some(o2))
           else
@@ -528,7 +555,7 @@ import Transformer._
       val o2: Component = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.mutexes, transformTODO _)
-      val r1: Result[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.binarySimaphores, transformTODO _)
+      val r1: Result[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
       val r2: Result[Context, IS[Z, TODO]] = transformISZ(r1.ctx, o2.semaphores, transformTODO _)
       val r3: Result[Context, IS[Z, TODO]] = transformISZ(r2.ctx, o2.dataports, transformTODO _)
       val r4: Result[Context, IS[Z, TODO]] = transformISZ(r3.ctx, o2.emits, transformTODO _)
@@ -538,7 +565,7 @@ import Transformer._
       val r8: Result[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.includes, transformTODO _)
       val r9: Result[Context, IS[Z, TODO]] = transformISZ(r8.ctx, o2.attributes, transformTODO _)
       if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
-        Result(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySimaphores = r1.resultOpt.getOrElse(o2.binarySimaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), includes = r8.resultOpt.getOrElse(o2.includes), attributes = r9.resultOpt.getOrElse(o2.attributes))))
+        Result(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), includes = r8.resultOpt.getOrElse(o2.includes), attributes = r9.resultOpt.getOrElse(o2.attributes))))
       else
         Result(r9.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
@@ -762,6 +789,32 @@ import Transformer._
     val hasChanged: B = r.resultOpt.nonEmpty
     val o2: Parameter = r.resultOpt.getOrElse(o)
     val postR: Result[Context, Parameter] = pp.postParameter(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return Result(postR.ctx, Some(o2))
+    } else {
+      return Result(postR.ctx, None())
+    }
+  }
+
+  @pure def transformBinarySemaphore(ctx: Context, o: BinarySemaphore): Result[Context, BinarySemaphore] = {
+    val preR: PreResult[Context, BinarySemaphore] = pp.preBinarySemaphore(ctx, o)
+    val r: Result[Context, BinarySemaphore] = if (preR.continu) {
+      val o2: BinarySemaphore = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        Result(ctx, Some(o2))
+      else
+        Result(ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      Result(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      Result(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: BinarySemaphore = r.resultOpt.getOrElse(o)
+    val postR: Result[Context, BinarySemaphore] = pp.postBinarySemaphore(r.ctx, o2)
     if (postR.resultOpt.nonEmpty) {
       return postR
     } else if (hasChanged) {
