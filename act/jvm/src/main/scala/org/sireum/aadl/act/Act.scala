@@ -2,8 +2,7 @@ package org.sireum.aadl.act
 
 import org.sireum.aadl.ir
 import java.io.File
-import org.sireum.cli.Sireum.path2fileOpt
-import org.sireum.{B, F, T, Z, ISZ, Either, String, Some}
+import org.sireum.{B, F, T, Z, ISZ, Either, String, Some, Option}
 
 object Act {
 
@@ -42,5 +41,17 @@ object Act {
     //out.foreach(o => println(s"${o._1} -> \n${o._2.render}"))
 
     0
+  }
+
+
+  def path2fileOpt(pathFor: String, path: Option[String], checkExist: B): scala.Option[File] = {
+    if (path.isEmpty) return scala.None
+    val f = new File(path.get.value)
+    if (checkExist && !f.exists) error(s"File '$path' does not exist.")
+    return scala.Some(f.getCanonicalFile.getAbsoluteFile)
+  }
+
+  def error(msg: Predef.String): Nothing = {
+    throw new RuntimeException(msg)
   }
 }
