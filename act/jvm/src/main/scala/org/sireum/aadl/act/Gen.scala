@@ -5,8 +5,6 @@ package org.sireum.aadl.act
 import org.sireum._
 import org.sireum.aadl.ir
 
-import scala.meta.internal.semanticdb3.Scala.Descriptor
-
 @record class Gen() {
 
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
