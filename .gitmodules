@@ -1,0 +1,12 @@
+[submodule "osate-plugin"]
+	path = osate-plugin
+	url = https://github.com/sireum/osate-plugin.git
+[submodule "runtime"]
+	path = runtime
+	url = https://github.com/sireum/runtime.git
+[submodule "air"]
+	path = air
+	url = https://github.com/sireum/air.git
+[submodule "act"]
+	path = act
+	url = https://github.com/santoslab/act.git
