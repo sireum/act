@@ -5,5 +5,7 @@ Scratch.scala
 Scratch.sc
 scratch.scala
 scratch.sc
-mill-standalone
+mill
 versions.properties
+sha3
+sha3.exe
