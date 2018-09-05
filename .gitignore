@@ -5,7 +5,11 @@ Scratch.scala
 Scratch.sc
 scratch.scala
 scratch.sc
-mill
-versions.properties
-sha3
-sha3.exe
+/bin/mill
+/versions.properties
+/bin/mac/sha3
+/bin/mac/jdk
+/bin/linux/sha3
+/bin/linux/jdk
+/bin/win/sha3.exe
+/bin/win/jdk
