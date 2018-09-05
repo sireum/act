@@ -9,6 +9,8 @@ MILL=${BIN_DIR}/mill
 LIB_URL=https://raw.githubusercontent.com/sireum/kekinian/1a5428ef964b5d8a631ce874cdf7e662e54995da/versions.properties
 LIB_SHA3=2df75aa996a9fba5b40429402961018645de5a0c4689b68a876d4e3dfcb443d3
 LIB=${ACT_HOME}/versions.properties
+SIREUM_URL=http://files.sireum.org/sireum # see https://github.com/sireum/kekinian
+SIREUM_SHA3=0ae8783bd64c9fdd1e3718eefe6e831602405cfb8aef56a4fbcf5a7dd01e09b3
 if [ -z "${PLATFORM}" ]; then
   if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then
     PLATFORM=win
@@ -25,14 +27,17 @@ if [ "${PLATFORM}" = "win" ]; then
   ZULU_URL=http://cdn.azul.com/zulu/bin/zulu${ZULU_VERSION}-win_x64.zip
   SHA3=${BIN_DIR}/win/sha3.exe
   SHA3_URL=http://files.sireum.org/win/sha3.exe
+  SIREUM=${BIN_DIR}/sireum.bat
 elif [ "${PLATFORM}" = "mac" ]; then
   ZULU_URL=http://cdn.azul.com/zulu/bin/zulu${ZULU_VERSION}-macosx_x64.zip
   SHA3=${BIN_DIR}/mac/sha3
   SHA3_URL=http://files.sireum.org/mac/sha3
+  SIREUM=${BIN_DIR}/sireum
 elif [ "${PLATFORM}" = "linux" ]; then
   ZULU_URL=http://cdn.azul.com/zulu/bin/zulu${ZULU_VERSION}-linux_x64.tar.gz
   SHA3=${BIN_DIR}/linux/sha3
   SHA3_URL=http://files.sireum.org/linux/sha3
+  SIREUM=${BIN_DIR}/sireum
 fi
 mkdir -p ${BIN_DIR}/${PLATFORM}
 cd ${BIN_DIR}/${PLATFORM}
@@ -83,16 +88,24 @@ if [ ! -f ${MILL} ] || [ "$(${SHA3} 256 < ${MILL})" != ${MILL_SHA3} ]; then
   echo "Downloading mill ..."
   curl -Lo ${MILL} ${MILL_URL}
   chmod +x ${MILL}
+  MILL_SHA3_LOCAL="$(${SHA3} 256 < ${MILL})"
   if [ "$(${SHA3} 256 < ${MILL})" != ${MILL_SHA3} ]; then
-    echo "Mill version mismatch; please notify ACT maintainers."
-    exit 1
+    >&2 echo "Mill version mismatch (${MILL_SHA3_LOCAL} != ${MILL_SHA3}); please notify ACT maintainers."
   fi
 fi
 if [ ! -f ${LIB} ] || [ "$(${SHA3} 256 < ${LIB})" != ${LIB_SHA3} ]; then
   echo "Downloading versions.properties ..."
   curl -Lo ${LIB} ${LIB_URL}
-  if [ "$(${SHA3} 256 < ${LIB})" != ${LIB_SHA3} ]; then
-    echo "Library dependency versions mismatch; please notify ACT maintainers."
-    exit 1
+  LIB_SHA3_LOCAL="$(${SHA3} 256 < ${LIB})"
+  if [ ${LIB_SHA3_LOCAL} != ${LIB_SHA3} ]; then
+    >&2 echo "Library dependency versions mismatch (${LIB_SHA3_LOCAL} != ${LIB_SHA3}); please notify ACT maintainers."
+  fi
+fi
+if [ ! -f ${SIREUM} ] || [ "$(${SHA3} 256 < ${SIREUM})" != ${SIREUM_SHA3} ]; then
+  echo "Downloading sireum ..."
+  curl -Lo ${SIREUM} ${SIREUM_URL}
+  SIREUM_SHA3_LOCAL="$(${SHA3} 256 < ${SIREUM})"
+  if [ ${SIREUM_SHA3_LOCAL} != ${SIREUM_SHA3} ]; then
+    >&2 echo "Sireum version mismatch (${SIREUM_SHA3_LOCAL} != ${SIREUM_SHA3}); please notify ACT maintainers."
   fi
 fi
