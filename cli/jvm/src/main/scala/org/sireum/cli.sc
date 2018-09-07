@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2018, Robby, Kansas State University
+ Copyright (c) 2018, Jason Belt, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -21,60 +21,42 @@
  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+ */ {
 
-import mill._
-import ammonite.ops._
-import $file.runtime.Runtime
-import $file.air.Air
-import $file.act.Act
-import $file.cli.Cli
+  import org.sireum._
+  import org.sireum.cli.CliOpt._
 
-object runtime extends mill.Module {
+  val actTool: Tool = Tool(
+    name = "act",
+    command = "act",
+    description = "AADL to CAmkES Translator",
+    header = "ACT ",
+    usage = "<option>* <file>+",
+    opts = ISZ(
+      Opt (name = "input", longKey = "input", shortKey = Some('i'),
+        tpe = Type.Choice(name = "format", sep = None(), elements = ISZ("air", "camkesir", "aadl")),
+        description = "Input format"
+      ),
+      Opt (name = "mode", longKey = "mode", shortKey = Some('m'),
+        tpe = Type.Choice(name = "mode", sep = None(), elements = ISZ("json", "msgpack")),
+        description = "Serialization method (only valid for air/camkesir input"
+      ),
+      Opt (name = "outputDir", longKey = "output-dir", shortKey = Some('o'),
+        tpe = Type.Path(multiple = F, default = Some(".")),
+        description = "Output directory for the generated project files")
+    ),
+    groups = ISZ()
+  )
 
-  object macros extends Runtime.Module.Macros
+  val mainGroup: Group = Group(
+    name = "sireum",
+    description = "",
+    header =
+      st"""Sireum: A Software Analysis Platform (v3)
+          |(c) 2018, SAnToS Laboratory, Kansas State University""".render,
+    unlisted = F,
+    subs = ISZ(actTool)
+  )
 
-  object library extends Runtime.Module.Library {
-
-    final override def macrosObject = macros
-
-  }
-
-}
-
-
-object air extends Air.Module {
-
-  final override def libraryObject = runtime.library
-
-}
-
-
-object act extends Act.Module {
-
-  final override def airObject = air
-
-}
-
-
-object cli extends Cli.Module {
-
-  final override def actObject = act
-
-}
-
-def regenCli() = T.command {
-  val out = pwd / 'bin / "sireum"
-  val sireumPackagePath = pwd / 'cli / 'jvm / 'src / 'main / 'scala / 'org / 'sireum
-  log(%%(out, 'tools, 'cligen, "-p", "org.sireum", "-l", pwd / "license.txt",
-    sireumPackagePath / "cli.sc")(sireumPackagePath))
-}
-
-private def log(r: CommandResult)(implicit ctx: mill.util.Ctx.Log): Unit = {
-  val logger = ctx.log
-  val out = r.out.string
-  val err = r.err.string
-  if (out.trim.nonEmpty) logger.info(out)
-  if (err.trim.nonEmpty) logger.error(err)
-  if (r.exitCode != 0) System.exit(r.exitCode)
+  mainGroup
 }
