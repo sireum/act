@@ -52,7 +52,7 @@
     name = "sireum",
     description = "",
     header =
-      st"""Sireum: A Software Analysis Platform (v3)
+      st"""Sireum: A High-Assurance Software Development Platform
           |(c) 2018, SAnToS Laboratory, Kansas State University""".render,
     unlisted = F,
     subs = ISZ(actTool)

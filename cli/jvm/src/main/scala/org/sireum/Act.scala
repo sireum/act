@@ -29,7 +29,7 @@ import java.io.File
 import Cli.{Format, Mode}
 import org.sireum.aadl.ir.{Aadl, JSON, MsgPack}
 
-object Act extends scala.App{
+object Act extends scala.App {
   Cli(File.pathSeparatorChar).parseSireum(ISZ(args.toSeq.map(s => s: String):_ *), 0) match {
     case Some(o: Cli.ActOption) => act(o)
     case Some(_: Cli.HelpOption) => 0

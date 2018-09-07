@@ -65,7 +65,7 @@ import Cli._
   def parseSireum(args: ISZ[String], i: Z): Option[SireumOption] = {
     if (i >= args.size) {
       println(
-        st"""Sireum: A Software Analysis Platform (v3)
+        st"""Sireum: A High-Assurance Software Development Platform
             |(c) 2018, SAnToS Laboratory, Kansas State University
             |
             |Available modes:
