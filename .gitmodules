@@ -9,4 +9,4 @@
 	url = https://github.com/sireum/air.git
 [submodule "act"]
 	path = act
-	url = https://github.com/santoslab/act.git
+	url = https://github.com/sireum/act.git
