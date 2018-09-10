@@ -10,3 +10,4 @@ ${ACT_HOME}/bin/mill all \
   cli.assembly \
   act.jvm.tests \
   cli.tests
+cp out/cli/assembly/dest/out.jar bin/act
