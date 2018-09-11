@@ -10,4 +10,8 @@ ${ACT_HOME}/bin/mill all \
   cli.assembly \
   act.jvm.tests \
   cli.tests
-cp out/cli/assembly/dest/out.jar bin/act
+if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then
+  cp out/cli/assembly/dest/out.jar bin/act.bat
+else
+  cp out/cli/assembly/dest/out.jar bin/act
+fi
