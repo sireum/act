@@ -1,0 +1,9 @@
+os: osx
+
+osx_image: xcode9.4
+
+script:
+- if echo "$TRAVIS_COMMIT_MESSAGE" | grep -F -q "[skip travis]" ; then echo "skip travis" && exit 0 ; fi
+- if echo "$TRAVIS_COMMIT_MESSAGE" | grep -F -q "[travis skip]" ; then echo "travis skip" && exit 0 ; fi
+- bin/test.sh
+- bin/sireum act

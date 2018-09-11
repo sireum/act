@@ -1,0 +1,26 @@
+version: 1.0.{build}
+
+image: Visual Studio 2017
+
+init:
+  - cmd: git config --global core.autocrlf true
+
+before_build:
+  - cmd: git config core.symlinks true
+  - cmd: git reset --hard
+  - cmd: git submodule update -q --init --recursive
+
+environment:
+  matrix:
+  - COMPILER: msys2
+    PLATFORM: x64
+    MSYS2_ARCH: x86_64
+    MSYS2_DIR: msys64
+    MSYSTEM: MINGW64
+    BIT: 64
+  PATH: 'C:\%MSYS2_DIR%\%MSYSTEM%\bin;C:\%MSYS2_DIR%\usr\bin;%PATH%'
+
+build_script:
+  - bash -lc "pacman --noconfirm -S unzip bc"
+  - bash -lc "$APPVEYOR_BUILD_FOLDER/bin/test.sh"
+  - bin\sireum.bat act

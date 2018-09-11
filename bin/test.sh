@@ -11,7 +11,8 @@ ${ACT_HOME}/bin/mill all \
   act.jvm.tests \
   cli.tests
 if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then
-  cp out/cli/assembly/dest/out.jar bin/act.bat
+  cp out/cli/assembly/dest/out.jar bin/sireum.bat
 else
-  cp out/cli/assembly/dest/out.jar bin/act
+  cp out/cli/assembly/dest/out.jar bin/sireum
+  chmod +x bin/sireum
 fi
