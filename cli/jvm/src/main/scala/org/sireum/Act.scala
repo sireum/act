@@ -30,7 +30,7 @@ import Cli.{Format, Mode}
 import org.sireum.aadl.ir.{Aadl, JSON, MsgPack}
 
 object Act extends scala.App {
-  Cli(File.pathSeparatorChar).parseSireum(ISZ(args.toSeq.map(s => s: String):_ *), 0) match {
+  Cli(File.pathSeparatorChar).parseAct(ISZ(args.toSeq.map(s => s: String):_ *), 0) match {
     case Some(o: Cli.ActOption) => act(o)
     case Some(_: Cli.HelpOption) => 0
     case _ => -1

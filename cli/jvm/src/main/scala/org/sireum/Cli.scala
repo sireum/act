@@ -34,9 +34,9 @@ import org.sireum._
 
 object Cli {
 
-  @datatype trait SireumOption
+  @datatype trait ActTopOption
 
-  @datatype class HelpOption extends SireumOption
+  @datatype class HelpOption extends ActTopOption
 
   @enum object Format {
     'Air
@@ -55,30 +55,12 @@ object Cli {
     input: Format.Type,
     mode: Mode.Type,
     outputDir: Option[String]
-  ) extends SireumOption
+  ) extends ActTopOption
 }
 
 import Cli._
 
 @record class Cli(pathSep: C) {
-
-  def parseSireum(args: ISZ[String], i: Z): Option[SireumOption] = {
-    if (i >= args.size) {
-      println(
-        st"""Sireum: A High-Assurance Software Development Platform
-            |(c) 2018, SAnToS Laboratory, Kansas State University
-            |
-            |Available modes:
-            |act                      AADL to CAmkES Translator""".render
-      )
-      return Some(HelpOption())
-    }
-    val opt = select("sireum", args, i, ISZ("act"))
-    opt match {
-      case Some(string"act") => parseAct(args, i + 1)
-      case _ => return None()
-    }
-  }
 
   def parseFormatH(arg: String): Option[Format.Type] = {
     arg.native match {
@@ -119,9 +101,9 @@ import Cli._
     return r
   }
 
-  def parseAct(args: ISZ[String], i: Z): Option[SireumOption] = {
+  def parseAct(args: ISZ[String], i: Z): Option[ActTopOption] = {
     val help =
-      st"""ACT 
+      st"""Sireum ACT: An AADL-to-CAmkES Translator
           |
           |Usage: <option>* <file>+
           |

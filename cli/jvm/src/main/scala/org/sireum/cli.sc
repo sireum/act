@@ -29,8 +29,8 @@
   val actTool: Tool = Tool(
     name = "act",
     command = "act",
-    description = "AADL to CAmkES Translator",
-    header = "ACT ",
+    description = "",
+    header = "Sireum ACT: An AADL-to-CAmkES Translator",
     usage = "<option>* <file>+",
     opts = ISZ(
       Opt (name = "input", longKey = "input", shortKey = Some('i'),
@@ -48,15 +48,5 @@
     groups = ISZ()
   )
 
-  val mainGroup: Group = Group(
-    name = "sireum",
-    description = "",
-    header =
-      st"""Sireum: A High-Assurance Software Development Platform
-          |(c) 2018, SAnToS Laboratory, Kansas State University""".render,
-    unlisted = F,
-    subs = ISZ(actTool)
-  )
-
-  mainGroup
+  actTool
 }
