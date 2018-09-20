@@ -26,19 +26,29 @@ import org.sireum._
                           binarySemaphores: ISZ[BinarySemaphore],
                           semaphores: ISZ[TODO],
                           dataports: ISZ[TODO],
-                          emits: ISZ[TODO],
+                          emits: ISZ[Emits],
                           uses: ISZ[Uses],
-                          consumes: ISZ[TODO],
+                          consumes: ISZ[Consumes],
                           provides: ISZ[Provides],
-                          includes: ISZ[TODO],
+                          includes: ISZ[String],
                           attributes: ISZ[TODO]) extends ASTObject
 
+
 @datatype class Uses(name: String,
-                     optional: B,
-                     procedure: String)
+                     typ: String,
+                     optional: B)
 
 @datatype class Provides(name: String,
-                         procedure: String)
+                         typ: String)
+
+
+@datatype class Emits(name: String,
+                      typ: String)
+
+@datatype class Consumes(name: String,
+                         typ: String,
+                         optional: B)
+
 
 @datatype class Connection(name : String,
                            connector: Connector,
@@ -60,10 +70,12 @@ import org.sireum._
                           to_type: String) extends ASTObject
 
 @datatype class Procedure(name: String,
-                          methods: ISZ[Method]) extends ASTObject
+                          methods: ISZ[Method],
+                          includes: ISZ[String]) extends ASTObject
 
 @datatype class Method(name : String,
-                       parameters: ISZ[Parameter]) extends ASTObject
+                       parameters: ISZ[Parameter],
+                       returnType: Option[String]) extends ASTObject
 
 @datatype class Parameter(array: B,
                           direction: Direction.Type,
@@ -73,6 +85,7 @@ import org.sireum._
 @enum object Direction {
   'In
   'Out
+  'Refin
 }
 
 @datatype class BinarySemaphore(name: String) extends ASTObject

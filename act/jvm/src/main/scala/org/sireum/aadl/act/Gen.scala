@@ -7,8 +7,22 @@ import org.sireum.aadl.ir
 
 @record class Gen() {
 
+  var topLevelProcess: Option[ir.Component] = None[ir.Component]
+  var typeHeaderFileName: String = ""
+
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
+  var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
+
+  // port paths to connection instances
+  var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
+  var outConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
+
+
   var astObjects: ISZ[ASTObject] = ISZ()
+  var ginstances: ISZ[Instance] = ISZ()
+
+  var monitors: HashMap[String, (Instance, Procedure)] = HashMap.empty
+  var procedures: ISZ[ASTObject] = ISZ()
 
   def gen(m : ir.Aadl) : ISZ[ASTObject] = {
 
@@ -16,11 +30,56 @@ import org.sireum.aadl.ir
       val name = Util.getName(c.identifier)
       assert(!componentMap.contains(name))
       componentMap = componentMap + (name ~> c)
+
+      c.features.foreach(f =>
+        if(f.isInstanceOf[ir.FeatureEnd]) {
+          featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
+        })
+
+      c.connectionInstances.foreach(ci => {
+        def add(portPath: String, isIn: B) : Unit = {
+          var map : HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
+            case T => inConnections
+            case F => outConnections
+          }
+          var cis: ISZ[ir.ConnectionInstance] = map.get(portPath) match {
+            case Some(cis) => cis
+            case _ => ISZ()
+          }
+          cis = cis :+ ci
+          isIn match {
+            case T => inConnections = inConnections + (portPath ~> cis)
+            case F => outConnections = outConnections + (portPath ~> cis)
+          }
+        }
+        add(Util.getName(ci.src.feature.get), F)
+        add(Util.getName(ci.dst.feature.get), T)
+      })
       c.subComponents.foreach(sc => r(sc))
     }
     m.components.foreach(c => r(c))
 
+    // TODO: add support for fan-out/fan-in connections
+    inConnections.keys.foreach(key => {
+      val x = inConnections.get(key).get
+      if(x.size > 1) {
+        println(s"${key} has ${x.size} in coming")
+      }
+      //assert(x.size <= 1)
+    })
+    outConnections.keys.foreach(key => {
+      val x = outConnections.get(key).get
+      if(x.size > 1) {
+        println(s"${key} has ${x.size} out going")
+      }
+      //assert(x.size <= 1)
+    })
+
+    processInConnections()
+
     m.components.foreach(c => gen(c))
+
+    astObjects = astObjects ++ procedures
 
     return astObjects
   }
@@ -42,6 +101,9 @@ import org.sireum.aadl.ir
   def genContainer(c : ir.Component) : Composition = {
     assert(c.category == ir.ComponentCategory.Process)
 
+    topLevelProcess = Some(c)
+    typeHeaderFileName = Util.getTypeHeaderFileName(c)
+
     var instances: ISZ[Instance] = ISZ()
     for(sc <- c.subComponents) {
       sc.category match {
@@ -60,11 +122,14 @@ import org.sireum.aadl.ir
               name = Util.getLastName(f.identifier),
               typ = Util.getClassifier(fend.classifier.get))
           }
-          val method = Method(name = Util.getLastName(sc.identifier),
-            parameters = params)
+          val method = Method(
+            name = Util.getLastName(sc.identifier),
+            parameters = params,
+            returnType = None[String]
+          )
 
           val procName = Util.getClassifier(sc.classifier.get)
-          astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method))
+          astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
         case _ =>
           halt(s"genContainer: Not handling: ${sc}")
       }
@@ -107,7 +172,7 @@ import org.sireum.aadl.ir
     return Composition(
       groups = ISZ(),
       exports = ISZ(),
-      instances = instances,
+      instances = instances ++ ginstances,
       connections = connections
     )
   }
@@ -117,40 +182,106 @@ import org.sireum.aadl.ir
     assert(c.subComponents.isEmpty)
     assert(c.connectionInstances.isEmpty)
 
-    //
-    // val id = Util.getLastName(c.identifier)
-    val id = Util.getClassifier(c.classifier.get)
-    val path = Util.getName(c.identifier)
     var provides: ISZ[Provides] = ISZ()
     var uses: ISZ[Uses] = ISZ()
-
-    //c.properties
-    //c.classifier
+    var emits: ISZ[Emits] = ISZ()
+    var consumes: ISZ[Consumes] = ISZ()
 
     for(f <- c.features){
       val fend = f.asInstanceOf[ir.FeatureEnd]
-      val name = Util.getLastName(f.identifier)
-      val proc = Util.getClassifier(fend.classifier.get)
+      val fpath = Util.getName(fend.identifier)
+      val fid = Util.getLastName(f.identifier)
+
+      def handleDataPort(): Unit = {
+        fend.direction match {
+          case ir.Direction.In =>
+            // uses monitor
+            // consumes notification
+            val interfaceName: String = Util.getInterfaceName(fend)
+            val monitor: (Instance, Procedure) = monitors.get(interfaceName).get
+
+            uses = uses :+ Uses(
+              name = Util.portName(fend, None[Z]),
+              typ = monitor._2.name,
+              optional = F)
+
+            consumes = consumes :+ Consumes(
+              name = Util.portNotificationName(fend),
+              typ = Util.MONITOR_NOTIFICATION_TYPE,
+              optional = F)
+
+          case ir.Direction.Out =>
+            // uses monitor
+            val outs = outConnections.get(fpath).get
+
+            var i: Z = 0
+            outs.foreach(o => {
+              val dstFeature = featureEndMap.get(fpath).get
+              val interfaceName = Util.getInterfaceName(dstFeature)
+
+              uses = uses :+ Uses(
+                name = Util.portName(fend, Some(i)),
+                typ = interfaceName,
+                optional = F
+              )
+              i = i + 1
+            })
+          case _ =>
+            halt(s"Not expecting direction ${fend.direction}")
+        }
+      }
+
+      def handleSubprogramAccess(): Unit = {
+        val proc = Util.getClassifier(fend.classifier.get)
+        val kind: Option[ir.ValueProp] = Util.getDiscreetPropertyValue[ir.ValueProp](f.properties, "AccessType")
+        kind match {
+          case Some(v) =>
+            if(v.value == "requires") {
+              uses = uses :+ Uses(
+                name = fid,
+                optional = F,
+                typ = proc)
+            } else if (v.value == "provides") {
+              provides = provides :+ Provides(
+                name = fid,
+                typ = proc)
+            } else {
+              halt(s"Unexpected: ${v}")
+            }
+          case _ =>
+            halt("Unexpected")
+        }
+      }
+
       f.category match {
+        case ir.FeatureCategory.DataPort =>
+          handleDataPort()
+        case ir.FeatureCategory.EventDataPort =>
+          handleDataPort()
+
+        case ir.FeatureCategory.SubprogramAccessGroup =>
+          handleSubprogramAccess()
         case ir.FeatureCategory.SubprogramAccess =>
-          val kind: Option[ir.ValueProp] = Util.getDiscreetPropertyValue[ir.ValueProp](f.properties, "AccessType")
-          kind match {
-            case Some(v) =>
-              if(v.value == "requires") {
-                uses = uses :+ Uses(name = name,
-                  optional = F,
-                  procedure = proc)
-              } else if (v.value == "provides") {
-                provides = provides :+ Provides(name = name,
-                  procedure = proc)
-              } else {
-                halt(s"Unexpected: ${v}")
-              }
-            case _ =>
-              halt("Unexpected")
+          handleSubprogramAccess()
+
+        case ir.FeatureCategory.EventPort =>
+          fend.direction match {
+            case ir.Direction.In =>
+              // consumes notification
+              consumes = consumes :+ Consumes(
+                name = fid,
+                typ = Util.NOTIFICATION_TYPE,
+                optional = F)
+            case ir.Direction.Out =>
+              // emits notification
+              emits = emits :+ Emits(
+                name = fid,
+                typ = Util.NOTIFICATION_TYPE)
+            case _ => halt(s"${fpath}: not expecting direction ${fend.direction}")
           }
+
         case _ =>
-          halt(s"Not handling ${f.category}")
+          Console.err.println(s"Skipping ${f.category} for ${fid}.${fid}")
       }
     }
 
@@ -162,22 +293,107 @@ import org.sireum.aadl.ir
       case _ =>
     }
 
+    val cid = Util.getClassifier(c.classifier.get)
     return Component(
       control = uses.nonEmpty,
       hardware = F,
-      name = id,
+      name = cid,
 
       mutexes = ISZ(),
       binarySemaphores = binarySemaphores,
       semaphores = ISZ(),
 
       dataports = ISZ(),
-      emits = ISZ(),
+      emits = emits,
       uses = uses,
-      consumes = ISZ(),
+      consumes = consumes,
       provides = provides,
-      includes = ISZ(),
+      includes = ISZ(s"<${typeHeaderFileName}>"),
       attributes = ISZ()
     )
+  }
+
+  def processInConnections(): Unit = {
+    inConnections.keys.withFilter(p => inConnections.get(p).get.size > 0).foreach(portPath => {
+      val connInsts: ISZ[ir.ConnectionInstance] = inConnections.get(portPath).get()
+      val connInst: ir.ConnectionInstance = connInsts(0)
+
+      val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
+      val dstFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.dst.feature.get)).get()
+
+      val src: ir.Component = componentMap.get(Util.getName(connInst.src.component)).get
+      val srcFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.src.feature.get)).get()
+
+      def handleDataPort(isEventDataPort: B) : Unit = {
+        val monitorName = Util.getMonitorName(dst, dstFeature)
+        val interfaceName = Util.getInterfaceName(dstFeature)
+
+        val typeName = Util.getClassifierFullyQualified(dstFeature.classifier.get)
+
+        val monitor = Component(
+          control = F,
+          hardware = F,
+          name = monitorName,
+
+          mutexes = ISZ(),
+          binarySemaphores = ISZ(),
+          semaphores =  ISZ(),
+          dataports = ISZ(),
+          emits = ISZ(Emits(name = "monsig", typ = Util.MONITOR_NOTIFICATION_TYPE)),
+          uses = ISZ(),
+          consumes = ISZ(),
+          provides = ISZ(Provides(name = "mon", typ = interfaceName)),
+          includes = ISZ(s"${interfaceName}.idl4"),
+          attributes = ISZ()
+        )
+
+        val inst: Instance = Instance(address_space = "", name = Util.toLowerCase(monitorName), component = monitor)
+
+        val proc: Procedure = Procedure(
+          name = interfaceName,
+          methods =
+            if(isEventDataPort) {
+              createQueueMethods(typeName)
+            } else {
+              createReadWriteMethods(typeName)
+            },
+          includes = ISZ()
+        )
+
+        val pair = (inst,proc) // FIXME: why can't I do this directly?
+        monitors = monitors + (interfaceName ~> pair)
+
+        procedures = procedures :+ proc
+        ginstances = ginstances :+ inst
+      }
+
+      connInst.kind match {
+        case ir.ConnectionKind.Port =>
+          dstFeature.category match {
+            case ir.FeatureCategory.DataPort =>
+              handleDataPort(F)
+            case ir.FeatureCategory.EventDataPort =>
+              handleDataPort(T)
+            case ir.FeatureCategory.EventPort =>
+              // will use Notification (
+
+            case _ => halt(s"not expecting ${dst}")
+          }
+        case _ =>
+          Console.err.println(s"processInConnections: Not handling ${connInst}")
+      }
+    })
+  }
+
+  def createReadWriteMethods(typeName: String): ISZ[Method] = {
+    return ISZ(
+      Method(name = "read", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")),
+      Method(name = "write", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")))
+  }
+
+  def createQueueMethods(typeName: String): ISZ[Method] = {
+    return ISZ(
+      Method(name = "enqueue", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")),
+      Method(name = "dequeue", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")))
   }
 }

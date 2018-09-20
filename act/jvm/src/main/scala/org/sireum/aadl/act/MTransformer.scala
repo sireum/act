@@ -77,6 +77,14 @@ object MTransformer {
 
   val PostResultProvides: MOption[Provides] = MNone()
 
+  val PreResultEmits: PreResult[Emits] = PreResult(T, MNone())
+
+  val PostResultEmits: MOption[Emits] = MNone()
+
+  val PreResultConsumes: PreResult[Consumes] = PreResult(T, MNone())
+
+  val PostResultConsumes: MOption[Consumes] = MNone()
+
   val PreResultConnection: PreResult[Connection] = PreResult(T, MNone())
 
   val PostResultConnection: MOption[Connection] = MNone()
@@ -228,6 +236,14 @@ import MTransformer._
     return PreResultProvides
   }
 
+  def preEmits(o: Emits): PreResult[Emits] = {
+    return PreResultEmits
+  }
+
+  def preConsumes(o: Consumes): PreResult[Consumes] = {
+    return PreResultConsumes
+  }
+
   def preConnection(o: Connection): PreResult[Connection] = {
     return PreResultConnection
   }
@@ -373,6 +389,14 @@ import MTransformer._
     return PostResultProvides
   }
 
+  def postEmits(o: Emits): MOption[Emits] = {
+    return PostResultEmits
+  }
+
+  def postConsumes(o: Consumes): MOption[Consumes] = {
+    return PostResultConsumes
+  }
+
   def postConnection(o: Connection): MOption[Connection] = {
     return PostResultConnection
   }
@@ -437,14 +461,13 @@ import MTransformer._
           val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
           val r2: MOption[IS[Z, TODO]] = transformISZ(o2.semaphores, transformTODO _)
           val r3: MOption[IS[Z, TODO]] = transformISZ(o2.dataports, transformTODO _)
-          val r4: MOption[IS[Z, TODO]] = transformISZ(o2.emits, transformTODO _)
+          val r4: MOption[IS[Z, Emits]] = transformISZ(o2.emits, transformEmits _)
           val r5: MOption[IS[Z, Uses]] = transformISZ(o2.uses, transformUses _)
-          val r6: MOption[IS[Z, TODO]] = transformISZ(o2.consumes, transformTODO _)
+          val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
           val r7: MOption[IS[Z, Provides]] = transformISZ(o2.provides, transformProvides _)
-          val r8: MOption[IS[Z, TODO]] = transformISZ(o2.includes, transformTODO _)
-          val r9: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
-          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
-            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), includes = r8.getOrElse(o2.includes), attributes = r9.getOrElse(o2.attributes)))
+          val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty)
+            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes)))
           else
             MNone()
         case o2: Connection =>
@@ -604,14 +627,13 @@ import MTransformer._
       val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
       val r2: MOption[IS[Z, TODO]] = transformISZ(o2.semaphores, transformTODO _)
       val r3: MOption[IS[Z, TODO]] = transformISZ(o2.dataports, transformTODO _)
-      val r4: MOption[IS[Z, TODO]] = transformISZ(o2.emits, transformTODO _)
+      val r4: MOption[IS[Z, Emits]] = transformISZ(o2.emits, transformEmits _)
       val r5: MOption[IS[Z, Uses]] = transformISZ(o2.uses, transformUses _)
-      val r6: MOption[IS[Z, TODO]] = transformISZ(o2.consumes, transformTODO _)
+      val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
       val r7: MOption[IS[Z, Provides]] = transformISZ(o2.provides, transformProvides _)
-      val r8: MOption[IS[Z, TODO]] = transformISZ(o2.includes, transformTODO _)
-      val r9: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
-      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
-        MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), includes = r8.getOrElse(o2.includes), attributes = r9.getOrElse(o2.attributes)))
+      val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty)
+        MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -674,6 +696,58 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Provides = r.getOrElse(o)
     val postR: MOption[Provides] = postProvides(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformEmits(o: Emits): MOption[Emits] = {
+    val preR: PreResult[Emits] = preEmits(o)
+    val r: MOption[Emits] = if (preR.continu) {
+      val o2: Emits = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: Emits = r.getOrElse(o)
+    val postR: MOption[Emits] = postEmits(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformConsumes(o: Consumes): MOption[Consumes] = {
+    val preR: PreResult[Consumes] = preConsumes(o)
+    val r: MOption[Consumes] = if (preR.continu) {
+      val o2: Consumes = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: Consumes = r.getOrElse(o)
+    val postR: MOption[Consumes] = postConsumes(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {

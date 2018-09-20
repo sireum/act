@@ -98,32 +98,24 @@ import org.sireum._
 
   def visitInstance(i: Instance): Option[ST] = {
     var name = i.component.name
-    var provides : ISZ[ST] = ISZ()
-    var uses: ISZ[ST] = ISZ()
-    var binSems: ISZ[ST] = ISZ()
-
-    for(p <- i.component.provides) {
-      provides = provides :+ st"""provides ${p.procedure} ${p.name};"""
-    }
-
-    for(p <- i.component.uses) {
-      uses = uses :+ st"""uses ${p.procedure} ${p.name};"""
-    }
-
-    for(p <- i.component.binarySemaphores) {
-      binSems = binSems :+ st"""has binary_semaphore ${p.name};"""
-    }
 
     val st =
       st"""component ${name} {
+          |  ${(i.component.includes.map(i => s"include ${i};"), "\n")}
           |  ${if(i.component.control) "control;" else ""}
-          |  ${(provides, "\n")}
-          |  ${(uses, "\n")}
-          |  ${(binSems, "\n")}
+          |  ${(i.component.provides.map(p => s"provides ${p.typ} ${p.name};"), "\n")}
+          |  ${(i.component.uses.map(u => s"uses ${u.typ} ${u.name};"), "\n")}
+          |  ${(i.component.emits.map(e => s"emits ${e.typ} ${e.name};"), "\n")}
+          |  ${(i.component.consumes.map(c => s"consumes ${c.typ} ${c.name};"), "\n")}
+          |  ${(i.component.binarySemaphores.map(b => s"has binary_semaphore ${b.name};"), "\n")}
           |}
           """
 
-    add(s"${dirComponents}/${name}/${name}.camkes", st)
+    if(Util.isMonitor(name)) {
+      add(s"${dirComponents}/${Util.MONITOR_DIRECTORY_NAME}/${name}/${name}.camkes", st)
+    } else {
+      add(s"${dirComponents}/${name}/${name}.camkes", st)
+    }
 
     return None()
   }
@@ -136,6 +128,7 @@ import org.sireum._
 
     val st =
       st"""procedure ${o.name} {
+          |  ${(o.includes.map(i => s"include ${i};"), "\n")}
           |  ${(methods, "\n")}
           |};"""
 
@@ -146,12 +139,21 @@ import org.sireum._
 
   def visitMethod(o: Method) : Option[ST] = {
     var params: ISZ[ST] = ISZ()
-    for(p<- o.parameters) {
-      val dir: String = if(p.direction == Direction.In) "in" else "out"
+    for(p <- o.parameters) {
+      val dir: String = p.direction match {
+        case Direction.In => "in"
+        case Direction.Out => "out"
+        case Direction.Refin => "refin"
+      }
       params = params :+ st"""${dir} ${p.typ} ${p.name}"""
     }
 
-    val st = st"""void ${o.name}(${(params, ",")});"""
+    val retType: String = o.returnType match {
+      case Some(r) => r
+      case _ => "void"
+    }
+
+    val st = st"""${retType} ${o.name}(${(params, ",")});"""
     return Some(st)
   }
 

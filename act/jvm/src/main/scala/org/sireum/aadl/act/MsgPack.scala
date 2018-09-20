@@ -48,21 +48,25 @@ object MsgPack {
 
     val Provides: Z = -27
 
-    val Connection: Z = -26
+    val Emits: Z = -26
 
-    val ConnectionEnd: Z = -25
+    val Consumes: Z = -25
 
-    val Connector: Z = -24
+    val Connection: Z = -24
 
-    val Procedure: Z = -23
+    val ConnectionEnd: Z = -23
 
-    val Method: Z = -22
+    val Connector: Z = -22
 
-    val Parameter: Z = -21
+    val Procedure: Z = -21
 
-    val BinarySemaphore: Z = -20
+    val Method: Z = -20
 
-    val TODO: Z = -19
+    val Parameter: Z = -19
+
+    val BinarySemaphore: Z = -18
+
+    val TODO: Z = -17
 
   }
 
@@ -123,25 +127,38 @@ object MsgPack {
       writer.writeISZ(o.binarySemaphores, writeBinarySemaphore _)
       writer.writeISZ(o.semaphores, writeTODO _)
       writer.writeISZ(o.dataports, writeTODO _)
-      writer.writeISZ(o.emits, writeTODO _)
+      writer.writeISZ(o.emits, writeEmits _)
       writer.writeISZ(o.uses, writeUses _)
-      writer.writeISZ(o.consumes, writeTODO _)
+      writer.writeISZ(o.consumes, writeConsumes _)
       writer.writeISZ(o.provides, writeProvides _)
-      writer.writeISZ(o.includes, writeTODO _)
+      writer.writeISZ(o.includes, writer.writeString _)
       writer.writeISZ(o.attributes, writeTODO _)
     }
 
     def writeUses(o: Uses): Unit = {
       writer.writeZ(Constants.Uses)
       writer.writeString(o.name)
+      writer.writeString(o.typ)
       writer.writeB(o.optional)
-      writer.writeString(o.procedure)
     }
 
     def writeProvides(o: Provides): Unit = {
       writer.writeZ(Constants.Provides)
       writer.writeString(o.name)
-      writer.writeString(o.procedure)
+      writer.writeString(o.typ)
+    }
+
+    def writeEmits(o: Emits): Unit = {
+      writer.writeZ(Constants.Emits)
+      writer.writeString(o.name)
+      writer.writeString(o.typ)
+    }
+
+    def writeConsumes(o: Consumes): Unit = {
+      writer.writeZ(Constants.Consumes)
+      writer.writeString(o.name)
+      writer.writeString(o.typ)
+      writer.writeB(o.optional)
     }
 
     def writeConnection(o: Connection): Unit = {
@@ -176,12 +193,14 @@ object MsgPack {
       writer.writeZ(Constants.Procedure)
       writer.writeString(o.name)
       writer.writeISZ(o.methods, writeMethod _)
+      writer.writeISZ(o.includes, writer.writeString _)
     }
 
     def writeMethod(o: Method): Unit = {
       writer.writeZ(Constants.Method)
       writer.writeString(o.name)
       writer.writeISZ(o.parameters, writeParameter _)
+      writer.writeOption(o.returnType, writer.writeString _)
     }
 
     def writeParameter(o: Parameter): Unit = {
@@ -309,11 +328,11 @@ object MsgPack {
       val binarySemaphores = reader.readISZ(readBinarySemaphore _)
       val semaphores = reader.readISZ(readTODO _)
       val dataports = reader.readISZ(readTODO _)
-      val emits = reader.readISZ(readTODO _)
+      val emits = reader.readISZ(readEmits _)
       val uses = reader.readISZ(readUses _)
-      val consumes = reader.readISZ(readTODO _)
+      val consumes = reader.readISZ(readConsumes _)
       val provides = reader.readISZ(readProvides _)
-      val includes = reader.readISZ(readTODO _)
+      val includes = reader.readISZ(reader.readString _)
       val attributes = reader.readISZ(readTODO _)
       return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
     }
@@ -328,9 +347,9 @@ object MsgPack {
         reader.expectZ(Constants.Uses)
       }
       val name = reader.readString()
+      val typ = reader.readString()
       val optional = reader.readB()
-      val procedure = reader.readString()
-      return Uses(name, optional, procedure)
+      return Uses(name, typ, optional)
     }
 
     def readProvides(): Provides = {
@@ -343,8 +362,37 @@ object MsgPack {
         reader.expectZ(Constants.Provides)
       }
       val name = reader.readString()
-      val procedure = reader.readString()
-      return Provides(name, procedure)
+      val typ = reader.readString()
+      return Provides(name, typ)
+    }
+
+    def readEmits(): Emits = {
+      val r = readEmitsT(F)
+      return r
+    }
+
+    def readEmitsT(typeParsed: B): Emits = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.Emits)
+      }
+      val name = reader.readString()
+      val typ = reader.readString()
+      return Emits(name, typ)
+    }
+
+    def readConsumes(): Consumes = {
+      val r = readConsumesT(F)
+      return r
+    }
+
+    def readConsumesT(typeParsed: B): Consumes = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.Consumes)
+      }
+      val name = reader.readString()
+      val typ = reader.readString()
+      val optional = reader.readB()
+      return Consumes(name, typ, optional)
     }
 
     def readConnection(): Connection = {
@@ -410,7 +458,8 @@ object MsgPack {
       }
       val name = reader.readString()
       val methods = reader.readISZ(readMethod _)
-      return Procedure(name, methods)
+      val includes = reader.readISZ(reader.readString _)
+      return Procedure(name, methods, includes)
     }
 
     def readMethod(): Method = {
@@ -424,7 +473,8 @@ object MsgPack {
       }
       val name = reader.readString()
       val parameters = reader.readISZ(readParameter _)
-      return Method(name, parameters)
+      val returnType = reader.readOption(reader.readString _)
+      return Method(name, parameters, returnType)
     }
 
     def readParameter(): Parameter = {
@@ -587,6 +637,36 @@ object MsgPack {
       return r
     }
     val r = to(data, fProvides _)
+    return r
+  }
+
+  def fromEmits(o: Emits, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeEmits(o)
+    return w.result
+  }
+
+  def toEmits(data: ISZ[U8]): Either[Emits, MessagePack.ErrorMsg] = {
+    def fEmits(reader: Reader): Emits = {
+      val r = reader.readEmits()
+      return r
+    }
+    val r = to(data, fEmits _)
+    return r
+  }
+
+  def fromConsumes(o: Consumes, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeConsumes(o)
+    return w.result
+  }
+
+  def toConsumes(data: ISZ[U8]): Either[Consumes, MessagePack.ErrorMsg] = {
+    def fConsumes(reader: Reader): Consumes = {
+      val r = reader.readConsumes()
+      return r
+    }
+    val r = to(data, fConsumes _)
     return r
   }
 

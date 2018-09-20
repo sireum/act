@@ -91,11 +91,11 @@ object JSON {
         ("binarySemaphores", printISZ(F, o.binarySemaphores, printBinarySemaphore _)),
         ("semaphores", printISZ(F, o.semaphores, printTODO _)),
         ("dataports", printISZ(F, o.dataports, printTODO _)),
-        ("emits", printISZ(F, o.emits, printTODO _)),
+        ("emits", printISZ(F, o.emits, printEmits _)),
         ("uses", printISZ(F, o.uses, printUses _)),
-        ("consumes", printISZ(F, o.consumes, printTODO _)),
+        ("consumes", printISZ(F, o.consumes, printConsumes _)),
         ("provides", printISZ(F, o.provides, printProvides _)),
-        ("includes", printISZ(F, o.includes, printTODO _)),
+        ("includes", printISZ(T, o.includes, printString _)),
         ("attributes", printISZ(F, o.attributes, printTODO _))
       ))
     }
@@ -104,8 +104,8 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Uses""""),
         ("name", printString(o.name)),
-        ("optional", printB(o.optional)),
-        ("procedure", printString(o.procedure))
+        ("typ", printString(o.typ)),
+        ("optional", printB(o.optional))
       ))
     }
 
@@ -113,7 +113,24 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Provides""""),
         ("name", printString(o.name)),
-        ("procedure", printString(o.procedure))
+        ("typ", printString(o.typ))
+      ))
+    }
+
+    @pure def printEmits(o: Emits): ST = {
+      return printObject(ISZ(
+        ("type", st""""Emits""""),
+        ("name", printString(o.name)),
+        ("typ", printString(o.typ))
+      ))
+    }
+
+    @pure def printConsumes(o: Consumes): ST = {
+      return printObject(ISZ(
+        ("type", st""""Consumes""""),
+        ("name", printString(o.name)),
+        ("typ", printString(o.typ)),
+        ("optional", printB(o.optional))
       ))
     }
 
@@ -155,7 +172,8 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Procedure""""),
         ("name", printString(o.name)),
-        ("methods", printISZ(F, o.methods, printMethod _))
+        ("methods", printISZ(F, o.methods, printMethod _)),
+        ("includes", printISZ(T, o.includes, printString _))
       ))
     }
 
@@ -163,7 +181,8 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Method""""),
         ("name", printString(o.name)),
-        ("parameters", printISZ(F, o.parameters, printParameter _))
+        ("parameters", printISZ(F, o.parameters, printParameter _)),
+        ("returnType", printOption(T, o.returnType, printString _))
       ))
     }
 
@@ -181,6 +200,7 @@ object JSON {
       val value: String = o match {
         case Direction.In => "In"
         case Direction.Out => "Out"
+        case Direction.Refin => "Refin"
       }
       return printObject(ISZ(
         ("type", printString("Direction")),
@@ -323,19 +343,19 @@ object JSON {
       val dataports = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("emits")
-      val emits = parser.parseISZ(parseTODO _)
+      val emits = parser.parseISZ(parseEmits _)
       parser.parseObjectNext()
       parser.parseObjectKey("uses")
       val uses = parser.parseISZ(parseUses _)
       parser.parseObjectNext()
       parser.parseObjectKey("consumes")
-      val consumes = parser.parseISZ(parseTODO _)
+      val consumes = parser.parseISZ(parseConsumes _)
       parser.parseObjectNext()
       parser.parseObjectKey("provides")
       val provides = parser.parseISZ(parseProvides _)
       parser.parseObjectNext()
       parser.parseObjectKey("includes")
-      val includes = parser.parseISZ(parseTODO _)
+      val includes = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
       parser.parseObjectKey("attributes")
       val attributes = parser.parseISZ(parseTODO _)
@@ -355,13 +375,13 @@ object JSON {
       parser.parseObjectKey("name")
       val name = parser.parseString()
       parser.parseObjectNext()
+      parser.parseObjectKey("typ")
+      val typ = parser.parseString()
+      parser.parseObjectNext()
       parser.parseObjectKey("optional")
       val optional = parser.parseB()
       parser.parseObjectNext()
-      parser.parseObjectKey("procedure")
-      val procedure = parser.parseString()
-      parser.parseObjectNext()
-      return Uses(name, optional, procedure)
+      return Uses(name, typ, optional)
     }
 
     def parseProvides(): Provides = {
@@ -376,10 +396,49 @@ object JSON {
       parser.parseObjectKey("name")
       val name = parser.parseString()
       parser.parseObjectNext()
-      parser.parseObjectKey("procedure")
-      val procedure = parser.parseString()
+      parser.parseObjectKey("typ")
+      val typ = parser.parseString()
       parser.parseObjectNext()
-      return Provides(name, procedure)
+      return Provides(name, typ)
+    }
+
+    def parseEmits(): Emits = {
+      val r = parseEmitsT(F)
+      return r
+    }
+
+    def parseEmitsT(typeParsed: B): Emits = {
+      if (!typeParsed) {
+        parser.parseObjectType("Emits")
+      }
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("typ")
+      val typ = parser.parseString()
+      parser.parseObjectNext()
+      return Emits(name, typ)
+    }
+
+    def parseConsumes(): Consumes = {
+      val r = parseConsumesT(F)
+      return r
+    }
+
+    def parseConsumesT(typeParsed: B): Consumes = {
+      if (!typeParsed) {
+        parser.parseObjectType("Consumes")
+      }
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("typ")
+      val typ = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("optional")
+      val optional = parser.parseB()
+      parser.parseObjectNext()
+      return Consumes(name, typ, optional)
     }
 
     def parseConnection(): Connection = {
@@ -481,7 +540,10 @@ object JSON {
       parser.parseObjectKey("methods")
       val methods = parser.parseISZ(parseMethod _)
       parser.parseObjectNext()
-      return Procedure(name, methods)
+      parser.parseObjectKey("includes")
+      val includes = parser.parseISZ(parser.parseString _)
+      parser.parseObjectNext()
+      return Procedure(name, methods, includes)
     }
 
     def parseMethod(): Method = {
@@ -499,7 +561,10 @@ object JSON {
       parser.parseObjectKey("parameters")
       val parameters = parser.parseISZ(parseParameter _)
       parser.parseObjectNext()
-      return Method(name, parameters)
+      parser.parseObjectKey("returnType")
+      val returnType = parser.parseOption(parser.parseString _)
+      parser.parseObjectNext()
+      return Method(name, parameters, returnType)
     }
 
     def parseParameter(): Parameter = {
@@ -714,6 +779,42 @@ object JSON {
       return r
     }
     val r = to(s, fProvides _)
+    return r
+  }
+
+  def fromEmits(o: Emits, isCompact: B): String = {
+    val st = Printer.printEmits(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toEmits(s: String): Either[Emits, Json.ErrorMsg] = {
+    def fEmits(parser: Parser): Emits = {
+      val r = parser.parseEmits()
+      return r
+    }
+    val r = to(s, fEmits _)
+    return r
+  }
+
+  def fromConsumes(o: Consumes, isCompact: B): String = {
+    val st = Printer.printConsumes(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toConsumes(s: String): Either[Consumes, Json.ErrorMsg] = {
+    def fConsumes(parser: Parser): Consumes = {
+      val r = parser.parseConsumes()
+      return r
+    }
+    val r = to(s, fConsumes _)
     return r
   }
 
