@@ -104,6 +104,7 @@ fi
 if [ ! -f ${SIREUM} ] || [ "$(${SHA3} 256 < ${SIREUM})" != ${SIREUM_SHA3} ]; then
   echo "Downloading sireum ..."
   curl -Lo ${SIREUM} ${SIREUM_URL}
+  chmod +x ${SIREUM}
   SIREUM_SHA3_LOCAL="$(${SHA3} 256 < ${SIREUM})"
   if [ ${SIREUM_SHA3_LOCAL} != ${SIREUM_SHA3} ]; then
     >&2 echo "Sireum version mismatch (${SIREUM_SHA3_LOCAL} != ${SIREUM_SHA3}); please notify ACT maintainers."
