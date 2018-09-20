@@ -23,4 +23,4 @@ environment:
 build_script:
   - bash -lc "pacman --noconfirm -S unzip bc"
   - bash -lc "$APPVEYOR_BUILD_FOLDER/bin/test.sh"
-  - bin\sireum.bat act
+  - bin\act.bat

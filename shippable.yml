@@ -14,7 +14,7 @@ build:
     if [[ ! `git show -s HEAD | grep -F -q "[skip shippable]"` ]]; then
       git submodule update --init --recursive &&
       bin/test.sh &&
-      bin/sireum act;
+      bin/act;
     fi
   post_ci:
   on_success:
