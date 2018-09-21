@@ -83,7 +83,7 @@ import org.sireum._
       val to = s"${c.to_ends(0).component}.${c.to_ends(0).end}"
 
       connections = connections :+
-        st"""connection seL4RPCCall ${c.name}(from ${from}, to ${to});"""
+        st"""connection ${c.connector.name} ${c.name}(from ${from}, to ${to});"""
     }
 
     val st =

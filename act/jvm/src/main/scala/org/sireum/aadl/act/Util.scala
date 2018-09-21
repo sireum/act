@@ -23,6 +23,9 @@ object Util {
 
   val DEFAULT_QUEUE_SIZE: Z = 1
 
+  val CONNECTOR_SEL4_NOTIFICATION: String = "sel4Notification"
+  val CONNECTOR_RPC: String = "seL4RPCCall"
+
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
     val a = replaceAll(c.name, "::", "__")
     val b = replaceAll(a, ".", "_")
@@ -63,7 +66,9 @@ object Util {
   }
 
   def getMonitorName(comp: ir.Component, feature: ir.FeatureEnd) : String = {
-    return s"${GEN_ARTIFACT_PREFIX}_${getName(comp.identifier)}_${getLastName(feature.identifier)}_${MONITOR_COMP_SUFFIX}"
+    val cname = Util.getLastName(comp.identifier)
+    val fname = Util.getLastName(feature.identifier)
+    return s"${GEN_ARTIFACT_PREFIX}_${cname}_${fname}_${MONITOR_COMP_SUFFIX}"
   }
 
   def getTypeHeaderFileName(c: ir.Component) : String = {
