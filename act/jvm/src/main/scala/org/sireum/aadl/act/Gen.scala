@@ -63,14 +63,14 @@ import org.sireum.aadl.ir
     inConnections.keys.foreach(key => {
       val x = inConnections.get(key).get
       if(x.size > 1) {
-        println(s"${key} has ${x.size} in coming")
+        //println(s"${key} has ${x.size} in coming")
       }
       //assert(x.size <= 1)
     })
     outConnections.keys.foreach(key => {
       val x = outConnections.get(key).get
       if(x.size > 1) {
-        println(s"${key} has ${x.size} out going")
+        //println(s"${key} has ${x.size} out going")
       }
       //assert(x.size <= 1)
     })

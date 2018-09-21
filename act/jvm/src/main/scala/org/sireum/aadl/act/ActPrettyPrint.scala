@@ -61,7 +61,7 @@ import org.sireum._
           |}
           |"""
 
-    add("cakeml-filter.camkes", st)
+    add("assembly.camkes", st)
 
     return None()
   }
