@@ -24,7 +24,7 @@ import org.sireum.aadl.ir
 
   def gen(m : ir.Aadl) : ISZ[ASTObject] = {
 
-    def resolve(m : ir.Aadl): Unit = {
+    def resolve(m : ir.Aadl): B = {
       def r(c: ir.Component): Unit = {
         val name = Util.getName(c.identifier)
         assert(!componentMap.contains(name))
@@ -73,17 +73,21 @@ import org.sireum.aadl.ir
           typeHeaderFileName = Util.getTypeHeaderFileName(p).get
         case _ =>
           Console.err.println("No processor bound process defined")
-          return ISZ()
+          return false
       }
 
       buildMonitors()
+
+      return true
     }
-    resolve(m)
 
+    if(resolve(m)) {
+      m.components.foreach(c => gen(c))
 
-    m.components.foreach(c => gen(c))
+      astObjects = astObjects ++ procedures
+    }
 
-    return astObjects ++ procedures
+    return astObjects
   }
 
   def gen(c: ir.Component) : Unit = {
