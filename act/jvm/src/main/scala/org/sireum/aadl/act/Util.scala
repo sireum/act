@@ -148,3 +148,8 @@ object Util {
     return conversions.String.fromCms(cms.map(c => COps(c).toLower))
   }
 }
+
+@datatype class Monitor (i: Instance,               // camkes monitor
+                         p: Procedure,              // camkes interface
+                         index: Z,                  // fan-out index
+                         ci: ir.ConnectionInstance) // aadl connection

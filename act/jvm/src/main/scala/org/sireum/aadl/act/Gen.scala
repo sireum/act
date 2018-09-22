@@ -20,8 +20,7 @@ import org.sireum.aadl.ir
 
   var astObjects: ISZ[ASTObject] = ISZ()
   var ginstances: ISZ[Instance] = ISZ()
-
-  var monitors: HashMap[String, (Instance, Procedure)] = HashMap.empty
+  var monitors: HashMap[String, Monitor] = HashMap.empty
   var procedures: ISZ[ASTObject] = ISZ()
 
   def gen(m : ir.Aadl) : ISZ[ASTObject] = {
@@ -184,24 +183,24 @@ import org.sireum.aadl.ir
     }
 
     def createDataConnection(conn: ir.ConnectionInstance) : Unit = {
+      val monitor = getMonitorForConnectionInstance(conn).get
+
       val srcComponent = Util.getLastName(conn.src.component)
-      val srcFeature = s"${Util.getLastName(conn.src.feature.get)}0" // FIXME
+      val srcFeature = s"${Util.getLastName(conn.src.feature.get)}${monitor.index}"
       val dstComponent = Util.getLastName(conn.dst.component)
       val dstFeature = Util.getLastName(conn.dst.feature.get)
 
       val __dstFeature = featureEndMap.get(Util.getName(conn.dst.feature.get)).get
-      val interfaceName = Util.getInterfaceName(__dstFeature)
-      val monitor = monitors.get(interfaceName).get
 
       // rpc src to mon
-      createRPCConnection(srcComponent, srcFeature, monitor._1.name, "mon")
+      createRPCConnection(srcComponent, srcFeature, monitor.i.name, "mon")
 
       // rpc mon to dst
-      createRPCConnection(dstComponent, dstFeature, monitor._1.name, "mon")
+      createRPCConnection(dstComponent, dstFeature, monitor.i.name, "mon")
 
       // notification monsig to dst
       createNotificationConnection(
-        monitor._1.name, "monsig",
+        monitor.i.name, "monsig",
         dstComponent, Util.portNotificationName(__dstFeature)
       )
     }
@@ -266,19 +265,21 @@ import org.sireum.aadl.ir
           case ir.Direction.In =>
             // uses monitor
             // consumes notification
-            val interfaceName: String = Util.getInterfaceName(fend)
-            val monitor: (Instance, Procedure) = monitors.get(interfaceName).get
+            if(inConnections.get(fpath).nonEmpty) {
+              val monitor = getMonitorForInPort(fend).get
 
-            uses = uses :+ Uses(
-              name = Util.portName(fend, None[Z]),
-              typ = monitor._2.name,
-              optional = F)
+              uses = uses :+ Uses(
+                name = Util.portName(fend, None[Z]),
+                typ = monitor.p.name,
+                optional = F)
 
-            consumes = consumes :+ Consumes(
-              name = Util.portNotificationName(fend),
-              typ = Util.MONITOR_NOTIFICATION_TYPE,
-              optional = F)
-
+              consumes = consumes :+ Consumes(
+                name = Util.portNotificationName(fend),
+                typ = Util.MONITOR_NOTIFICATION_TYPE,
+                optional = F)
+            } else {
+              Console.err.println(s"in port '${fpath}' is not connected")
+            }
           case ir.Direction.Out =>
             // uses monitor
             outConnections.get(fpath) match {
@@ -386,78 +387,81 @@ import org.sireum.aadl.ir
   }
 
   def processInConnections(): Unit = {
-    inConnections.keys.withFilter(p => inConnections.get(p).get.size > 0).foreach(portPath => {
-      val connInsts: ISZ[ir.ConnectionInstance] = inConnections.get(portPath).get()
-      val connInst: ir.ConnectionInstance = connInsts(0)
+    for (portPath <- outConnections.keys.withFilter(p => outConnections.get(p).get.size > 0)) {
+      var i: Z = 0
+      for (connInst <- outConnections.get(portPath).get()) {
 
-      val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
-      val dstFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.dst.feature.get)).get()
+        val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
+        val dstFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.dst.feature.get)).get()
 
-      val src: ir.Component = componentMap.get(Util.getName(connInst.src.component)).get
-      val srcFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.src.feature.get)).get()
+        val src: ir.Component = componentMap.get(Util.getName(connInst.src.component)).get
+        val srcFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.src.feature.get)).get()
 
-      def handleDataPort(isEventDataPort: B) : Unit = {
-        val monitorName = Util.getMonitorName(dst, dstFeature)
-        val interfaceName = Util.getInterfaceName(dstFeature)
+        def handleDataPort(isEventDataPort: B): Unit = {
+          val monitorName = Util.getMonitorName(dst, dstFeature)
+          val interfaceName = Util.getInterfaceName(dstFeature)
 
-        val typeName = Util.getClassifierFullyQualified(dstFeature.classifier.get)
+          val typeName = Util.getClassifierFullyQualified(dstFeature.classifier.get)
 
-        val monitor = Component(
-          control = F,
-          hardware = F,
-          name = monitorName,
+          val monitor = Component(
+            control = F,
+            hardware = F,
+            name = monitorName,
 
-          mutexes = ISZ(),
-          binarySemaphores = ISZ(),
-          semaphores =  ISZ(),
-          dataports = ISZ(),
-          emits = ISZ(Emits(name = "monsig", typ = Util.MONITOR_NOTIFICATION_TYPE)),
-          uses = ISZ(),
-          consumes = ISZ(),
-          provides = ISZ(Provides(name = "mon", typ = interfaceName)),
-          includes = ISZ(s"${interfaceName}.idl4"),
-          attributes = ISZ()
-        )
+            mutexes = ISZ(),
+            binarySemaphores = ISZ(),
+            semaphores = ISZ(),
+            dataports = ISZ(),
+            emits = ISZ(Emits(name = "monsig", typ = Util.MONITOR_NOTIFICATION_TYPE)),
+            uses = ISZ(),
+            consumes = ISZ(),
+            provides = ISZ(Provides(name = "mon", typ = interfaceName)),
+            includes = ISZ(s"${interfaceName}.idl4"),
+            attributes = ISZ()
+          )
 
-        val inst: Instance = Instance(address_space = "", name = Util.toLowerCase(monitorName), component = monitor)
+          val inst: Instance = Instance(address_space = "", name = Util.toLowerCase(monitorName), component = monitor)
 
-        val methods: ISZ[Method] =
-          if(isEventDataPort) {
-          createQueueMethods(typeName)
-        } else {
-          createReadWriteMethods(typeName)
+          val methods: ISZ[Method] =
+            if (isEventDataPort) {
+              createQueueMethods(typeName)
+            } else {
+              createReadWriteMethods(typeName)
+            }
+
+          val proc: Procedure = Procedure(
+            name = interfaceName,
+            methods = methods,
+            includes = ISZ()
+          )
+
+          val connInstName = Util.getName(connInst.name)
+          monitors = monitors + (connInstName ~> Monitor(inst, proc, i, connInst))
+
+          procedures = procedures :+ proc
+          ginstances = ginstances :+ inst
         }
 
-        val proc: Procedure = Procedure(
-          name = interfaceName,
-          methods = methods,
-          includes = ISZ()
-        )
+        connInst.kind match {
+          case ir.ConnectionKind.Port =>
+            dstFeature.category match {
+              case ir.FeatureCategory.DataPort =>
+                handleDataPort(F)
+              case ir.FeatureCategory.EventDataPort =>
+                handleDataPort(T)
+              case ir.FeatureCategory.EventPort =>
+                // will use Notification
+                nop()
+              case _ =>
+                halt(s"not expecting ${dst}")
+            }
+          case _ =>
+            Console.err.println(s"processInConnections: Not handling ${connInst}")
+        }
 
-        val pair = (inst,proc) // FIXME: why can't I do this directly?
-        monitors = monitors + (interfaceName ~> pair)
-
-        procedures = procedures :+ proc
-        ginstances = ginstances :+ inst
+        i = i + 1
       }
-
-      connInst.kind match {
-        case ir.ConnectionKind.Port =>
-          dstFeature.category match {
-            case ir.FeatureCategory.DataPort =>
-              handleDataPort(F)
-            case ir.FeatureCategory.EventDataPort =>
-              handleDataPort(T)
-            case ir.FeatureCategory.EventPort =>
-              // will use Notification
-              nop()
-            case _ =>
-              halt(s"not expecting ${dst}")
-          }
-        case _ =>
-          Console.err.println(s"processInConnections: Not handling ${connInst}")
-      }
-    })
+    }
   }
 
   def createReadWriteMethods(typeName: String): ISZ[Method] = {
@@ -470,6 +474,22 @@ import org.sireum.aadl.ir
     return ISZ(
       Method(name = "enqueue", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")),
       Method(name = "dequeue", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")))
+  }
+
+
+  def getMonitorForConnectionInstance(instance: ir.ConnectionInstance): Option[Monitor] = {
+    for(m <- monitors.values if(m.ci == instance)){
+      return Some(m)
+    }
+    return None[Monitor]()
+  }
+
+  def getMonitorForInPort(end: ir.FeatureEnd): Option[Monitor] = {
+    val n = Util.getName(end.identifier)
+    for(m <- monitors.values if(Util.getName(m.ci.dst.feature.get) == n)) {
+      return Some(m)
+    }
+    return None[Monitor]()
   }
 
   def nop(): Unit = {}
