@@ -13,7 +13,6 @@ import org.sireum.aadl.ir
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
   var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
 
-  // port paths to connection instances
   var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
   var outConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
 
@@ -25,62 +24,66 @@ import org.sireum.aadl.ir
 
   def gen(m : ir.Aadl) : ISZ[ASTObject] = {
 
-    def r(c: ir.Component) : Unit = {
-      val name = Util.getName(c.identifier)
-      assert(!componentMap.contains(name))
-      componentMap = componentMap + (name ~> c)
+    def resolve(m : ir.Aadl): Unit = {
+      def r(c: ir.Component): Unit = {
+        val name = Util.getName(c.identifier)
+        assert(!componentMap.contains(name))
+        componentMap = componentMap + (name ~> c)
 
-      c.features.foreach(f =>
-        if(f.isInstanceOf[ir.FeatureEnd]) {
-          featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
+        c.features.foreach(f =>
+          if (f.isInstanceOf[ir.FeatureEnd]) {
+            featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
+          })
+
+        c.connectionInstances.foreach(ci => {
+          def add(portPath: String, isIn: B): Unit = {
+            var map: HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
+              case T => inConnections
+              case F => outConnections
+            }
+            var cis: ISZ[ir.ConnectionInstance] = map.get(portPath) match {
+              case Some(cis) => cis
+              case _ => ISZ()
+            }
+            cis = cis :+ ci
+            isIn match {
+              case T => inConnections = inConnections + (portPath ~> cis)
+              case F => outConnections = outConnections + (portPath ~> cis)
+            }
+          }
+
+          add(Util.getName(ci.src.feature.get), F)
+          add(Util.getName(ci.dst.feature.get), T)
         })
+        c.subComponents.foreach(sc => r(sc))
+      }
 
-      c.connectionInstances.foreach(ci => {
-        def add(portPath: String, isIn: B) : Unit = {
-          var map : HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
-            case T => inConnections
-            case F => outConnections
-          }
-          var cis: ISZ[ir.ConnectionInstance] = map.get(portPath) match {
-            case Some(cis) => cis
-            case _ => ISZ()
-          }
-          cis = cis :+ ci
-          isIn match {
-            case T => inConnections = inConnections + (portPath ~> cis)
-            case F => outConnections = outConnections + (portPath ~> cis)
-          }
+      m.components.foreach(c => r(c))
+
+      def getProcessor(): Option[ir.Component] = {
+        for (c <- componentMap.values if (c.category == ir.ComponentCategory.Process) && Util.getTypeHeaderFileName(c).nonEmpty) {
+          return Some(c)
         }
-        add(Util.getName(ci.src.feature.get), F)
-        add(Util.getName(ci.dst.feature.get), T)
-      })
-      c.subComponents.foreach(sc => r(sc))
+        return None[ir.Component]
+      }
+
+      getProcessor() match {
+        case Some(p) =>
+          topLevelProcess = Some(p)
+          typeHeaderFileName = Util.getTypeHeaderFileName(p).get
+        case _ =>
+          Console.err.println("No processor bound process defined")
+          return ISZ()
+      }
+
+      buildMonitors()
     }
-    m.components.foreach(c => r(c))
+    resolve(m)
 
-    // TODO: add support for fan-out/fan-in connections
-    inConnections.keys.foreach(key => {
-      val x = inConnections.get(key).get
-      if(x.size > 1) {
-        //println(s"${key} has ${x.size} in coming")
-      }
-      //assert(x.size <= 1)
-    })
-    outConnections.keys.foreach(key => {
-      val x = outConnections.get(key).get
-      if(x.size > 1) {
-        //println(s"${key} has ${x.size} out going")
-      }
-      //assert(x.size <= 1)
-    })
-
-    processInConnections()
 
     m.components.foreach(c => gen(c))
 
-    astObjects = astObjects ++ procedures
-
-    return astObjects
+    return astObjects ++ procedures
   }
 
   def gen(c: ir.Component) : Unit = {
@@ -99,9 +102,6 @@ import org.sireum.aadl.ir
 
   def genContainer(c : ir.Component) : Composition = {
     assert(c.category == ir.ComponentCategory.Process)
-
-    topLevelProcess = Some(c)
-    typeHeaderFileName = Util.getTypeHeaderFileName(c)
 
     var instances: ISZ[Instance] = ISZ()
     for(sc <- c.subComponents) {
@@ -386,7 +386,7 @@ import org.sireum.aadl.ir
     )
   }
 
-  def processInConnections(): Unit = {
+  def buildMonitors(): Unit = {
     for (portPath <- outConnections.keys.withFilter(p => outConnections.get(p).get.size > 0)) {
       var i: Z = 0
       for (connInst <- outConnections.get(portPath).get()) {
@@ -432,7 +432,7 @@ import org.sireum.aadl.ir
           val proc: Procedure = Procedure(
             name = interfaceName,
             methods = methods,
-            includes = ISZ()
+            includes = ISZ(typeHeaderFileName)
           )
 
           val connInstName = Util.getName(connInst.name)

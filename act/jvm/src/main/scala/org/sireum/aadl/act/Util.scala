@@ -71,14 +71,14 @@ object Util {
     return s"${GEN_ARTIFACT_PREFIX}_${cname}_${fname}_${MONITOR_COMP_SUFFIX}"
   }
 
-  def getTypeHeaderFileName(c: ir.Component) : String = {
+  def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
     assert(c.category == ir.ComponentCategory.Process)
     val processor = getDiscreetPropertyValue[ir.ReferenceProp](c.properties, PROP_ACTUAL_PROCESSOR_BINDING)
     val procName: String = processor match {
       case Some(v) => getLastName(v.value)
-      case _ => halt("No processor binding provided")
+      case _ => return None[String]()
     }
-    return s"${GEN_ARTIFACT_PREFIX}_${procName}_types.h"
+    return Some(s"${GEN_ARTIFACT_PREFIX}_${procName}_types.h")
   }
 
   def getInterfaceName(feature: ir.FeatureEnd): String = {
