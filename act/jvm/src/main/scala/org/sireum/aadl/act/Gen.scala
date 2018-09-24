@@ -279,7 +279,7 @@ import org.sireum.aadl.ir
 
               consumes = consumes :+ Consumes(
                 name = Util.portNotificationName(fend),
-                typ = Util.MONITOR_NOTIFICATION_TYPE,
+                typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
             } else {
               Console.err.println(s"in port '${fpath}' is not connected")
@@ -401,9 +401,10 @@ import org.sireum.aadl.ir
         val src: ir.Component = componentMap.get(Util.getName(connInst.src.component)).get
         val srcFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.src.feature.get)).get()
 
-        def handleDataPort(isEventDataPort: B): Unit = {
+        def handleDataPort(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, dstFeature)
           val interfaceName = Util.getInterfaceName(dstFeature)
+          val isEventDataPort = f.category == ir.FeatureCategory.EventDataPort
 
           val typeName = Util.getClassifierFullyQualified(dstFeature.classifier.get)
 
@@ -416,7 +417,7 @@ import org.sireum.aadl.ir
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
             dataports = ISZ(),
-            emits = ISZ(Emits(name = "monsig", typ = Util.MONITOR_NOTIFICATION_TYPE)),
+            emits = ISZ(Emits(name = "monsig", typ = Util.getMonitorNotificationType(f.category))),
             uses = ISZ(),
             consumes = ISZ(),
             provides = ISZ(Provides(name = "mon", typ = interfaceName)),
@@ -450,9 +451,9 @@ import org.sireum.aadl.ir
           case ir.ConnectionKind.Port =>
             dstFeature.category match {
               case ir.FeatureCategory.DataPort =>
-                handleDataPort(F)
+                handleDataPort(dstFeature)
               case ir.FeatureCategory.EventDataPort =>
-                handleDataPort(T)
+                handleDataPort(dstFeature)
               case ir.FeatureCategory.EventPort =>
                 // will use Notification
                 nop()

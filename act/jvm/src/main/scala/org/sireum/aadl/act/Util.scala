@@ -12,7 +12,9 @@ object Util {
 
   val MONITOR_COMP_SUFFIX: String  = "Monitor"
   val MONITOR_DIRECTORY_NAME: String = "tb_Monitors"
-  val MONITOR_NOTIFICATION_TYPE: String  = "QueuedData"
+
+  val MONITOR_EVENT_NOTIFICATION_TYPE: String =  "QueuedData"
+  val MONITOR_DATA_NOTIFICATION_TYPE: String  = "DataportWrite"
 
   val NOTIFICATION_TYPE: String = "Notification"
 
@@ -69,6 +71,16 @@ object Util {
     val cname = Util.getLastName(comp.identifier)
     val fname = Util.getLastName(feature.identifier)
     return s"${GEN_ARTIFACT_PREFIX}_${cname}_${fname}_${MONITOR_COMP_SUFFIX}"
+  }
+
+  def getMonitorNotificationType(t: ir.FeatureCategory.Type) : String = {
+    val ret: String = t match {
+      case ir.FeatureCategory.DataPort => Util.MONITOR_DATA_NOTIFICATION_TYPE
+      case ir.FeatureCategory.EventDataPort => Util.MONITOR_EVENT_NOTIFICATION_TYPE
+      case _ =>
+        halt(s"Not expecting: ${t}")
+    }
+    return ret
   }
 
   def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
