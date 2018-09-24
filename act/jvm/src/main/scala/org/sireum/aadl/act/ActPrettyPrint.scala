@@ -101,15 +101,15 @@ import org.sireum.aadl.act.ast._
     var name = i.component.name
 
     val st =
-      st"""${(i.component.imports.map(i => s"import ${i};"), "\n")}
+      st"""${(i.component.imports.map((i: String) => s"import ${i};"), "\n")}
           |component ${name} {
-          |  ${(i.component.includes.map(i => s"include ${i};"), "\n")}
+          |  ${(i.component.includes.map((i: String) => s"include ${i};"), "\n")}
           |  ${if(i.component.control) "control;" else ""}
-          |  ${(i.component.provides.map(p => s"provides ${p.typ} ${p.name};"), "\n")}
-          |  ${(i.component.uses.map(u => s"uses ${u.typ} ${u.name};"), "\n")}
-          |  ${(i.component.emits.map(e => s"emits ${e.typ} ${e.name};"), "\n")}
-          |  ${(i.component.consumes.map(c => s"consumes ${c.typ} ${c.name};"), "\n")}
-          |  ${(i.component.binarySemaphores.map(b => s"has binary_semaphore ${b.name};"), "\n")}
+          |  ${(i.component.provides.map((p: Provides) => s"provides ${p.typ} ${p.name};"), "\n")}
+          |  ${(i.component.uses.map((u: Uses) => s"uses ${u.typ} ${u.name};"), "\n")}
+          |  ${(i.component.emits.map((e: Emits) => s"emits ${e.typ} ${e.name};"), "\n")}
+          |  ${(i.component.consumes.map((c: Consumes) => s"consumes ${c.typ} ${c.name};"), "\n")}
+          |  ${(i.component.binarySemaphores.map((b: BinarySemaphore) => s"has binary_semaphore ${b.name};"), "\n")}
           |}
           """
 
@@ -130,7 +130,7 @@ import org.sireum.aadl.act.ast._
 
     val st =
       st"""procedure ${o.name} {
-          |  ${(o.includes.map(i => s"include ${i};"), "\n")}
+          |  ${(o.includes.map((i: String) => s"include ${i};"), "\n")}
           |  ${(methods, "\n")}
           |};"""
 

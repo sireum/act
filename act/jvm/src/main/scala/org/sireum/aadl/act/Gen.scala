@@ -8,7 +8,7 @@ import org.sireum.aadl.act.ast._
 
 @record class Gen() {
 
-  var topLevelProcess: Option[ir.Component] = None[ir.Component]
+  var topLevelProcess: Option[ir.Component] = None[ir.Component]()
   var typeHeaderFileName: String = ""
 
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
@@ -23,7 +23,7 @@ import org.sireum.aadl.act.ast._
   var monitors: HashMap[String, Monitor] = HashMap.empty
   var procedures: ISZ[ASTObject] = ISZ()
 
-  def gen(m : ir.Aadl) : ISZ[ASTObject] = {
+  def process(model : ir.Aadl) : ISZ[ASTObject] = {
 
     def resolve(m : ir.Aadl): B = {
       def r(c: ir.Component): Unit = {
@@ -31,10 +31,9 @@ import org.sireum.aadl.act.ast._
         assert(!componentMap.contains(name))
         componentMap = componentMap + (name ~> c)
 
-        c.features.foreach(f =>
-          if (f.isInstanceOf[ir.FeatureEnd]) {
-            featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
-          })
+        for (f <- c.features.withFilter(f => f.isInstanceOf[ir.FeatureEnd])) {
+          featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
+        }
 
         c.connectionInstances.foreach(ci => {
           def add(portPath: String, isIn: B): Unit = {
@@ -65,7 +64,7 @@ import org.sireum.aadl.act.ast._
         for (c <- componentMap.values if (c.category == ir.ComponentCategory.Process) && Util.getTypeHeaderFileName(c).nonEmpty) {
           return Some(c)
         }
-        return None[ir.Component]
+        return None[ir.Component]()
       }
 
       getProcessor() match {
@@ -73,8 +72,7 @@ import org.sireum.aadl.act.ast._
           topLevelProcess = Some(p)
           typeHeaderFileName = Util.getTypeHeaderFileName(p).get
         case _ =>
-          Console.err.println("No processor bound process defined")
-          return false
+          cprintln(T,"No processor bound process defined")
       }
 
       buildMonitors()
@@ -82,8 +80,8 @@ import org.sireum.aadl.act.ast._
       return true
     }
 
-    if(resolve(m)) {
-      m.components.foreach(c => gen(c))
+    if(resolve(model)) {
+      model.components.foreach(c => gen(c))
 
       astObjects = astObjects ++ procedures
     }
@@ -129,7 +127,7 @@ import org.sireum.aadl.act.ast._
           val method = Method(
             name = Util.getLastName(sc.identifier),
             parameters = params,
-            returnType = None[String]
+            returnType = None[String]()
           )
 
           val procName = Util.getClassifier(sc.classifier.get)
@@ -197,7 +195,7 @@ import org.sireum.aadl.act.ast._
       val dstFeature = featureEndMap.get(Util.getName(conn.dst.feature.get)).get
 
       val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
-      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z])
+      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
 
       // rpc src to mon
       createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, "mon")
@@ -262,7 +260,7 @@ import org.sireum.aadl.act.ast._
     var emits: ISZ[Emits] = ISZ()
     var consumes: ISZ[Consumes] = ISZ()
 
-    var imports : Set[String] = Set.empty[String]()
+    var imports : Set[String] = Set.empty
 
     for(f <- c.features){
       val fend = f.asInstanceOf[ir.FeatureEnd]
@@ -279,7 +277,7 @@ import org.sireum.aadl.act.ast._
               imports = imports + Util.getInterfaceFilename(monitor.p.name)
 
               uses = uses :+ Uses(
-                name = Util.genMonitorFeatureName(fend, None[Z]),
+                name = Util.genMonitorFeatureName(fend, None[Z]()),
                 typ = monitor.p.name,
                 optional = F)
 
@@ -288,7 +286,7 @@ import org.sireum.aadl.act.ast._
                 typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
             } else {
-              Console.err.println(s"in port '${fpath}' is not connected")
+              cprintln(T,s"in port '${fpath}' is not connected")
             }
           case ir.Direction.Out =>
             // uses monitor
@@ -317,9 +315,9 @@ import org.sireum.aadl.act.ast._
 
       def handleSubprogramAccess(): Unit = {
         val proc = Util.getClassifier(fend.classifier.get)
-        val kind: Option[ir.ValueProp] = Util.getDiscreetPropertyValue[ir.ValueProp](f.properties, "AccessType")
+        val kind = Util.getDiscreetPropertyValue(f.properties, "AccessType")
         kind match {
-          case Some(v) =>
+          case Some(v : ir.ValueProp) =>
             if(v.value == "requires") {
               uses = uses :+ Uses(
                 name = fid,
@@ -365,14 +363,14 @@ import org.sireum.aadl.act.ast._
           }
 
         case _ =>
-          Console.err.println(s"Skipping ${f.category} for ${fid}.${fid}")
+          cprintln(F, s"Skipping ${f.category} for ${fid}.${fid}")
       }
     }
 
     var binarySemaphores: ISZ[BinarySemaphore] = ISZ()
-    val binSem = Util.getDiscreetPropertyValue[ir.ValueProp](c.properties, "camkes::Binary_Semaphore")
+    val binSem = Util.getDiscreetPropertyValue(c.properties, "camkes::Binary_Semaphore")
     binSem match {
-      case Some(v) =>
+      case Some(v: ir.ValueProp) =>
         binarySemaphores = binarySemaphores :+ BinarySemaphore(v.value)
       case _ =>
     }
@@ -395,7 +393,7 @@ import org.sireum.aadl.act.ast._
       includes = ISZ(s"<${typeHeaderFileName}>"),
       attributes = ISZ(),
 
-      imports.elements // FIXME
+      imports = imports.elements // FIXME
     )
   }
 
@@ -405,10 +403,10 @@ import org.sireum.aadl.act.ast._
       for (connInst <- outConnections.get(portPath).get()) {
 
         val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
-        val dstFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.dst.feature.get)).get()
+        val dstFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.dst.feature.get)).get
 
         val src: ir.Component = componentMap.get(Util.getName(connInst.src.component)).get
-        val srcFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.src.feature.get)).get()
+        val srcFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.src.feature.get)).get
 
         def handleDataPort(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, dstFeature)
@@ -470,7 +468,7 @@ import org.sireum.aadl.act.ast._
                 halt(s"not expecting ${dst}")
             }
           case _ =>
-            Console.err.println(s"processInConnections: Not handling ${connInst}")
+            cprintln(T,s"processInConnections: Not handling ${connInst}")
         }
 
         i = i + 1

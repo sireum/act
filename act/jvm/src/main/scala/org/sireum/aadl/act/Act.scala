@@ -32,7 +32,7 @@ object Act {
       return -1
     }
 
-    val objs = Gen().gen(m)
+    val objs = Gen().process(m)
 
     //objs.foreach(a => println(JSON.fromASTObject(a, F)))
 

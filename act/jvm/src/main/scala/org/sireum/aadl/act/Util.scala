@@ -46,11 +46,11 @@ object Util {
     }
   }
 
-  @pure def getDiscreetPropertyValue[T](properties: ISZ[ir.Property], propertyName: String): Option[T] = {
+  @pure def getDiscreetPropertyValue(properties: ISZ[ir.Property], propertyName: String): Option[ir.PropertyValue] = {
     for (p <- properties if getLastName(p.name) == propertyName) {
-      return Some(ISZOps(p.propertyValues).first.asInstanceOf[T])
+      return Some(ISZOps(p.propertyValues).first)
     }
-    return None[T]
+    return None[ir.PropertyValue]()
   }
 
 
@@ -108,9 +108,9 @@ object Util {
 
   def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
     assert(c.category == ir.ComponentCategory.Process)
-    val processor = getDiscreetPropertyValue[ir.ReferenceProp](c.properties, PROP_ACTUAL_PROCESSOR_BINDING)
+    val processor: Option[ir.PropertyValue] = getDiscreetPropertyValue(c.properties, PROP_ACTUAL_PROCESSOR_BINDING)
     val procName: String = processor match {
-      case Some(v) => getLastName(v.value)
+      case Some(v : ir.ReferenceProp) => getLastName(v.value)
       case _ => return None[String]()
     }
     return Some(s"${GEN_ARTIFACT_PREFIX}_${procName}_types.h")
@@ -118,9 +118,9 @@ object Util {
 
 
   def getQueueSize(f: ir.Feature): Z = {
-    val x: Option[ir.UnitProp] = getDiscreetPropertyValue[ir.UnitProp](f.properties, PROP_QUEUE_SIZE)
+    val x = getDiscreetPropertyValue(f.properties, PROP_QUEUE_SIZE)
     val v: Z = x match {
-      case Some(v) =>
+      case Some(v : ir.UnitProp) =>
         R(v.value) match {
           case Some(vv) => conversions.R.toZ(vv)
           case _ => DEFAULT_QUEUE_SIZE
@@ -142,9 +142,9 @@ object Util {
 
     var start: Z = 0
     var index: Z = 0
-
-    for(i <- 0 until cms.length.toInt) {
-      if(cms(i) == fcms(index)){
+    var i: Z = 0
+    for(c <- cms) {
+      if(c == fcms(index)){
         index = index + 1
       }
       if(index == fcms.size) {
@@ -152,9 +152,10 @@ object Util {
         start = i + 1
         index = 0
       }
+      i = i + 1
     }
-    if(start < cms.length) {
-      split = split :+ sops.substring(start, cms.length)
+    if(start < cms.size) {
+      split = split :+ sops.substring(start, cms.size)
     }
 
     return  st"""${(split, replacement)}""".render
@@ -162,7 +163,7 @@ object Util {
 
   def toLowerCase(s: String):String = {
     val cms = conversions.String.toCms(s)
-    return conversions.String.fromCms(cms.map(c => COps(c).toLower))
+    return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
   }
 }
 
