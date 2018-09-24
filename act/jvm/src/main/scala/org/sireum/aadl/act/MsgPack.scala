@@ -133,6 +133,7 @@ object MsgPack {
       writer.writeISZ(o.provides, writeProvides _)
       writer.writeISZ(o.includes, writer.writeString _)
       writer.writeISZ(o.attributes, writeTODO _)
+      writer.writeISZ(o.imports, writer.writeString _)
     }
 
     def writeUses(o: Uses): Unit = {
@@ -334,7 +335,8 @@ object MsgPack {
       val provides = reader.readISZ(readProvides _)
       val includes = reader.readISZ(reader.readString _)
       val attributes = reader.readISZ(readTODO _)
-      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
+      val imports = reader.readISZ(reader.readString _)
+      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports)
     }
 
     def readUses(): Uses = {

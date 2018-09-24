@@ -100,7 +100,8 @@ import org.sireum._
     var name = i.component.name
 
     val st =
-      st"""component ${name} {
+      st"""${(i.component.imports.map(i => s"import ${i};"), "\n")}
+          |component ${name} {
           |  ${(i.component.includes.map(i => s"include ${i};"), "\n")}
           |  ${if(i.component.control) "control;" else ""}
           |  ${(i.component.provides.map(p => s"provides ${p.typ} ${p.name};"), "\n")}

@@ -96,7 +96,8 @@ object JSON {
         ("consumes", printISZ(F, o.consumes, printConsumes _)),
         ("provides", printISZ(F, o.provides, printProvides _)),
         ("includes", printISZ(T, o.includes, printString _)),
-        ("attributes", printISZ(F, o.attributes, printTODO _))
+        ("attributes", printISZ(F, o.attributes, printTODO _)),
+        ("imports", printISZ(T, o.imports, printString _))
       ))
     }
 
@@ -360,7 +361,10 @@ object JSON {
       parser.parseObjectKey("attributes")
       val attributes = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
-      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes)
+      parser.parseObjectKey("imports")
+      val imports = parser.parseISZ(parser.parseString _)
+      parser.parseObjectNext()
+      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports)
     }
 
     def parseUses(): Uses = {

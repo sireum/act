@@ -83,6 +83,10 @@ object Util {
     return ret
   }
 
+  def getInterfaceFilename(interfaceName: String): String = {
+    return s"${interfaceName}.idl4"
+  }
+
   def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
     assert(c.category == ir.ComponentCategory.Process)
     val processor = getDiscreetPropertyValue[ir.ReferenceProp](c.properties, PROP_ACTUAL_PROCESSOR_BINDING)

@@ -31,7 +31,10 @@ import org.sireum._
                           consumes: ISZ[Consumes],
                           provides: ISZ[Provides],
                           includes: ISZ[String],
-                          attributes: ISZ[TODO]) extends ASTObject
+                          attributes: ISZ[TODO],
+
+                          imports: ISZ[String]
+                         ) extends ASTObject
 
 
 @datatype class Uses(name: String,

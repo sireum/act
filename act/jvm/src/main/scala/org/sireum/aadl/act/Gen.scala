@@ -259,6 +259,8 @@ import org.sireum.aadl.ir
     var emits: ISZ[Emits] = ISZ()
     var consumes: ISZ[Consumes] = ISZ()
 
+    var imports : Set[String] = Set.empty[String]()
+
     for(f <- c.features){
       val fend = f.asInstanceOf[ir.FeatureEnd]
       val fpath = Util.getName(fend.identifier)
@@ -271,6 +273,7 @@ import org.sireum.aadl.ir
             // consumes notification
             if(inConnections.get(fpath).nonEmpty) {
               val monitor = getMonitorForInPort(fend).get
+              imports = imports + Util.getInterfaceFilename(monitor.p.name)
 
               uses = uses :+ Uses(
                 name = Util.portName(fend, None[Z]),
@@ -292,6 +295,7 @@ import org.sireum.aadl.ir
                 outs.foreach(o => {
                   val dstFeature = featureEndMap.get(fpath).get
                   val interfaceName = Util.getInterfaceName(dstFeature)
+                  imports = imports + Util.getInterfaceFilename(interfaceName)
 
                   uses = uses :+ Uses(
                     name = Util.portName(fend, Some(i)),
@@ -386,7 +390,9 @@ import org.sireum.aadl.ir
       consumes = consumes,
       provides = provides,
       includes = ISZ(s"<${typeHeaderFileName}>"),
-      attributes = ISZ()
+      attributes = ISZ(),
+
+      imports.elements // FIXME
     )
   }
 
@@ -404,7 +410,6 @@ import org.sireum.aadl.ir
         def handleDataPort(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, dstFeature)
           val interfaceName = Util.getInterfaceName(dstFeature)
-          val isEventDataPort = f.category == ir.FeatureCategory.EventDataPort
 
           val typeName = Util.getClassifierFullyQualified(dstFeature.classifier.get)
 
@@ -422,17 +427,18 @@ import org.sireum.aadl.ir
             consumes = ISZ(),
             provides = ISZ(Provides(name = "mon", typ = interfaceName)),
             includes = ISZ(s"${interfaceName}.idl4"),
-            attributes = ISZ()
+            attributes = ISZ(),
+            imports = ISZ()
           )
 
           val inst: Instance = Instance(address_space = "", name = Util.toLowerCase(monitorName), component = monitor)
 
-          val methods: ISZ[Method] =
-            if (isEventDataPort) {
-              createQueueMethods(typeName)
-            } else {
-              createReadWriteMethods(typeName)
-            }
+          val methods: ISZ[Method] = f.category match {
+            case ir.FeatureCategory.EventDataPort => createQueueMethods(typeName)
+            case ir.FeatureCategory.DataPort => createReadWriteMethods(typeName)
+            case _ =>
+              halt(s"not expecting ${f.category}")
+          }
 
           val proc: Procedure = Procedure(
             name = interfaceName,
