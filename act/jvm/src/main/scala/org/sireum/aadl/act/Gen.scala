@@ -4,6 +4,7 @@ package org.sireum.aadl.act
 
 import org.sireum._
 import org.sireum.aadl.ir
+import org.sireum.aadl.act.ast._
 
 @record class Gen() {
 

@@ -28,7 +28,7 @@
 
 // This file is auto-generated from ActAst.scala
 
-package org.sireum.aadl.act
+package org.sireum.aadl.act.ast
 
 import org.sireum._
 import org.sireum.Json.Printer._

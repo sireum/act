@@ -1,6 +1,6 @@
 // #Sireum
 
-package org.sireum.aadl.act
+package org.sireum.aadl.act.ast
 
 import org.sireum._
 

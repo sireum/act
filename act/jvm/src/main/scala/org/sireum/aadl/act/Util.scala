@@ -166,7 +166,7 @@ object Util {
   }
 }
 
-@datatype class Monitor (i: Instance,               // camkes monitor
-                         p: Procedure,              // camkes interface
+@datatype class Monitor (i: ast.Instance,               // camkes monitor
+                         p: ast.Procedure,              // camkes interface
                          index: Z,                  // fan-out index
                          ci: ir.ConnectionInstance) // aadl connection
