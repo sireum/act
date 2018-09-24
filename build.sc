@@ -70,6 +70,12 @@ def regenCli() = T.command {
     sireumPackagePath / "cli.sc")(sireumPackagePath))
 }
 
+def tipe() = T.command {
+  val out = pwd/ 'bin / "sireum"
+  val paths = s"${pwd / 'act}:${pwd / 'air}"
+  log(%%(out, 'slang, 'tipe, "-s", paths)(pwd))
+}
+
 private def log(r: CommandResult)(implicit ctx: mill.util.Ctx.Log): Unit = {
   val logger = ctx.log
   val out = r.out.string
