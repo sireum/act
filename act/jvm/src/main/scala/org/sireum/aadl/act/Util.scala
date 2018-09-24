@@ -62,6 +62,7 @@ object Util {
     return st"""${(n.name, "_")}""".render
   }
 
+
   def isMonitor(s: String) : B = {
     val ss = StringOps(s)
     return ss.startsWith(GEN_ARTIFACT_PREFIX) && ss.endsWith(MONITOR_COMP_SUFFIX)
@@ -83,8 +84,26 @@ object Util {
     return ret
   }
 
+  def genMonitorFeatureName(f: ir.FeatureEnd, num: Option[Z]): String = {
+    return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}"
+  }
+
+  def genMonitorNotificationFeatureName(f: ir.FeatureEnd): String = {
+    return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}_notification"
+  }
+
   def getInterfaceFilename(interfaceName: String): String = {
     return s"${interfaceName}.idl4"
+  }
+
+  def getInterfaceName(feature: ir.FeatureEnd): String = {
+    val typeName = getClassifierFullyQualified(feature.classifier.get)
+
+    if(feature.category == ir.FeatureCategory.DataPort) {
+      return s"${INTERFACE_PREFIX}_${typeName}"
+    } else {
+      return s"${INTERFACE_PREFIX}_${typeName}_${getQueueSize(feature)}"
+    }
   }
 
   def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
@@ -97,15 +116,6 @@ object Util {
     return Some(s"${GEN_ARTIFACT_PREFIX}_${procName}_types.h")
   }
 
-  def getInterfaceName(feature: ir.FeatureEnd): String = {
-    val typeName = getClassifierFullyQualified(feature.classifier.get)
-
-    if(feature.category == ir.FeatureCategory.DataPort) {
-      return s"${INTERFACE_PREFIX}_${typeName}"
-    } else {
-      return s"${INTERFACE_PREFIX}_${typeName}_${getQueueSize(feature)}"
-    }
-  }
 
   def getQueueSize(f: ir.Feature): Z = {
     val x: Option[ir.UnitProp] = getDiscreetPropertyValue[ir.UnitProp](f.properties, PROP_QUEUE_SIZE)
@@ -120,15 +130,6 @@ object Util {
     return v
   }
 
-
-
-  def portName(f: ir.FeatureEnd, num: Option[Z]): String = {
-    return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}"
-  }
-
-  def portNotificationName(f: ir.FeatureEnd): String = {
-    return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}_notification"
-  }
 
 
 

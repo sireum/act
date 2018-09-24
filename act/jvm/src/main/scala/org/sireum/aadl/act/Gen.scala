@@ -190,22 +190,24 @@ import org.sireum.aadl.ir
       val monitor = getMonitorForConnectionInstance(conn).get
 
       val srcComponent = Util.getLastName(conn.src.component)
-      val srcFeature = s"${Util.getLastName(conn.src.feature.get)}${monitor.index}"
       val dstComponent = Util.getLastName(conn.dst.component)
-      val dstFeature = Util.getLastName(conn.dst.feature.get)
 
-      val __dstFeature = featureEndMap.get(Util.getName(conn.dst.feature.get)).get
+      val srcFeature = featureEndMap.get(Util.getName(conn.src.feature.get)).get
+      val dstFeature = featureEndMap.get(Util.getName(conn.dst.feature.get)).get
+
+      val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
+      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z])
 
       // rpc src to mon
-      createRPCConnection(srcComponent, srcFeature, monitor.i.name, "mon")
+      createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, "mon")
 
       // rpc mon to dst
-      createRPCConnection(dstComponent, dstFeature, monitor.i.name, "mon")
+      createRPCConnection(dstComponent, dstFeatureName, monitor.i.name, "mon")
 
       // notification monsig to dst
       createNotificationConnection(
         monitor.i.name, "monsig",
-        dstComponent, Util.portNotificationName(__dstFeature)
+        dstComponent, Util.genMonitorNotificationFeatureName(dstFeature)
       )
     }
 
@@ -276,12 +278,12 @@ import org.sireum.aadl.ir
               imports = imports + Util.getInterfaceFilename(monitor.p.name)
 
               uses = uses :+ Uses(
-                name = Util.portName(fend, None[Z]),
+                name = Util.genMonitorFeatureName(fend, None[Z]),
                 typ = monitor.p.name,
                 optional = F)
 
               consumes = consumes :+ Consumes(
-                name = Util.portNotificationName(fend),
+                name = Util.genMonitorNotificationFeatureName(fend),
                 typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
             } else {
@@ -298,7 +300,7 @@ import org.sireum.aadl.ir
                   imports = imports + Util.getInterfaceFilename(interfaceName)
 
                   uses = uses :+ Uses(
-                    name = Util.portName(fend, Some(i)),
+                    name = Util.genMonitorFeatureName(fend, Some(i)),
                     typ = interfaceName,
                     optional = F
                   )
