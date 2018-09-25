@@ -73,6 +73,7 @@ import org.sireum.aadl.act.ast._
           typeHeaderFileName = Util.getTypeHeaderFileName(p).get
         case _ =>
           cprintln(T,"No processor bound process defined")
+          return false
       }
 
       buildMonitors()
