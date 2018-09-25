@@ -293,7 +293,7 @@ import org.sireum.aadl.act.ast._
             outConnections.get(fpath) match {
               case Some(outs) =>
                 var i: Z = 0
-                outs.foreach(o => {
+                for(o <- outs) {
                   val dstFeature = featureEndMap.get(fpath).get
                   val interfaceName = Util.getInterfaceName(dstFeature)
                   imports = imports + Util.getInterfaceFilename(interfaceName)
@@ -304,8 +304,7 @@ import org.sireum.aadl.act.ast._
                     optional = F
                   )
                   i = i + 1
-                  nop()
-                })
+                }
               case _ =>
             }
           case _ =>
@@ -463,7 +462,6 @@ import org.sireum.aadl.act.ast._
                 handleDataPort(dstFeature)
               case ir.FeatureCategory.EventPort =>
                 // will use Notification
-                nop()
               case _ =>
                 halt(s"not expecting ${dst}")
             }
@@ -503,6 +501,4 @@ import org.sireum.aadl.act.ast._
     }
     return None[Monitor]()
   }
-
-  def nop(): Unit = {}
 }
