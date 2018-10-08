@@ -569,36 +569,40 @@ import org.sireum.aadl.act.ast._
   def processDataType(c: ir.Component, isField: B): ST = {
     var includes: ISZ[ST] = ISZ()
     val s: ST =
-      if(TypeUtil.isRecordType(c)) {
-
-        val fields: ISZ[ST] = c.subComponents.map(sub => {
-          st"""${processDataType(sub, T)} ${Util.getLastName(sub.identifier)};"""
-        })
-
+      if (TypeUtil.isRecordType(c)) {
         val name = Util.getClassifierFullyQualified(c.classifier.get)
-        st"""typedef
-            |  struct ${name} {
-            |    ${(fields, "\n")}
-            |  } ${name};"""
-      } else {
-        if(TypeUtil.isBaseType(c.classifier.get.name)) {
-          st"""${TypeUtil.translateBaseType(c.classifier.get.name)}"""
-        } else if (isField) {
-          st"""${Util.getClassifierFullyQualified(c.classifier.get)}"""
-        } else if(TypeUtil.isArrayDef(c)) {
-          // TODO multidim arrays
-          val name = Util.getClassifierFullyQualified(c.classifier.get)
-          val container = Util.getContainerName(name)
-          st"""typdef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
-              |
-              |typedef
-              |  struct ${container} {
-              |    ${name} f;
-              |  } ${container};"""
+        if(isField) {
+          st"""$name"""
         } else {
-          halt(s"Unexpected ${c}")
+          val fields: ISZ[ST] = c.subComponents.map(sub => {
+            st"""${processDataType(sub, T)} ${Util.getLastName(sub.identifier)};"""
+          })
+
+
+          st"""typedef
+              |  struct ${name} {
+              |    ${(fields, "\n")}
+              |  } ${name};"""
         }
+      } else if (TypeUtil.isBaseType(c.classifier.get.name)) {
+        st"""${TypeUtil.translateBaseType(c.classifier.get.name)}"""
+      } else if (isField) {
+        st"""${Util.getClassifierFullyQualified(c.classifier.get)}"""
+      } else if (TypeUtil.isArrayDef(c)) {
+        // TODO multidim arrays
+        val name = Util.getClassifierFullyQualified(c.classifier.get)
+        val container = Util.getContainerName(name)
+        st"""typdef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
+            |
+              |typedef
+            |  struct ${container} {
+            |    ${name} f;
+            |  } ${container};"""
+      } else {
+        cprintln(T, s"Unexpected datatype: ${c}")
+        st""" """
       }
+
 
     return s
   }

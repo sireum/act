@@ -10,7 +10,7 @@ LIB_URL=https://raw.githubusercontent.com/sireum/kekinian/0dce2aacfc8d68016066f5
 LIB_SHA3=46ead9fa1da096f8b817a04cc6ed1be98d52a53d5ed63d26780c73739aaacb26
 LIB=${ACT_HOME}/versions.properties
 SIREUM_URL=http://files.sireum.org/sireum # see https://github.com/sireum/kekinian
-SIREUM_SHA3=d01df67d2b1e3da878300efa390deec06f8df59c70dd72925a281d8876ff73ed
+SIREUM_SHA3=ddfda8d6da0b9529a1f304040ab324707be6cda5e83a861c84977069271188b1
 if [ -z "${PLATFORM}" ]; then
   if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then
     PLATFORM=win
