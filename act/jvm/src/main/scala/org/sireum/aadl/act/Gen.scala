@@ -12,6 +12,7 @@ import org.sireum.aadl.act.ast._
   var typeHeaderFileName: String = ""
 
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
+  var typeMap: HashMap[String, ir.Component] = HashMap.empty
   var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
 
   var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
@@ -20,12 +21,13 @@ import org.sireum.aadl.act.ast._
 
   var astObjects: ISZ[ASTObject] = ISZ()
   var ginstances: ISZ[Instance] = ISZ()
-  var monitors: HashMap[String, Monitor] = HashMap.empty
+  var monitors: HashMap[String, Monitor] = HashMap.empty // conn instname -> monitor
   var procedures: ISZ[ASTObject] = ISZ()
+  var auxFiles: ISZ[(String, ST)] = ISZ()
 
-  def process(model : ir.Aadl) : ISZ[ASTObject] = {
+  def process(model : ir.Aadl) : ActContainer = {
 
-    def resolve(m : ir.Aadl): B = {
+    def resolve(sys : ir.Component): B = {
       def r(c: ir.Component): Unit = {
         val name = Util.getName(c.identifier)
         assert(!componentMap.contains(name))
@@ -58,7 +60,7 @@ import org.sireum.aadl.act.ast._
         c.subComponents.foreach(sc => r(sc))
       }
 
-      m.components.foreach(c => r(c))
+      r(sys)
 
       def getProcessor(): Option[ir.Component] = {
         for (c <- componentMap.values if (c.category == ir.ComponentCategory.Process) && Util.getTypeHeaderFileName(c).nonEmpty) {
@@ -81,13 +83,27 @@ import org.sireum.aadl.act.ast._
       return true
     }
 
-    if(resolve(model)) {
-      model.components.foreach(c => gen(c))
+    val data = model.components.withFilter(f => f.category == ir.ComponentCategory.Data)
+    val components = model.components.withFilter(f => f.category != ir.ComponentCategory.Data)
+    if(components.size != 1 || components(0).category != ir.ComponentCategory.System) {
+      halt(s"Model contains ${components.size} components.  Should only contain a single top-level system")
+    }
+    val system = components(0)
+
+    for(d <- data) {
+      typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d)
+    }
+
+    if(resolve(system)) {
+      val x: (String, ST) = (s"${Util.DIR_INCLUDES}/${typeHeaderFileName}.h", processDataTypes(data))
+      auxFiles = auxFiles :+ x
+
+      gen(system)
 
       astObjects = astObjects ++ procedures
     }
 
-    return astObjects
+    return ActContainer(astObjects, auxFiles)
   }
 
   def gen(c: ir.Component) : Unit = {
@@ -134,7 +150,7 @@ import org.sireum.aadl.act.ast._
           val procName = Util.getClassifier(sc.classifier.get)
           astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
         case _ =>
-          halt(s"genContainer: Not handling: ${sc}")
+          halt(s"gen: Not handling: ${sc}")
       }
     }
 
@@ -263,6 +279,9 @@ import org.sireum.aadl.act.ast._
 
     var imports : Set[String] = Set.empty
 
+    var cIncludes: ISZ[ST] = ISZ()
+    var cImpls: ISZ[ST] = ISZ()
+
     for(f <- c.features){
       val fend = f.asInstanceOf[ir.FeatureEnd]
       val fpath = Util.getName(fend.identifier)
@@ -275,11 +294,11 @@ import org.sireum.aadl.act.ast._
             // consumes notification
             if(inConnections.get(fpath).nonEmpty) {
               val monitor = getMonitorForInPort(fend).get
-              imports = imports + Util.getInterfaceFilename(monitor.p.name)
+              imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
               uses = uses :+ Uses(
                 name = Util.genMonitorFeatureName(fend, None[Z]()),
-                typ = monitor.p.name,
+                typ = monitor.interface.name,
                 optional = F)
 
               consumes = consumes :+ Consumes(
@@ -295,13 +314,12 @@ import org.sireum.aadl.act.ast._
               case Some(outs) =>
                 var i: Z = 0
                 for(o <- outs) {
-                  val dstFeature = featureEndMap.get(fpath).get
-                  val interfaceName = Util.getInterfaceName(dstFeature)
-                  imports = imports + Util.getInterfaceFilename(interfaceName)
+                  val monitor = monitors.get(Util.getName(o.name)).get
+                  imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
                   uses = uses :+ Uses(
                     name = Util.genMonitorFeatureName(fend, Some(i)),
-                    typ = interfaceName,
+                    typ = monitor.interface.name,
                     optional = F
                   )
                   i = i + 1
@@ -365,7 +383,17 @@ import org.sireum.aadl.act.ast._
         case _ =>
           cprintln(F, s"Skipping ${f.category} for ${fid}.${fid}")
       }
+
+      generateC_InterfaceMethod(c, f.asInstanceOf[ir.FeatureEnd]) match {
+        case Some((interface, impl)) =>
+          cIncludes = cIncludes :+ interface
+          cImpls = cImpls :+ impl
+        case _ =>
+      }
     }
+
+    genComponentTypeInterfaceFile(c, cIncludes)
+    genComponentTypeImplementationFile(c, cImpls)
 
     var binarySemaphores: ISZ[BinarySemaphore] = ISZ()
     val binSem = Util.getDiscreetPropertyValue(c.properties, "camkes::Binary_Semaphore")
@@ -390,7 +418,7 @@ import org.sireum.aadl.act.ast._
       uses = uses,
       consumes = consumes,
       provides = provides,
-      includes = ISZ(s"<${typeHeaderFileName}>"),
+      includes = ISZ(s"<${typeHeaderFileName}.h>"),
       attributes = ISZ(),
 
       imports = imports.elements // FIXME
@@ -427,9 +455,9 @@ import org.sireum.aadl.act.ast._
             uses = ISZ(),
             consumes = ISZ(),
             provides = ISZ(Provides(name = "mon", typ = interfaceName)),
-            includes = ISZ(s"${interfaceName}.idl4"),
+            includes = ISZ(),
             attributes = ISZ(),
-            imports = ISZ()
+            imports = ISZ(s"${interfaceName}.idl4")
           )
 
           val inst: Instance = Instance(address_space = "", name = Util.toLowerCase(monitorName), component = monitor)
@@ -444,14 +472,33 @@ import org.sireum.aadl.act.ast._
           val proc: Procedure = Procedure(
             name = interfaceName,
             methods = methods,
-            includes = ISZ(typeHeaderFileName)
+            includes = ISZ(s"<${typeHeaderFileName}.h>")
+          )
+
+          val paramType = typeMap.get(typeName).get
+          val writer: Procedure = Procedure (
+            name = Util.getMonitorWriterName(dstFeature),
+            methods = ISZ(Method(
+              name = s"write_${typeName}",
+              parameters = ISZ(Parameter(F, Direction.Refin, "arg", Util.getMonitorWriterParamName(paramType))),
+              returnType = Some("bool")
+            )),
+            includes = ISZ(s"<${typeHeaderFileName}.h>")
           )
 
           val connInstName = Util.getName(connInst.name)
-          monitors = monitors + (connInstName ~> Monitor(inst, proc, i, connInst))
+          monitors = monitors + (connInstName ~> Monitor(inst, proc, writer, i, connInst))
 
-          procedures = procedures :+ proc
+          procedures = procedures :+ proc :+ writer
           ginstances = ginstances :+ inst
+
+          val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
+          val impl: (String, ST) = (implName, StringTemplate.tbImpl(typeName, Util.getQueueSize(f), monitorName, typeHeaderFileName))
+          auxFiles = auxFiles :+ impl
+
+          val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
+          val inter: (String, ST) = (interName, StringTemplate.tbInterface(s"__${monitorName}_H__"))
+          auxFiles = auxFiles :+ inter
         }
 
         connInst.kind match {
@@ -501,5 +548,185 @@ import org.sireum.aadl.act.ast._
       return Some(m)
     }
     return None[Monitor]()
+  }
+
+  def processDataTypes(values: ISZ[ir.Component]): ST = {
+    val defs: ISZ[ST] = values.withFilter(v => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).map(v => processDataType(v, F))
+    val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
+    val body = st"""#ifndef ${macroname}
+                   |#define ${macroname}
+                   |
+                   |include <stdbool.h>
+                   |include <stdint.h>
+                   |
+                   |${(defs, "\n\n")}
+                   |
+                   |#endif // __TB_AADL_${typeHeaderFileName}__H
+                   |"""
+    return body
+  }
+
+  def processDataType(c: ir.Component, isField: B): ST = {
+    var includes: ISZ[ST] = ISZ()
+    val s: ST =
+      if(TypeUtil.isRecordType(c)) {
+
+        val fields: ISZ[ST] = c.subComponents.map(sub => {
+          st"""${processDataType(sub, T)} ${Util.getLastName(sub.identifier)};"""
+        })
+
+        val name = Util.getClassifierFullyQualified(c.classifier.get)
+        st"""typedef
+            |  struct ${name} {
+            |    ${(fields, "\n")}
+            |  } ${name};"""
+      } else {
+        if(TypeUtil.isBaseType(c.classifier.get.name)) {
+          st"""${TypeUtil.translateBaseType(c.classifier.get.name)}"""
+        } else if (isField) {
+          st"""${Util.getClassifierFullyQualified(c.classifier.get)}"""
+        } else if(TypeUtil.isArrayDef(c)) {
+          // TODO multidim arrays
+          val name = Util.getClassifierFullyQualified(c.classifier.get)
+          val container = Util.getContainerName(name)
+          st"""typdef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
+              |
+              |typedef
+              |  struct ${container} {
+              |    ${name} f;
+              |  } ${container};"""
+        } else {
+          halt(s"Unexpected ${c}")
+        }
+      }
+
+    return s
+  }
+
+  def generateC_InterfaceMethod(component: ir.Component, feature: ir.FeatureEnd): Option[(ST,ST)] = {
+    val ret: Option[(ST, ST)] = feature.category match {
+      case ir.FeatureCategory.DataPort =>
+        val (suffix, mod) : (String, String) = feature.direction match {
+          case ir.Direction.In => ("read", "")
+          case ir.Direction.Out => ("write", "const ")
+          case x => halt(s"Unexpected direction: ${x}")
+        }
+        val name = Util.genMonitorFeatureName(feature, None[Z]())
+        val paramType = Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get)
+
+        val inter = st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
+        val impl: ST =
+          if(suffix == "write") {
+            st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
+                |  bool tb_result = true;
+                |  tb_result &= ${name}0_${suffix}((${paramType} *) ${name});
+                |  return tb_result;
+                |}"""
+          } else {
+            st""" """
+          }
+        Some((inter, impl))
+
+      case ir.FeatureCategory.EventDataPort =>
+        val (suffix, mod, paramType): (String, String, String) = feature.direction match {
+          case ir.Direction.In => ("dequeue", "", Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
+          case ir.Direction.Out => ("enqueue", "const ", Util.getClassifierFullyQualified(feature.classifier.get))
+          case x => halt(s"Unexpected direction: ${x}")
+        }
+        val name = Util.genMonitorFeatureName(feature, None[Z]())
+
+        val inter = st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
+
+        val impl: ST = if(suffix == "enqueue") {
+          st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
+              |  bool tb_result = true;
+              |  tb_result &= ${name}0_${suffix}((${paramType} *) ${name});
+              |  return tb_result;
+              |}"""
+        } else {
+          st""""""
+        }
+        Some((inter, impl))
+
+      case ir.FeatureCategory.EventPort =>
+        val dir: String = feature.direction match {
+          case ir.Direction.In => "read"
+          case ir.Direction.Out => "write"
+          case x => halt(s"Unexpected direction: ${x}")
+        }
+        val compName = Util.getClassifier(component.classifier.get)
+        val methodName = Util.getLastName(feature.identifier)
+        val name = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
+
+        val inter = st"""bool ${name}(void);"""
+
+        val impl: ST = if(dir == "read") {
+          val varName = s"${methodName}_index"
+          val callback = s"${methodName}_callback"
+          val callback_reg = s"${methodName}_reg_callback"
+
+          st"""static bool ${varName} = false;
+              |
+              |bool ${callback}(void *_ UNUSED){
+              |  $varName = true;
+              |  CALLBACK(${callback_reg}(${callback}, NULL));
+              |  return true;
+              |}
+              |
+              |bool ${name}(){
+              |  bool result;
+              |  result = ${varName};
+              |  ${varName} = false;
+              |  return result;
+              |}
+              |"""
+
+        } else {
+          val emit = s"${methodName}_emit()"
+          st"""bool ${name}(void) {
+              |  bool tb_result = true;
+              |  ${emit};
+              |  return tb_result;
+              |}
+              |"""
+        }
+        Some((inter, impl))
+
+      case _ => None[(ST,ST)]()
+    }
+    return ret
+  }
+
+  def genComponentTypeInterfaceFile(component: ir.Component, sts: ISZ[ST]): Unit = {
+    val name = Util.getClassifier(component.classifier.get)
+    val compTypeHeaderFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
+    val macroName = s"__${Util.GEN_ARTIFACT_PREFIX}_AADL_${name}_types__H"
+
+    val ret = st"""#ifndef $macroName
+                  |#define $macroName
+                  |
+                  |#include <${typeHeaderFileName}.h>
+                  |
+                  |${(sts, "\n")}
+                  |
+                  |#endif // $macroName
+                  |"""
+
+    val x: (String, ST) = (s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_INCLUDES}/${compTypeHeaderFileName}.h", ret)
+    auxFiles = auxFiles :+ x
+  }
+
+  def genComponentTypeImplementationFile(component:ir.Component, sts: ISZ[ST]): Unit = {
+    val name = Util.getClassifier(component.classifier.get)
+    val compTypeFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
+
+    val ret = st"""#include "${compTypeFileName}.h"
+                  |#include <string.h>
+                  |#include <camkes.h>
+                  |
+                  |${(sts, "\n")}
+                  |"""
+    val x: (String, ST) = (s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret)
+    auxFiles = auxFiles :+ x
   }
 }

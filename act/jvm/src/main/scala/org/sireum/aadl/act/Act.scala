@@ -32,17 +32,12 @@ object Act {
       return -1
     }
 
-    val objs = Gen().process(m)
+    val con = Gen().process(m)
 
-    //objs.foreach(a => println(JSON.fromASTObject(a, F)))
-
-    val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, objs)
-
-    //out.foreach(o => println(s"${o._1} -> \n${o._2.render}"))
+    val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con)
 
     0
   }
-
 
   def path2fileOpt(pathFor: String, path: Option[String], checkExist: B): scala.Option[File] = {
     if (path.isEmpty) return scala.None

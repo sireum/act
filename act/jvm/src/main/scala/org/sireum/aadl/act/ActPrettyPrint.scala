@@ -7,18 +7,12 @@ import org.sireum.aadl.act.ast._
 
 @record class BijiPrettyPrint() {
 
-  val dirComponents: String = "components"
-  val dirInterfaces: String = "interfaces"
-
   var out : ISZ[(String, ST)] = ISZ()
 
-  def tempEntry(destDir: String, objs: ISZ[ASTObject]): ISZ[(String, ST)] = {
-    prettyPrint(objs)
+  def tempEntry(destDir: String, container: ActContainer): ISZ[(String, ST)] = {
+    prettyPrint(container.models)
 
-
-    for(o <- out) {
-      NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T)
-    }
+    (out ++ container.auxFiles).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))
 
     return out
   }
@@ -27,8 +21,6 @@ import org.sireum.aadl.act.ast._
     for(a <- objs) {
       visit(a)
     }
-
-
     return out
   }
 
@@ -48,9 +40,7 @@ import org.sireum.aadl.act.ast._
 
     val comp = visitComposition(a.composition)
 
-    for(o <- out) {
-      imports = imports :+ st"""import "${o._1}";"""
-    }
+    imports = imports ++ out.map((o: (String, ST)) => st"""import "${o._1}";""")
 
     val st =
       st"""import <std_connector.camkes>;
@@ -102,6 +92,7 @@ import org.sireum.aadl.act.ast._
 
     val st =
       st"""${(i.component.imports.map((i: String) => s"import ${i};"), "\n")}
+         |
           |component ${name} {
           |  ${(i.component.includes.map((i: String) => s"include ${i};"), "\n")}
           |  ${if(i.component.control) "control;" else ""}
@@ -114,9 +105,9 @@ import org.sireum.aadl.act.ast._
           """
 
     if(Util.isMonitor(name)) {
-      add(s"${dirComponents}/${Util.MONITOR_DIRECTORY_NAME}/${name}/${name}.camkes", st)
+      add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st)
     } else {
-      add(s"${dirComponents}/${name}/${name}.camkes", st)
+      add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st)
     }
 
     return None()
@@ -134,7 +125,7 @@ import org.sireum.aadl.act.ast._
           |  ${(methods, "\n")}
           |};"""
 
-    add(s"${dirInterfaces}/${o.name}.idl4", st)
+    add(s"${Util.DIR_INTERFACES}/${o.name}.idl4", st)
 
     return None()
   }
