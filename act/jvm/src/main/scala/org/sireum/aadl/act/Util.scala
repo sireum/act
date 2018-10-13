@@ -28,7 +28,7 @@ object Util {
 
   val DEFAULT_QUEUE_SIZE: Z = 1
 
-  val CONNECTOR_SEL4_NOTIFICATION: String = "sel4Notification"
+  val CONNECTOR_SEL4_NOTIFICATION: String = "seL4Notification"
   val CONNECTOR_RPC: String = "seL4RPCCall"
 
   val DIR_SRC: String = "src"
@@ -42,14 +42,14 @@ object Util {
       case Some(v) => v
       case _ => c.name
     }
-    return replaceAll(replaceAll(t, "::", "__"), ".", "_")
+    return StringUtil.replaceAll(StringUtil.replaceAll(t, "::", "__"), ".", "_")
   }
 
   def getClassifier(c : ir.Classifier) : String = {
     var s = StringOps(c.name)
     var index = s.lastIndexOf(':') + 1
     s = StringOps(s.substring(index, c.name.size))
-    return replaceAll(s.s, ".", "_")
+    return StringUtil.replaceAll(s.s, ".", "_")
   }
 
   @pure def getDiscreetPropertyValue(properties: ISZ[ir.Property], propertyName: String): Option[ir.PropertyValue] = {
@@ -112,7 +112,7 @@ object Util {
   }
 
   def getInterfaceFilename(interfaceName: String): String = {
-    return s"${interfaceName}.idl4"
+    return st""""../../interfaces/${interfaceName}.idl4"""".render
   }
 
   def getInterfaceName(feature: ir.FeatureEnd): String = {
@@ -158,40 +158,6 @@ object Util {
       case _ => DEFAULT_QUEUE_SIZE
     }
     return ret
-  }
-
-
-  def replaceAll(s: String, f: String, replacement: String): String = {
-    var split: ISZ[String] = ISZ()
-
-    val sops = StringOps(s)
-    val cms = conversions.String.toCms(s)
-    val fcms = conversions.String.toCms(f)
-
-    var start: Z = 0
-    var index: Z = 0
-    var i: Z = 0
-    for(c <- cms) {
-      if(c == fcms(index)){
-        index = index + 1
-      }
-      if(index == fcms.size) {
-        split = split :+ sops.substring(start, i - fcms.size + 1)
-        start = i + 1
-        index = 0
-      }
-      i = i + 1
-    }
-    if(start < cms.size) {
-      split = split :+ sops.substring(start, cms.size)
-    }
-
-    return  st"""${(split, replacement)}""".render
-  }
-
-  def toLowerCase(s: String):String = {
-    val cms = conversions.String.toCms(s)
-    return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
   }
 }
 
@@ -258,6 +224,51 @@ object TypeUtil {
   }
 }
 
+object StringUtil {
+  def getDirectory(path: String): String = {
+    val so = StringOps(path)
+    val index = so.lastIndexOf('/')
+    if(index >= 0) {
+      return so.substring(0, index + 1)
+    } else {
+      return path
+    }
+  }
+
+  def replaceAll(s: String, f: String, replacement: String): String = {
+    var split: ISZ[String] = ISZ()
+
+    val sops = StringOps(s)
+    val cms = conversions.String.toCms(s)
+    val fcms = conversions.String.toCms(f)
+
+    var start: Z = 0
+    var index: Z = 0
+    var i: Z = 0
+    for(c <- cms) {
+      if(c == fcms(index)){
+        index = index + 1
+      }
+      if(index == fcms.size) {
+        split = split :+ sops.substring(start, i - fcms.size + 1)
+        start = i + 1
+        index = 0
+      }
+      i = i + 1
+    }
+    if(start < cms.size) {
+      split = split :+ sops.substring(start, cms.size)
+    }
+
+    return  st"""${(split, replacement)}""".render
+  }
+
+  def toLowerCase(s: String):String = {
+    val cms = conversions.String.toCms(s)
+    return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
+  }
+}
+
 object StringTemplate{
   def tbInterface(macroName: String): ST = {
     val r : ST = st"""#ifdef ${macroName}
@@ -268,10 +279,42 @@ object StringTemplate{
     return r
   }
 
-  def tbImpl(typeName: String, dim: Z, typeHeaderFilename: String, monitorTypeHeaderFilename: String): ST = {
+  def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String): ST = {
+    var r : ST =
+      st"""#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
+          |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
+          |
+          |int mon_get_sender_id(void);
+          |int monsig_emit(void);
+          |
+          |static $typeName contents;
+          |
+          |bool mon_read($typeName * m) {
+          |  if (mon_get_sender_id() != TB_MONITOR_READ_ACCESS) {
+          |    return false;
+          |  } else {
+          |    *m = contents;
+          |    return true;
+          |  }
+          |}
+          |
+          |bool mon_write(const $typeName * m) {
+          |  if (mon_get_sender_id() != TB_MONITOR_WRITE_ACCESS) {
+          |    return false;
+          |  } else {
+          |    contents = *m;
+          |    monsig_emit();
+          |    return true;
+          |  }
+          |}
+          |"""
+    return r;
+  }
+
+  def tbEnqueueDequeue(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String): ST = {
     val r: ST =
-    st"""#include "../../../../include/${typeHeaderFilename}.h"
-        |#include "../include/${monitorTypeHeaderFilename}.h"
+    st"""#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
+        |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
         |
         |int mon_get_sender_id(void);
         |int monsig_emit(void);
@@ -317,13 +360,58 @@ object StringTemplate{
     return r
   }
 
+  def cmakeList(projectName: String, rootServer: String, components: ISZ[ST], cmakeVersion: String): ST = {
+    val r: ST =
+      st"""cmake_minimum_required(VERSION ${cmakeVersion})
+          |
+          |project (${rootServer} C)
+          |
+          |${(components, "\n\n")}
+          |
+          |DeclareCAmkESRootserver(${rootServer}.camkes)
+          |"""
+    return r
+  }
+
+  def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String]): ST = {
+    val s = if(sources.nonEmpty){
+      st"""SOURCES ${(sources, " ")}"""
+    } else{
+      st""""""
+    }
+    val i = if(includes.nonEmpty){
+      st"""INCLUDES ${(includes, " ")}"""
+    } else{
+      st""""""
+    }
+
+    val r: ST =
+      st"""DeclareCAmkESComponent(${componentName}
+          |  ${s}
+          |  ${i}
+          |)"""
+    return r
+  }
 }
+
+@datatype class ActContainer(rootServer: String,
+                             models: ISZ[ast.ASTObject],
+                             monitors: ISZ[Monitor],
+                             cContainers: ISZ[CContainer],
+                             auxFiles: ISZ[Resource])
+
 
 @datatype class Monitor (i: ast.Instance,           // camkes monitor
                          interface: ast.Procedure,  // camkes interface
                          writer: ast.Procedure,     // writer interface
+                         cimplementation: Resource,
+                         cinclude: Resource,
                          index: Z,                  // fan-out index
                          ci: ir.ConnectionInstance) // aadl connection
 
-@datatype class ActContainer(models: ISZ[ast.ASTObject],
-                            auxFiles: ISZ[(String, ST)])
+@datatype class CContainer(component: String,
+                           cSources: ISZ[Resource],
+                           cIncludes: ISZ[Resource])
+
+@datatype class Resource(path: String,
+                         contents: ST)

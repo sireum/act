@@ -8,12 +8,37 @@ import org.sireum.aadl.act.ast._
 @record class BijiPrettyPrint() {
 
   var out : ISZ[(String, ST)] = ISZ()
+  var rootServer: String = ""
 
   def tempEntry(destDir: String, container: ActContainer): ISZ[(String, ST)] = {
+    rootServer = container.rootServer
+
     prettyPrint(container.models)
 
-    (out ++ container.auxFiles).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))
+    val c = container.cContainers.flatMap(x => x.cSources ++ x.cIncludes).map(x => (x.path, x.contents))
+    val aux = container.auxFiles.map(x => (x.path, x.contents))
 
+    var components = container.cContainers.map(c => {
+      val sources = c.cSources.map(r => r.path)
+      val includes = c.cIncludes.map(r => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
+      StringTemplate.cmakeComponent(c.component, sources, includes)
+    })
+
+    container.monitors.foreach(m => {
+      prettyPrint(ISZ(m.writer, m.interface))
+
+      components = components :+ StringTemplate.cmakeComponent(m.i.component.name,
+        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES))
+
+      NativeIO.writeToFile(s"${destDir}/${m.cimplementation.path}", m.cimplementation.contents.render, T)
+      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
+      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
+    })
+
+    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, "3.7.2")
+    NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
+
+    (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))
     return out
   }
 
@@ -52,7 +77,7 @@ import org.sireum.aadl.act.ast._
           |}
           |"""
 
-    add("assembly.camkes", st)
+    add(s"${rootServer}.camkes", st)
 
     return None()
   }
