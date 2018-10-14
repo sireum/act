@@ -37,7 +37,8 @@ import org.sireum.aadl.act.ast._
     }
 
     if(resolve(system)) {
-      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(data))
+      val sortedData = sortData(data)
+      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData))
       gen(system)
     }
 
@@ -745,5 +746,27 @@ import org.sireum.aadl.act.ast._
     buildMonitors()
 
     return true
+  }
+
+
+  def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {
+    // build dependence graph so that required data types are processed first
+    var graph: Graph[ir.Component, String] = Graph(HashMap.empty, ISZ(), HashMap.empty, HashMap.empty, 0, F)
+    var map: HashMap[String, ir.Component] = HashMap.empty
+    data.foreach(d => {
+      map = map + (d.classifier.get.name ~> d)
+      graph = graph * d
+    })
+    // add edges
+    data.foreach(d => d.subComponents.foreach(s => graph = graph + (d, map.get(s.classifier.get.name).get)))
+
+    var sorted: ISZ[ir.Component] = ISZ()
+    def process(c : ir.Component): Unit = {
+      if(org.sireum.ops.ISZOps(sorted).contains(c)){ return }
+      graph.outgoing(c).foreach(o => process(o.dest))
+      sorted = sorted :+ c
+    }
+    graph.nodes.keys.withFilter(k => graph.incoming(k).size == z"0").foreach(r => process(r))
+    return sorted
   }
 }
