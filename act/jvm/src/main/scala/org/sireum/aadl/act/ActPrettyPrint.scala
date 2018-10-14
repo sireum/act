@@ -15,12 +15,12 @@ import org.sireum.aadl.act.ast._
 
     prettyPrint(container.models)
 
-    val c = container.cContainers.flatMap(x => x.cSources ++ x.cIncludes).map(x => (x.path, x.contents))
-    val aux = container.auxFiles.map(x => (x.path, x.contents))
+    val c = container.cContainers.flatMap((x: CContainer) => x.cSources ++ x.cIncludes).map((x: Resource) => (x.path, x.contents))
+    val aux = container.auxFiles.map((x: Resource) => (x.path, x.contents))
 
-    var components = container.cContainers.map(c => {
-      val sources = c.cSources.map(r => r.path)
-      val includes = c.cIncludes.map(r => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
+    var components: ISZ[ST] = container.cContainers.map((c: CContainer) => {
+      val sources = c.cSources.map((r: Resource) => r.path)
+      val includes = c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
       StringTemplate.cmakeComponent(c.component, sources, includes)
     })
 

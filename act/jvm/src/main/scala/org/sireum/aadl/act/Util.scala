@@ -374,12 +374,12 @@ object StringTemplate{
   }
 
   def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String]): ST = {
-    val s = if(sources.nonEmpty){
+    val s: ST = if(sources.nonEmpty){
       st"""SOURCES ${(sources, " ")}"""
     } else{
       st""""""
     }
-    val i = if(includes.nonEmpty){
+    val i: ST = if(includes.nonEmpty){
       st"""INCLUDES ${(includes, " ")}"""
     } else{
       st""""""

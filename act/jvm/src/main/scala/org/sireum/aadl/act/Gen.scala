@@ -25,19 +25,17 @@ import org.sireum.aadl.act.ast._
 
   def process(model : ir.Aadl) : ActContainer = {
 
-    val data = model.components.withFilter(f => f.category == ir.ComponentCategory.Data)
+    val datatypes = model.components.withFilter(f => f.category == ir.ComponentCategory.Data)
+    for(d <- datatypes) { typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
+    val sortedData = sortData(datatypes)
+
     val components = model.components.withFilter(f => f.category != ir.ComponentCategory.Data)
     if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
       halt(s"Model contains ${components.size} components.  Should only contain a single top-level system")
     }
+
     val system = components(0)
-
-    for(d <- data) {
-      typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d)
-    }
-
     if(resolve(system)) {
-      val sortedData = sortData(data)
       auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData))
       gen(system)
     }
@@ -75,6 +73,7 @@ import org.sireum.aadl.act.ast._
             Instance(address_space =  "",
               name = name,
               component = genThread(sc))
+
         case ir.ComponentCategory.Subprogram =>
           var params: ISZ[Parameter] = ISZ()
           for(f <- sc.features) {
@@ -92,6 +91,13 @@ import org.sireum.aadl.act.ast._
 
           val procName = Util.getClassifier(sc.classifier.get)
           astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
+
+        case ir.ComponentCategory.SubprogramGroup =>
+          if(sc.features.nonEmpty) { halt(s"Need to handle subprogram group features: ${sc}")}
+          if(sc.subComponents.nonEmpty) { halt(s"Need to handle subprogram group subComponents: ${sc}")}
+
+          val procName = Util.getClassifier(sc.classifier.get)
+          astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(), includes = ISZ())
         case _ =>
           halt(s"gen: Not handling: ${sc}")
       }
@@ -202,7 +208,7 @@ import org.sireum.aadl.act.ast._
       }
     }
 
-    val monInstances = monitors.values.map(m => m.i)
+    val monInstances = monitors.values.map((m: Monitor) => m.i)
     return Composition(
       groups = ISZ(),
       exports = ISZ(),
@@ -281,11 +287,13 @@ import org.sireum.aadl.act.ast._
         kind match {
           case Some(v : ir.ValueProp) =>
             if(v.value == "requires") {
+              imports = imports + Util.getInterfaceFilename(proc)
               uses = uses :+ Uses(
                 name = fid,
                 optional = F,
                 typ = proc)
             } else if (v.value == "provides") {
+              imports = imports + Util.getInterfaceFilename(proc)
               provides = provides :+ Provides(
                 name = fid,
                 typ = proc)
@@ -406,9 +414,12 @@ import org.sireum.aadl.act.ast._
 
           val inst: Instance = Instance(address_space = "", name = StringUtil.toLowerCase(monitorName), component = monitor)
 
+          val paramType = typeMap.get(typeName).get
+          val paramTypeName = Util.getMonitorWriterParamName(paramType)
+
           val methods: ISZ[Method] = f.category match {
-            case ir.FeatureCategory.EventDataPort => createQueueMethods(typeName)
-            case ir.FeatureCategory.DataPort => createReadWriteMethods(typeName)
+            case ir.FeatureCategory.EventDataPort => createQueueMethods(paramTypeName)
+            case ir.FeatureCategory.DataPort => createReadWriteMethods(paramTypeName)
             case _ =>
               halt(s"not expecting ${f.category}")
           }
@@ -416,30 +427,28 @@ import org.sireum.aadl.act.ast._
           val interface: Procedure = Procedure(
             name = interfaceName,
             methods = methods,
-            //includes = ISZ(st""""../${Util.DIR_INCLUDES}/${typeHeaderFileName}.h"""".render)
             includes = ISZ(s"<${typeHeaderFileName}.h>")
           )
 
-          val paramType = typeMap.get(typeName).get
           val writer: Procedure = Procedure (
             name = Util.getMonitorWriterName(dstFeature),
             methods = ISZ(Method(
               name = s"write_${typeName}",
-              parameters = ISZ(Parameter(F, Direction.Refin, "arg", Util.getMonitorWriterParamName(paramType))),
+              parameters = ISZ(Parameter(F, Direction.Refin, "arg", paramTypeName)),
               returnType = Some("bool")
             )),
-            //includes = ISZ(st""""../${Util.DIR_INCLUDES}/${typeHeaderFileName}.h"""".render)
             includes = ISZ(s"<${typeHeaderFileName}.h>")
           )
 
           val connInstName = Util.getName(connInst.name)
 
+
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
-          val cimplementation =
+          val cimplementation: Resource =
             if(f.category == ir.FeatureCategory.DataPort) {
-              Resource(implName, StringTemplate.tbMonReadWrite(typeName, Util.getQueueSize(f), monitorName, typeHeaderFileName))
+              Resource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName))
             } else {
-              Resource(implName, StringTemplate.tbEnqueueDequeue(typeName, Util.getQueueSize(f), monitorName, typeHeaderFileName))
+              Resource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName))
             }
 
           val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
@@ -542,7 +551,7 @@ import org.sireum.aadl.act.ast._
         // TODO multidim arrays
         val name = Util.getClassifierFullyQualified(c.classifier.get)
         val container = Util.getContainerName(name)
-        st"""typdef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
+        st"""typedef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
             |
               |typedef
             |  struct ${container} {
@@ -623,7 +632,7 @@ import org.sireum.aadl.act.ast._
               |
               |bool ${callback}(void *_ UNUSED){
               |  $varName = true;
-              |  CALLBACK(${callback_reg}(${callback}, NULL));
+              |  //CALLBACK(${callback_reg}(${callback}, NULL));
               |  return true;
               |}
               |
@@ -752,21 +761,25 @@ import org.sireum.aadl.act.ast._
   def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {
     // build dependence graph so that required data types are processed first
     var graph: Graph[ir.Component, String] = Graph(HashMap.empty, ISZ(), HashMap.empty, HashMap.empty, 0, F)
-    var map: HashMap[String, ir.Component] = HashMap.empty
-    data.foreach(d => {
-      map = map + (d.classifier.get.name ~> d)
+    for(d <- data){
       graph = graph * d
-    })
-    // add edges
-    data.foreach(d => d.subComponents.foreach(s => graph = graph + (d, map.get(s.classifier.get.name).get)))
+      for(s <- d.subComponents) {
+        val pair = (d, typeMap.get(Util.getClassifierFullyQualified(s.classifier.get)).get)
+        graph = graph + pair
+      }
+    }
 
     var sorted: ISZ[ir.Component] = ISZ()
-    def process(c : ir.Component): Unit = {
+    def build(c : ir.Component): Unit = {
       if(org.sireum.ops.ISZOps(sorted).contains(c)){ return }
-      graph.outgoing(c).foreach(o => process(o.dest))
+      graph.outgoing(c).foreach(o => build(o.dest))
       sorted = sorted :+ c
     }
-    graph.nodes.keys.withFilter(k => graph.incoming(k).size == z"0").foreach(r => process(r))
+    graph.nodes.keys.withFilter(k => graph.incoming(k).size == z"0").foreach(r => build(r))
+
+    data.foreach(p => println(p.classifier.get))
+    println()
+    sorted.foreach(p => println(p.classifier.get))
     return sorted
   }
 }
