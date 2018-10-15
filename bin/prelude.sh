@@ -4,13 +4,13 @@ set -e
 BIN_DIR=${ACT_HOME}/bin
 ZULU_VERSION=10.3+5-jdk10.0.2
 MILL_URL=http://files.sireum.org/mill-standalone # see https://github.com/sireum/mill-build
-MILL_SHA3=368ff274b302d941695b8376557791e71c1e2c4aebb5526e3e2156342e99a67d
+MILL_SHA3=9604c1a78043c498c4821ef58c3866db052253028dfefee0ce6b72f02f370e57
 MILL=${BIN_DIR}/mill
 LIB_URL=https://raw.githubusercontent.com/sireum/kekinian/0dce2aacfc8d68016066f55be8e5db1aba969e1c/versions.properties
 LIB_SHA3=46ead9fa1da096f8b817a04cc6ed1be98d52a53d5ed63d26780c73739aaacb26
 LIB=${ACT_HOME}/versions.properties
 SIREUM_URL=http://files.sireum.org/sireum # see https://github.com/sireum/kekinian
-SIREUM_SHA3=ddfda8d6da0b9529a1f304040ab324707be6cda5e83a861c84977069271188b1
+SIREUM_SHA3=1ee08e174d6925fc0c350ceabd0523c8df33ab1bdfc7989728c8546088db03bd
 if [ -z "${PLATFORM}" ]; then
   if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then
     PLATFORM=win

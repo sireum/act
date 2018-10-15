@@ -30,23 +30,25 @@ import $file.air.Air
 import $file.act.Act
 import $file.cli.Cli
 
+
 object runtime extends mill.Module {
 
   object macros extends Runtime.Module.Macros
 
-  object library extends Runtime.Module.Library {
-
+  object test extends Runtime.Module.Test {
     final override def macrosObject = macros
+  }
 
+  object library extends Runtime.Module.Library {
+    final override def macrosObject = macros
+    final override def testObject = test
   }
 
 }
 
-
 object air extends Air.Module {
-
   final override def libraryObject = runtime.library
-
+  final override def testObject = runtime.test
 }
 
 

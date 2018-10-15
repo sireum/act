@@ -53,5 +53,5 @@ trait Module extends CrossJvmJs {
 
   final override def jsTestFrameworks = jvmTestFrameworks
 
-  def airObject: CrossJvmJs
+  def airObject: CrossJvmJsPublish
 }
