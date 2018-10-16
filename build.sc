@@ -36,33 +36,31 @@ object runtime extends mill.Module {
   object macros extends Runtime.Module.Macros
 
   object test extends Runtime.Module.Test {
-    final override def macrosObject = macros
+    override def macrosObject = macros
   }
 
-  object library extends Runtime.Module.Library {
-    final override def macrosObject = macros
-    final override def testObject = test
+  trait testProvider extends Runtime.Module.TestProvider {
+    override def testObject = test
+  }
+
+  object library extends Runtime.Module.Library with testProvider {
+    override def macrosObject = macros
   }
 
 }
 
-object air extends Air.Module {
+object air extends Air.Module with runtime.testProvider {
   final override def libraryObject = runtime.library
-  final override def testObject = runtime.test
 }
 
 
 object act extends Act.Module {
-
   final override def airObject = air
-
 }
 
 
 object cli extends Cli.Module {
-
   final override def actObject = act
-
 }
 
 def regenCli() = T.command {
