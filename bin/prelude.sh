@@ -4,13 +4,13 @@ set -e
 BIN_DIR=${ACT_HOME}/bin
 ZULU_VERSION=10.3+5-jdk10.0.2
 MILL_URL=http://files.sireum.org/mill-standalone # see https://github.com/sireum/mill-build
-MILL_SHA3=9604c1a78043c498c4821ef58c3866db052253028dfefee0ce6b72f02f370e57
+MILL_SHA3=25fae8688d64a4191ddb73ff05b56f683821cc0c41affe548ee325ef4e7fbead
 MILL=${BIN_DIR}/mill
-LIB_URL=https://raw.githubusercontent.com/sireum/kekinian/0dce2aacfc8d68016066f55be8e5db1aba969e1c/versions.properties
-LIB_SHA3=46ead9fa1da096f8b817a04cc6ed1be98d52a53d5ed63d26780c73739aaacb26
+LIB_URL=https://raw.githubusercontent.com/sireum/kekinian/0ee88fbc16e26a1cf7d7a81510206070fda208db/versions.properties
+LIB_SHA3=cb497ea8cb94a875d63aae7e465be26330f164d475d6ce7f7631f1c31ad10caa
 LIB=${ACT_HOME}/versions.properties
 SIREUM_URL=http://files.sireum.org/sireum # see https://github.com/sireum/kekinian
-SIREUM_SHA3=1ee08e174d6925fc0c350ceabd0523c8df33ab1bdfc7989728c8546088db03bd
+SIREUM_SHA3=33b03d6564eb811f6a868a6de7a7ffb8d8892085a92f2dd95f461b36bb431708
 if [ -z "${PLATFORM}" ]; then
   if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then
     PLATFORM=win
