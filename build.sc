@@ -30,37 +30,37 @@ import $file.air.Air
 import $file.act.Act
 import $file.cli.Cli
 
+
 object runtime extends mill.Module {
 
   object macros extends Runtime.Module.Macros
 
-  object library extends Runtime.Module.Library {
+  object test extends Runtime.Module.Test {
+    override def macrosObject = macros
+  }
 
-    final override def macrosObject = macros
+  trait testProvider extends Runtime.Module.TestProvider {
+    override def testObject = test
+  }
 
+  object library extends Runtime.Module.Library with testProvider {
+    override def macrosObject = macros
   }
 
 }
 
-
-object air extends Air.Module {
-
+object air extends Air.Module with runtime.testProvider {
   final override def libraryObject = runtime.library
-
 }
 
 
 object act extends Act.Module {
-
   final override def airObject = air
-
 }
 
 
 object cli extends Cli.Module {
-
   final override def actObject = act
-
 }
 
 def regenCli() = T.command {
