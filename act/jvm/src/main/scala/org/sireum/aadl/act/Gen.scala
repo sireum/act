@@ -3,6 +3,7 @@
 package org.sireum.aadl.act
 
 import org.sireum._
+import org.sireum.ops.ISZOps
 import org.sireum.aadl.ir
 import org.sireum.aadl.act.ast._
 
@@ -759,27 +760,26 @@ import org.sireum.aadl.act.ast._
 
 
   def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {
+    def u(_c:ir.Component): String = { return Util.getClassifierFullyQualified(_c.classifier.get) }
+    def sort(s: ISZ[ir.Component]): ISZ[ir.Component] = { return ISZOps(s).sortWith((a,b) => u(a) < u(b)) }
+
     // build dependence graph so that required data types are processed first
     var graph: Graph[ir.Component, String] = Graph(HashMap.empty, ISZ(), HashMap.empty, HashMap.empty, 0, F)
     for(d <- data){
       graph = graph * d
       for(s <- d.subComponents) {
-        val pair = (d, typeMap.get(Util.getClassifierFullyQualified(s.classifier.get)).get)
+        val pair = (d, typeMap.get(u(s)).get)
         graph = graph + pair
       }
     }
 
     var sorted: ISZ[ir.Component] = ISZ()
     def build(c : ir.Component): Unit = {
-      if(org.sireum.ops.ISZOps(sorted).contains(c)){ return }
-      graph.outgoing(c).foreach(o => build(o.dest))
+      if(ISZOps(sorted).contains(c)){ return }
+      sort(graph.outgoing(c).map(m => m.dest)).foreach(o => build(o))
       sorted = sorted :+ c
     }
-    graph.nodes.keys.withFilter(k => graph.incoming(k).size == z"0").foreach(r => build(r))
-
-    data.foreach(p => println(p.classifier.get))
-    println()
-    sorted.foreach(p => println(p.classifier.get))
+    sort(graph.nodes.keys.withFilter(k => graph.incoming(k).size == z"0")).foreach(r => build(r))
     return sorted
   }
 }
