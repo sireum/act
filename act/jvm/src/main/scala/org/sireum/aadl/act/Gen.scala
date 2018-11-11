@@ -89,31 +89,32 @@ import org.sireum.aadl.act.ast._
     for(sc <- c.subComponents) {
       sc.category match {
         case ir.ComponentCategory.Thread =>
-          val name = Util.getLastName(sc.identifier)
+          val componentId = Util.getLastName(sc.identifier)
           val classifier = Util.getClassifier(sc.classifier.get)
           instances = instances :+
             Instance(address_space =  "",
-              name = name,
+              name = componentId,
               component = genThread(sc))
 
           if(Util.getDispatchProtocol(sc) == Some(Dispatch_Protocol.Periodic)) {
             // connect component to time server
             createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
-              name, "tb_timer",
+              componentId, TimerUtil.TIMER_ID,
               TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
 
             // connect dispatcher to component
             createConnection(Util.CONNECTOR_SEL4_NOTIFICATION,
-              TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.componentNotificationName(name),
-              name, TimerUtil.TIMER_NOTIFICATION_ID)
+              TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.componentNotificationName(componentId),
+              componentId, TimerUtil.TIMER_NOTIFICATION_ID)
 
             dispatchNotifications = dispatchNotifications :+ Emits(
-              name = TimerUtil.componentNotificationName(name),
+              name = TimerUtil.componentNotificationName(componentId),
               typ = Util.NOTIFICATION_TYPE)
 
-            configuration = configuration :+ TimerUtil.configurationTimerAttribute(name, counter(), F)
-            configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(name, classifier, TimerUtil.TIMER_ID)
-            configuration = configuration :+ StringTemplate.configurationPriority(name, Util.getPriority(sc))
+            configuration = configuration :+ TimerUtil.configurationTimerAttribute(componentId, counter(), F)
+            configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(componentId, classifier, TimerUtil.TIMER_ID)
+            configuration = configuration :+ StringTemplate.configurationPriority(componentId, Util.getPriority(sc))
+            configuration = configuration :+ StringTemplate.configurationStackSize(componentId, Util.getStackSize(sc))
           }
 
         case ir.ComponentCategory.Subprogram =>

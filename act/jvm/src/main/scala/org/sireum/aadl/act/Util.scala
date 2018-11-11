@@ -31,10 +31,11 @@ object Util {
   val PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING: String = "Deployment_Properties::Actual_Processor_Binding"
   val PROP_COMMUNICATION_PROPERTIES__QUEUE_SIZE: String = "Communication_Properties::Queue_Size"
 
-
+  val PROP_MEMORY_PROPERTIES__STACK_SIZE: String = "Memory_Properties::Stack_Size"
 
   val DEFAULT_QUEUE_SIZE: Z = 1
   val DEFAULT_PRIORITY: Z = 201
+  val DEFAULT_STACK_SIZE: Z = 1024
 
   val CONNECTOR_SEL4_NOTIFICATION: String = "seL4Notification"
   val CONNECTOR_RPC: String = "seL4RPCCall"
@@ -185,11 +186,36 @@ object Util {
         R(z) match {
           case Some(v) => conversions.R.toZ(v)
           case _ => Util.DEFAULT_PRIORITY
-       }
+        }
       case _ =>
         Util.DEFAULT_PRIORITY
     }
     return ret
+  }
+
+  def getStackSize(c: ir.Component): Z = {
+    val ret: Z = getDiscreetPropertyValue(c.properties, PROP_MEMORY_PROPERTIES__STACK_SIZE) match {
+      case Some(ir.UnitProp(z, u)) =>
+        R(z) match {
+          case Some(v) =>
+            val _v = conversions.R.toZ(v)
+            val _ret: Z = u match {
+              case Some("bits")  => _v / 8
+              case Some("Bytes") => _v
+              case Some("KByte") => _v * 1000
+              case Some("MByte") => _v * 1000 * 1000
+              case Some("GByte") => _v * 1000 * 1000 * 1000
+              case Some("TByte") => _v * 1000 * 1000 * 1000 * 1000
+              case _ => Util.DEFAULT_STACK_SIZE
+            }
+            _ret
+          case _ => Util.DEFAULT_STACK_SIZE
+        }
+      case _ =>
+        Util.DEFAULT_STACK_SIZE
+    }
+    return ret
+
   }
 }
 
@@ -430,6 +456,10 @@ object StringTemplate{
 
   def configurationPriority(name: String, priority: Z): ST = {
     return st"""${name}.priority = ${priority};"""
+  }
+
+  def configurationStackSize(name: String, size: Z): ST = {
+    return st"""${name}._control_stack_size = ${size};"""
   }
 }
 
