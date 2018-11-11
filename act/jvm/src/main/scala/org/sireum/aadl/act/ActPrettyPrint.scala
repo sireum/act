@@ -35,7 +35,7 @@ import org.sireum.aadl.act.ast._
       NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
     })
 
-    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, "3.7.2")
+    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, Util.CMAKE_VERSION)
     NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
 
     (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))

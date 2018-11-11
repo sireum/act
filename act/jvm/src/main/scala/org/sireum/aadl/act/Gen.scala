@@ -85,6 +85,7 @@ import org.sireum.aadl.act.ast._
 
     var instances: ISZ[Instance] = ISZ()
     var dispatchNotifications: ISZ[Emits] = ISZ()
+    var calendars: ISZ[ST]= ISZ()
 
     for(sc <- c.subComponents) {
       sc.category match {
@@ -111,10 +112,32 @@ import org.sireum.aadl.act.ast._
               name = TimerUtil.componentNotificationName(componentId),
               typ = Util.NOTIFICATION_TYPE)
 
+            val period: Z = if(Util.getPeriod(sc).isEmpty) {
+              cprint(T, s"Period not provided for ${classifier}, using ${Util.DEFAULT_PERIOD}")
+              Util.DEFAULT_PERIOD
+            } else {
+              Util.getPeriod(sc).get
+            }
+            calendars = calendars :+ TimerUtil.calendar(componentId, period)
+
             configuration = configuration :+ TimerUtil.configurationTimerAttribute(componentId, counter(), F)
             configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(componentId, classifier, TimerUtil.TIMER_ID)
-            configuration = configuration :+ StringTemplate.configurationPriority(componentId, Util.getPriority(sc))
-            configuration = configuration :+ StringTemplate.configurationStackSize(componentId, Util.getStackSize(sc))
+
+            val priority: Z = if(Util.getPriority(sc).isEmpty){
+              cprint(T, s"Priority not provided for ${classifier}, using ${Util.DEFAULT_PRIORITY}")
+              Util.DEFAULT_PRIORITY
+            } else {
+              Util.getPriority(sc).get
+            }
+            configuration = configuration :+ StringTemplate.configurationPriority(componentId, priority)
+
+            val stackSize: Z = if(Util.getStackSize(sc).isEmpty) {
+              cprint(T, s"Stack Size not provided for ${classifier}, using ${Util.DEFAULT_STACK_SIZE}")
+              Util.DEFAULT_STACK_SIZE
+            } else {
+              Util.getStackSize(sc).get
+            }
+            configuration = configuration :+ StringTemplate.configurationStackSize(componentId, stackSize)
           }
 
         case ir.ComponentCategory.Subprogram =>
@@ -149,12 +172,13 @@ import org.sireum.aadl.act.ast._
     { // add the timer component
       val timerComponent = TimerUtil.timerComponent()
       instances = instances :+ timerComponent
-      containers = containers :+ C_Container(timerComponent.component.name, ISZ(), ISZ())
+      containers = containers :+ C_Container(timerComponent.component.name, ISZ(TimerUtil.timerCSource()), ISZ())
 
       // add the dispatcher component
       val dispatchComponent = TimerUtil.dispatchComponent(dispatchNotifications)
       instances = instances :+ dispatchComponent
-      containers = containers :+ C_Container(dispatchComponent.component.name, ISZ(TimerUtil.dispatchComponentCSource()), ISZ())
+      containers = containers :+ C_Container(dispatchComponent.component.name,
+        ISZ(TimerUtil.dispatchComponentCSource(s"<${typeHeaderFileName}.h>", calendars)), ISZ())
 
       // connect dispatch timer to time server
       createConnection(Util.CONNECTOR_SEL4_TIMESERVER,

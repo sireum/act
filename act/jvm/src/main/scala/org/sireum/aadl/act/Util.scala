@@ -20,22 +20,23 @@ object Util {
   val INTERFACE_PREFIX: String  = s"${GEN_ARTIFACT_PREFIX}_Monitor"
 
 
-
   val PROP_DATA_MODEL__DATA_REPRESENTATION: String = "Data_Model::Data_Representation"
   val PROP_DATA_MODEL__DIMENSION: String = "Data_Model::Dimension"
   val PROP_DATA_MODEL__BASE_TYPE: String = "Data_Model::Base_Type"
 
   val PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL: String = "Thread_Properties::Dispatch_Protocol"
   val PROP_THREAD_PROPERTIES__PRIORITY: String =  "Thread_Properties::Priority"
+  val PROP_THREAD_PROPERTIES__PERIOD: String = "Timing_Properties::Period"
 
   val PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING: String = "Deployment_Properties::Actual_Processor_Binding"
   val PROP_COMMUNICATION_PROPERTIES__QUEUE_SIZE: String = "Communication_Properties::Queue_Size"
 
   val PROP_MEMORY_PROPERTIES__STACK_SIZE: String = "Memory_Properties::Stack_Size"
 
-  val DEFAULT_QUEUE_SIZE: Z = 1
-  val DEFAULT_PRIORITY: Z = 201
-  val DEFAULT_STACK_SIZE: Z = 1024
+  val DEFAULT_QUEUE_SIZE: Z = z"1"
+  val DEFAULT_PRIORITY: Z = z"201"
+  val DEFAULT_STACK_SIZE: Z = z"1024"
+  val DEFAULT_PERIOD: Z = z"1"
 
   val CONNECTOR_SEL4_NOTIFICATION: String = "seL4Notification"
   val CONNECTOR_RPC: String = "seL4RPCCall"
@@ -47,6 +48,8 @@ object Util {
   val DIR_COMPONENTS: String = "components"
   val DIR_INTERFACES: String = "interfaces"
   val DIR_MONITORS: String = "tb_Monitors"
+
+  val CMAKE_VERSION: String = "3.8.2"
 
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
     val t: String = TypeUtil.translateBaseType(c.name) match {
@@ -180,42 +183,64 @@ object Util {
     return ret
   }
 
-  def getPriority(c: ir.Component): Z = {
-    val ret: Z = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__PRIORITY) match {
+  def getPriority(c: ir.Component): Option[Z] = {
+    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__PRIORITY) match {
       case Some(ir.UnitProp(z, u)) =>
         R(z) match {
-          case Some(v) => conversions.R.toZ(v)
-          case _ => Util.DEFAULT_PRIORITY
+          case Some(v) => Some(conversions.R.toZ(v))
+          case _ => None[Z]()
         }
-      case _ =>
-        Util.DEFAULT_PRIORITY
+      case _ => None[Z]()
     }
     return ret
   }
 
-  def getStackSize(c: ir.Component): Z = {
-    val ret: Z = getDiscreetPropertyValue(c.properties, PROP_MEMORY_PROPERTIES__STACK_SIZE) match {
+  def getStackSize(c: ir.Component): Option[Z] = {
+    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_MEMORY_PROPERTIES__STACK_SIZE) match {
       case Some(ir.UnitProp(z, u)) =>
         R(z) match {
           case Some(v) =>
             val _v = conversions.R.toZ(v)
-            val _ret: Z = u match {
-              case Some("bits")  => _v / 8
-              case Some("Bytes") => _v
-              case Some("KByte") => _v * 1000
-              case Some("MByte") => _v * 1000 * 1000
-              case Some("GByte") => _v * 1000 * 1000 * 1000
-              case Some("TByte") => _v * 1000 * 1000 * 1000 * 1000
-              case _ => Util.DEFAULT_STACK_SIZE
+            val _ret: Option[Z] = u match {
+              case Some("bits")  => Some(_v / z"8")
+              case Some("Bytes") => Some(_v)
+              case Some("KByte") => Some(_v * z"1000")
+              case Some("MByte") => Some(_v * z"1000" * z"1000")
+              case Some("GByte") => Some(_v * z"1000" * z"1000" * z"1000")
+              case Some("TByte") => Some(_v * z"1000" * z"1000" * z"1000" * z"1000")
+              case _ => None[Z]()
             }
             _ret
-          case _ => Util.DEFAULT_STACK_SIZE
+          case _ => None[Z]()
         }
-      case _ =>
-        Util.DEFAULT_STACK_SIZE
+      case _ => None[Z]()
     }
     return ret
 
+  }
+
+  def getPeriod(c: ir.Component): Option[Z] = {
+    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__PERIOD) match {
+      case Some(ir.UnitProp(z, u)) =>
+        R(z) match {
+          case Some(v) =>
+            val _v = conversions.R.toZ(v)
+            val _ret: Option[Z] = u match {
+              case Some("ps")  => Some(_v / (z"1000" * z"1000" * z"1000"))
+              case Some("ns")  => Some(_v / (z"1000" * z"1000"))
+              case Some("us")  => Some(_v / (z"1000"))
+              case Some("ms")  => Some(_v)
+              case Some("sec") => Some(_v * z"1000")
+              case Some("min") => Some(_v * z"1000" * z"60")
+              case Some("hr")  => Some(_v * z"1000" * z"60" * z"60")
+              case _ => None[Z]()
+            }
+            _ret
+          case _ => None[Z]()
+        }
+      case _ => None[Z]()
+    }
+    return ret
   }
 }
 
@@ -513,11 +538,66 @@ object TimerUtil {
     return i
   }
 
-  def dispatchComponentCSource(): Resource = {
-    val st: ST = st"""void ${TIMER_NOTIFICATION_DISPATCHER_ID}_callback() {
-                     |  //tb_thread_calendar();
+  def calendar(componentName: String, period: Z): ST = {
+    val st = st"""if ((aadl_calendar_counter % (${period} / aadl_tick_interval)) == 0) {
+                 |  ${componentName}_periodic_dispatcher_emit();
+                 |}"""
+    return st
+  }
+
+  def dispatchComponentCSource(modelTypesHeader: String, calendars: ISZ[ST]): Resource = {
+    val st: ST = st"""#include <string.h>
+                     |#include <camkes.h>
+                     |#include ${modelTypesHeader}
+                     |
+                     |// prototypes for clock functions
+                     |void clock_init();
+                     |void clock_set_interval_in_ms(uint32_t interval);
+                     |void clock_start_timer(void);
+                     |void clock_irq_callback(void);
+                     |uint64_t clock_get_time();
+                     |
+                     |// Declarations for managing periodic thread dispatch
+                     |const uint32_t aadl_tick_interval = 1;
+                     |const uint32_t aadl_hyperperiod_subdivisions = 5;
+                     |uint32_t aadl_calendar_counter = 0;
+                     |uint32_t aadl_calendar_ticks = 0;
+                     |
+                     |void tb_thread_calendar() {
+                     |  ${(calendars, "\n")}
+                     |
+                     |  aadl_calendar_counter = (aadl_calendar_counter + 1) % aadl_hyperperiod_subdivisions;
+                     |  aadl_calendar_ticks++;
+                     |}
+                     |
+                     |void ${TIMER_NOTIFICATION_DISPATCHER_ID}_callback() {
+                     |  tb_thread_calendar();
+                     |}
+                     |
+                     |// no op under the new time server scheme.
+                     |void clock_init() { }
+                     |
+                     |// Set interrupt interval, in milliseconds.
+                     |void clock_set_interval_in_ms(uint32_t interval) {
+                     |  timer_periodic(0, ((uint64_t)interval) * NS_IN_MS);
+                     |}
+                     |
+                     |// no op under the new time server scheme
+                     |void clock_start_timer(void) { }
+                     |
+                     |// defer to time server
+                     |uint64_t clock_get_time() {
+                     |  return (timer_time() / NS_IN_MS);
+                     |}
+                     |
+                     |int run(void) {
+                     |  clock_init();
+                     |  clock_set_interval_in_ms(1);
+                     |  clock_start_timer();
+                     |  return 0;
                      |}
                      |"""
+
     val compTypeFileName:String = s"${Util.GEN_ARTIFACT_PREFIX}_${DISPATCH_CLASSIFIER}"
     return Resource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st)
   }
@@ -550,15 +630,52 @@ object TimerUtil {
     return i
   }
 
+  def timerCSource(): Resource = {
+    val st: ST = st"""#include <stdio.h>
+                     |#include <camkes.h>
+                     |
+                     |int the_timer_oneshot_relative(int id, uint64_t ns) {
+                     |    return -1;
+                     |}
+                     |
+                     |int the_timer_oneshot_absolute(int id, uint64_t ns) {
+                     |    return -1;
+                     |}
+                     |
+                     |int the_timer_periodic(int id, uint64_t ns) {
+                     |    return -1;
+                     |}
+                     |
+                     |int the_timer_stop(int id) {
+                     |    return -1;
+                     |}
+                     |
+                     |unsigned int the_timer_completed() {
+                     |    return 1;
+                     |}
+                     |
+                     |uint64_t the_timer_time() {
+                     |    return 1;
+                     |}
+                     |
+                     |uint64_t the_timer_tsc_frequency() {
+                     |    return 1;
+                     |}
+                     |"""
+
+    val compTypeFileName:String = s"${Util.GEN_ARTIFACT_PREFIX}_${TIMER_INSTANCE}"
+    return Resource(s"${Util.DIR_COMPONENTS}/${TIMER_SERVER_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st)
+  }
+
   def timerInterface(): Resource = {
     val _st: ST = st"""procedure Timer {
-                      |  //unsigned int completed();
-                      |  //int periodic(in int tid, in uint64_t ns);
-                      |  //int oneshot_absolute(in int tid, in uint64_t ns);
-                      |  //int oneshot_relative(in int tid, in uint64_t ns);
-                      |  //int stop(in int tid);
-                      |  //uint64_t time();
-                      |  //uint64_t tsc_frequency();
+                      |  unsigned int completed();
+                      |  int periodic(in int tid, in uint64_t ns);
+                      |  int oneshot_absolute(in int tid, in uint64_t ns);
+                      |  int oneshot_relative(in int tid, in uint64_t ns);
+                      |  int stop(in int tid);
+                      |  uint64_t time();
+                      |  uint64_t tsc_frequency();
                       |};
                       |"""
     return Resource(s"${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4", _st)
