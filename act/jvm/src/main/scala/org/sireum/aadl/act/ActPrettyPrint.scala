@@ -15,10 +15,10 @@ import org.sireum.aadl.act.ast._
 
     prettyPrint(container.models)
 
-    val c = container.cContainers.flatMap((x: CContainer) => x.cSources ++ x.cIncludes).map((x: Resource) => (x.path, x.contents))
+    val c = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes).map((x: Resource) => (x.path, x.contents))
     val aux = container.auxFiles.map((x: Resource) => (x.path, x.contents))
 
-    var components: ISZ[ST] = container.cContainers.map((c: CContainer) => {
+    var components: ISZ[ST] = container.cContainers.map((c: C_Container) => {
       val sources = c.cSources.map((r: Resource) => r.path)
       val includes = c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
       StringTemplate.cmakeComponent(c.component, sources, includes)
@@ -72,8 +72,17 @@ import org.sireum.aadl.act.ast._
           |
           |${(imports, "\n")}
           |
+          |connector seL4TimeServer {
+          |  from Procedures template "seL4TimeServer-from.template.c";
+          |  to Procedure template "seL4TimeServer-to.template.c";
+          |}
+          |
           |assembly {
           |  ${comp.get}
+          |
+          |  configuration {
+          |    ${a.configuration}
+          |  }
           |}
           |"""
 

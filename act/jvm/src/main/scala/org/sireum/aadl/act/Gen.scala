@@ -22,7 +22,14 @@ import org.sireum.aadl.act.ast._
   var astObjects: ISZ[ASTObject] = ISZ()
   var monitors: HashSMap[String, Monitor] = HashSMap.empty // conn instname -> monitor
   var auxFiles: ISZ[Resource] = ISZ()
-  var containers: ISZ[CContainer] = ISZ()
+  var containers: ISZ[C_Container] = ISZ()
+  var configuration: ISZ[ST] = ISZ()
+
+  var count: Z = 0
+  def counter(): Z = {
+    count = count + 1
+    return count - 1
+  }
 
   def process(model : ir.Aadl) : ActContainer = {
 
@@ -38,6 +45,8 @@ import org.sireum.aadl.act.ast._
     val system = components(0)
     if(resolve(system)) {
       auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData))
+      auxFiles = auxFiles :+ TimerUtil.timerInterface()
+
       gen(system)
     }
 
@@ -54,7 +63,7 @@ import org.sireum.aadl.act.ast._
         c.subComponents.foreach(sc => gen(sc))
       case ir.ComponentCategory.Process =>
         val g = genContainer(c)
-        astObjects = astObjects :+ Assembly("", g)
+        astObjects = astObjects :+ Assembly(st"""${(configuration, "\n")}""".render, g)
       case ir.ComponentCategory.Thread =>
         genThread(c)
       case _ =>
@@ -65,7 +74,18 @@ import org.sireum.aadl.act.ast._
   def genContainer(c : ir.Component) : Composition = {
     assert(c.category == ir.ComponentCategory.Process)
 
+    var connections: ISZ[Connection] = ISZ()
+    var i: Z = 1
+
+    def newConn(): String = {
+      val ret = s"conn${i}"
+      i = i + 1
+      return ret
+    }
+
     var instances: ISZ[Instance] = ISZ()
+    var dispatchNotifications: ISZ[Emits] = ISZ()
+
     for(sc <- c.subComponents) {
       sc.category match {
         case ir.ComponentCategory.Thread =>
@@ -74,6 +94,23 @@ import org.sireum.aadl.act.ast._
             Instance(address_space =  "",
               name = name,
               component = genThread(sc))
+
+          if(Util.getDispatchProtocol(sc) == Some(Dispatch_Protocol.Periodic)) {
+            createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
+              name, "tb_timer",
+              TimerUtil.TIMER_INSTANCE, "the_timer")
+
+            createConnection(Util.CONNECTOR_SEL4_NOTIFICATION,
+              TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.componentNotificationName(name),
+              name, TimerUtil.TIMER_NOTIFICATION)
+
+            dispatchNotifications = dispatchNotifications :+ Emits(
+              name = TimerUtil.componentNotificationName(name),
+              typ = Util.NOTIFICATION_TYPE)
+
+            configuration = configuration :+ TimerUtil.timerAttribute(name, counter(), F)
+            configuration = configuration :+ TimerUtil.timerGlobalEndpoint(name, F)
+          }
 
         case ir.ComponentCategory.Subprogram =>
           var params: ISZ[Parameter] = ISZ()
@@ -104,20 +141,32 @@ import org.sireum.aadl.act.ast._
       }
     }
 
-    var connections: ISZ[Connection] = ISZ()
-    var i: Z = 1
+    { // add the timer and dispatch components
+      val timerComponent = TimerUtil.timerComponent()
+      instances = instances :+ timerComponent
+      containers = containers :+ C_Container(timerComponent.component.name, ISZ(), ISZ())
 
-    def newConn(): String = {
-      val ret = s"conn${i}"
-      i = i + 1
-      return ret
+      val dispatchComponent = TimerUtil.dispatchComponent(dispatchNotifications)
+      instances = instances :+ dispatchComponent
+      containers = containers :+ C_Container(dispatchComponent.component.name, ISZ(), ISZ())
+
+      createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
+        TimerUtil.DISPATCH_PERIODIC_INSTANCE, "timer",
+        TimerUtil.TIMER_INSTANCE, "the_timer")
+
+      createConnection(Util.CONNECTOR_SEL4_GLOBAL_ASYNCH_CALLBACK,
+        TimerUtil.TIMER_INSTANCE, "timer_notification",
+        TimerUtil.DISPATCH_PERIODIC_INSTANCE, "timer_complete")
+
+      configuration = configuration :+ TimerUtil.timerAttribute(dispatchComponent.name, counter(), T)
+      configuration = configuration :+ TimerUtil.timerGlobalEndpoint(dispatchComponent.name, T)
     }
 
-    def createConnection(isNotification: B,
+    def createConnection(connectionType: String,
                          srcComponent: String, srcFeature: String,
                          dstComponent: String, dstFeature: String): Unit = {
       val connector = Connector(
-          name = if(isNotification) Util.CONNECTOR_SEL4_NOTIFICATION else Util.CONNECTOR_RPC,
+          name = connectionType,
           from_type = "", to_type = "",
           from_hardware = F, from_multiple = F, from_threads = 1, to_hardware = F, to_multiple = F, to_threads = 1
         )
@@ -144,12 +193,12 @@ import org.sireum.aadl.act.ast._
 
     def createNotificationConnection(srcComponent: String, srcFeature: String,
                                      dstComponent: String, dstFeature: String): Unit = {
-      createConnection(T, srcComponent, srcFeature, dstComponent, dstFeature)
+      createConnection(Util.CONNECTOR_SEL4_NOTIFICATION, srcComponent, srcFeature, dstComponent, dstFeature)
     }
 
     def createRPCConnection(srcComponent: String, srcFeature: String,
                             dstComponent: String, dstFeature: String) : Unit = {
-      createConnection(F, srcComponent, srcFeature, dstComponent, dstFeature)
+      createConnection(Util.CONNECTOR_RPC, srcComponent, srcFeature, dstComponent, dstFeature)
     }
 
     def createDataConnection(conn: ir.ConnectionInstance) : Unit = {
@@ -353,11 +402,42 @@ import org.sireum.aadl.act.ast._
       case _ =>
     }
 
+    Util.getDispatchProtocol(c) match {
+      case Some(Dispatch_Protocol.Periodic) =>
+        // import Timer.idl4
+        imports = imports + Util.getInterfaceFilename(TimerUtil.TIMER_TYPE)
+
+        // has semaphore tb_dispatch_sem
+        binarySemaphores = binarySemaphores :+ BinarySemaphore(TimerUtil.SEM_DISPATCH)
+
+        // uses Timer tb_timer;
+        uses = uses :+ Uses(
+          name = TimerUtil.TIMER_IDENTIFIER,
+          typ = TimerUtil.TIMER_TYPE,
+          optional = F)
+
+        // consumes Notification tb_timer_complete
+        consumes = consumes :+ Consumes(
+          name = TimerUtil.TIMER_NOTIFICATION,
+          typ = Util.NOTIFICATION_TYPE,
+          optional = F)
+
+        cIncludes = cIncludes :+ st"""
+                                     |// user entrypoints for periodic dispatch
+                                     |void component_entry(const int64_t * periodic_dispatcher);
+                                     |void component_init(const int64_t *arg);"""
+
+      case Some(Dispatch_Protocol.Sporadic) =>
+      case _ =>
+        cprint(T, s"Dispatch Protocol not specified for ${c}")
+    }
+
+
     val cid = Util.getClassifier(c.classifier.get)
 
-    containers = containers :+ CContainer(cid,
+    containers = containers :+ C_Container(cid,
       ISZ(genComponentTypeImplementationFile(c, cImpls)),
-        ISZ(genComponentTypeInterfaceFile(c, cIncludes))
+      ISZ(genComponentTypeInterfaceFile(c, cIncludes))
     )
 
     return Component(
@@ -377,7 +457,7 @@ import org.sireum.aadl.act.ast._
       includes = ISZ(s"<${typeHeaderFileName}.h>"),
       attributes = ISZ(),
 
-      imports = imports.elements // FIXME
+      imports = imports.elements
     )
   }
 

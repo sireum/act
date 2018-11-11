@@ -19,17 +19,23 @@ object Util {
 
   val INTERFACE_PREFIX: String  = s"${GEN_ARTIFACT_PREFIX}_Monitor"
 
+
+
   val PROP_DATA_MODEL__DATA_REPRESENTATION: String = "Data_Model::Data_Representation"
   val PROP_DATA_MODEL__DIMENSION: String = "Data_Model::Dimension"
   val PROP_DATA_MODEL__BASE_TYPE: String = "Data_Model::Base_Type"
-
+  val PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL: String = "Thread_Properties::Dispatch_Protocol"
   val PROP_ACTUAL_PROCESSOR_BINDING: String = "Deployment_Properties::Actual_Processor_Binding"
   val PROP_QUEUE_SIZE: String = "Communication_Properties::Queue_Size"
+
+
 
   val DEFAULT_QUEUE_SIZE: Z = 1
 
   val CONNECTOR_SEL4_NOTIFICATION: String = "seL4Notification"
   val CONNECTOR_RPC: String = "seL4RPCCall"
+  val CONNECTOR_SEL4_TIMESERVER: String = "seL4TimeServer"
+  val CONNECTOR_SEL4_GLOBAL_ASYNCH_CALLBACK: String = CONNECTOR_SEL4_NOTIFICATION // "seL4GlobalAsynchCallback" // FIXME
 
   val DIR_SRC: String = "src"
   val DIR_INCLUDES: String = "includes"
@@ -156,6 +162,15 @@ object Util {
     val ret: Z = getUnitPropZ(f.properties, PROP_QUEUE_SIZE) match {
       case Some(z) => z
       case _ => DEFAULT_QUEUE_SIZE
+    }
+    return ret
+  }
+
+  def getDispatchProtocol(c: ir.Component): Option[Dispatch_Protocol.Type] = {
+    val ret: Option[Dispatch_Protocol.Type] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
+      case Some(ir.ValueProp("Periodic")) => Some(Dispatch_Protocol.Periodic)
+      case Some(ir.ValueProp("Spordic")) => Some(Dispatch_Protocol.Sporadic)
+      case _ => None[Dispatch_Protocol.Type]()
     }
     return ret
   }
@@ -366,6 +381,9 @@ object StringTemplate{
           |
           |project (${rootServer} C)
           |
+          |
+          |CAmkESAddTemplatesPath(../../../../components/templates/)
+          |
           |${(components, "\n\n")}
           |
           |DeclareCAmkESRootserver(${rootServer}.camkes)
@@ -392,12 +410,110 @@ object StringTemplate{
           |)"""
     return r
   }
+
+}
+
+object TimerUtil {
+
+  val SEM_DISPATCH: String = s"${Util.GEN_ARTIFACT_PREFIX}_dispatch_sem"
+  val TIMER_IDENTIFIER: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer"
+  val TIMER_TYPE: String = "Timer"
+  val TIMER_NOTIFICATION: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer_complete"
+  val TIMER_SERVER_CLASSIFIER: String = "TimeServer"
+  val TIMER_INSTANCE: String = "time_server"
+
+  val DISPATCH_PERIODIC_INSTANCE: String = "dispatch_periodic_inst"
+
+  def dispatchComponent(notifications: ISZ[ast.Emits]): ast.Instance = {
+    val i = ast.Instance(
+      address_space = "",
+      name = DISPATCH_PERIODIC_INSTANCE,
+      component = ast.Component(
+        control = F,
+        hardware = F,
+        name = "dispatch_periodic",
+        mutexes = ISZ(),
+        binarySemaphores = ISZ(),
+        semaphores = ISZ(),
+        dataports = ISZ(),
+        emits = notifications,
+        uses = ISZ(ast.Uses(
+          name = "timer",
+          typ = TIMER_TYPE,
+          optional = F)),
+        consumes = ISZ(ast.Consumes(
+          name = "timer_complete",
+          typ = Util.NOTIFICATION_TYPE,
+          optional = F)),
+        provides = ISZ(),
+        includes = ISZ(),
+        attributes = ISZ(),
+        imports = ISZ(st""""../../${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4"""".render)
+      ))
+    return i
+  }
+
+  def timerComponent(): ast.Instance = {
+    val i = ast.Instance(
+      address_space = "",
+      name = TIMER_INSTANCE,
+      component = ast.Component(
+        control = F,
+        hardware = F,
+        name = TIMER_SERVER_CLASSIFIER,
+        mutexes = ISZ(),
+        binarySemaphores = ISZ(),
+        semaphores = ISZ(),
+        dataports = ISZ(),
+        emits = ISZ(ast.Emits(
+          name = "timer_notification",
+          typ = Util.NOTIFICATION_TYPE)),
+        uses = ISZ(),
+        consumes = ISZ(),
+        provides = ISZ(ast.Provides(
+          name = "the_timer",
+          typ = TIMER_TYPE)),
+        includes = ISZ(),
+        attributes = ISZ(),
+        imports = ISZ()
+      )
+    )
+    return i
+  }
+
+  def timerInterface(): Resource = {
+    val _st: ST = st"""procedure Timer {
+                      |  //unsigned int completed();
+                      |  //int periodic(in int tid, in uint64_t ns);
+                      |  //int oneshot_absolute(in int tid, in uint64_t ns);
+                      |  //int oneshot_relative(in int tid, in uint64_t ns);
+                      |  //int stop(in int tid);
+                      |  //uint64_t time();
+                      |  //uint64_t tsc_frequency();
+                      |};
+                      |"""
+    return Resource(s"${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4", _st)
+  }
+
+  def componentNotificationName(name: String): String = {
+    return s"${name}_periodic_dispatcher"
+  }
+
+  def timerAttribute(name: String, i: Z, isDispatchComponent: B): ST = {
+    val tb: String = if(isDispatchComponent) { "" } else { s"${Util.GEN_ARTIFACT_PREFIX}_" }
+    return st"""${name}.${tb}timer_attributes = ${i};"""
+  }
+
+  def timerGlobalEndpoint(name: String, isDispatchComponent: B): ST = {
+    val tb: String = if(isDispatchComponent) { "" } else { s"${Util.GEN_ARTIFACT_PREFIX}_" }
+    return st"""${name}.${tb}timer_global_endpoint = "${name}_${tb}timer";"""
+  }
 }
 
 @datatype class ActContainer(rootServer: String,
                              models: ISZ[ast.ASTObject],
                              monitors: ISZ[Monitor],
-                             cContainers: ISZ[CContainer],
+                             cContainers: ISZ[C_Container],
                              auxFiles: ISZ[Resource])
 
 
@@ -409,9 +525,14 @@ object StringTemplate{
                          index: Z,                  // fan-out index
                          ci: ir.ConnectionInstance) // aadl connection
 
-@datatype class CContainer(component: String,
-                           cSources: ISZ[Resource],
-                           cIncludes: ISZ[Resource])
+@datatype class C_Container(component: String,
+                            cSources: ISZ[Resource],
+                            cIncludes: ISZ[Resource])
 
 @datatype class Resource(path: String,
                          contents: ST)
+
+@enum object Dispatch_Protocol {
+  'Periodic
+  'Sporadic
+}
