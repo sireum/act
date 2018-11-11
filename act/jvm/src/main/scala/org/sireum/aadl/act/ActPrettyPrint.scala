@@ -77,6 +77,11 @@ import org.sireum.aadl.act.ast._
           |  to Procedure template "seL4TimeServer-to.template.c";
           |}
           |
+          |connector seL4GlobalAsynchCallback {
+          |  from Events template "seL4GlobalAsynchCallback-from.template.c";
+          |  to Event template "seL4GlobalAsynchCallback-to.template.c";
+          |}
+          |
           |assembly {
           |  ${comp.get}
           |

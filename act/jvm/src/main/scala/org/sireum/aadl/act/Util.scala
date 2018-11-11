@@ -39,7 +39,7 @@ object Util {
   val CONNECTOR_SEL4_NOTIFICATION: String = "seL4Notification"
   val CONNECTOR_RPC: String = "seL4RPCCall"
   val CONNECTOR_SEL4_TIMESERVER: String = "seL4TimeServer"
-  val CONNECTOR_SEL4_GLOBAL_ASYNCH_CALLBACK: String = CONNECTOR_SEL4_NOTIFICATION // "seL4GlobalAsynchCallback" // FIXME
+  val CONNECTOR_SEL4_GLOBAL_ASYNCH_CALLBACK: String = "seL4GlobalAsynchCallback"
 
   val DIR_SRC: String = "src"
   val DIR_INCLUDES: String = "includes"
@@ -398,7 +398,7 @@ object StringTemplate{
           |
           |project (${rootServer} C)
           |
-          |
+          |# add path to connector templates
           |CAmkESAddTemplatesPath(../../../../components/templates/)
           |
           |${(components, "\n\n")}
@@ -481,6 +481,15 @@ object TimerUtil {
         imports = ISZ(st""""../../${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4"""".render)
       ))
     return i
+  }
+
+  def dispatchComponentCSource(): Resource = {
+    val st: ST = st"""void ${TIMER_NOTIFICATION_DISPATCHER_ID}_callback() {
+                     |  //tb_thread_calendar();
+                     |}
+                     |"""
+    val compTypeFileName:String = s"${Util.GEN_ARTIFACT_PREFIX}_${DISPATCH_CLASSIFIER}"
+    return Resource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st)
   }
 
   def timerComponent(): ast.Instance = {

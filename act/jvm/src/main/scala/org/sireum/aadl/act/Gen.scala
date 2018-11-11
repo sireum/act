@@ -102,7 +102,7 @@ import org.sireum.aadl.act.ast._
               name, "tb_timer",
               TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
 
-            // connect dipatcher to component
+            // connect dispatcher to component
             createConnection(Util.CONNECTOR_SEL4_NOTIFICATION,
               TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.componentNotificationName(name),
               name, TimerUtil.TIMER_NOTIFICATION_ID)
@@ -145,14 +145,15 @@ import org.sireum.aadl.act.ast._
       }
     }
 
-    { // add the timer and dispatch components
+    { // add the timer component
       val timerComponent = TimerUtil.timerComponent()
       instances = instances :+ timerComponent
       containers = containers :+ C_Container(timerComponent.component.name, ISZ(), ISZ())
 
+      // add the dispatcher component
       val dispatchComponent = TimerUtil.dispatchComponent(dispatchNotifications)
       instances = instances :+ dispatchComponent
-      containers = containers :+ C_Container(dispatchComponent.component.name, ISZ(), ISZ())
+      containers = containers :+ C_Container(dispatchComponent.component.name, ISZ(TimerUtil.dispatchComponentCSource()), ISZ())
 
       // connect dispatch timer to time server
       createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
@@ -164,6 +165,8 @@ import org.sireum.aadl.act.ast._
         TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
 
       configuration = configuration :+ TimerUtil.configurationTimerAttribute(dispatchComponent.name, counter(), T)
+
+      // FIXME: TB uses "periodic_dispatcher" rather than the assigned classifier "dispatch_periodic"???
       configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
       configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
 
