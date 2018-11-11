@@ -90,26 +90,30 @@ import org.sireum.aadl.act.ast._
       sc.category match {
         case ir.ComponentCategory.Thread =>
           val name = Util.getLastName(sc.identifier)
+          val classifier = Util.getClassifier(sc.classifier.get)
           instances = instances :+
             Instance(address_space =  "",
               name = name,
               component = genThread(sc))
 
           if(Util.getDispatchProtocol(sc) == Some(Dispatch_Protocol.Periodic)) {
+            // connect component to time server
             createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
               name, "tb_timer",
-              TimerUtil.TIMER_INSTANCE, "the_timer")
+              TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
 
+            // connect dipatcher to component
             createConnection(Util.CONNECTOR_SEL4_NOTIFICATION,
               TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.componentNotificationName(name),
-              name, TimerUtil.TIMER_NOTIFICATION)
+              name, TimerUtil.TIMER_NOTIFICATION_ID)
 
             dispatchNotifications = dispatchNotifications :+ Emits(
               name = TimerUtil.componentNotificationName(name),
               typ = Util.NOTIFICATION_TYPE)
 
-            configuration = configuration :+ TimerUtil.timerAttribute(name, counter(), F)
-            configuration = configuration :+ TimerUtil.timerGlobalEndpoint(name, F)
+            configuration = configuration :+ TimerUtil.configurationTimerAttribute(name, counter(), F)
+            configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(name, classifier, TimerUtil.TIMER_ID)
+            configuration = configuration :+ StringTemplate.configurationPriority(name, Util.getPriority(sc))
           }
 
         case ir.ComponentCategory.Subprogram =>
@@ -150,16 +154,21 @@ import org.sireum.aadl.act.ast._
       instances = instances :+ dispatchComponent
       containers = containers :+ C_Container(dispatchComponent.component.name, ISZ(), ISZ())
 
+      // connect dispatch timer to time server
       createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
-        TimerUtil.DISPATCH_PERIODIC_INSTANCE, "timer",
-        TimerUtil.TIMER_INSTANCE, "the_timer")
+        TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_ID_DISPATCHER,
+        TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
 
       createConnection(Util.CONNECTOR_SEL4_GLOBAL_ASYNCH_CALLBACK,
-        TimerUtil.TIMER_INSTANCE, "timer_notification",
-        TimerUtil.DISPATCH_PERIODIC_INSTANCE, "timer_complete")
+        TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_NOTIFICATION_ID,
+        TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
 
-      configuration = configuration :+ TimerUtil.timerAttribute(dispatchComponent.name, counter(), T)
-      configuration = configuration :+ TimerUtil.timerGlobalEndpoint(dispatchComponent.name, T)
+      configuration = configuration :+ TimerUtil.configurationTimerAttribute(dispatchComponent.name, counter(), T)
+      configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
+      configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
+
+      // FIXME: is there a default priority for dispatch component?
+      configuration = configuration :+ StringTemplate.configurationPriority(dispatchComponent.name, Util.DEFAULT_PRIORITY)
     }
 
     def createConnection(connectionType: String,
@@ -412,13 +421,13 @@ import org.sireum.aadl.act.ast._
 
         // uses Timer tb_timer;
         uses = uses :+ Uses(
-          name = TimerUtil.TIMER_IDENTIFIER,
+          name = TimerUtil.TIMER_ID,
           typ = TimerUtil.TIMER_TYPE,
           optional = F)
 
         // consumes Notification tb_timer_complete
         consumes = consumes :+ Consumes(
-          name = TimerUtil.TIMER_NOTIFICATION,
+          name = TimerUtil.TIMER_NOTIFICATION_ID,
           typ = Util.NOTIFICATION_TYPE,
           optional = F)
 

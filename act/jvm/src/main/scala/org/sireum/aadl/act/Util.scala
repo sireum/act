@@ -24,13 +24,17 @@ object Util {
   val PROP_DATA_MODEL__DATA_REPRESENTATION: String = "Data_Model::Data_Representation"
   val PROP_DATA_MODEL__DIMENSION: String = "Data_Model::Dimension"
   val PROP_DATA_MODEL__BASE_TYPE: String = "Data_Model::Base_Type"
+
   val PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL: String = "Thread_Properties::Dispatch_Protocol"
-  val PROP_ACTUAL_PROCESSOR_BINDING: String = "Deployment_Properties::Actual_Processor_Binding"
-  val PROP_QUEUE_SIZE: String = "Communication_Properties::Queue_Size"
+  val PROP_THREAD_PROPERTIES__PRIORITY: String =  "Thread_Properties::Priority"
+
+  val PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING: String = "Deployment_Properties::Actual_Processor_Binding"
+  val PROP_COMMUNICATION_PROPERTIES__QUEUE_SIZE: String = "Communication_Properties::Queue_Size"
 
 
 
   val DEFAULT_QUEUE_SIZE: Z = 1
+  val DEFAULT_PRIORITY: Z = 201
 
   val CONNECTOR_SEL4_NOTIFICATION: String = "seL4Notification"
   val CONNECTOR_RPC: String = "seL4RPCCall"
@@ -133,7 +137,7 @@ object Util {
 
   def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
     assert(c.category == ir.ComponentCategory.Process)
-    val processor: Option[ir.PropertyValue] = getDiscreetPropertyValue(c.properties, PROP_ACTUAL_PROCESSOR_BINDING)
+    val processor: Option[ir.PropertyValue] = getDiscreetPropertyValue(c.properties, PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING)
     val procName: String = processor match {
       case Some(v : ir.ReferenceProp) => getLastName(v.value)
       case _ => return None[String]()
@@ -159,7 +163,7 @@ object Util {
   }
 
   def getQueueSize(f: ir.Feature): Z = {
-    val ret: Z = getUnitPropZ(f.properties, PROP_QUEUE_SIZE) match {
+    val ret: Z = getUnitPropZ(f.properties, PROP_COMMUNICATION_PROPERTIES__QUEUE_SIZE) match {
       case Some(z) => z
       case _ => DEFAULT_QUEUE_SIZE
     }
@@ -171,6 +175,19 @@ object Util {
       case Some(ir.ValueProp("Periodic")) => Some(Dispatch_Protocol.Periodic)
       case Some(ir.ValueProp("Spordic")) => Some(Dispatch_Protocol.Sporadic)
       case _ => None[Dispatch_Protocol.Type]()
+    }
+    return ret
+  }
+
+  def getPriority(c: ir.Component): Z = {
+    val ret: Z = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__PRIORITY) match {
+      case Some(ir.UnitProp(z, u)) =>
+        R(z) match {
+          case Some(v) => conversions.R.toZ(v)
+          case _ => Util.DEFAULT_PRIORITY
+       }
+      case _ =>
+        Util.DEFAULT_PRIORITY
     }
     return ret
   }
@@ -411,18 +428,31 @@ object StringTemplate{
     return r
   }
 
+  def configurationPriority(name: String, priority: Z): ST = {
+    return st"""${name}.priority = ${priority};"""
+  }
 }
 
 object TimerUtil {
 
   val SEM_DISPATCH: String = s"${Util.GEN_ARTIFACT_PREFIX}_dispatch_sem"
-  val TIMER_IDENTIFIER: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer"
+
+  val TIMER_ID: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer"
+  val TIMER_ID_DISPATCHER: String = "timer"
+
+  val TIMER_NOTIFICATION_ID: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer_complete"
+  val TIMER_NOTIFICATION_DISPATCHER_ID: String = "timer_complete"
+
   val TIMER_TYPE: String = "Timer"
-  val TIMER_NOTIFICATION: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer_complete"
-  val TIMER_SERVER_CLASSIFIER: String = "TimeServer"
   val TIMER_INSTANCE: String = "time_server"
 
+  val TIMER_SERVER_CLASSIFIER: String = "TimeServer"
+  val TIMER_SERVER_TIMER_ID: String = "the_timer"
+  val TIMER_SERVER_NOTIFICATION_ID: String = "timer_notification"
+
+  val DISPATCH_CLASSIFIER: String = "dispatch_periodic"
   val DISPATCH_PERIODIC_INSTANCE: String = "dispatch_periodic_inst"
+  val DISPATCH_TIMER_ID: String = "timer"
 
   def dispatchComponent(notifications: ISZ[ast.Emits]): ast.Instance = {
     val i = ast.Instance(
@@ -431,18 +461,18 @@ object TimerUtil {
       component = ast.Component(
         control = F,
         hardware = F,
-        name = "dispatch_periodic",
+        name = DISPATCH_CLASSIFIER,
         mutexes = ISZ(),
         binarySemaphores = ISZ(),
         semaphores = ISZ(),
         dataports = ISZ(),
         emits = notifications,
         uses = ISZ(ast.Uses(
-          name = "timer",
+          name = DISPATCH_TIMER_ID,
           typ = TIMER_TYPE,
           optional = F)),
         consumes = ISZ(ast.Consumes(
-          name = "timer_complete",
+          name = TIMER_NOTIFICATION_DISPATCHER_ID,
           typ = Util.NOTIFICATION_TYPE,
           optional = F)),
         provides = ISZ(),
@@ -466,12 +496,12 @@ object TimerUtil {
         semaphores = ISZ(),
         dataports = ISZ(),
         emits = ISZ(ast.Emits(
-          name = "timer_notification",
+          name = TIMER_SERVER_NOTIFICATION_ID,
           typ = Util.NOTIFICATION_TYPE)),
         uses = ISZ(),
         consumes = ISZ(),
         provides = ISZ(ast.Provides(
-          name = "the_timer",
+          name = TIMER_SERVER_TIMER_ID,
           typ = TIMER_TYPE)),
         includes = ISZ(),
         attributes = ISZ(),
@@ -499,14 +529,13 @@ object TimerUtil {
     return s"${name}_periodic_dispatcher"
   }
 
-  def timerAttribute(name: String, i: Z, isDispatchComponent: B): ST = {
-    val tb: String = if(isDispatchComponent) { "" } else { s"${Util.GEN_ARTIFACT_PREFIX}_" }
-    return st"""${name}.${tb}timer_attributes = ${i};"""
+  def configurationTimerAttribute(instanceName: String, i: Z, isDispatcher: B): ST = {
+    val id: String = if(isDispatcher) {TIMER_ID_DISPATCHER} else {TIMER_ID}
+    return st"""${instanceName}.${id}_attributes = ${i};"""
   }
 
-  def timerGlobalEndpoint(name: String, isDispatchComponent: B): ST = {
-    val tb: String = if(isDispatchComponent) { "" } else { s"${Util.GEN_ARTIFACT_PREFIX}_" }
-    return st"""${name}.${tb}timer_global_endpoint = "${name}_${tb}timer";"""
+  def configurationTimerGlobalEndpoint(instanceName: String, classifier: String, id: String): ST = {
+    return st"""${instanceName}.${id}_global_endpoint = "${classifier}_${id}";"""
   }
 }
 
