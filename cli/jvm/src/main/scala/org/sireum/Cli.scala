@@ -54,7 +54,8 @@ object Cli {
     args: ISZ[String],
     input: Format.Type,
     mode: Mode.Type,
-    outputDir: Option[String]
+    outputDir: Option[String],
+    auxDirs: ISZ[String]
   ) extends ActTopOption
 }
 
@@ -115,11 +116,15 @@ import Cli._
           |                           json)
           |-o, --output-dir         Output directory for the generated project files
           |                           (expects a path; default is ".")
+          |-a, --aux-directories    
+          |                          Directories containing C files to be included in
+          |                           build (expects path strings)
           |-h, --help               Display this information""".render
 
     var input: Format.Type = Format.Air
     var mode: Mode.Type = Mode.Json
     var outputDir: Option[String] = Some(".")
+    var auxDirs: ISZ[String] = ISZ[String]()
     var j = i
     var isOption = T
     while (j < args.size && isOption) {
@@ -146,6 +151,12 @@ import Cli._
              case Some(v) => outputDir = v
              case _ => return None()
            }
+         } else if (arg == "-a" || arg == "--aux-directories") {
+           val o: Option[ISZ[String]] = parsePaths(args, j + 1)
+           o match {
+             case Some(v) => auxDirs = v
+             case _ => return None()
+           }
          } else {
           eprintln(s"Unrecognized option '$arg'.")
           return None()
@@ -155,7 +166,7 @@ import Cli._
         isOption = F
       }
     }
-    return Some(ActOption(help, parseArguments(args, j), input, mode, outputDir))
+    return Some(ActOption(help, parseArguments(args, j), input, mode, outputDir, auxDirs))
   }
 
   def parseArguments(args: ISZ[String], i: Z): ISZ[String] = {

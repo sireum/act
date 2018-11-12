@@ -25,13 +25,17 @@ import org.sireum.aadl.act.ast._
   var containers: ISZ[C_Container] = ISZ()
   var configuration: ISZ[ST] = ISZ()
 
+  var auxCSources: ISZ[ST] = ISZ()
+
   var count: Z = 0
   def counter(): Z = {
     count = count + 1
     return count - 1
   }
 
-  def process(model : ir.Aadl) : ActContainer = {
+  def process(model : ir.Aadl, cSources: ISZ[String]) : ActContainer = {
+
+    auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
     val datatypes = model.components.withFilter(f => f.category == ir.ComponentCategory.Data)
     for(d <- datatypes) { typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
@@ -801,6 +805,7 @@ import org.sireum.aadl.act.ast._
     val compTypeFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
 
     val ret = st"""#include "../${Util.DIR_INCLUDES}/${compTypeFileName}.h"
+                  |${(auxCSources, "\n")}
                   |#include <string.h>
                   |#include <camkes.h>
                   |

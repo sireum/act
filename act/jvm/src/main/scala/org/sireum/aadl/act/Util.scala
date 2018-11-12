@@ -443,7 +443,10 @@ object StringTemplate{
     return r
   }
 
-  def cmakeList(projectName: String, rootServer: String, components: ISZ[ST], cmakeVersion: String): ST = {
+  val AUX_C_SOURCES: String = "cSources"
+  val AUX_C_INCLUDES: String = "cIncludes"
+
+  def cmakeList(projectName: String, rootServer: String, components: ISZ[ST], cmakeVersion: String, auxCSources: ISZ[ST]): ST = {
     val r: ST =
       st"""cmake_minimum_required(VERSION ${cmakeVersion})
           |
@@ -452,6 +455,11 @@ object StringTemplate{
           |# add path to connector templates
           |CAmkESAddTemplatesPath(../../../../components/templates/)
           |
+          |set(${AUX_C_SOURCES} "")
+          |set(${AUX_C_INCLUDES} "aux/includes")
+          |
+          |${(auxCSources, "\n")}
+          |
           |${(components, "\n\n")}
           |
           |DeclareCAmkESRootserver(${rootServer}.camkes)
@@ -459,14 +467,18 @@ object StringTemplate{
     return r
   }
 
+  def auxTemplate(i: String): ST = {
+    return st"""list(APPEND ${AUX_C_SOURCES} ${i})"""
+  }
+
   def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String]): ST = {
     val s: ST = if(sources.nonEmpty){
-      st"""SOURCES ${(sources, " ")}"""
+      st"""SOURCES $${${AUX_C_SOURCES}} ${(sources, " ")}"""
     } else{
       st""""""
     }
     val i: ST = if(includes.nonEmpty){
-      st"""INCLUDES ${(includes, " ")}"""
+      st"""INCLUDES $${${AUX_C_INCLUDES}} ${(includes, " ")}"""
     } else{
       st""""""
     }

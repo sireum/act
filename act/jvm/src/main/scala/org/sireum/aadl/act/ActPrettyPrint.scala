@@ -10,7 +10,7 @@ import org.sireum.aadl.act.ast._
   var out : ISZ[(String, ST)] = ISZ()
   var rootServer: String = ""
 
-  def tempEntry(destDir: String, container: ActContainer): ISZ[(String, ST)] = {
+  def tempEntry(destDir: String, container: ActContainer, cFiles: ISZ[String], hFiles: ISZ[String]): ISZ[(String, ST)] = {
     rootServer = container.rootServer
 
     prettyPrint(container.models)
@@ -35,7 +35,9 @@ import org.sireum.aadl.act.ast._
       NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
     })
 
-    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, Util.CMAKE_VERSION)
+
+    val auxCFiles: ISZ[ST] = cFiles.map(c => StringTemplate.auxTemplate(c))
+    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, Util.CMAKE_VERSION, auxCFiles)
     NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
 
     (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))

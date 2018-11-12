@@ -2,7 +2,9 @@ package org.sireum.aadl.act
 
 import org.sireum.aadl.ir
 import java.io.File
-import org.sireum.{B, F, T, Z, ISZ, Either, String, Some, Option}
+import java.nio.file.StandardCopyOption
+
+import org.sireum.{B, Either, F, ISZ, Option, Some, String, T, Z}
 
 object Act {
 
@@ -12,13 +14,13 @@ object Act {
     val destDir = new File(args(1))
 
     ir.JSON.toAadl(input) match {
-      case Either.Left(m) => run(destDir, m)
+      case Either.Left(m) => run(destDir, m, ISZ())
       case Either.Right(m) =>
         Console.println(s"Json deserialization error at (${m.line}, ${m.column}): ${m.message}")
     }
   }
 
-  def run(destDir: File, m: ir.Aadl) : Int = {
+  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[String]) : Int = {
 
     if(m.components.isEmpty) {
       Console.err.println("Model is empty")
@@ -32,9 +34,38 @@ object Act {
       return -1
     }
 
-    val con = Gen().process(m)
+    val auxSrcDir = new File(_destDir, "aux/src")
+    val auxIncludesDir = new File(_destDir, "aux/includes")
 
-    val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con)
+    auxSrcDir.mkdirs()
+    auxIncludesDir.mkdirs()
+
+    var cFiles: ISZ[String] = ISZ()
+    var hFiles: ISZ[String] = ISZ()
+
+    def processDir(dir: File): Unit = {
+        dir.listFiles().filter(p => p.getName.endsWith(".c")).foreach(f => {
+          val dfile = new File(auxSrcDir, f.getName)
+          java.nio.file.Files.copy(f.toPath, dfile.toPath, StandardCopyOption.REPLACE_EXISTING)
+          cFiles = cFiles :+ s"aux/src/${dfile.getName}"
+        })
+        dir.listFiles().filter(p => p.getName.endsWith(".h")).foreach(f => {
+          val dfile = new File(auxIncludesDir, f.getName)
+          java.nio.file.Files.copy(f.toPath, dfile.toPath, StandardCopyOption.REPLACE_EXISTING)
+          hFiles = hFiles :+ s"aux/includes/${dfile.getName}"
+        })
+      dir.listFiles().foreach(f => if(f.isDirectory) processDir(f))
+    }
+    for(d <- auxDirectories) {
+      val dir = new File(d.native)
+      if (dir.isDirectory) processDir(dir)
+    }
+    cFiles.foreach(f => println(f))
+    hFiles.foreach(f => println(f))
+
+    val con = Gen().process(m, hFiles)
+
+    val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, hFiles)
 
     0
   }

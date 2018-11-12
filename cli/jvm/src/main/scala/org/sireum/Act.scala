@@ -90,7 +90,7 @@ object Act extends scala.App {
             }
         }
 
-        org.sireum.aadl.act.Act.run(outputDir, aadl)
+        org.sireum.aadl.act.Act.run(outputDir, aadl, o.auxDirs)
 
       case Format.Camkesir =>
         eprintln("CAmkES IR is not currently supported")

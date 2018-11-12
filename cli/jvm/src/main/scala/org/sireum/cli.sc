@@ -43,7 +43,11 @@
       ),
       Opt (name = "outputDir", longKey = "output-dir", shortKey = Some('o'),
         tpe = Type.Path(multiple = F, default = Some(".")),
-        description = "Output directory for the generated project files")
+        description = "Output directory for the generated project files"
+      ),
+      Opt (name = "auxDirs", longKey = "aux-directories", shortKey = Some('a'),
+        tpe = Type.Path(multiple = T, default = None()),
+        description = "Directories containing C files to be included in build")
     ),
     groups = ISZ()
   )
