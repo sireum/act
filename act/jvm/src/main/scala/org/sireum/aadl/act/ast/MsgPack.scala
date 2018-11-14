@@ -165,7 +165,7 @@ object MsgPack {
     def writeConnection(o: Connection): Unit = {
       writer.writeZ(Constants.Connection)
       writer.writeString(o.name)
-      writeConnector(o.connector)
+      writer.writeString(o.connectionType)
       writer.writeISZ(o.from_ends, writeConnectionEnd _)
       writer.writeISZ(o.to_ends, writeConnectionEnd _)
     }
@@ -177,17 +177,21 @@ object MsgPack {
       writer.writeString(o.end)
     }
 
+    def writeConnectorTypeType(o: ConnectorType.Type): Unit = {
+      writer.writeZ(o.ordinal)
+    }
+
     def writeConnector(o: Connector): Unit = {
       writer.writeZ(Constants.Connector)
-      writer.writeB(o.from_hardware)
-      writer.writeB(o.from_multiple)
-      writer.writeZ(o.from_threads)
-      writer.writeString(o.from_type)
       writer.writeString(o.name)
-      writer.writeB(o.to_hardware)
-      writer.writeB(o.to_multiple)
+      writeConnectorTypeType(o.from_type)
+      writer.writeOption(o.from_template, writer.writeString _)
+      writer.writeZ(o.from_threads)
+      writer.writeB(o.from_hardware)
+      writeConnectorTypeType(o.to_type)
+      writer.writeOption(o.to_template, writer.writeString _)
       writer.writeZ(o.to_threads)
-      writer.writeString(o.to_type)
+      writer.writeB(o.to_hardware)
     }
 
     def writeProcedure(o: Procedure): Unit = {
@@ -407,10 +411,10 @@ object MsgPack {
         reader.expectZ(Constants.Connection)
       }
       val name = reader.readString()
-      val connector = readConnector()
+      val connectionType = reader.readString()
       val from_ends = reader.readISZ(readConnectionEnd _)
       val to_ends = reader.readISZ(readConnectionEnd _)
-      return Connection(name, connector, from_ends, to_ends)
+      return Connection(name, connectionType, from_ends, to_ends)
     }
 
     def readConnectionEnd(): ConnectionEnd = {
@@ -428,6 +432,11 @@ object MsgPack {
       return ConnectionEnd(isFrom, component, end)
     }
 
+    def readConnectorTypeType(): ConnectorType.Type = {
+      val r = reader.readZ()
+      return ConnectorType.byOrdinal(r).get
+    }
+
     def readConnector(): Connector = {
       val r = readConnectorT(F)
       return r
@@ -437,16 +446,16 @@ object MsgPack {
       if (!typeParsed) {
         reader.expectZ(Constants.Connector)
       }
-      val from_hardware = reader.readB()
-      val from_multiple = reader.readB()
-      val from_threads = reader.readZ()
-      val from_type = reader.readString()
       val name = reader.readString()
-      val to_hardware = reader.readB()
-      val to_multiple = reader.readB()
+      val from_type = readConnectorTypeType()
+      val from_template = reader.readOption(reader.readString _)
+      val from_threads = reader.readZ()
+      val from_hardware = reader.readB()
+      val to_type = readConnectorTypeType()
+      val to_template = reader.readOption(reader.readString _)
       val to_threads = reader.readZ()
-      val to_type = reader.readString()
-      return Connector(from_hardware, from_multiple, from_threads, from_type, name, to_hardware, to_multiple, to_threads, to_type)
+      val to_hardware = reader.readB()
+      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware)
     }
 
     def readProcedure(): Procedure = {

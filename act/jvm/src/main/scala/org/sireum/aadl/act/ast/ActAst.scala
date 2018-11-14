@@ -54,7 +54,7 @@ import org.sireum._
 
 
 @datatype class Connection(name : String,
-                           connector: Connector,
+                           connectionType: String,
                            from_ends: ISZ[ConnectionEnd],
                            to_ends: ISZ[ConnectionEnd]) extends ASTObject
 
@@ -62,15 +62,25 @@ import org.sireum._
                               component: String,
                               end: String) extends ASTObject
 
-@datatype class Connector(from_hardware : B,
-                          from_multiple: B,
+@enum object ConnectorType {
+  'Event
+  'Events
+  'Procedure
+  'Procedures
+  'Dataport
+  'Dataports
+}
+@datatype class Connector(name: String,
+
+                          from_type: ConnectorType.Type,
+                          from_template: Option[String],
                           from_threads: Z,
-                          from_type: String,
-                          name: String,
-                          to_hardware: B,
-                          to_multiple: B,
+                          from_hardware : B,
+
+                          to_type: ConnectorType.Type,
+                          to_template: Option[String],
                           to_threads: Z,
-                          to_type: String) extends ASTObject
+                          to_hardware: B) extends ASTObject
 
 @datatype class Procedure(name: String,
                           methods: ISZ[Method],

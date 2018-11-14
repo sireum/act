@@ -417,13 +417,12 @@ import Transformer._
           else
             Result(r8.ctx, None())
         case o2: Connection =>
-          val r0: Result[Context, Connector] = transformConnector(ctx, o2.connector)
-          val r1: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.from_ends, transformConnectionEnd _)
-          val r2: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(r1.ctx, o2.to_ends, transformConnectionEnd _)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
-            Result(r2.ctx, Some(o2(connector = r0.resultOpt.getOrElse(o2.connector), from_ends = r1.resultOpt.getOrElse(o2.from_ends), to_ends = r2.resultOpt.getOrElse(o2.to_ends))))
+          val r0: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(ctx, o2.from_ends, transformConnectionEnd _)
+          val r1: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.to_ends, transformConnectionEnd _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            Result(r1.ctx, Some(o2(from_ends = r0.resultOpt.getOrElse(o2.from_ends), to_ends = r1.resultOpt.getOrElse(o2.to_ends))))
           else
-            Result(r2.ctx, None())
+            Result(r1.ctx, None())
         case o2: ConnectionEnd =>
           if (hasChanged)
             Result(ctx, Some(o2))
@@ -708,13 +707,12 @@ import Transformer._
     val r: Result[Context, Connection] = if (preR.continu) {
       val o2: Connection = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: Result[Context, Connector] = transformConnector(ctx, o2.connector)
-      val r1: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.from_ends, transformConnectionEnd _)
-      val r2: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(r1.ctx, o2.to_ends, transformConnectionEnd _)
-      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
-        Result(r2.ctx, Some(o2(connector = r0.resultOpt.getOrElse(o2.connector), from_ends = r1.resultOpt.getOrElse(o2.from_ends), to_ends = r2.resultOpt.getOrElse(o2.to_ends))))
+      val r0: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(ctx, o2.from_ends, transformConnectionEnd _)
+      val r1: Result[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.to_ends, transformConnectionEnd _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+        Result(r1.ctx, Some(o2(from_ends = r0.resultOpt.getOrElse(o2.from_ends), to_ends = r1.resultOpt.getOrElse(o2.to_ends))))
       else
-        Result(r2.ctx, None())
+        Result(r1.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       Result(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {

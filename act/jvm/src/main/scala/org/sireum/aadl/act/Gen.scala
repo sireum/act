@@ -19,13 +19,16 @@ import org.sireum.aadl.act.ast._
   var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
   var outConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
 
+  var connectors: ISZ[ast.Connector] = ISZ()
   var astObjects: ISZ[ASTObject] = ISZ()
   var monitors: HashSMap[String, Monitor] = HashSMap.empty // conn instname -> monitor
-  var auxFiles: ISZ[Resource] = ISZ()
   var containers: ISZ[C_Container] = ISZ()
-  var configuration: ISZ[ST] = ISZ()
+  var auxFiles: ISZ[Resource] = ISZ()
 
+  var configuration: ISZ[ST] = ISZ()
   var auxCSources: ISZ[ST] = ISZ()
+
+  var hasPeriodicComponents: B = F
 
   var count: Z = 0
   def counter(): Z = {
@@ -49,12 +52,15 @@ import org.sireum.aadl.act.ast._
     val system = components(0)
     if(resolve(system)) {
       auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData))
-      auxFiles = auxFiles :+ TimerUtil.timerInterface()
+      if(hasPeriodicComponents) {
+        auxFiles = auxFiles :+ TimerUtil.timerInterface()
+      }
 
       gen(system)
     }
 
     return ActContainer(Util.getLastName(topLevelProcess.get.identifier),
+      connectors,
       astObjects,
       monitors.values,
       containers,
@@ -173,7 +179,17 @@ import org.sireum.aadl.act.ast._
       }
     }
 
-    { // add the timer component
+    if(hasPeriodicComponents) { // add the periodic dispatcher component
+
+      connectors = connectors :+ ast.Connector(name = "seL4TimeServer",
+        from_type = ConnectorType.Procedures, from_template = Some("seL4TimeServer-from.template.c"), from_threads = 0, from_hardware = F,
+        to_type = ConnectorType.Procedure, to_template = Some("seL4TimeServer-to.template.c"), to_threads = 0, to_hardware = F)
+
+      connectors = connectors :+ ast.Connector(name = "seL4GlobalAsynchCallback",
+        from_type = ConnectorType.Events, from_template = Some("seL4GlobalAsynchCallback-from.template.c"), from_threads = 0, from_hardware = F,
+        to_type = ConnectorType.Event, to_template = Some("seL4GlobalAsynchCallback-to.template.c"), to_threads = 0, to_hardware = F)
+
+      // add placeholder time server
       val timerComponent = TimerUtil.timerComponent()
       instances = instances :+ timerComponent
       containers = containers :+ C_Container(timerComponent.component.name, ISZ(TimerUtil.timerCSource()), ISZ())
@@ -206,12 +222,6 @@ import org.sireum.aadl.act.ast._
     def createConnection(connectionType: String,
                          srcComponent: String, srcFeature: String,
                          dstComponent: String, dstFeature: String): Unit = {
-      val connector = Connector(
-          name = connectionType,
-          from_type = "", to_type = "",
-          from_hardware = F, from_multiple = F, from_threads = 1, to_hardware = F, to_multiple = F, to_threads = 1
-        )
-
       val from_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
         isFrom = T,
         component = srcComponent,
@@ -224,7 +234,7 @@ import org.sireum.aadl.act.ast._
 
       val con = Connection(
         name = newConn(),
-        connector = connector,
+        connectionType = connectionType,
         from_ends = from_ends,
         to_ends = to_ends
       )
@@ -313,6 +323,8 @@ import org.sireum.aadl.act.ast._
     assert(c.subComponents.isEmpty)
     assert(c.connectionInstances.isEmpty)
 
+    val cid = Util.getClassifier(c.classifier.get)
+
     var provides: ISZ[Provides] = ISZ()
     var uses: ISZ[Uses] = ISZ()
     var emits: ISZ[Emits] = ISZ()
@@ -323,7 +335,7 @@ import org.sireum.aadl.act.ast._
     var cIncludes: ISZ[ST] = ISZ()
     var cImpls: ISZ[ST] = ISZ()
 
-    for(f <- c.features){
+    for(f <- c.features) {
       val fend = f.asInstanceOf[ir.FeatureEnd]
       val fpath = Util.getName(fend.identifier)
       val fid = Util.getLastName(f.identifier)
@@ -443,13 +455,13 @@ import org.sireum.aadl.act.ast._
       case _ =>
     }
 
+    // has semaphore tb_dispatch_sem
+    binarySemaphores = binarySemaphores :+ BinarySemaphore(TimerUtil.SEM_DISPATCH)
+
     Util.getDispatchProtocol(c) match {
       case Some(Dispatch_Protocol.Periodic) =>
         // import Timer.idl4
         imports = imports + Util.getInterfaceFilename(TimerUtil.TIMER_TYPE)
-
-        // has semaphore tb_dispatch_sem
-        binarySemaphores = binarySemaphores :+ BinarySemaphore(TimerUtil.SEM_DISPATCH)
 
         // uses Timer tb_timer;
         uses = uses :+ Uses(
@@ -469,13 +481,10 @@ import org.sireum.aadl.act.ast._
                                      |void component_init(const int64_t *arg);"""
 
       case Some(Dispatch_Protocol.Sporadic) =>
+        println()
       case _ =>
         cprint(T, s"Dispatch Protocol not specified for ${c}")
     }
-
-
-    val cid = Util.getClassifier(c.classifier.get)
-
     containers = containers :+ C_Container(cid,
       ISZ(genComponentTypeImplementationFile(c, cImpls)),
       ISZ(genComponentTypeInterfaceFile(c, cIncludes))
@@ -602,8 +611,8 @@ import org.sireum.aadl.act.ast._
 
   def createReadWriteMethods(typeName: String): ISZ[Method] = {
     return ISZ(
-      Method(name = "read", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")),
-      Method(name = "write", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")))
+      Method(name = "read", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")),
+      Method(name = "write", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")))
   }
 
   def createQueueMethods(typeName: String): ISZ[Method] = {
@@ -637,9 +646,32 @@ import org.sireum.aadl.act.ast._
                    |#include <stdbool.h>
                    |#include <stdint.h>
                    |
+                   |#ifndef TB_VERIFY
+                   |#include <stddef.h>
+                   |#endif // TB_VERIFY
+                   |
                    |#define __TB_OS_CAMKES__
                    |#define TB_MONITOR_READ_ACCESS 111
                    |#define TB_MONITOR_WRITE_ACCESS 222
+                   |
+                   |#ifndef TB_VERIFY
+                   |#define MUTEXOP(OP)\
+                   |if((OP) != 0) {\
+                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
+                   |  *((int*)0)=0xdeadbeef;\
+                   |}
+                   |#else
+                   |#define MUTEXOP(OP) OP
+                   |#endif // TB_VERIFY
+                   |#ifndef TB_VERIFY
+                   |#define CALLBACKOP(OP)\
+                   |if((OP) != 0) {\
+                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
+                   |  *((int*)0)=0xdeadbeef;\
+                   |}
+                   |#else
+                   |#define CALLBACKOP(OP) OP
+                   |#endif // TB_VERIFY
                    |
                    |${(defs, "\n\n")}
                    |
@@ -699,12 +731,12 @@ import org.sireum.aadl.act.ast._
         val name = Util.genMonitorFeatureName(feature, None[Z]())
         val paramType = Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get)
 
-        val inter = st"""// bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
+        val inter = st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
         val impl: ST =
           if(suffix == "write") {
             st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
                 |  bool tb_result = true;
-                |  //tb_result &= ${name}0_${suffix}((${paramType} *) ${name});
+                |  tb_result &= ${name}_${suffix}((${paramType} *) ${name});
                 |  return tb_result;
                 |}"""
           } else {
@@ -725,11 +757,12 @@ import org.sireum.aadl.act.ast._
         val impl: ST = if(suffix == "enqueue") {
           st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
               |  bool tb_result = true;
-              |  //tb_result &= ${name}0_${suffix}((${paramType} *) ${name});
+              |  tb_result &= ${name}_${suffix}((${paramType} *) ${name});
               |  return tb_result;
               |}"""
         } else {
-          st""""""
+          val simpleName = Util.getLastName(feature.identifier)
+          st"""void tb_entrypoint_tb_${Util.getClassifier(component.classifier.get)}_${simpleName}(const ${paramType} * in_arg) { }"""
         }
         Some((inter, impl))
 
@@ -792,7 +825,7 @@ import org.sireum.aadl.act.ast._
                   |
                   |#include "../../../${Util.DIR_INCLUDES}/${typeHeaderFileName}.h"
                   |
-                  |${(sts, "\n")}
+                  |${(sts, "\n\n")}
                   |
                   |#endif // $macroName
                   |"""
@@ -809,9 +842,19 @@ import org.sireum.aadl.act.ast._
                   |#include <string.h>
                   |#include <camkes.h>
                   |
-                  |${(sts, "\n")}
+                  |${(sts, "\n\n")}
                   |
-                  |int run(void) { return 0; }
+                  |void pre_init(void) { }
+                  |
+                  |int run(void) {
+                  |  // Initial lock to await dispatch input.
+                  |  MUTEXOP(tb_dispatch_sem_wait())
+                  |  for(;;) {
+                  |    MUTEXOP(tb_dispatch_sem_wait())
+                  |    // Drain the queues
+                  |  }
+                  |  return 0;
+                  |}
                   |"""
     return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret)
   }
@@ -829,6 +872,7 @@ import org.sireum.aadl.act.ast._
       assert(!componentMap.contains(name))
       componentMap = componentMap + (name ~> c)
       c.subComponents.foreach(sc => constructMap(sc))
+      hasPeriodicComponents = hasPeriodicComponents | Util.isPeriodic(c)
     }
     constructMap(sys)
 

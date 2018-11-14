@@ -34,16 +34,17 @@ object Act {
       return -1
     }
 
-    val auxSrcDir = new File(_destDir, "aux/src")
-    val auxIncludesDir = new File(_destDir, "aux/includes")
-
-    auxSrcDir.mkdirs()
-    auxIncludesDir.mkdirs()
-
     var cFiles: ISZ[String] = ISZ()
     var hFiles: ISZ[String] = ISZ()
 
-    def processDir(dir: File): Unit = {
+    if(auxDirectories.nonEmpty) {
+      val auxSrcDir = new File(_destDir, "aux/src")
+      val auxIncludesDir = new File(_destDir, "aux/includes")
+
+      auxSrcDir.mkdirs()
+      auxIncludesDir.mkdirs()
+
+      def processDir(dir: File): Unit = {
         dir.listFiles().filter(p => p.getName.endsWith(".c")).foreach(f => {
           val dfile = new File(auxSrcDir, f.getName)
           java.nio.file.Files.copy(f.toPath, dfile.toPath, StandardCopyOption.REPLACE_EXISTING)
@@ -54,18 +55,17 @@ object Act {
           java.nio.file.Files.copy(f.toPath, dfile.toPath, StandardCopyOption.REPLACE_EXISTING)
           hFiles = hFiles :+ s"aux/includes/${dfile.getName}"
         })
-      dir.listFiles().foreach(f => if(f.isDirectory) processDir(f))
+        dir.listFiles().foreach(f => if (f.isDirectory) processDir(f))
+      }
+
+      for (d <- auxDirectories) {
+        val dir = new File(d.native)
+        if (dir.isDirectory) processDir(dir)
+      }
     }
-    for(d <- auxDirectories) {
-      val dir = new File(d.native)
-      if (dir.isDirectory) processDir(dir)
-    }
-    cFiles.foreach(f => println(f))
-    hFiles.foreach(f => println(f))
 
     val con = Gen().process(m, hFiles)
-
-    val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, hFiles)
+    val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles)
 
     0
   }

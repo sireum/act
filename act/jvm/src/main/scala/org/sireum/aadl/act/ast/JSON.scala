@@ -139,7 +139,7 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Connection""""),
         ("name", printString(o.name)),
-        ("connector", printConnector(o.connector)),
+        ("connectionType", printString(o.connectionType)),
         ("from_ends", printISZ(F, o.from_ends, printConnectionEnd _)),
         ("to_ends", printISZ(F, o.to_ends, printConnectionEnd _))
       ))
@@ -154,18 +154,33 @@ object JSON {
       ))
     }
 
+    @pure def printConnectorTypeType(o: ConnectorType.Type): ST = {
+      val value: String = o match {
+        case ConnectorType.Event => "Event"
+        case ConnectorType.Events => "Events"
+        case ConnectorType.Procedure => "Procedure"
+        case ConnectorType.Procedures => "Procedures"
+        case ConnectorType.Dataport => "Dataport"
+        case ConnectorType.Dataports => "Dataports"
+      }
+      return printObject(ISZ(
+        ("type", printString("ConnectorType")),
+        ("value", printString(value))
+      ))
+    }
+
     @pure def printConnector(o: Connector): ST = {
       return printObject(ISZ(
         ("type", st""""Connector""""),
-        ("from_hardware", printB(o.from_hardware)),
-        ("from_multiple", printB(o.from_multiple)),
-        ("from_threads", printZ(o.from_threads)),
-        ("from_type", printString(o.from_type)),
         ("name", printString(o.name)),
-        ("to_hardware", printB(o.to_hardware)),
-        ("to_multiple", printB(o.to_multiple)),
+        ("from_type", printConnectorTypeType(o.from_type)),
+        ("from_template", printOption(T, o.from_template, printString _)),
+        ("from_threads", printZ(o.from_threads)),
+        ("from_hardware", printB(o.from_hardware)),
+        ("to_type", printConnectorTypeType(o.to_type)),
+        ("to_template", printOption(T, o.to_template, printString _)),
         ("to_threads", printZ(o.to_threads)),
-        ("to_type", printString(o.to_type))
+        ("to_hardware", printB(o.to_hardware))
       ))
     }
 
@@ -457,8 +472,8 @@ object JSON {
       parser.parseObjectKey("name")
       val name = parser.parseString()
       parser.parseObjectNext()
-      parser.parseObjectKey("connector")
-      val connector = parseConnector()
+      parser.parseObjectKey("connectionType")
+      val connectionType = parser.parseString()
       parser.parseObjectNext()
       parser.parseObjectKey("from_ends")
       val from_ends = parser.parseISZ(parseConnectionEnd _)
@@ -466,7 +481,7 @@ object JSON {
       parser.parseObjectKey("to_ends")
       val to_ends = parser.parseISZ(parseConnectionEnd _)
       parser.parseObjectNext()
-      return Connection(name, connector, from_ends, to_ends)
+      return Connection(name, connectionType, from_ends, to_ends)
     }
 
     def parseConnectionEnd(): ConnectionEnd = {
@@ -490,6 +505,27 @@ object JSON {
       return ConnectionEnd(isFrom, component, end)
     }
 
+    def parseConnectorTypeType(): ConnectorType.Type = {
+      val r = parseConnectorTypeT(F)
+      return r
+    }
+
+    def parseConnectorTypeT(typeParsed: B): ConnectorType.Type = {
+      if (!typeParsed) {
+        parser.parseObjectType("ConnectorType")
+      }
+      parser.parseObjectKey("value")
+      var i = parser.offset
+      val s = parser.parseString()
+      parser.parseObjectNext()
+      ConnectorType.byName(s) match {
+        case Some(r) => return r
+        case _ =>
+          parser.parseException(i, s"Invalid element name '$s' for ConnectorType.")
+          return ConnectorType.byOrdinal(0).get
+      }
+    }
+
     def parseConnector(): Connector = {
       val r = parseConnectorT(F)
       return r
@@ -499,34 +535,34 @@ object JSON {
       if (!typeParsed) {
         parser.parseObjectType("Connector")
       }
-      parser.parseObjectKey("from_hardware")
-      val from_hardware = parser.parseB()
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
       parser.parseObjectNext()
-      parser.parseObjectKey("from_multiple")
-      val from_multiple = parser.parseB()
+      parser.parseObjectKey("from_type")
+      val from_type = parseConnectorTypeType()
+      parser.parseObjectNext()
+      parser.parseObjectKey("from_template")
+      val from_template = parser.parseOption(parser.parseString _)
       parser.parseObjectNext()
       parser.parseObjectKey("from_threads")
       val from_threads = parser.parseZ()
       parser.parseObjectNext()
-      parser.parseObjectKey("from_type")
-      val from_type = parser.parseString()
+      parser.parseObjectKey("from_hardware")
+      val from_hardware = parser.parseB()
       parser.parseObjectNext()
-      parser.parseObjectKey("name")
-      val name = parser.parseString()
+      parser.parseObjectKey("to_type")
+      val to_type = parseConnectorTypeType()
       parser.parseObjectNext()
-      parser.parseObjectKey("to_hardware")
-      val to_hardware = parser.parseB()
-      parser.parseObjectNext()
-      parser.parseObjectKey("to_multiple")
-      val to_multiple = parser.parseB()
+      parser.parseObjectKey("to_template")
+      val to_template = parser.parseOption(parser.parseString _)
       parser.parseObjectNext()
       parser.parseObjectKey("to_threads")
       val to_threads = parser.parseZ()
       parser.parseObjectNext()
-      parser.parseObjectKey("to_type")
-      val to_type = parser.parseString()
+      parser.parseObjectKey("to_hardware")
+      val to_hardware = parser.parseB()
       parser.parseObjectNext()
-      return Connector(from_hardware, from_multiple, from_threads, from_type, name, to_hardware, to_multiple, to_threads, to_type)
+      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware)
     }
 
     def parseProcedure(): Procedure = {

@@ -471,11 +471,10 @@ import MTransformer._
           else
             MNone()
         case o2: Connection =>
-          val r0: MOption[Connector] = transformConnector(o2.connector)
-          val r1: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.from_ends, transformConnectionEnd _)
-          val r2: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.to_ends, transformConnectionEnd _)
-          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
-            MSome(o2(connector = r0.getOrElse(o2.connector), from_ends = r1.getOrElse(o2.from_ends), to_ends = r2.getOrElse(o2.to_ends)))
+          val r0: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.from_ends, transformConnectionEnd _)
+          val r1: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.to_ends, transformConnectionEnd _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(from_ends = r0.getOrElse(o2.from_ends), to_ends = r1.getOrElse(o2.to_ends)))
           else
             MNone()
         case o2: ConnectionEnd =>
@@ -762,11 +761,10 @@ import MTransformer._
     val r: MOption[Connection] = if (preR.continu) {
       val o2: Connection = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: MOption[Connector] = transformConnector(o2.connector)
-      val r1: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.from_ends, transformConnectionEnd _)
-      val r2: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.to_ends, transformConnectionEnd _)
-      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
-        MSome(o2(connector = r0.getOrElse(o2.connector), from_ends = r1.getOrElse(o2.from_ends), to_ends = r2.getOrElse(o2.to_ends)))
+      val r0: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.from_ends, transformConnectionEnd _)
+      val r1: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.to_ends, transformConnectionEnd _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+        MSome(o2(from_ends = r0.getOrElse(o2.from_ends), to_ends = r1.getOrElse(o2.to_ends)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {

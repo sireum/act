@@ -9,26 +9,31 @@ import org.sireum.aadl.act.ast._
 
   var out : ISZ[(String, ST)] = ISZ()
   var rootServer: String = ""
+  var actContainer: Option[ActContainer] = None[ActContainer]()
 
-  def tempEntry(destDir: String, container: ActContainer, cFiles: ISZ[String], hFiles: ISZ[String]): ISZ[(String, ST)] = {
+  def tempEntry(destDir: String, container: ActContainer,
+                cFiles: ISZ[String]
+               ): ISZ[(String, ST)] = {
     rootServer = container.rootServer
+    actContainer = Some(container)
 
     prettyPrint(container.models)
 
     val c = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes).map((x: Resource) => (x.path, x.contents))
     val aux = container.auxFiles.map((x: Resource) => (x.path, x.contents))
 
+
     var components: ISZ[ST] = container.cContainers.map((c: C_Container) => {
       val sources = c.cSources.map((r: Resource) => r.path)
       val includes = c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
-      StringTemplate.cmakeComponent(c.component, sources, includes)
+      StringTemplate.cmakeComponent(c.component, sources, includes, cFiles.nonEmpty)
     })
 
     container.monitors.foreach(m => {
       prettyPrint(ISZ(m.writer, m.interface))
 
       components = components :+ StringTemplate.cmakeComponent(m.i.component.name,
-        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES))
+        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), cFiles.nonEmpty)
 
       NativeIO.writeToFile(s"${destDir}/${m.cimplementation.path}", m.cimplementation.contents.render, T)
       NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
@@ -37,7 +42,8 @@ import org.sireum.aadl.act.ast._
 
 
     val auxCFiles: ISZ[ST] = cFiles.map(c => StringTemplate.auxTemplate(c))
-    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, Util.CMAKE_VERSION, auxCFiles)
+    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, Util.CMAKE_VERSION,
+      auxCFiles, container.connectors.nonEmpty)
     NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
 
     (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))
@@ -62,28 +68,28 @@ import org.sireum.aadl.act.ast._
   }
 
   def visitAssembly(a: Assembly) : Option[ST] = {
-    var imports: ISZ[ST] = ISZ()
     var children: ISZ[ST] = ISZ()
 
     val comp = visitComposition(a.composition)
 
-    imports = imports ++ out.map((o: (String, ST)) => st"""import "${o._1}";""")
+    val imports = out.map((o: (String, ST)) => st"""import "${o._1}";""")
+
+    val connectors: ISZ[ST] = actContainer.get.connectors.map(c => {
+      val fromType: ST = if(c.from_template.nonEmpty) st"""template "${c.from_template.get}"""" else st"""TODO"""
+      val toType: ST = if(c.from_template.nonEmpty) st"""template "${c.to_template.get}"""" else st"""TODO"""
+      st"""connector ${c.name} {
+          |  from ${c.from_type.name} ${fromType};
+          |  to ${c.to_type.name} ${toType};
+          |}
+          |"""
+    })
 
     val st =
       st"""import <std_connector.camkes>;
           |
           |${(imports, "\n")}
           |
-          |connector seL4TimeServer {
-          |  from Procedures template "seL4TimeServer-from.template.c";
-          |  to Procedure template "seL4TimeServer-to.template.c";
-          |}
-          |
-          |connector seL4GlobalAsynchCallback {
-          |  from Events template "seL4GlobalAsynchCallback-from.template.c";
-          |  to Event template "seL4GlobalAsynchCallback-to.template.c";
-          |}
-          |
+          |${(connectors, "\n")}
           |assembly {
           |  ${comp.get}
           |
@@ -115,7 +121,7 @@ import org.sireum.aadl.act.ast._
       val to = s"${c.to_ends(0).component}.${c.to_ends(0).end}"
 
       connections = connections :+
-        st"""connection ${c.connector.name} ${c.name}(from ${from}, to ${to});"""
+        st"""connection ${c.connectionType} ${c.name}(from ${from}, to ${to});"""
     }
 
     val st =

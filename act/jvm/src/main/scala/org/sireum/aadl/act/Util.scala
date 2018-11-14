@@ -174,6 +174,14 @@ object Util {
     return ret
   }
 
+  def isPeriodic(c: ir.Component): B = {
+    val ret: B = getDispatchProtocol(c) match {
+      case Some(Dispatch_Protocol.Periodic) => T
+      case _ => F
+    }
+    return ret
+  }
+
   def getDispatchProtocol(c: ir.Component): Option[Dispatch_Protocol.Type] = {
     val ret: Option[Dispatch_Protocol.Type] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
       case Some(ir.ValueProp("Periodic")) => Some(Dispatch_Protocol.Periodic)
@@ -396,7 +404,11 @@ object StringTemplate{
 
   def tbEnqueueDequeue(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String): ST = {
     val r: ST =
-    st"""#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
+    st"""#ifndef TB_VERIFY
+        |#include <stdio.h>
+        |#endif // TB_VERIFY
+        |
+        |#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
         |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
         |
         |int mon_get_sender_id(void);
@@ -446,20 +458,28 @@ object StringTemplate{
   val AUX_C_SOURCES: String = "cSources"
   val AUX_C_INCLUDES: String = "cIncludes"
 
-  def cmakeList(projectName: String, rootServer: String, components: ISZ[ST], cmakeVersion: String, auxCSources: ISZ[ST]): ST = {
+  def cmakeList(projectName: String, rootServer: String, components: ISZ[ST], cmakeVersion: String,
+                auxCSources: ISZ[ST], hasConnectorDefs: B): ST = {
+    val aux:ST = if(auxCSources.nonEmpty) {
+      st"""set(${AUX_C_SOURCES} "")
+          |set(${AUX_C_INCLUDES} "aux/includes")
+          |
+          |${(auxCSources, "\n")}
+          |"""
+    } else { st"""""" }
+
+    val connectors: ST = if(hasConnectorDefs) { st"""# add path to connector templates
+                                                    |CAmkESAddTemplatesPath(../../../../components/templates/)
+                                                    |"""}
+    else { st""""""}
+
     val r: ST =
       st"""cmake_minimum_required(VERSION ${cmakeVersion})
           |
           |project (${rootServer} C)
           |
-          |# add path to connector templates
-          |CAmkESAddTemplatesPath(../../../../components/templates/)
-          |
-          |set(${AUX_C_SOURCES} "")
-          |set(${AUX_C_INCLUDES} "aux/includes")
-          |
-          |${(auxCSources, "\n")}
-          |
+          |${connectors}
+          |${aux}
           |${(components, "\n\n")}
           |
           |DeclareCAmkESRootserver(${rootServer}.camkes)
@@ -471,14 +491,14 @@ object StringTemplate{
     return st"""list(APPEND ${AUX_C_SOURCES} ${i})"""
   }
 
-  def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String]): ST = {
+  def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String], hasAux: B): ST = {
     val s: ST = if(sources.nonEmpty){
-      st"""SOURCES $${${AUX_C_SOURCES}} ${(sources, " ")}"""
+      st"""SOURCES ${ if(hasAux) s"$${${AUX_C_SOURCES}} "  else "" }${(sources, " ")}"""
     } else{
       st""""""
     }
     val i: ST = if(includes.nonEmpty){
-      st"""INCLUDES $${${AUX_C_INCLUDES}} ${(includes, " ")}"""
+      st"""INCLUDES ${ if(hasAux)  s"$${${AUX_C_INCLUDES}} "  else "" }${(includes, " ")}"""
     } else{
       st""""""
     }
@@ -708,6 +728,7 @@ object TimerUtil {
 }
 
 @datatype class ActContainer(rootServer: String,
+                             connectors: ISZ[ast.Connector],
                              models: ISZ[ast.ASTObject],
                              monitors: ISZ[Monitor],
                              cContainers: ISZ[C_Container],
