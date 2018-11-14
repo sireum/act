@@ -16,6 +16,7 @@ import org.sireum.aadl.act.ast._
   var typeMap: HashMap[String, ir.Component] = HashMap.empty
   var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
 
+  // port-paths -> connInstances
   var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
   var outConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
 
@@ -734,11 +735,22 @@ import org.sireum.aadl.act.ast._
         val inter = st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
         val impl: ST =
           if(suffix == "write") {
-            st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
-                |  bool tb_result = true;
-                |  tb_result &= ${name}_${suffix}((${paramType} *) ${name});
-                |  return tb_result;
-                |}"""
+            outConnections.get(Util.getName(feature.identifier)) match {
+              case Some(conns) =>
+                var accum: ISZ[ST] = ISZ()
+                var i = 0
+                while (i < conns.size) {
+                  accum = accum :+ st"""tb_result &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
+                  i = i + 1
+                }
+
+                st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
+                    |  bool tb_result = true;
+                    |  ${(accum, "\n")}
+                    |  return tb_result;
+                    |}"""
+              case _ => st""""""
+            }
           } else {
             st""" """
           }
@@ -755,11 +767,22 @@ import org.sireum.aadl.act.ast._
         val inter = st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
 
         val impl: ST = if(suffix == "enqueue") {
-          st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
-              |  bool tb_result = true;
-              |  tb_result &= ${name}_${suffix}((${paramType} *) ${name});
-              |  return tb_result;
-              |}"""
+          // OUT
+          outConnections.get(Util.getName(feature.identifier)) match {
+            case Some(conns) =>
+              var accum: ISZ[ST] = ISZ()
+              var i = 0
+              while(i < conns.size) {
+                accum = accum :+ st"""tb_result &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
+                i = i + 1
+              }
+              st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
+                  |  bool tb_result = true;
+                  |  ${(accum, "\n")}
+                  |  return tb_result;
+                  |}"""
+            case _ => st""""""
+          }
         } else {
           val simpleName = Util.getLastName(feature.identifier)
           st"""void tb_entrypoint_tb_${Util.getClassifier(component.classifier.get)}_${simpleName}(const ${paramType} * in_arg) { }"""
