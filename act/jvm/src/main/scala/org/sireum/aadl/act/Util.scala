@@ -185,7 +185,7 @@ object Util {
   def getDispatchProtocol(c: ir.Component): Option[Dispatch_Protocol.Type] = {
     val ret: Option[Dispatch_Protocol.Type] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
       case Some(ir.ValueProp("Periodic")) => Some(Dispatch_Protocol.Periodic)
-      case Some(ir.ValueProp("Spordic")) => Some(Dispatch_Protocol.Sporadic)
+      case Some(ir.ValueProp("Sporadic")) => Some(Dispatch_Protocol.Sporadic)
       case _ => None[Dispatch_Protocol.Type]()
     }
     return ret
@@ -250,6 +250,18 @@ object Util {
     }
     return ret
   }
+
+  def addMessage(msg: String): Unit = {
+    cprintln(F, msg)
+  }
+
+  def addWarning(msg: String): Unit = {
+    cprintln(F, s"WARNING: $msg")
+  }
+
+  def addError(msg:String): Unit = {
+    cprintln(T, s"ERROR: $msg")
+  }
 }
 
 object TypeUtil {
@@ -304,10 +316,10 @@ object TypeUtil {
       case "Base_Types::Float_64" => Some("double")
 
       case "Base_Types::Character" =>
-        cprintln(T, "Character type not currently supported")
+        Util.addError("Character type not currently supported")
         None[String]()
       case "Base_Types::String" =>
-        cprintln(T, "String type not currently supported")
+        Util.addError("String type not currently supported")
         None[String]()
 
       case _ => None[String]()

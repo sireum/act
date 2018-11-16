@@ -124,7 +124,7 @@ import org.sireum.aadl.act.ast._
               typ = Util.NOTIFICATION_TYPE)
 
             val period: Z = if(Util.getPeriod(sc).isEmpty) {
-              cprint(T, s"Period not provided for ${classifier}, using ${Util.DEFAULT_PERIOD}")
+              Util.addWarning(s"Period not provided for ${classifier}, using ${Util.DEFAULT_PERIOD}")
               Util.DEFAULT_PERIOD
             } else {
               Util.getPeriod(sc).get
@@ -135,7 +135,7 @@ import org.sireum.aadl.act.ast._
             configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(componentId, classifier, TimerUtil.TIMER_ID)
 
             val priority: Z = if(Util.getPriority(sc).isEmpty){
-              cprint(T, s"Priority not provided for ${classifier}, using ${Util.DEFAULT_PRIORITY}")
+              Util.addWarning(s"Priority not provided for ${classifier}, using ${Util.DEFAULT_PRIORITY}")
               Util.DEFAULT_PRIORITY
             } else {
               Util.getPriority(sc).get
@@ -143,7 +143,7 @@ import org.sireum.aadl.act.ast._
             configuration = configuration :+ StringTemplate.configurationPriority(componentId, priority)
 
             val stackSize: Z = if(Util.getStackSize(sc).isEmpty) {
-              cprint(T, s"Stack Size not provided for ${classifier}, using ${Util.DEFAULT_STACK_SIZE}")
+              Util.addWarning(s"Stack Size not provided for ${classifier}, using ${Util.DEFAULT_STACK_SIZE}")
               Util.DEFAULT_STACK_SIZE
             } else {
               Util.getStackSize(sc).get
@@ -360,7 +360,7 @@ import org.sireum.aadl.act.ast._
                 typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
             } else {
-              cprintln(T,s"in port '${fpath}' is not connected")
+              Util.addWarning(s"in port '${fpath}' is not connected")
             }
           case ir.Direction.Out =>
             // uses monitor
@@ -437,7 +437,7 @@ import org.sireum.aadl.act.ast._
           }
 
         case _ =>
-          cprintln(F, s"Skipping ${f.category} for ${fid}.${fid}")
+          Util.addWarning(s"Skipping ${f.category} for ${fid}.${fid}")
       }
 
       generateC_InterfaceMethod(c, f.asInstanceOf[ir.FeatureEnd]) match {
@@ -482,9 +482,9 @@ import org.sireum.aadl.act.ast._
                                      |void component_init(const int64_t *arg);"""
 
       case Some(Dispatch_Protocol.Sporadic) =>
-        println()
+
       case _ =>
-        cprint(T, s"Dispatch Protocol not specified for ${c}")
+        Util.addWarning(s"Dispatch Protocol not specified for ${Util.getLastName(c.identifier)}")
     }
     containers = containers :+ C_Container(cid,
       ISZ(genComponentTypeImplementationFile(c, cImpls)),
@@ -602,7 +602,7 @@ import org.sireum.aadl.act.ast._
                 halt(s"not expecting ${dst}")
             }
           case _ =>
-            cprintln(T,s"processInConnections: Not handling ${connInst}")
+            Util.addWarning(s"processInConnections: Not handling ${connInst}")
         }
 
         i = i + 1
@@ -713,7 +713,7 @@ import org.sireum.aadl.act.ast._
             |    ${name} f;
             |  } ${container};"""
       } else {
-        cprintln(T, s"Unexpected datatype: ${c}")
+        Util.addError(s"Unexpected datatype: ${c}")
         st""" """
       }
 
@@ -938,7 +938,7 @@ import org.sireum.aadl.act.ast._
         topLevelProcess = Some(p)
         typeHeaderFileName = Util.getTypeHeaderFileName(p).get
       case _ =>
-        cprintln(T, "No processor bound process defined")
+        Util.addError("No processor bound process defined")
         return false
     }
 

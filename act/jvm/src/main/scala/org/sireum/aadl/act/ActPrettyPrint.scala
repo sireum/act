@@ -62,7 +62,7 @@ import org.sireum.aadl.act.ast._
       case o: Assembly => visitAssembly(o)
       case o: Procedure => visitProcedure(o)
       case _ =>
-        println(s"Not handling: ${a}")
+        Util.addError(s"Not handling: ast object ${a}")
     }
     return None()
   }
