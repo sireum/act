@@ -126,7 +126,7 @@ object Util {
   }
 
   def getInterfaceFilename(interfaceName: String): String = {
-    return st""""../../interfaces/${interfaceName}.idl4"""".render
+    return st""""../../${DIR_INTERFACES}/${interfaceName}.idl4"""".render
   }
 
   def getInterfaceName(feature: ir.FeatureEnd): String = {
