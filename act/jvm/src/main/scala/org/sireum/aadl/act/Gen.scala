@@ -30,6 +30,7 @@ import org.sireum.aadl.act.ast._
   var auxCSources: ISZ[ST] = ISZ()
 
   var hasPeriodicComponents: B = F
+  var hasErrors: B = F
 
   var count: Z = 0
   def counter(): Z = {
@@ -37,7 +38,7 @@ import org.sireum.aadl.act.ast._
     return count - 1
   }
 
-  def process(model : ir.Aadl, cSources: ISZ[String]) : ActContainer = {
+  def process(model : ir.Aadl, cSources: ISZ[String]) : Option[ActContainer] = {
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
@@ -51,21 +52,31 @@ import org.sireum.aadl.act.ast._
     }
 
     val system = components(0)
-    if(resolve(system)) {
-      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData))
-      if(hasPeriodicComponents) {
-        auxFiles = auxFiles :+ TimerUtil.timerInterface()
-      }
+    resolve(system)
 
+    if(!hasErrors) {
+      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData))
+    }
+
+    if(hasPeriodicComponents) {
+      auxFiles = auxFiles :+ TimerUtil.timerInterface()
+    }
+
+    if(!hasErrors) {
       gen(system)
     }
 
-    return ActContainer(Util.getLastName(topLevelProcess.get.identifier),
-      connectors,
-      astObjects,
-      monitors.values,
-      containers,
-      auxFiles)
+    if(!hasErrors) {
+      return Some(ActContainer(Util.getLastName(topLevelProcess.get.identifier),
+        connectors,
+        astObjects,
+        monitors.values,
+        containers,
+        auxFiles))
+
+    } else {
+      return None[ActContainer]()
+    }
   }
 
   def gen(c: ir.Component) : Unit = {
@@ -359,8 +370,6 @@ import org.sireum.aadl.act.ast._
                 name = Util.genMonitorNotificationFeatureName(fend),
                 typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
-            } else {
-              Util.addWarning(s"in port '${fpath}' is not connected")
             }
           case ir.Direction.Out =>
             // uses monitor
@@ -689,9 +698,13 @@ import org.sireum.aadl.act.ast._
           st"""$name"""
         } else {
           val fields: ISZ[ST] = c.subComponents.map(sub => {
-            st"""${processDataType(sub, T)} ${Util.getLastName(sub.identifier)};"""
+            val fname: String = Util.getLastName(sub.identifier)
+            if(ISZOps(Util.cKeywords).contains(fname)) {
+              Util.addError(s"The attribute '${fname}' from data type ${name} is a reserved keyword")
+              hasErrors = T
+            }
+            st"""${processDataType(sub, T)} ${fname};"""
           })
-
 
           st"""typedef
               |  struct ${name} {
@@ -708,7 +721,7 @@ import org.sireum.aadl.act.ast._
         val container = Util.getContainerName(name)
         st"""typedef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
             |
-              |typedef
+            |typedef
             |  struct ${container} {
             |    ${name} f;
             |  } ${container};"""
@@ -890,6 +903,7 @@ import org.sireum.aadl.act.ast._
 
 
   def resolve(sys : ir.Component): B = {
+
     def constructMap(c: ir.Component): Unit = {
       val name = Util.getName(c.identifier)
       assert(!componentMap.contains(name))
@@ -904,25 +918,44 @@ import org.sireum.aadl.act.ast._
         featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
       }
 
-      c.connectionInstances.withFilter(ci => isThreadConnection(ci)).foreach(ci => {
-        def add(portPath: String, isIn: B): Unit = {
-          val map: HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
-            case T => inConnections
-            case F => outConnections
-          }
-          var cis: ISZ[ir.ConnectionInstance] = map.get(portPath) match {
-            case Some(x) => x
-            case _ => ISZ()
-          }
-          cis = cis :+ ci
-          isIn match {
-            case T => inConnections = inConnections + (portPath ~> cis)
-            case F => outConnections = outConnections + (portPath ~> cis)
-          }
+      c.features.foreach(f => {
+        f match {
+          case fe: ir.FeatureEnd =>
+            if (Util.isDataport(fe) && fe.classifier.isEmpty) {
+              Util.addError(s"Data type required for ${fe.category} ${Util.getName(fe.identifier)}")
+              hasErrors = T
+            }
+          case _ =>
         }
+      })
 
-        add(Util.getName(ci.src.feature.get), F)
-        add(Util.getName(ci.dst.feature.get), T)
+      c.connectionInstances.foreach(ci => {
+        if(isThreadConnection(ci)) {
+          def add(portPath: String, isIn: B): Unit = {
+            val map: HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
+              case T => inConnections
+              case F => outConnections
+            }
+            var cis: ISZ[ir.ConnectionInstance] = map.get(portPath) match {
+              case Some(x) => x
+              case _ => ISZ()
+            }
+            cis = cis :+ ci
+            isIn match {
+              case T => inConnections = inConnections + (portPath ~> cis)
+              case F => outConnections = outConnections + (portPath ~> cis)
+            }
+          }
+
+          add(Util.getName(ci.src.feature.get), F)
+          add(Util.getName(ci.dst.feature.get), T)
+        } else {
+          val src = componentMap.get(Util.getName(ci.src.component)).get
+          val dst = componentMap.get(Util.getName(ci.dst.component)).get
+          val srcName = s"${Util.getLastName(src.identifier)}.${Util.getLastName(ci.src.feature.get)}"
+          val dstName = s"${Util.getLastName(dst.identifier)}.${Util.getLastName(ci.src.feature.get)}"
+          Util.addMessage(s"Ignoring ${src.category} to ${dst.category} connection: ${srcName} -> ${dstName}")
+        }
       })
     })
 
@@ -939,12 +972,14 @@ import org.sireum.aadl.act.ast._
         typeHeaderFileName = Util.getTypeHeaderFileName(p).get
       case _ =>
         Util.addError("No processor bound process defined")
-        return false
+        hasErrors = T
     }
 
-    buildMonitors()
+    if(!hasErrors) {
+      buildMonitors()
+    }
 
-    return true
+    return !hasErrors
   }
 
 
