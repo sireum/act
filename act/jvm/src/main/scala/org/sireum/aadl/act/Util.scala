@@ -51,6 +51,10 @@ object Util {
 
   val CMAKE_VERSION: String = "3.8.2"
 
+  val cKeywords: ISZ[String] = ISZ("auto", "break", "case", "char", "const", "continue", "default", "do", "double",
+    "else", "enum", "extern", "float", "for", "goto", "if", "int", "long", "register", "return", "short",
+    "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while")
+
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
     val t: String = TypeUtil.translateBaseType(c.name) match {
       case Some(v) => v
@@ -249,6 +253,10 @@ object Util {
       case _ => None[Z]()
     }
     return ret
+  }
+
+  def isDataport(f: ir.FeatureEnd): B = {
+    return f.category == ir.FeatureCategory.DataPort || f.category == ir.FeatureCategory.EventDataPort
   }
 
   def addMessage(msg: String): Unit = {

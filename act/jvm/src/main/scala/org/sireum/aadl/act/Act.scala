@@ -64,10 +64,12 @@ object Act {
       }
     }
 
-    val con = Gen().process(m, hFiles)
-    val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles)
-
-    0
+    Gen().process(m, hFiles) match {
+      case Some(con) =>
+        val out = BijiPrettyPrint ().tempEntry (destDir.getAbsolutePath, con, cFiles)
+        return 0
+      case _ => return 1
+    }
   }
 
   def path2fileOpt(pathFor: String, path: Option[String], checkExist: B): scala.Option[File] = {
