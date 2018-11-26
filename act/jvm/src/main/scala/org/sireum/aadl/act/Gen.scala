@@ -4,7 +4,7 @@ package org.sireum.aadl.act
 
 import org.sireum._
 import org.sireum.ops.ISZOps
-import org.sireum.aadl.ir
+import org.sireum.aadl.{act, ir}
 import org.sireum.aadl.act.ast._
 
 @record class Gen() {
@@ -346,6 +346,8 @@ import org.sireum.aadl.act.ast._
 
     var cIncludes: ISZ[ST] = ISZ()
     var cImpls: ISZ[ST] = ISZ()
+    var cPreInits: ISZ[ST] = ISZ()
+    var cDrainQueues: ISZ[(ST, ST)] = ISZ()
 
     for(f <- c.features) {
       val fend = f.asInstanceOf[ir.FeatureEnd]
@@ -394,6 +396,25 @@ import org.sireum.aadl.act.ast._
         }
       }
 
+      def handleEventPort(): Unit = {
+        fend.direction match {
+          case ir.Direction.In =>
+            Util.getComputeEntrypointSourceText(fend.properties) match {
+              case Some(v) =>
+                val name = Util.genMonitorNotificationFeatureName(fend)
+                val handlerName = s"${name}_handler"
+                val regCallback = s"${name}_reg_callback"
+
+                cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
+                cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
+              case _ =>
+                Util.addWarning(s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
+            }
+
+          case _ =>
+        }
+      }
+
       def handleSubprogramAccess(): Unit = {
         val proc = Util.getClassifier(fend.classifier.get)
         val kind = Util.getDiscreetPropertyValue(f.properties, "AccessType")
@@ -423,6 +444,7 @@ import org.sireum.aadl.act.ast._
           handleDataPort()
         case ir.FeatureCategory.EventDataPort =>
           handleDataPort()
+          handleEventPort()
 
         case ir.FeatureCategory.SubprogramAccessGroup =>
           handleSubprogramAccess()
@@ -430,6 +452,8 @@ import org.sireum.aadl.act.ast._
           handleSubprogramAccess()
 
         case ir.FeatureCategory.EventPort =>
+          handleEventPort()
+
           fend.direction match {
             case ir.Direction.In =>
               // consumes notification
@@ -450,9 +474,11 @@ import org.sireum.aadl.act.ast._
       }
 
       generateC_InterfaceMethod(c, f.asInstanceOf[ir.FeatureEnd]) match {
-        case Some((interface, impl)) =>
-          cIncludes = cIncludes :+ interface
-          cImpls = cImpls :+ impl
+        case Some(C_SimpleContainer(inter, impl, preInit, drainQueues)) =>
+          if(inter.nonEmpty) { cIncludes = cIncludes :+ inter.get }
+          if(impl.nonEmpty) { cImpls = cImpls :+ impl.get }
+          if(preInit.nonEmpty) { cPreInits = cPreInits :+ preInit.get}
+          if(drainQueues.nonEmpty) { cDrainQueues = cDrainQueues :+ drainQueues.get}
         case _ =>
       }
     }
@@ -495,8 +521,21 @@ import org.sireum.aadl.act.ast._
       case _ =>
         Util.addWarning(s"Dispatch Protocol not specified for ${Util.getLastName(c.identifier)}")
     }
+
+    var cRunEntries: ISZ[ST] = cDrainQueues.map(x => x._1)
+
+    Util.getInitializeEntryPoint(c.properties) match {
+      case Some(methodName) =>
+        cIncludes = cIncludes :+ st"""void ${methodName}(const int64_t *arg);"""
+        val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(cid, methodName)
+        cImpls = cImpls :+ cimpl
+        cRunEntries = cRunEntries :+ runEntry
+      case _ =>
+    }
+
+
     containers = containers :+ C_Container(cid,
-      ISZ(genComponentTypeImplementationFile(c, cImpls)),
+      ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunEntries, cDrainQueues.map(x => x._2))),
       ISZ(genComponentTypeInterfaceFile(c, cIncludes))
     )
 
@@ -650,44 +689,7 @@ import org.sireum.aadl.act.ast._
   def processDataTypes(values: ISZ[ir.Component]): ST = {
     val defs: ISZ[ST] = values.withFilter(v => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).map(v => processDataType(v, F))
     val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
-    val body = st"""#ifndef ${macroname}
-                   |#define ${macroname}
-                   |
-                   |#include <stdbool.h>
-                   |#include <stdint.h>
-                   |
-                   |#ifndef TB_VERIFY
-                   |#include <stddef.h>
-                   |#endif // TB_VERIFY
-                   |
-                   |#define __TB_OS_CAMKES__
-                   |#define TB_MONITOR_READ_ACCESS 111
-                   |#define TB_MONITOR_WRITE_ACCESS 222
-                   |
-                   |#ifndef TB_VERIFY
-                   |#define MUTEXOP(OP)\
-                   |if((OP) != 0) {\
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
-                   |  *((int*)0)=0xdeadbeef;\
-                   |}
-                   |#else
-                   |#define MUTEXOP(OP) OP
-                   |#endif // TB_VERIFY
-                   |#ifndef TB_VERIFY
-                   |#define CALLBACKOP(OP)\
-                   |if((OP) != 0) {\
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
-                   |  *((int*)0)=0xdeadbeef;\
-                   |}
-                   |#else
-                   |#define CALLBACKOP(OP) OP
-                   |#endif // TB_VERIFY
-                   |
-                   |${(defs, "\n\n")}
-                   |
-                   |#endif // __TB_AADL_${typeHeaderFileName}__H
-                   |"""
-    return body
+    return StringTemplate.tbTypeHeaderFile(macroname, typeHeaderFileName, defs)
   }
 
   def processDataType(c: ir.Component, isField: B): ST = {
@@ -734,8 +736,8 @@ import org.sireum.aadl.act.ast._
     return s
   }
 
-  def generateC_InterfaceMethod(component: ir.Component, feature: ir.FeatureEnd): Option[(ST, ST)] = {
-    val ret: Option[(ST, ST)] = feature.category match {
+  def generateC_InterfaceMethod(component: ir.Component, feature: ir.FeatureEnd): Option[C_SimpleContainer] = {
+    val ret: Option[C_SimpleContainer] = feature.category match {
       case ir.FeatureCategory.DataPort =>
         val (suffix, mod) : (String, String) = feature.direction match {
           case ir.Direction.In => ("read", "")
@@ -745,8 +747,8 @@ import org.sireum.aadl.act.ast._
         val name = Util.genMonitorFeatureName(feature, None[Z]())
         val paramType = Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get)
 
-        val inter = st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
-        val impl: ST =
+        val inter = Some(st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});""")
+        val impl: Option[ST] =
           if(suffix == "write") {
             outConnections.get(Util.getName(feature.identifier)) match {
               case Some(conns) =>
@@ -757,17 +759,31 @@ import org.sireum.aadl.act.ast._
                   i = i + 1
                 }
 
-                st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
+                val methodName = s"${name}_${suffix}"
+                Some(st"""/************************************************************************
+                    | * ${methodName}:
+                    | * Invoked from user code in the local thread.
+                    | *
+                    | * This is the function invoked by the local thread to make a
+                    | * call to write to a remote data port.
+                    | *
+                    | * XXX: When simulating fan out, the caller of this function will only
+                    | * receive a positive response when all enqueues are successful. When a
+                    | * negative response is received it only indicates that at least one
+                    | * enqueue attempt failed.
+                    | *
+                    | ************************************************************************/
+                    |bool ${methodName}(${mod}${paramType} * ${name}){
                     |  bool tb_result = true;
                     |  ${(accum, "\n")}
                     |  return tb_result;
-                    |}"""
-              case _ => st""""""
+                    |}""")
+              case _ => None[ST]()
             }
           } else {
-            st""" """
+            None[ST]()
           }
-        Some((inter, impl))
+        Some(C_SimpleContainer(inter, impl, None[ST](), None[(ST, ST)]()))
 
       case ir.FeatureCategory.EventDataPort =>
         val (suffix, mod, paramType): (String, String, String) = feature.direction match {
@@ -777,9 +793,12 @@ import org.sireum.aadl.act.ast._
         }
         val name = Util.genMonitorFeatureName(feature, None[Z]())
 
-        val inter = st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});"""
+        val genMethodName = s"${name}_${suffix}"
+        var inter = Some(st"""bool ${genMethodName}(${mod}${paramType} * ${name});""")
+        var preInit: Option[ST] = None[ST]()
+        var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
 
-        val impl: ST = if(suffix == "enqueue") {
+        val impl: Option[ST] = if(suffix == "enqueue") {
           // OUT
           outConnections.get(Util.getName(feature.identifier)) match {
             case Some(conns) =>
@@ -789,18 +808,61 @@ import org.sireum.aadl.act.ast._
                 accum = accum :+ st"""tb_result &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
                 i = i + 1
               }
-              st"""bool ${name}_${suffix}(${mod}${paramType} * ${name}){
+              val methodName: String = s"${name}_${suffix}"
+
+              Some(st"""/************************************************************************
+                  | * ${methodName}:
+                  | * Invoked from user code in the local thread.
+                  | *
+                  | * This is the function invoked by the local thread to make a
+                  | * call to write to a remote data port.
+                  | *
+                  | * XXX: When simulating fan out, the caller of this function will only
+                  | * receive a positive response when all enqueues are successful. When a
+                  | * negative response is received it only indicates that at least one
+                  | * enqueue attempt failed.
+                  | *
+                  | ************************************************************************/
+                  |bool ${methodName}(${mod}${paramType} * ${name}){
                   |  bool tb_result = true;
                   |  ${(accum, "\n")}
                   |  return tb_result;
-                  |}"""
-            case _ => st""""""
+                  |}""")
+            case _ => None[ST]()
           }
         } else {
           val simpleName = Util.getLastName(feature.identifier)
-          st"""void tb_entrypoint_tb_${Util.getClassifier(component.classifier.get)}_${simpleName}(const ${paramType} * in_arg) { }"""
+          val methodName = s"tb_entrypoint_tb_${Util.getClassifier(component.classifier.get)}_${simpleName}"
+
+          val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
+            case Some(v) =>
+              val varName = s"tb_${simpleName}";
+              drainQueue = Some(st"""${paramType} ${varName};""",
+                st"""while (${genMethodName}((${paramType} *) &${varName})) {
+                    |  ${methodName}(&${varName});
+                    |}""")
+
+              inter = Some(st"""${inter.get}
+                               |
+                               |void ${v}(const ${paramType} * in_arg);""")
+
+              s"${v}((${paramType} *) in_arg);"
+            case _ => ""
+          }
+
+          Some(st"""/************************************************************************
+              | * ${methodName}:
+              | *
+              | * This is the function invoked by an active thread dispatcher to
+              | * call to a user-defined entrypoint function.  It sets up the dispatch
+              | * context for the user-defined entrypoint, then calls it.
+              | *
+              | ************************************************************************/
+              |void ${methodName}(const ${paramType} * in_arg) {
+              |  ${invokeHandler}
+              |}""")
         }
-        Some((inter, impl))
+        Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
 
       case ir.FeatureCategory.EventPort =>
         val dir: String = feature.direction match {
@@ -812,41 +874,71 @@ import org.sireum.aadl.act.ast._
         val methodName = Util.getLastName(feature.identifier)
         val name = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
 
-        val inter = st"""bool ${name}(void);"""
+        val inter = Some(st"""bool ${name}(void);""")
 
-        val impl: ST = if(dir == "read") {
+        val impl: Option[ST] = if(dir == "read") {
           val varName = s"${methodName}_index"
           val callback = s"${methodName}_callback"
           val callback_reg = s"${methodName}_reg_callback"
 
-          st"""static bool ${varName} = false;
+          Some(st"""/************************************************************************
+              | *
+              | * Static variables and queue management functions for event port:
+              | *     ${methodName}
+              | *
+              | ************************************************************************/
+              |static bool ${varName} = false;
               |
+              |/************************************************************************
+              | * ${callback}:
+              | * Invoked by: remote RPC
+              | *
+              | * This is the function invoked by a remote RPC to write to an active-thread
+              | * input event port.  It increments a count of received messages.
+              | *
+              | ************************************************************************/
               |bool ${callback}(void *_ UNUSED){
               |  $varName = true;
               |  //CALLBACK(${callback_reg}(${callback}, NULL));
               |  return true;
               |}
               |
+              |/************************************************************************
+              | * ${name}:
+              | * Invoked from local active thread.
+              | *
+              | * This is the function invoked by the active thread to decrement the
+              | * input event index.
+              | *
+              | ************************************************************************/
               |bool ${name}(){
               |  bool result;
               |  result = ${varName};
               |  ${varName} = false;
               |  return result;
               |}
-              |"""
+              |""")
 
         } else {
           val emit = s"${methodName}_emit()"
-          st"""bool ${name}(void) {
+          Some(st"""/************************************************************************
+              | * ${name}
+              | * Invoked from user code in the local thread.
+              | *
+              | * This is the function invoked by the local thread to make a
+              | * call to write to a remote data port.
+              | *
+              | ************************************************************************/
+              |bool ${name}(void) {
               |  bool tb_result = true;
               |  ${emit};
               |  return tb_result;
               |}
-              |"""
+              |""")
         }
-        Some((inter, impl))
+        Some(C_SimpleContainer(inter, impl, None[ST](), None[(ST, ST)]()))
 
-      case _ => None[(ST,ST)]()
+      case _ => None[C_SimpleContainer]()
     }
     return ret
   }
@@ -869,29 +961,12 @@ import org.sireum.aadl.act.ast._
     return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_INCLUDES}/${compTypeHeaderFileName}.h", ret)
   }
 
-  def genComponentTypeImplementationFile(component:ir.Component, sts: ISZ[ST]): Resource = {
+  def genComponentTypeImplementationFile(component:ir.Component, sts: ISZ[ST], preInitComments: ISZ[ST],
+                                         cRunPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): Resource = {
     val name = Util.getClassifier(component.classifier.get)
     val compTypeFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
+    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, sts, preInitComments, cRunPreEntries, cDrainQueues)
 
-    val ret = st"""#include "../${Util.DIR_INCLUDES}/${compTypeFileName}.h"
-                  |${(auxCSources, "\n")}
-                  |#include <string.h>
-                  |#include <camkes.h>
-                  |
-                  |${(sts, "\n\n")}
-                  |
-                  |void pre_init(void) { }
-                  |
-                  |int run(void) {
-                  |  // Initial lock to await dispatch input.
-                  |  MUTEXOP(tb_dispatch_sem_wait())
-                  |  for(;;) {
-                  |    MUTEXOP(tb_dispatch_sem_wait())
-                  |    // Drain the queues
-                  |  }
-                  |  return 0;
-                  |}
-                  |"""
     return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret)
   }
 

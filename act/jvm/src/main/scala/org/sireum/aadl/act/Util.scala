@@ -33,6 +33,10 @@ object Util {
 
   val PROP_MEMORY_PROPERTIES__STACK_SIZE: String = "Memory_Properties::Stack_Size"
 
+  val PROP_PROGRAMMING_PROPERTIES__INITIALIZE_ENTRYPOINT_SOURCE_TEXT: String = "Programming_Properties::Initialize_Entrypoint_Source_Text"
+
+  val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
+
   val DEFAULT_QUEUE_SIZE: Z = z"1"
   val DEFAULT_PRIORITY: Z = z"201"
   val DEFAULT_STACK_SIZE: Z = z"1024"
@@ -255,6 +259,23 @@ object Util {
     return ret
   }
 
+  def getInitializeEntryPoint(properties: ISZ[ir.Property]): Option[String] = {
+    val ret: Option[String] = getDiscreetPropertyValue(properties, PROP_PROGRAMMING_PROPERTIES__INITIALIZE_ENTRYPOINT_SOURCE_TEXT) match {
+      case Some(ir.ValueProp(v)) => Some(v)
+      case _ => None[String]()
+    }
+    return ret
+  }
+
+  def getComputeEntrypointSourceText(properties: ISZ[ir.Property]): Option[String] = {
+    val ret: Option[String] = getDiscreetPropertyValue(properties, PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT) match {
+      case Some(ir.ValueProp(v)) => Some(v)
+      case _ => None[String]()
+    }
+    return ret
+
+  }
+
   def isDataport(f: ir.FeatureEnd): B = {
     return f.category == ir.FeatureCategory.DataPort || f.category == ir.FeatureCategory.EventDataPort
   }
@@ -388,6 +409,48 @@ object StringTemplate{
                      |#endif // ${macroName}
                      |"""
     return r
+  }
+
+  def tbTypeHeaderFile(macroName: String, typeHeaderFileName: String, defs: ISZ[ST]): ST = {
+    val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
+    val body = st"""#ifndef ${macroname}
+                   |#define ${macroname}
+                   |
+                   |#include <stdbool.h>
+                   |#include <stdint.h>
+                   |
+                   |#ifndef TB_VERIFY
+                   |#include <stddef.h>
+                   |#endif // TB_VERIFY
+                   |
+                   |#define __TB_OS_CAMKES__
+                   |#define TB_MONITOR_READ_ACCESS 111
+                   |#define TB_MONITOR_WRITE_ACCESS 222
+                   |
+                   |#ifndef TB_VERIFY
+                   |#define MUTEXOP(OP)\
+                   |if((OP) != 0) {\
+                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
+                   |  *((int*)0)=0xdeadbeef;\
+                   |}
+                   |#else
+                   |#define MUTEXOP(OP) OP
+                   |#endif // TB_VERIFY
+                   |#ifndef TB_VERIFY
+                   |#define CALLBACKOP(OP)\
+                   |if((OP) != 0) {\
+                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
+                   |  *((int*)0)=0xdeadbeef;\
+                   |}
+                   |#else
+                   |#define CALLBACKOP(OP) OP
+                   |#endif // TB_VERIFY
+                   |
+                   |${(defs, "\n\n")}
+                   |
+                   |#endif // __TB_AADL_${typeHeaderFileName}__H
+                   |"""
+    return body
   }
 
   def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String): ST = {
@@ -537,6 +600,74 @@ object StringTemplate{
 
   def configurationStackSize(name: String, size: Z): ST = {
     return st"""${name}._control_stack_size = ${size};"""
+  }
+
+  def componentTypeImpl(filename: String, auxCSources: ISZ[ST], stmts: ISZ[ST],
+                        preInitComments: ISZ[ST], runPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): ST = {
+    val ret:ST = st"""#include "../${Util.DIR_INCLUDES}/${filename}.h"
+        |${(auxCSources, "\n")}
+        |#include <string.h>
+        |#include <camkes.h>
+        |
+        |${(stmts, "\n\n")}
+        |
+        |void pre_init(void) {
+        |  ${(preInitComments, "\n")}
+        |}
+        |
+        |/************************************************************************
+        | * int run(void)
+        | * Main active thread function.
+        | ************************************************************************/
+        |int run(void) {
+        |  ${(runPreEntries, "\n")}
+        |
+        |  // Initial lock to await dispatch input.
+        |  MUTEXOP(tb_dispatch_sem_wait())
+        |  for(;;) {
+        |    MUTEXOP(tb_dispatch_sem_wait())
+        |    // Drain the queues
+        |    ${(cDrainQueues, "\n")}
+        |  }
+        |  return 0;
+        |}
+        |"""
+    return ret
+  }
+
+  def componentInitializeEntryPoint(componentName: String, methodName: String): (ST, ST) = {
+    val init: String = s"tb_entrypoint_${componentName}_initializer"
+    val ret: ST =
+      st"""/************************************************************************
+          | *  ${init}:
+          | *
+          | * This is the function invoked by an active thread dispatcher to
+          | * call to a user-defined entrypoint function.  It sets up the dispatch
+          | * context for the user-defined entrypoint, then calls it.
+          | *
+          | ************************************************************************/
+          |void ${init}(const int64_t * in_arg) {
+          |  ${methodName}((int64_t *) in_arg);
+          |}"""
+    val runEntry: ST = st"""{
+                           |  int64_t tb_dummy;
+                           |  ${init}(&tb_dummy);
+                           |}"""
+    return (ret, runEntry)
+  }
+
+  def cEventNotificiationHandler(handlerName: String, regCallback: String): ST = {
+    val ret: ST =
+      st"""static void ${handlerName}(void * unused) {
+          |  MUTEXOP(tb_dispatch_sem_post())
+          |  CALLBACKOP(${regCallback}(${handlerName}, NULL));
+          |}"""
+    return ret
+  }
+
+  def cRegCallback(handlerName: String, regCallback: String): ST = {
+    val ret: ST = st"""CALLBACKOP(${regCallback}(${handlerName}, NULL));"""
+    return ret
   }
 }
 
@@ -766,6 +897,11 @@ object TimerUtil {
 @datatype class C_Container(component: String,
                             cSources: ISZ[Resource],
                             cIncludes: ISZ[Resource])
+
+@datatype class C_SimpleContainer(cImpl: Option[ST],
+                                  cIncl: Option[ST],
+                                  preInits: Option[ST],
+                                  drainQueues: Option[(ST, ST)])
 
 @datatype class Resource(path: String,
                          contents: ST)
