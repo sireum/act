@@ -34,6 +34,7 @@ object Util {
   val PROP_MEMORY_PROPERTIES__STACK_SIZE: String = "Memory_Properties::Stack_Size"
 
   val PROP_PROGRAMMING_PROPERTIES__INITIALIZE_ENTRYPOINT_SOURCE_TEXT: String = "Programming_Properties::Initialize_Entrypoint_Source_Text"
+  val PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT: String = "Programming_Properties::Source_Text"
 
   val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
 
@@ -75,12 +76,16 @@ object Util {
   }
 
   @pure def getDiscreetPropertyValue(properties: ISZ[ir.Property], propertyName: String): Option[ir.PropertyValue] = {
-    for (p <- properties if getLastName(p.name) == propertyName) {
-      return Some(ISZOps(p.propertyValues).first)
+    val ret: Option[ir.PropertyValue] = getPropertyValues(properties, propertyName) match {
+      case ISZ(a) => Some(a)
+      case _ => None[ir.PropertyValue]()
     }
-    return None[ir.PropertyValue]()
+    return ret
   }
 
+  @pure def getPropertyValues(properties: ISZ[ir.Property], propertyName: String): ISZ[ir.PropertyValue] = {
+    return properties.withFilter(p => getLastName(p.name) == propertyName).flatMap(p => p.propertyValues)
+  }
 
   def getLastName(n : ir.Name) : String = {
     return n.name(n.name.size - 1)
@@ -276,6 +281,10 @@ object Util {
 
   }
 
+  def getSourceText(properties: ISZ[ir.Property]): ISZ[String] = {
+    return getPropertyValues(properties, PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT).map(p => p.asInstanceOf[ir.ValueProp].value)
+  }
+
   def isDataport(f: ir.FeatureEnd): B = {
     return f.category == ir.FeatureCategory.DataPort || f.category == ir.FeatureCategory.EventDataPort
   }
@@ -398,6 +407,24 @@ object StringUtil {
   def toLowerCase(s: String):String = {
     val cms = conversions.String.toCms(s)
     return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
+  }
+
+  def endsWith(s: String, suffix: String): B = {
+    val cms = conversions.String.toCms(s)
+    val scms = conversions.String.toCms(suffix)
+    if(scms.isEmpty || cms.size < scms.size) {
+      return F
+    }
+    var i = scms.size - 1
+    var j = cms.size - 1
+    while(i > 0) {
+      if(cms(j) != scms(i)) {
+        return F
+      }
+      i = i - 1
+      j = j - 1
+    }
+    return T
   }
 }
 
@@ -896,7 +923,8 @@ object TimerUtil {
 
 @datatype class C_Container(component: String,
                             cSources: ISZ[Resource],
-                            cIncludes: ISZ[Resource])
+                            cIncludes: ISZ[Resource],
+                            sourceText: ISZ[String])
 
 @datatype class C_SimpleContainer(cImpl: Option[ST],
                                   cIncl: Option[ST],

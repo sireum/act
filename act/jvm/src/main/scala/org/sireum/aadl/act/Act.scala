@@ -4,7 +4,7 @@ import org.sireum.aadl.ir
 import java.io.File
 import java.nio.file.StandardCopyOption
 
-import org.sireum.{B, Either, F, ISZ, Option, Some, String, T, Z}
+import org.sireum.{B, Either, F, ISZ, None, Option, Some, String, T, Z}
 
 object Act {
 
@@ -21,6 +21,10 @@ object Act {
   }
 
   def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[String]) : Int = {
+    run(destDir, m, auxDirectories, None[File])
+  }
+
+  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[String], aadlRootDir: Option[File]) : Int = {
 
     if(m.components.isEmpty) {
       Console.err.println("Model is empty")
@@ -66,7 +70,11 @@ object Act {
 
     Gen().process(m, hFiles) match {
       case Some(con) =>
-        val out = BijiPrettyPrint ().tempEntry (destDir.getAbsolutePath, con, cFiles)
+        val rootDir = aadlRootDir match {
+          case Some(f) => f.getAbsolutePath
+          case _ => ""
+        }
+        val out = BijiPrettyPrint ().tempEntry (destDir.getAbsolutePath, con, cFiles, rootDir)
         return 0
       case _ => return 1
     }
