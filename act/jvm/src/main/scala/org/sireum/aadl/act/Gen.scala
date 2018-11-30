@@ -204,13 +204,13 @@ import org.sireum.aadl.act.ast._
       // add placeholder time server
       val timerComponent = TimerUtil.timerComponent()
       instances = instances :+ timerComponent
-      containers = containers :+ C_Container(timerComponent.component.name, ISZ(TimerUtil.timerCSource()), ISZ())
+      containers = containers :+ C_Container(timerComponent.component.name, ISZ(TimerUtil.timerCSource()), ISZ(), ISZ())
 
       // add the dispatcher component
       val dispatchComponent = TimerUtil.dispatchComponent(dispatchNotifications)
       instances = instances :+ dispatchComponent
       containers = containers :+ C_Container(dispatchComponent.component.name,
-        ISZ(TimerUtil.dispatchComponentCSource(s"<${typeHeaderFileName}.h>", calendars)), ISZ())
+        ISZ(TimerUtil.dispatchComponentCSource(s"<${typeHeaderFileName}.h>", calendars)), ISZ(), ISZ())
 
       // connect dispatch timer to time server
       createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
@@ -533,10 +533,10 @@ import org.sireum.aadl.act.ast._
       case _ =>
     }
 
-
     containers = containers :+ C_Container(cid,
       ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunEntries, cDrainQueues.map(x => x._2))),
-      ISZ(genComponentTypeInterfaceFile(c, cIncludes))
+      ISZ(genComponentTypeInterfaceFile(c, cIncludes)),
+      Util.getSourceText(c.properties)
     )
 
     return Component(
@@ -837,10 +837,10 @@ import org.sireum.aadl.act.ast._
           val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
             case Some(v) =>
               val varName = s"tb_${simpleName}";
-              drainQueue = Some(st"""${paramType} ${varName};""",
+              drainQueue = Some((st"""${paramType} ${varName};""",
                 st"""while (${genMethodName}((${paramType} *) &${varName})) {
                     |  ${methodName}(&${varName});
-                    |}""")
+                    |}"""))
 
               inter = Some(st"""${inter.get}
                                |
@@ -993,7 +993,7 @@ import org.sireum.aadl.act.ast._
         featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
       }
 
-      c.features.foreach(f => {
+      for(f <- c.features){
         f match {
           case fe: ir.FeatureEnd =>
             if (Util.isDataport(fe) && fe.classifier.isEmpty) {
@@ -1002,7 +1002,7 @@ import org.sireum.aadl.act.ast._
             }
           case _ =>
         }
-      })
+      }
 
       c.connectionInstances.foreach(ci => {
         if(isThreadConnection(ci)) {

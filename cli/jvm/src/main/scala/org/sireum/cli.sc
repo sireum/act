@@ -47,7 +47,10 @@
       ),
       Opt (name = "auxDirs", longKey = "aux-directories", shortKey = Some('a'),
         tpe = Type.Path(multiple = T, default = None()),
-        description = "Directories containing C files to be included in build")
+        description = "Directories containing C files to be included in build"),
+      Opt (name = "aadlRootDir", longKey = "root-dir", shortKey = Some('r'),
+        tpe = Type.Path(multiple = F, default = None()),
+        description = "")
     ),
     groups = ISZ()
   )

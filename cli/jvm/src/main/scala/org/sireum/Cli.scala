@@ -55,7 +55,8 @@ object Cli {
     input: Format.Type,
     mode: Mode.Type,
     outputDir: Option[String],
-    auxDirs: ISZ[String]
+    auxDirs: ISZ[String],
+    aadlRootDir: Option[String]
   ) extends ActTopOption
 }
 
@@ -119,12 +120,14 @@ import Cli._
           |-a, --aux-directories    
           |                          Directories containing C files to be included in
           |                           build (expects path strings)
+          |-r, --root-dir            (expects a path)
           |-h, --help               Display this information""".render
 
     var input: Format.Type = Format.Air
     var mode: Mode.Type = Mode.Json
     var outputDir: Option[String] = Some(".")
     var auxDirs: ISZ[String] = ISZ[String]()
+    var aadlRootDir: Option[String] = None[String]()
     var j = i
     var isOption = T
     while (j < args.size && isOption) {
@@ -157,6 +160,12 @@ import Cli._
              case Some(v) => auxDirs = v
              case _ => return None()
            }
+         } else if (arg == "-r" || arg == "--root-dir") {
+           val o: Option[Option[String]] = parsePath(args, j + 1)
+           o match {
+             case Some(v) => aadlRootDir = v
+             case _ => return None()
+           }
          } else {
           eprintln(s"Unrecognized option '$arg'.")
           return None()
@@ -166,7 +175,7 @@ import Cli._
         isOption = F
       }
     }
-    return Some(ActOption(help, parseArguments(args, j), input, mode, outputDir, auxDirs))
+    return Some(ActOption(help, parseArguments(args, j), input, mode, outputDir, auxDirs, aadlRootDir))
   }
 
   def parseArguments(args: ISZ[String], i: Z): ISZ[String] = {

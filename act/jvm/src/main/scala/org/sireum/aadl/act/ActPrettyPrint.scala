@@ -12,7 +12,8 @@ import org.sireum.aadl.act.ast._
   var actContainer: Option[ActContainer] = None[ActContainer]()
 
   def tempEntry(destDir: String, container: ActContainer,
-                cFiles: ISZ[String]
+                cFiles: ISZ[String],
+                aadlRootDir: String
                ): ISZ[(String, ST)] = {
     rootServer = container.rootServer
     actContainer = Some(container)
@@ -23,16 +24,42 @@ import org.sireum.aadl.act.ast._
     val aux = container.auxFiles.map((x: Resource) => (x.path, x.contents))
 
 
-    var components: ISZ[ST] = container.cContainers.map((c: C_Container) => {
-      val sources = c.cSources.map((r: Resource) => r.path)
-      val includes = c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
+    var cmakeComponents: ISZ[ST] = container.cContainers.map((c: C_Container) => {
+      var sources: ISZ[String] = ISZ()
+      var includes: ISZ[String] = ISZ()
+
+      if(c.sourceText.nonEmpty) {
+        val dir = s"components/${c.component}/"
+        val rootDestDir = s"${destDir}/${dir}"
+
+        for(st <- c.sourceText) {
+          val path = s"${aadlRootDir}/${st}"
+          if(NativeIO.fileExists(path)) {
+
+            if(StringUtil.endsWith(st, ".c")) {
+              val fname = NativeIO.copyFile(path, s"${rootDestDir}/src")
+              sources = sources :+ s"${dir}/src/${fname}"
+            } else if(StringUtil.endsWith(st, ".h")) {
+              val fname = NativeIO.copyFile(path, s"${rootDestDir}/includes")
+              includes = includes :+ s"${dir}/includes/${fname}"
+            } else {
+              Util.addWarning(s"${path} does not appear to be a valid C source file")
+            }
+          } else {
+            Util.addWarning(s"${path} does not exist")
+          }
+        }
+      }
+
+      sources = sources ++ c.cSources.map((r: Resource) => r.path)
+      includes = includes ++ c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
       StringTemplate.cmakeComponent(c.component, sources, includes, cFiles.nonEmpty)
     })
 
     container.monitors.foreach(m => {
       prettyPrint(ISZ(m.writer, m.interface))
 
-      components = components :+ StringTemplate.cmakeComponent(m.i.component.name,
+      cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
         ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), cFiles.nonEmpty)
 
       NativeIO.writeToFile(s"${destDir}/${m.cimplementation.path}", m.cimplementation.contents.render, T)
@@ -42,7 +69,7 @@ import org.sireum.aadl.act.ast._
 
 
     val auxCFiles: ISZ[ST] = cFiles.map(c => StringTemplate.auxTemplate(c))
-    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, components, Util.CMAKE_VERSION,
+    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, cmakeComponents, Util.CMAKE_VERSION,
       auxCFiles, container.connectors.nonEmpty)
     NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
 
@@ -206,4 +233,6 @@ import org.sireum.aadl.act.ast._
 
 @ext object NativeIO {
   def writeToFile(path: String, contents: String, overwrite: B): Unit = $
+  def copyFile(srcPath: org.sireum.String, outputPath: org.sireum.String): String = $
+  def fileExists(path: String): B = $
 }

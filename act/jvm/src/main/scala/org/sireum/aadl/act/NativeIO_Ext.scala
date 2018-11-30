@@ -1,8 +1,9 @@
 package org.sireum.aadl.act
 
-import java.io.{File, BufferedWriter, FileWriter}
-import org.sireum.{B}
+import java.io.{BufferedWriter, File, FileWriter}
+import java.nio.file.StandardCopyOption
 
+import org.sireum.B
 import org.sireum.println
 
 object NativeIO_Ext {
@@ -25,8 +26,29 @@ object NativeIO_Ext {
       }
     } catch {
       case e: Throwable =>
-        println("Error encountered while trying to create file: " + fname)
-        println(e.getMessage)
+        Util.addError("Error encountered while trying to create file: " + fname)
+        Util.addError(e.getMessage)
     }
+  }
+
+  def copyFile(srcPath: org.sireum.String, outputPath: org.sireum.String): String = {
+    val src = new File(srcPath.native)
+
+    val outputDir = new File(outputPath.native)
+
+    val outputFile = new File(outputDir, src.getName)
+
+    outputFile.getParentFile.mkdirs()
+
+    java.nio.file.Files.copy(src.toPath, outputFile.toPath, StandardCopyOption.REPLACE_EXISTING)
+
+    Util.addMessage(s"Wrote: ${outputFile}")
+
+    return src.getName
+  }
+
+  def fileExists(path: org.sireum.String): B = {
+    val f = new File(path.native)
+    return f.exists()
   }
 }

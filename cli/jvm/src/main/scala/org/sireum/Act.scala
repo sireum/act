@@ -90,7 +90,12 @@ object Act extends scala.App {
             }
         }
 
-        org.sireum.aadl.act.Act.run(outputDir, aadl, o.auxDirs)
+        val rootDir: Option[java.io.File] = o.aadlRootDir match {
+          case Some(p) => Some(new java.io.File(p.native))
+          case _ => org.sireum.None[File]
+        }
+
+        org.sireum.aadl.act.Act.run(outputDir, aadl, o.auxDirs, rootDir)
 
       case Format.Camkesir =>
         eprintln("CAmkES IR is not currently supported")
