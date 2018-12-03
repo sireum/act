@@ -42,9 +42,8 @@ import org.sireum.aadl.act.ast._
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
-    val datatypes = model.components.withFilter(f => f.category == ir.ComponentCategory.Data)
-    for(d <- datatypes) { typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
-    val sortedData = sortData(datatypes)
+    for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
+    val sortedData = sortData(model.dataComponents)
 
     val components = model.components.withFilter(f => f.category != ir.ComponentCategory.Data)
     if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
