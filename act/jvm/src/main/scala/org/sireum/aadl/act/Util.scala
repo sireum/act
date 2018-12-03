@@ -92,7 +92,7 @@ object Util {
   }
 
   def getName(n : ir.Name) : String = {
-    return st"""${(n.name, "_")}""".render
+    return st"${(n.name, "_")}".render
   }
 
 
@@ -188,11 +188,11 @@ object Util {
   }
 
   def isPeriodic(c: ir.Component): B = {
-    val ret: B = getDispatchProtocol(c) match {
-      case Some(Dispatch_Protocol.Periodic) => T
-      case _ => F
-    }
-    return ret
+    return getDispatchProtocol(c) == Some(Dispatch_Protocol.Periodic)
+  }
+
+  def isSporadic(c: ir.Component): B = {
+    return getDispatchProtocol(c) == Some(Dispatch_Protocol.Sporadic)
   }
 
   def getDispatchProtocol(c: ir.Component): Option[Dispatch_Protocol.Type] = {
@@ -438,7 +438,10 @@ object StringTemplate{
     return r
   }
 
-  def tbTypeHeaderFile(macroName: String, typeHeaderFileName: String, defs: ISZ[ST]): ST = {
+  def tbTypeHeaderFile(macroName: String, typeHeaderFileName: String, defs: ISZ[ST], preventBadging: B): ST = {
+    val badges: ST = if(preventBadging) {st""} else {st"""
+                                                         |#define TB_MONITOR_READ_ACCESS 111
+                                                         |#define TB_MONITOR_WRITE_ACCESS 222"""}
     val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
     val body = st"""#ifndef ${macroname}
                    |#define ${macroname}
@@ -450,9 +453,7 @@ object StringTemplate{
                    |#include <stddef.h>
                    |#endif // TB_VERIFY
                    |
-                   |#define __TB_OS_CAMKES__
-                   |#define TB_MONITOR_READ_ACCESS 111
-                   |#define TB_MONITOR_WRITE_ACCESS 222
+                   |#define __TB_OS_CAMKES__${badges}
                    |
                    |#ifndef TB_VERIFY
                    |#define MUTEXOP(OP)\
@@ -480,39 +481,66 @@ object StringTemplate{
     return body
   }
 
-  def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String): ST = {
-    var r : ST =
+  def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
+                     preventBadging: B): ST = {
+    val read: ST = st"""*m = contents;
+                       |return true;"""
+    val mon_read: ST = if(preventBadging) { read } else {
+      st"""if (mon_get_sender_id() != TB_MONITOR_READ_ACCESS) {
+          |  return false;
+          |} else {
+          |  ${read}}
+          |}"""
+    }
+
+    val write: ST = st"""contents = *m;
+                        |monsig_emit();
+                        |return true;"""
+    val mon_write: ST = if(preventBadging) { write } else {
+      st"""bool mon_write(const $typeName * m) {
+          |  if (mon_get_sender_id() != TB_MONITOR_WRITE_ACCESS) {
+          |    return false;
+          |  } else {
+          |    ${write}
+          |  }
+          |}"""
+    }
+
+    val senderSig: ST = if(preventBadging) { st"" } else { st"""
+                                                               |int mon_get_sender_id(void);""" }
+    val r : ST =
       st"""#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
           |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
           |
-          |int mon_get_sender_id(void);
-          |int monsig_emit(void);
+          |${senderSig}int monsig_emit(void);
           |
           |static $typeName contents;
           |
           |bool mon_read($typeName * m) {
-          |  if (mon_get_sender_id() != TB_MONITOR_READ_ACCESS) {
-          |    return false;
-          |  } else {
-          |    *m = contents;
-          |    return true;
-          |  }
+          |  ${mon_read}
           |}
           |
           |bool mon_write(const $typeName * m) {
-          |  if (mon_get_sender_id() != TB_MONITOR_WRITE_ACCESS) {
-          |    return false;
-          |  } else {
-          |    contents = *m;
-          |    monsig_emit();
-          |    return true;
-          |  }
-          |}
-          |"""
+          |  ${mon_write}
+          |}"""
     return r;
   }
 
-  def tbEnqueueDequeue(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String): ST = {
+  def tbEnqueueDequeue(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
+                       preventBadging: B): ST = {
+
+    val mon_dequeue: ST = if(preventBadging) { st"" } else {
+      st"""if (mon_get_sender_id() != TB_MONITOR_READ_ACCESS) {
+          |  return false;
+          |} else """
+    }
+
+    val mon_enqueue: ST = if(preventBadging) { st"" } else {
+      st"""if (mon_get_sender_id() != TB_MONITOR_WRITE_ACCESS) {
+          |    return false;
+          |} else """
+    }
+
     val r: ST =
     st"""#ifndef TB_VERIFY
         |#include <stdio.h>
@@ -537,9 +565,7 @@ object StringTemplate{
         |}
         |
         |bool mon_dequeue(${typeName} * m) {
-        |  if (mon_get_sender_id() != TB_MONITOR_READ_ACCESS) {
-        |    return false;
-        |  } else if (is_empty()) {
+        |  ${mon_dequeue}if (is_empty()) {
         |    return false;
         |  } else {
         |    *m = contents[front];
@@ -550,9 +576,7 @@ object StringTemplate{
         |}
         |
         |bool mon_enqueue(const ${typeName} * m) {
-        |  if (mon_get_sender_id() != TB_MONITOR_WRITE_ACCESS) {
-        |    return false;
-        |  } else if (is_full()) {
+        |  ${mon_enqueue}if (is_full()) {
         |    return false;
         |  } else {
         |    contents[(front + length) % 1] = *m;
@@ -581,7 +605,7 @@ object StringTemplate{
     val connectors: ST = if(hasConnectorDefs) { st"""# add path to connector templates
                                                     |CAmkESAddTemplatesPath(../../../../components/templates/)
                                                     |"""}
-    else { st""""""}
+    else { st"" }
 
     val r: ST =
       st"""cmake_minimum_required(VERSION ${cmakeVersion})
@@ -598,19 +622,19 @@ object StringTemplate{
   }
 
   def auxTemplate(i: String): ST = {
-    return st"""list(APPEND ${AUX_C_SOURCES} ${i})"""
+    return st"list(APPEND ${AUX_C_SOURCES} ${i})"
   }
 
   def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String], hasAux: B): ST = {
     val s: ST = if(sources.nonEmpty){
       st"""SOURCES ${ if(hasAux) s"$${${AUX_C_SOURCES}} "  else "" }${(sources, " ")}"""
     } else{
-      st""""""
+      st""
     }
     val i: ST = if(includes.nonEmpty){
       st"""INCLUDES ${ if(hasAux)  s"$${${AUX_C_INCLUDES}} "  else "" }${(includes, " ")}"""
     } else{
-      st""""""
+      st""
     }
 
     val r: ST =
@@ -622,15 +646,18 @@ object StringTemplate{
   }
 
   def configurationPriority(name: String, priority: Z): ST = {
-    return st"""${name}.priority = ${priority};"""
+    return st"${name}.priority = ${priority};"
   }
 
   def configurationStackSize(name: String, size: Z): ST = {
-    return st"""${name}._control_stack_size = ${size};"""
+    return st"${name}._control_stack_size = ${size};"
   }
 
   def componentTypeImpl(filename: String, auxCSources: ISZ[ST], stmts: ISZ[ST],
-                        preInitComments: ISZ[ST], runPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): ST = {
+                        preInitComments: ISZ[ST], runPreEntries: ISZ[ST], cDrainQueues: ISZ[ST],
+                        isSporadic: B): ST = {
+    val initialLock: ST = if(isSporadic) { st"" } else { st"""// Initial lock to await dispatch input.
+                                                             |MUTEXOP(tb_dispatch_sem_wait())"""}
     val ret:ST = st"""#include "../${Util.DIR_INCLUDES}/${filename}.h"
         |${(auxCSources, "\n")}
         |#include <string.h>
@@ -648,9 +675,7 @@ object StringTemplate{
         | ************************************************************************/
         |int run(void) {
         |  ${(runPreEntries, "\n")}
-        |
-        |  // Initial lock to await dispatch input.
-        |  MUTEXOP(tb_dispatch_sem_wait())
+        |  ${initialLock}
         |  for(;;) {
         |    MUTEXOP(tb_dispatch_sem_wait())
         |    // Drain the queues
@@ -693,7 +718,7 @@ object StringTemplate{
   }
 
   def cRegCallback(handlerName: String, regCallback: String): ST = {
-    val ret: ST = st"""CALLBACKOP(${regCallback}(${handlerName}, NULL));"""
+    val ret: ST = st"CALLBACKOP(${regCallback}(${handlerName}, NULL));"
     return ret
   }
 }
