@@ -31,6 +31,7 @@ import org.sireum.aadl.act.ast._
 
   var hasPeriodicComponents: B = F
   var hasErrors: B = F
+  val preventBadging: B = T
 
   var count: Z = 0
   def counter(): Z = {
@@ -42,9 +43,8 @@ import org.sireum.aadl.act.ast._
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
-    val datatypes = model.components.withFilter(f => f.category == ir.ComponentCategory.Data)
-    for(d <- datatypes) { typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
-    val sortedData = sortData(datatypes)
+    for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
+    val sortedData = sortData(model.dataComponents)
 
     val components = model.components.withFilter(f => f.category != ir.ComponentCategory.Data)
     if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
@@ -626,9 +626,9 @@ import org.sireum.aadl.act.ast._
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
           val cimplementation: Resource =
             if(f.category == ir.FeatureCategory.DataPort) {
-              Resource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName))
+              Resource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging))
             } else {
-              Resource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName))
+              Resource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging))
             }
 
           val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
@@ -689,7 +689,7 @@ import org.sireum.aadl.act.ast._
   def processDataTypes(values: ISZ[ir.Component]): ST = {
     val defs: ISZ[ST] = values.withFilter(v => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).map(v => processDataType(v, F))
     val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
-    return StringTemplate.tbTypeHeaderFile(macroname, typeHeaderFileName, defs)
+    return StringTemplate.tbTypeHeaderFile(macroname, typeHeaderFileName, defs, preventBadging)
   }
 
   def processDataType(c: ir.Component, isField: B): ST = {
@@ -705,7 +705,7 @@ import org.sireum.aadl.act.ast._
               Util.addError(s"The attribute '${fname}' from data type ${name} is a reserved keyword")
               hasErrors = T
             }
-            st"""${processDataType(sub, T)} ${fname};"""
+            st"${processDataType(sub, T)} ${fname};"
           })
 
           st"""typedef
@@ -714,9 +714,9 @@ import org.sireum.aadl.act.ast._
               |  } ${name};"""
         }
       } else if (TypeUtil.isBaseType(c.classifier.get.name)) {
-        st"""${TypeUtil.translateBaseType(c.classifier.get.name)}"""
+        st"${TypeUtil.translateBaseType(c.classifier.get.name)}"
       } else if (isField) {
-        st"""${Util.getClassifierFullyQualified(c.classifier.get)}"""
+        st"${Util.getClassifierFullyQualified(c.classifier.get)}"
       } else if (TypeUtil.isArrayDef(c)) {
         // TODO multidim arrays
         val name = Util.getClassifierFullyQualified(c.classifier.get)
@@ -729,7 +729,7 @@ import org.sireum.aadl.act.ast._
             |  } ${container};"""
       } else {
         Util.addError(s"Unexpected datatype: ${c}")
-        st""" """
+        st" "
       }
 
 
@@ -965,7 +965,7 @@ import org.sireum.aadl.act.ast._
                                          cRunPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): Resource = {
     val name = Util.getClassifier(component.classifier.get)
     val compTypeFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
-    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, sts, preInitComments, cRunPreEntries, cDrainQueues)
+    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, sts, preInitComments, cRunPreEntries, cDrainQueues, Util.isSporadic(component))
 
     return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret)
   }
