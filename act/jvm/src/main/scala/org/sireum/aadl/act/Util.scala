@@ -557,7 +557,7 @@ object StringTemplate{
         |static uint32_t length = 0;
         |
         |static bool is_full(void) {
-        |  return length == 1;
+        |  return length == ${dim};
         |}
         |
         |static bool is_empty(void) {
@@ -569,7 +569,7 @@ object StringTemplate{
         |    return false;
         |  } else {
         |    *m = contents[front];
-        |    front = (front + 1) % 1;
+        |    front = (front + 1) % ${dim};
         |    length--;
         |    return true;
         |  }
@@ -579,7 +579,7 @@ object StringTemplate{
         |  ${mon_enqueue}if (is_full()) {
         |    return false;
         |  } else {
-        |    contents[(front + length) % 1] = *m;
+        |    contents[(front + length) % ${dim}] = *m;
         |    length++;
         |    monsig_emit();
         |    return true;
