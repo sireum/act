@@ -174,6 +174,7 @@ import org.sireum.aadl.act.ast._
           |  ${(i.component.uses.map((u: Uses) => s"uses ${u.typ} ${u.name};"), "\n")}
           |  ${(i.component.emits.map((e: Emits) => s"emits ${e.typ} ${e.name};"), "\n")}
           |  ${(i.component.consumes.map((c: Consumes) => s"consumes ${c.typ} ${c.name};"), "\n")}
+          |  ${(i.component.dataports.map((d: Dataport) => s"dataport ${d.typ} ${d.name};"), "\n")}
           |  ${(i.component.binarySemaphores.map((b: BinarySemaphore) => s"has binary_semaphore ${b.name};"), "\n")}
           |}
           """

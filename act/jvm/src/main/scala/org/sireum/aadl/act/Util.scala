@@ -37,16 +37,12 @@ object Util {
   val PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT: String = "Programming_Properties::Source_Text"
 
   val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
+  val PROP_TB_SYS__CAmkES_Owner_Thread: String = "TB_SYS::CAmkES_Owner_Thread"
 
   val DEFAULT_QUEUE_SIZE: Z = z"1"
   val DEFAULT_PRIORITY: Z = z"201"
   val DEFAULT_STACK_SIZE: Z = z"1024"
   val DEFAULT_PERIOD: Z = z"1"
-
-  val CONNECTOR_SEL4_NOTIFICATION: String = "seL4Notification"
-  val CONNECTOR_RPC: String = "seL4RPCCall"
-  val CONNECTOR_SEL4_TIMESERVER: String = "seL4TimeServer"
-  val CONNECTOR_SEL4_GLOBAL_ASYNCH_CALLBACK: String = "seL4GlobalAsynchCallback"
 
   val DIR_SRC: String = "src"
   val DIR_INCLUDES: String = "includes"
@@ -101,7 +97,7 @@ object Util {
     return ss.startsWith(GEN_ARTIFACT_PREFIX) && ss.endsWith(MONITOR_COMP_SUFFIX)
   }
 
-  def getMonitorName(comp: ir.Component, feature: ir.FeatureEnd) : String = {
+  def getMonitorName(comp: ir.Component, feature: ir.Feature) : String = {
     val cname = Util.getLastName(comp.identifier)
     val fname = Util.getLastName(feature.identifier)
     return s"${GEN_ARTIFACT_PREFIX}_${cname}_${fname}_${MONITOR_COMP_SUFFIX}"
@@ -117,17 +113,26 @@ object Util {
     return ret
   }
 
-  def genMonitorFeatureName(f: ir.FeatureEnd, num: Option[Z]): String = {
+  def genMonitorFeatureName(f: ir.Feature, num: Option[Z]): String = {
     return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}"
   }
 
-  def genMonitorNotificationFeatureName(f: ir.FeatureEnd): String = {
+  def genMonitorNotificationFeatureName(f: ir.Feature): String = {
     return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}_notification"
   }
 
   def getMonitorWriterName(f: ir.FeatureEnd): String = {
     return s"${getClassifierFullyQualified(f.classifier.get)}_writer"
   }
+
+  def getWriterName(c: ir.Classifier): String = {
+    return s"${getClassifierFullyQualified(c)}_writer"
+  }
+
+  def getSharedDataInterfaceName(c: ir.Classifier): String = {
+    return s"${GEN_ARTIFACT_PREFIX}_${Util.getClassifierFullyQualified(c)}_shared_var"
+  }
+
 
   def getMonitorWriterParamName(c: ir.Component): String = {
     val name = Util.getClassifierFullyQualified(c.classifier.get)
@@ -278,7 +283,14 @@ object Util {
       case _ => None[String]()
     }
     return ret
+  }
 
+  def getCamkesOwnerThread(p: ISZ[ir.Property]): Option[String] = {
+    val ret: Option[String] = getDiscreetPropertyValue(p, PROP_TB_SYS__CAmkES_Owner_Thread) match {
+      case Some(ir.ValueProp(v)) => Some(v)
+      case _ => None[String]()
+    }
+    return ret
   }
 
   def getSourceText(properties: ISZ[ir.Property]): ISZ[String] = {
@@ -289,17 +301,11 @@ object Util {
     return f.category == ir.FeatureCategory.DataPort || f.category == ir.FeatureCategory.EventDataPort
   }
 
-  def addMessage(msg: String): Unit = {
-    cprintln(F, msg)
-  }
+  def addMessage(msg: String): Unit = { cprintln(F, msg) }
 
-  def addWarning(msg: String): Unit = {
-    cprintln(F, s"WARNING: $msg")
-  }
+  def addWarning(msg: String): Unit = { cprintln(F, s"WARNING: $msg") }
 
-  def addError(msg:String): Unit = {
-    cprintln(T, s"ERROR: $msg")
-  }
+  def addError(msg:String): Unit = { cprintln(T, s"ERROR: $msg") }
 }
 
 object TypeUtil {
@@ -569,7 +575,7 @@ object StringTemplate{
         |    return false;
         |  } else {
         |    *m = contents[front];
-        |    front = (front + 1) % 1;
+        |    front = (front + 1) % ${dim};
         |    length--;
         |    return true;
         |  }
@@ -579,7 +585,7 @@ object StringTemplate{
         |  ${mon_enqueue}if (is_full()) {
         |    return false;
         |  } else {
-        |    contents[(front + length) % 1] = *m;
+        |    contents[(front + length) % ${dim}] = *m;
         |    length++;
         |    monsig_emit();
         |    return true;
@@ -962,4 +968,17 @@ object TimerUtil {
 @enum object Dispatch_Protocol {
   'Periodic
   'Sporadic
+}
+
+@datatype class SharedData(owner: ir.Component,
+                           ownerFeature: Option[ir.FeatureAccess],
+                           typ: ir.Classifier,
+                           subcomponentId: String)
+
+@enum object Sel4ConnectorTypes {
+  'seL4GlobalAsynchCallback
+  'seL4Notification
+  'seL4RPCCall
+  'seL4SharedData
+  'seL4TimeServer
 }

@@ -25,7 +25,7 @@ import org.sireum._
                           mutexes: ISZ[TODO],
                           binarySemaphores: ISZ[BinarySemaphore],
                           semaphores: ISZ[TODO],
-                          dataports: ISZ[TODO],
+                          dataports: ISZ[Dataport],
                           emits: ISZ[Emits],
                           uses: ISZ[Uses],
                           consumes: ISZ[Consumes],
@@ -52,6 +52,9 @@ import org.sireum._
                          typ: String,
                          optional: B)
 
+@datatype class Dataport(name: String,
+                         typ: String,
+                         optional: B)
 
 @datatype class Connection(name : String,
                            connectionType: String,

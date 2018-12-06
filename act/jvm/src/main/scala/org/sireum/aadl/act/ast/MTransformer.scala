@@ -85,6 +85,10 @@ object MTransformer {
 
   val PostResultConsumes: MOption[Consumes] = MNone()
 
+  val PreResultDataport: PreResult[Dataport] = PreResult(T, MNone())
+
+  val PostResultDataport: MOption[Dataport] = MNone()
+
   val PreResultConnection: PreResult[Connection] = PreResult(T, MNone())
 
   val PostResultConnection: MOption[Connection] = MNone()
@@ -244,6 +248,10 @@ import MTransformer._
     return PreResultConsumes
   }
 
+  def preDataport(o: Dataport): PreResult[Dataport] = {
+    return PreResultDataport
+  }
+
   def preConnection(o: Connection): PreResult[Connection] = {
     return PreResultConnection
   }
@@ -397,6 +405,10 @@ import MTransformer._
     return PostResultConsumes
   }
 
+  def postDataport(o: Dataport): MOption[Dataport] = {
+    return PostResultDataport
+  }
+
   def postConnection(o: Connection): MOption[Connection] = {
     return PostResultConnection
   }
@@ -460,7 +472,7 @@ import MTransformer._
           val r0: MOption[IS[Z, TODO]] = transformISZ(o2.mutexes, transformTODO _)
           val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
           val r2: MOption[IS[Z, TODO]] = transformISZ(o2.semaphores, transformTODO _)
-          val r3: MOption[IS[Z, TODO]] = transformISZ(o2.dataports, transformTODO _)
+          val r3: MOption[IS[Z, Dataport]] = transformISZ(o2.dataports, transformDataport _)
           val r4: MOption[IS[Z, Emits]] = transformISZ(o2.emits, transformEmits _)
           val r5: MOption[IS[Z, Uses]] = transformISZ(o2.uses, transformUses _)
           val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
@@ -625,7 +637,7 @@ import MTransformer._
       val r0: MOption[IS[Z, TODO]] = transformISZ(o2.mutexes, transformTODO _)
       val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
       val r2: MOption[IS[Z, TODO]] = transformISZ(o2.semaphores, transformTODO _)
-      val r3: MOption[IS[Z, TODO]] = transformISZ(o2.dataports, transformTODO _)
+      val r3: MOption[IS[Z, Dataport]] = transformISZ(o2.dataports, transformDataport _)
       val r4: MOption[IS[Z, Emits]] = transformISZ(o2.emits, transformEmits _)
       val r5: MOption[IS[Z, Uses]] = transformISZ(o2.uses, transformUses _)
       val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
@@ -747,6 +759,32 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Consumes = r.getOrElse(o)
     val postR: MOption[Consumes] = postConsumes(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformDataport(o: Dataport): MOption[Dataport] = {
+    val preR: PreResult[Dataport] = preDataport(o)
+    val r: MOption[Dataport] = if (preR.continu) {
+      val o2: Dataport = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: Dataport = r.getOrElse(o)
+    val postR: MOption[Dataport] = postDataport(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {

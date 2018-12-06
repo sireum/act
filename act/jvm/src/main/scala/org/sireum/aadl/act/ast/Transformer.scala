@@ -164,6 +164,10 @@ object Transformer {
       return PreResult(ctx, T, None())
     }
 
+    @pure def preDataport(ctx: Context, o: Dataport): PreResult[Context, Dataport] = {
+      return PreResult(ctx, T, None())
+    }
+
     @pure def preConnection(ctx: Context, o: Connection): PreResult[Context, Connection] = {
       return PreResult(ctx, T, None())
     }
@@ -317,6 +321,10 @@ object Transformer {
       return Result(ctx, None())
     }
 
+    @pure def postDataport(ctx: Context, o: Dataport): Result[Context, Dataport] = {
+      return Result(ctx, None())
+    }
+
     @pure def postConnection(ctx: Context, o: Connection): Result[Context, Connection] = {
       return Result(ctx, None())
     }
@@ -406,7 +414,7 @@ import Transformer._
           val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.mutexes, transformTODO _)
           val r1: Result[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
           val r2: Result[Context, IS[Z, TODO]] = transformISZ(r1.ctx, o2.semaphores, transformTODO _)
-          val r3: Result[Context, IS[Z, TODO]] = transformISZ(r2.ctx, o2.dataports, transformTODO _)
+          val r3: Result[Context, IS[Z, Dataport]] = transformISZ(r2.ctx, o2.dataports, transformDataport _)
           val r4: Result[Context, IS[Z, Emits]] = transformISZ(r3.ctx, o2.emits, transformEmits _)
           val r5: Result[Context, IS[Z, Uses]] = transformISZ(r4.ctx, o2.uses, transformUses _)
           val r6: Result[Context, IS[Z, Consumes]] = transformISZ(r5.ctx, o2.consumes, transformConsumes _)
@@ -571,7 +579,7 @@ import Transformer._
       val r0: Result[Context, IS[Z, TODO]] = transformISZ(ctx, o2.mutexes, transformTODO _)
       val r1: Result[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
       val r2: Result[Context, IS[Z, TODO]] = transformISZ(r1.ctx, o2.semaphores, transformTODO _)
-      val r3: Result[Context, IS[Z, TODO]] = transformISZ(r2.ctx, o2.dataports, transformTODO _)
+      val r3: Result[Context, IS[Z, Dataport]] = transformISZ(r2.ctx, o2.dataports, transformDataport _)
       val r4: Result[Context, IS[Z, Emits]] = transformISZ(r3.ctx, o2.emits, transformEmits _)
       val r5: Result[Context, IS[Z, Uses]] = transformISZ(r4.ctx, o2.uses, transformUses _)
       val r6: Result[Context, IS[Z, Consumes]] = transformISZ(r5.ctx, o2.consumes, transformConsumes _)
@@ -693,6 +701,32 @@ import Transformer._
     val hasChanged: B = r.resultOpt.nonEmpty
     val o2: Consumes = r.resultOpt.getOrElse(o)
     val postR: Result[Context, Consumes] = pp.postConsumes(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return Result(postR.ctx, Some(o2))
+    } else {
+      return Result(postR.ctx, None())
+    }
+  }
+
+  @pure def transformDataport(ctx: Context, o: Dataport): Result[Context, Dataport] = {
+    val preR: PreResult[Context, Dataport] = pp.preDataport(ctx, o)
+    val r: Result[Context, Dataport] = if (preR.continu) {
+      val o2: Dataport = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        Result(ctx, Some(o2))
+      else
+        Result(ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      Result(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      Result(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: Dataport = r.resultOpt.getOrElse(o)
+    val postR: Result[Context, Dataport] = pp.postDataport(r.ctx, o2)
     if (postR.resultOpt.nonEmpty) {
       return postR
     } else if (hasChanged) {

@@ -52,21 +52,23 @@ object MsgPack {
 
     val Consumes: Z = -25
 
-    val Connection: Z = -24
+    val Dataport: Z = -24
 
-    val ConnectionEnd: Z = -23
+    val Connection: Z = -23
 
-    val Connector: Z = -22
+    val ConnectionEnd: Z = -22
 
-    val Procedure: Z = -21
+    val Connector: Z = -21
 
-    val Method: Z = -20
+    val Procedure: Z = -20
 
-    val Parameter: Z = -19
+    val Method: Z = -19
 
-    val BinarySemaphore: Z = -18
+    val Parameter: Z = -18
 
-    val TODO: Z = -17
+    val BinarySemaphore: Z = -17
+
+    val TODO: Z = -16
 
   }
 
@@ -126,7 +128,7 @@ object MsgPack {
       writer.writeISZ(o.mutexes, writeTODO _)
       writer.writeISZ(o.binarySemaphores, writeBinarySemaphore _)
       writer.writeISZ(o.semaphores, writeTODO _)
-      writer.writeISZ(o.dataports, writeTODO _)
+      writer.writeISZ(o.dataports, writeDataport _)
       writer.writeISZ(o.emits, writeEmits _)
       writer.writeISZ(o.uses, writeUses _)
       writer.writeISZ(o.consumes, writeConsumes _)
@@ -157,6 +159,13 @@ object MsgPack {
 
     def writeConsumes(o: Consumes): Unit = {
       writer.writeZ(Constants.Consumes)
+      writer.writeString(o.name)
+      writer.writeString(o.typ)
+      writer.writeB(o.optional)
+    }
+
+    def writeDataport(o: Dataport): Unit = {
+      writer.writeZ(Constants.Dataport)
       writer.writeString(o.name)
       writer.writeString(o.typ)
       writer.writeB(o.optional)
@@ -332,7 +341,7 @@ object MsgPack {
       val mutexes = reader.readISZ(readTODO _)
       val binarySemaphores = reader.readISZ(readBinarySemaphore _)
       val semaphores = reader.readISZ(readTODO _)
-      val dataports = reader.readISZ(readTODO _)
+      val dataports = reader.readISZ(readDataport _)
       val emits = reader.readISZ(readEmits _)
       val uses = reader.readISZ(readUses _)
       val consumes = reader.readISZ(readConsumes _)
@@ -399,6 +408,21 @@ object MsgPack {
       val typ = reader.readString()
       val optional = reader.readB()
       return Consumes(name, typ, optional)
+    }
+
+    def readDataport(): Dataport = {
+      val r = readDataportT(F)
+      return r
+    }
+
+    def readDataportT(typeParsed: B): Dataport = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.Dataport)
+      }
+      val name = reader.readString()
+      val typ = reader.readString()
+      val optional = reader.readB()
+      return Dataport(name, typ, optional)
     }
 
     def readConnection(): Connection = {
@@ -678,6 +702,21 @@ object MsgPack {
       return r
     }
     val r = to(data, fConsumes _)
+    return r
+  }
+
+  def fromDataport(o: Dataport, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeDataport(o)
+    return w.result
+  }
+
+  def toDataport(data: ISZ[U8]): Either[Dataport, MessagePack.ErrorMsg] = {
+    def fDataport(reader: Reader): Dataport = {
+      val r = reader.readDataport()
+      return r
+    }
+    val r = to(data, fDataport _)
     return r
   }
 

@@ -90,7 +90,7 @@ object JSON {
         ("mutexes", printISZ(F, o.mutexes, printTODO _)),
         ("binarySemaphores", printISZ(F, o.binarySemaphores, printBinarySemaphore _)),
         ("semaphores", printISZ(F, o.semaphores, printTODO _)),
-        ("dataports", printISZ(F, o.dataports, printTODO _)),
+        ("dataports", printISZ(F, o.dataports, printDataport _)),
         ("emits", printISZ(F, o.emits, printEmits _)),
         ("uses", printISZ(F, o.uses, printUses _)),
         ("consumes", printISZ(F, o.consumes, printConsumes _)),
@@ -129,6 +129,15 @@ object JSON {
     @pure def printConsumes(o: Consumes): ST = {
       return printObject(ISZ(
         ("type", st""""Consumes""""),
+        ("name", printString(o.name)),
+        ("typ", printString(o.typ)),
+        ("optional", printB(o.optional))
+      ))
+    }
+
+    @pure def printDataport(o: Dataport): ST = {
+      return printObject(ISZ(
+        ("type", st""""Dataport""""),
         ("name", printString(o.name)),
         ("typ", printString(o.typ)),
         ("optional", printB(o.optional))
@@ -356,7 +365,7 @@ object JSON {
       val semaphores = parser.parseISZ(parseTODO _)
       parser.parseObjectNext()
       parser.parseObjectKey("dataports")
-      val dataports = parser.parseISZ(parseTODO _)
+      val dataports = parser.parseISZ(parseDataport _)
       parser.parseObjectNext()
       parser.parseObjectKey("emits")
       val emits = parser.parseISZ(parseEmits _)
@@ -458,6 +467,27 @@ object JSON {
       val optional = parser.parseB()
       parser.parseObjectNext()
       return Consumes(name, typ, optional)
+    }
+
+    def parseDataport(): Dataport = {
+      val r = parseDataportT(F)
+      return r
+    }
+
+    def parseDataportT(typeParsed: B): Dataport = {
+      if (!typeParsed) {
+        parser.parseObjectType("Dataport")
+      }
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("typ")
+      val typ = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("optional")
+      val optional = parser.parseB()
+      parser.parseObjectNext()
+      return Dataport(name, typ, optional)
     }
 
     def parseConnection(): Connection = {
@@ -855,6 +885,24 @@ object JSON {
       return r
     }
     val r = to(s, fConsumes _)
+    return r
+  }
+
+  def fromDataport(o: Dataport, isCompact: B): String = {
+    val st = Printer.printDataport(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toDataport(s: String): Either[Dataport, Json.ErrorMsg] = {
+    def fDataport(parser: Parser): Dataport = {
+      val r = parser.parseDataport()
+      return r
+    }
+    val r = to(s, fDataport _)
     return r
   }
 

@@ -14,7 +14,9 @@ import org.sireum.aadl.act.ast._
 
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
   var typeMap: HashMap[String, ir.Component] = HashMap.empty
-  var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
+  //var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
+  var featureMap: HashMap[String, ir.Feature] = HashMap.empty
+  var sharedData: HashMap[String, SharedData] = HashMap.empty
 
   // port-paths -> connInstances
   var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
@@ -41,17 +43,20 @@ import org.sireum.aadl.act.ast._
 
   def process(model : ir.Aadl, cSources: ISZ[String]) : Option[ActContainer] = {
 
-    auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
-
-    for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
-    val sortedData = sortData(model.dataComponents)
-
     val components = model.components.withFilter(f => f.category != ir.ComponentCategory.Data)
     if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
       halt(s"Model contains ${components.size} components.  Should only contain a single top-level system")
     }
-
     val system = components(0)
+
+    buildComponentMap(system)
+
+    auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
+
+    val dataSubcomponents = componentMap.values.withFilter(f => f.category == ir.ComponentCategory.Data)
+    for(d <- (model.dataComponents ++ dataSubcomponents)){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
+    val sortedData = sortData(model.dataComponents)
+
     resolve(system)
 
     if(!hasErrors) {
@@ -63,6 +68,9 @@ import org.sireum.aadl.act.ast._
     }
 
     if(!hasErrors) {
+      if(preventBadging) {
+        Util.addWarning("Branding disabled")
+      }
       gen(system)
     }
 
@@ -121,12 +129,12 @@ import org.sireum.aadl.act.ast._
 
           if(Util.getDispatchProtocol(sc) == Some(Dispatch_Protocol.Periodic)) {
             // connect component to time server
-            createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
+            createConnection(Sel4ConnectorTypes.seL4TimeServer,
               componentId, TimerUtil.TIMER_ID,
               TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
 
             // connect dispatcher to component
-            createConnection(Util.CONNECTOR_SEL4_NOTIFICATION,
+            createConnection(Sel4ConnectorTypes.seL4Notification,
               TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.componentNotificationName(componentId),
               componentId, TimerUtil.TIMER_NOTIFICATION_ID)
 
@@ -186,8 +194,52 @@ import org.sireum.aadl.act.ast._
 
           val procName = Util.getClassifier(sc.classifier.get)
           astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(), includes = ISZ())
+
+        case ir.ComponentCategory.Data =>
+          val typeName = Util.getClassifierFullyQualified(sc.classifier.get)
+
+          val readMethod = Method(
+            name = s"read_${typeName}",
+            parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "arg", typ = typeName)),
+            returnType = None[String]()
+          )
+
+          val writeMethod = Method(
+            name = s"write_${typeName}",
+            parameters = ISZ(Parameter(array = F, direction = Direction.Refin, name = "arg", typ = typeName)),
+            returnType = None[String]()
+          )
+
+          val procName = Util.getSharedDataInterfaceName(sc.classifier.get)
+          astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(readMethod, writeMethod), includes = ISZ(s"<${typeHeaderFileName}.h>"))
+
+          Util.getCamkesOwnerThread(sc.properties) match {
+            case Some(owner) =>
+              val threads = componentMap.values.withFilter(f => f.category == ir.ComponentCategory.Thread)
+              val thread = threads.withFilter(f => f.classifier.get.name == owner || Util.getClassifier(f.classifier.get) == owner)
+
+              if(thread.nonEmpty) {
+                val theOwner = thread(0)
+                if(thread.size > 1) {
+                  Util.addWarning(s"Found multiple matches for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property: ${owner}")
+                }
+                if(Util.getClassifier(theOwner.classifier.get) == owner){
+                  Util.addWarning(s"Fully qualified name '${theOwner.classifier.get.name}' should be used for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property")
+                }
+
+                val subcomponentId = Util.getLastName(sc.identifier)
+                sharedData = sharedData +
+                  (Util.getName(sc.identifier) ~> SharedData(theOwner, None[ir.FeatureAccess](), sc.classifier.get, subcomponentId))
+
+              } else {
+                addError(st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread}:  Could not locate component '${owner}'.  Please use one of the following:
+                             |  ${(threads.map(m => m.classifier.get.name), "\n")}""".render)
+              }
+            case _ =>
+          }
+
         case _ =>
-          halt(s"gen: Not handling: ${sc}")
+          halt(s"Not handling: subcomponent of type '${sc.category}'.  ${Util.getName(sc.identifier)}")
       }
     }
 
@@ -213,11 +265,11 @@ import org.sireum.aadl.act.ast._
         ISZ(TimerUtil.dispatchComponentCSource(s"<${typeHeaderFileName}.h>", calendars)), ISZ(), ISZ())
 
       // connect dispatch timer to time server
-      createConnection(Util.CONNECTOR_SEL4_TIMESERVER,
+      createConnection(Sel4ConnectorTypes.seL4TimeServer,
         TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_ID_DISPATCHER,
         TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
 
-      createConnection(Util.CONNECTOR_SEL4_GLOBAL_ASYNCH_CALLBACK,
+      createConnection(Sel4ConnectorTypes.seL4GlobalAsynchCallback,
         TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_NOTIFICATION_ID,
         TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
 
@@ -231,7 +283,7 @@ import org.sireum.aadl.act.ast._
       configuration = configuration :+ StringTemplate.configurationPriority(dispatchComponent.name, Util.DEFAULT_PRIORITY)
     }
 
-    def createConnection(connectionType: String,
+    def createConnection(connectionType: Sel4ConnectorTypes.Type,
                          srcComponent: String, srcFeature: String,
                          dstComponent: String, dstFeature: String): Unit = {
       val from_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
@@ -246,7 +298,7 @@ import org.sireum.aadl.act.ast._
 
       val con = Connection(
         name = newConn(),
-        connectionType = connectionType,
+        connectionType = s"$connectionType",
         from_ends = from_ends,
         to_ends = to_ends
       )
@@ -256,12 +308,12 @@ import org.sireum.aadl.act.ast._
 
     def createNotificationConnection(srcComponent: String, srcFeature: String,
                                      dstComponent: String, dstFeature: String): Unit = {
-      createConnection(Util.CONNECTOR_SEL4_NOTIFICATION, srcComponent, srcFeature, dstComponent, dstFeature)
+      createConnection(Sel4ConnectorTypes.seL4Notification, srcComponent, srcFeature, dstComponent, dstFeature)
     }
 
     def createRPCConnection(srcComponent: String, srcFeature: String,
                             dstComponent: String, dstFeature: String) : Unit = {
-      createConnection(Util.CONNECTOR_RPC, srcComponent, srcFeature, dstComponent, dstFeature)
+      createConnection(Sel4ConnectorTypes.seL4RPCCall, srcComponent, srcFeature, dstComponent, dstFeature)
     }
 
     def createDataConnection(conn: ir.ConnectionInstance) : Unit = {
@@ -270,8 +322,10 @@ import org.sireum.aadl.act.ast._
       val srcComponent = Util.getLastName(conn.src.component)
       val dstComponent = Util.getLastName(conn.dst.component)
 
-      val srcFeature = featureEndMap.get(Util.getName(conn.src.feature.get)).get
-      val dstFeature = featureEndMap.get(Util.getName(conn.dst.feature.get)).get
+      //val srcFeature = featureEndMap.get(Util.getName(conn.src.feature.get)).get
+      //val dstFeature = featureEndMap.get(Util.getName(conn.dst.feature.get)).get
+      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
 
       val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
       val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
@@ -289,8 +343,14 @@ import org.sireum.aadl.act.ast._
       )
     }
 
+    resolveSharedDataFeatures(c.connectionInstances)
+    val missingFeatures = sharedData.values.withFilter(f => f.ownerFeature == None[ir.FeatureAccess])
+    if(missingFeatures.nonEmpty) {
+      addError(s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map(f => f.subcomponentId), ", ")}")
+    }
+
     for(conn <- c.connectionInstances) {
-      val fdst = featureEndMap.get(Util.getName(conn.dst.feature.get)).get
+      val fdst = featureMap.get(Util.getName(conn.dst.feature.get)).get
 
       val srcComponent = Util.getLastName(conn.src.component)
       val srcFeature = Util.getLastName(conn.src.feature.get)
@@ -315,6 +375,21 @@ import org.sireum.aadl.act.ast._
               createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
             case ir.FeatureCategory.SubprogramAccessGroup =>
               createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
+
+            case ir.FeatureCategory.DataAccess =>
+              val sd = sharedData.get(Util.getName(conn.src.feature.get)).get
+              val dstComp = componentMap.get(Util.getName(conn.dst.component)).get
+              val ownerId = Util.getName(sd.owner.identifier)
+              val dstId = Util.getName(dstComp.identifier)
+
+              if(ownerId != dstId) {
+                 createConnection(Sel4ConnectorTypes.seL4SharedData,
+                   dstComponent, dstFeature,
+                   Util.getLastName(sd.owner.identifier), Util.getLastName(sd.ownerFeature.get.identifier)
+                 )
+              } else {
+                // Ignore connection to the owner component
+              }
             case _ =>  halt (s"not expecting ${fdst.category}")
           }
         case _ => halt(s"not expecting ${conn.kind}")
@@ -341,6 +416,7 @@ import org.sireum.aadl.act.ast._
     var uses: ISZ[Uses] = ISZ()
     var emits: ISZ[Emits] = ISZ()
     var consumes: ISZ[Consumes] = ISZ()
+    var dataports: ISZ[Dataport] = ISZ()
 
     var imports : Set[String] = Set.empty
 
@@ -349,7 +425,68 @@ import org.sireum.aadl.act.ast._
     var cPreInits: ISZ[ST] = ISZ()
     var cDrainQueues: ISZ[(ST, ST)] = ISZ()
 
-    for(f <- c.features) {
+    for(f <- c.features.withFilter(_f => _f.isInstanceOf[ir.FeatureAccess])) {
+      def handleSubprogramAccess(): Unit = {
+        val fend = f.asInstanceOf[ir.FeatureAccess]
+        val fpath = Util.getName(fend.identifier)
+        val fid = Util.getLastName(f.identifier)
+
+        val proc = Util.getClassifier(fend.classifier.get)
+
+        fend.accessType match {
+          case ir.AccessType.Requires =>
+            imports = imports + Util.getInterfaceFilename(proc)
+            uses = uses :+ Uses(
+              name = fid,
+              optional = F,
+              typ = proc)
+          case ir.AccessType.Provides =>
+            imports = imports + Util.getInterfaceFilename(proc)
+            provides = provides :+ Provides(
+              name = fid,
+              typ = proc)
+        }
+      }
+
+      def handleDataAccess(): Unit = {
+        val fend = f.asInstanceOf[ir.FeatureAccess]
+        val fpath = Util.getName(fend.identifier)
+        val fid = Util.getLastName(f.identifier)
+
+        val typeName = Util.getClassifierFullyQualified(fend.classifier.get)
+        val interfaceName = Util.getSharedDataInterfaceName(fend.classifier.get)
+
+        fend.accessType match {
+          case ir.AccessType.Requires =>
+            imports = imports + Util.getInterfaceFilename(interfaceName)
+            dataports = dataports :+ Dataport(
+              name = fid,
+              optional = F,
+              typ = typeName)
+          case ir.AccessType.Provides =>
+            imports = imports + Util.getInterfaceFilename(interfaceName)
+            dataports = dataports :+ Dataport(
+              name = fid,
+              optional = F,
+              typ = typeName)
+        }
+      }
+
+      f.category match {
+        case ir.FeatureCategory.SubprogramAccessGroup =>
+          handleSubprogramAccess()
+        case ir.FeatureCategory.SubprogramAccess =>
+          handleSubprogramAccess()
+
+        case ir.FeatureCategory.DataAccess =>
+          handleDataAccess()
+
+        case _ =>
+          Console.err.println(s"Not expecting AccessType: ${Util.getName(f.identifier)}")
+      }
+    }
+
+    for(f <- c.features.withFilter(_f => _f.isInstanceOf[ir.FeatureEnd])) {
       val fend = f.asInstanceOf[ir.FeatureEnd]
       val fpath = Util.getName(fend.identifier)
       val fid = Util.getLastName(f.identifier)
@@ -415,41 +552,12 @@ import org.sireum.aadl.act.ast._
         }
       }
 
-      def handleSubprogramAccess(): Unit = {
-        val proc = Util.getClassifier(fend.classifier.get)
-        val kind = Util.getDiscreetPropertyValue(f.properties, "AccessType")
-        kind match {
-          case Some(v : ir.ValueProp) =>
-            if(v.value == "requires") {
-              imports = imports + Util.getInterfaceFilename(proc)
-              uses = uses :+ Uses(
-                name = fid,
-                optional = F,
-                typ = proc)
-            } else if (v.value == "provides") {
-              imports = imports + Util.getInterfaceFilename(proc)
-              provides = provides :+ Provides(
-                name = fid,
-                typ = proc)
-            } else {
-              halt(s"Unexpected: ${v}")
-            }
-          case _ =>
-            halt("Unexpected")
-        }
-      }
-
       f.category match {
         case ir.FeatureCategory.DataPort =>
           handleDataPort()
         case ir.FeatureCategory.EventDataPort =>
           handleDataPort()
           handleEventPort()
-
-        case ir.FeatureCategory.SubprogramAccessGroup =>
-          handleSubprogramAccess()
-        case ir.FeatureCategory.SubprogramAccess =>
-          handleSubprogramAccess()
 
         case ir.FeatureCategory.EventPort =>
           handleEventPort()
@@ -548,7 +656,7 @@ import org.sireum.aadl.act.ast._
       binarySemaphores = binarySemaphores,
       semaphores = ISZ(),
 
-      dataports = ISZ(),
+      dataports = dataports,
       emits = emits,
       uses = uses,
       consumes = consumes,
@@ -566,13 +674,12 @@ import org.sireum.aadl.act.ast._
       for (connInst <- outConnections.get(portPath).get()) {
 
         val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
-        val dstFeature: ir.FeatureEnd = featureEndMap.get(Util.getName(connInst.dst.feature.get)).get
 
         def handleDataPort(f: ir.FeatureEnd): Unit = {
-          val monitorName = Util.getMonitorName(dst, dstFeature)
-          val interfaceName = Util.getInterfaceName(dstFeature)
+          val monitorName = Util.getMonitorName(dst, f)
+          val interfaceName = Util.getInterfaceName(f)
 
-          val typeName = Util.getClassifierFullyQualified(dstFeature.classifier.get)
+          val typeName = Util.getClassifierFullyQualified(f.classifier.get)
 
           val monitor = Component(
             control = F,
@@ -611,7 +718,7 @@ import org.sireum.aadl.act.ast._
           )
 
           val writer: Procedure = Procedure (
-            name = Util.getMonitorWriterName(dstFeature),
+            name = Util.getMonitorWriterName(f),
             methods = ISZ(Method(
               name = s"write_${typeName}",
               parameters = ISZ(Parameter(F, Direction.Refin, "arg", paramTypeName)),
@@ -637,13 +744,15 @@ import org.sireum.aadl.act.ast._
           monitors = monitors + (connInstName ~> Monitor(inst, interface, writer, cimplementation, cincludes, i, connInst))
         }
 
+        val dstFeature: ir.Feature = featureMap.get(Util.getName(connInst.dst.feature.get)).get
+
         connInst.kind match {
           case ir.ConnectionKind.Port =>
             dstFeature.category match {
               case ir.FeatureCategory.DataPort =>
-                handleDataPort(dstFeature)
+                handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
               case ir.FeatureCategory.EventDataPort =>
-                handleDataPort(dstFeature)
+                handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
               case ir.FeatureCategory.EventPort =>
                 // will use Notification
               case _ =>
@@ -702,8 +811,7 @@ import org.sireum.aadl.act.ast._
           val fields: ISZ[ST] = c.subComponents.map(sub => {
             val fname: String = Util.getLastName(sub.identifier)
             if(ISZOps(Util.cKeywords).contains(fname)) {
-              Util.addError(s"The attribute '${fname}' from data type ${name} is a reserved keyword")
-              hasErrors = T
+              addError(s"The attribute '${fname}' from data type ${name} is a reserved keyword")
             }
             st"${processDataType(sub, T)} ${fname};"
           })
@@ -728,7 +836,7 @@ import org.sireum.aadl.act.ast._
             |    ${name} f;
             |  } ${container};"""
       } else {
-        Util.addError(s"Unexpected datatype: ${c}")
+        addError(s"Unexpected datatype: ${c}")
         st" "
       }
 
@@ -977,34 +1085,31 @@ import org.sireum.aadl.act.ast._
   }
 
 
+  def buildComponentMap(c: ir.Component): Unit = {
+    val name = Util.getName(c.identifier)
+    assert(!componentMap.contains(name))
+    componentMap = componentMap + (name ~> c)
+    c.subComponents.foreach(sc => buildComponentMap(sc))
+    hasPeriodicComponents = hasPeriodicComponents | Util.isPeriodic(c)
+  }
+
   def resolve(sys : ir.Component): B = {
 
-    def constructMap(c: ir.Component): Unit = {
-      val name = Util.getName(c.identifier)
-      assert(!componentMap.contains(name))
-      componentMap = componentMap + (name ~> c)
-      c.subComponents.foreach(sc => constructMap(sc))
-      hasPeriodicComponents = hasPeriodicComponents | Util.isPeriodic(c)
-    }
-    constructMap(sys)
-
-    componentMap.values.foreach(c => {
-      for (f <- c.features.withFilter(f => f.isInstanceOf[ir.FeatureEnd])) {
-        featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
-      }
-
+    for(c <- componentMap.values){
       for(f <- c.features){
+        //featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
+        featureMap = featureMap + (Util.getName(f.identifier) ~> f)
+
         f match {
           case fe: ir.FeatureEnd =>
             if (Util.isDataport(fe) && fe.classifier.isEmpty) {
-              Util.addError(s"Data type required for ${fe.category} ${Util.getName(fe.identifier)}")
-              hasErrors = T
+              addError(s"Data type required for ${fe.category} ${Util.getName(fe.identifier)}")
             }
           case _ =>
         }
       }
 
-      c.connectionInstances.foreach(ci => {
+      for(ci <- c.connectionInstances){
         if(isThreadConnection(ci)) {
           def add(portPath: String, isIn: B): Unit = {
             val map: HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
@@ -1031,8 +1136,8 @@ import org.sireum.aadl.act.ast._
           val dstName = s"${Util.getLastName(dst.identifier)}.${Util.getLastName(ci.src.feature.get)}"
           Util.addMessage(s"Ignoring ${src.category} to ${dst.category} connection: ${srcName} -> ${dstName}")
         }
-      })
-    })
+      }
+    }
 
     def findProcessor(): Option[ir.Component] = {
       for (c <- componentMap.values if (c.category == ir.ComponentCategory.Process) && Util.getTypeHeaderFileName(c).nonEmpty) {
@@ -1046,8 +1151,7 @@ import org.sireum.aadl.act.ast._
         topLevelProcess = Some(p)
         typeHeaderFileName = Util.getTypeHeaderFileName(p).get
       case _ =>
-        Util.addError("No processor bound process defined")
-        hasErrors = T
+        addError("No processor bound process defined")
     }
 
     if(!hasErrors) {
@@ -1057,6 +1161,41 @@ import org.sireum.aadl.act.ast._
     return !hasErrors
   }
 
+
+  def resolveSharedDataFeatures(conns: ISZ[ir.ConnectionInstance]): Unit = {
+    val dataConnections = conns.withFilter(f => f.kind == ir.ConnectionKind.Access).withFilter(
+      f => featureMap.get(Util.getName(f.dst.feature.get)).get.category == ir.FeatureCategory.DataAccess)
+
+    for(conn <- dataConnections) {
+      val srcComp = componentMap.get(Util.getName(conn.src.component)).get
+
+      if(srcComp.category != ir.ComponentCategory.Data) {
+        addError(s"${Util.getLastName(conn.src.component)} is not a data component")
+      }
+
+      val dataKey = Util.getName(conn.src.feature.get)
+      sharedData.get(dataKey) match {
+        case Some(sd) =>
+          val dstComp = componentMap.get(Util.getName(conn.dst.component)).get
+          val ownerId = Util.getName(sd.owner.identifier)
+          val dstId = Util.getName(dstComp.identifier)
+
+          if(ownerId == dstId) {
+            val _f = dstComp.features.withFilter(f => Util.getName(f.identifier) == Util.getName(conn.dst.feature.get))
+            if(_f.size != 1) {
+              addError(s"There are ${_f.size} matching features for ${Util.getName(conn.dst.feature.get)}, expecting only 1.")
+            } else if(!_f(0).isInstanceOf[ir.FeatureAccess]) {
+              addError(s"${Util.getName(conn.dst.feature.get)} is not a FeatureAccess.")
+            } else {
+              // add the owner's feature
+              sharedData = sharedData + (dataKey ~> SharedData(sd.owner, Some(_f(0).asInstanceOf[ir.FeatureAccess]), sd.typ, sd.subcomponentId))
+            }
+          }
+        case _ =>
+          addError(s"Could not find data subcomponent: ${dataKey}")
+      }
+    }
+  }
 
   def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {
     def u(_c:ir.Component): String = { return Util.getClassifierFullyQualified(_c.classifier.get) }
@@ -1081,4 +1220,10 @@ import org.sireum.aadl.act.ast._
     sort(graph.nodes.keys.withFilter(k => graph.incoming(k).size == z"0")).foreach(r => build(r))
     return sorted
   }
+
+  def addError(msg:String): Unit = {
+    hasErrors = T
+    Util.addError(msg)
+  }
 }
+
