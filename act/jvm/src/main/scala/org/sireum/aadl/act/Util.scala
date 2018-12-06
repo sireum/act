@@ -563,7 +563,7 @@ object StringTemplate{
         |static uint32_t length = 0;
         |
         |static bool is_full(void) {
-        |  return length == 1;
+        |  return length == ${dim};
         |}
         |
         |static bool is_empty(void) {
