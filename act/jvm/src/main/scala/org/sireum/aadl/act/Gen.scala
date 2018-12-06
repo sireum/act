@@ -484,6 +484,7 @@ import org.sireum.aadl.act.ast._
     }
 
     var binarySemaphores: ISZ[BinarySemaphore] = ISZ()
+    var semaphores: ISZ[Semaphore] = ISZ()
     val binSem = Util.getDiscreetPropertyValue(c.properties, "camkes::Binary_Semaphore")
     binSem match {
       case Some(v: ir.ValueProp) =>
@@ -491,8 +492,10 @@ import org.sireum.aadl.act.ast._
       case _ =>
     }
 
+    // FIXME: 2018.12.06 - changed binary semaphore to semaphore
     // has semaphore tb_dispatch_sem
-    binarySemaphores = binarySemaphores :+ BinarySemaphore(TimerUtil.SEM_DISPATCH)
+    //binarySemaphores = binarySemaphores :+ BinarySemaphore(TimerUtil.SEM_DISPATCH)
+    semaphores = semaphores :+ Semaphore(TimerUtil.SEM_DISPATCH)
 
     Util.getDispatchProtocol(c) match {
       case Some(Dispatch_Protocol.Periodic) =>
@@ -546,7 +549,7 @@ import org.sireum.aadl.act.ast._
 
       mutexes = ISZ(),
       binarySemaphores = binarySemaphores,
-      semaphores = ISZ(),
+      semaphores = semaphores,
 
       dataports = ISZ(),
       emits = emits,
