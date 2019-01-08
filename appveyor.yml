@@ -23,5 +23,6 @@ environment:
 
 build_script:
   - bash -lc "pacman --noconfirm -S unzip bc"
+  - bash -lc "rm -rf $APPVEYOR_BUILD_FOLDER/out"
   - bash -lc "$APPVEYOR_BUILD_FOLDER/bin/test.sh"
   - bin\act.bat
