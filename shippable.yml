@@ -23,3 +23,11 @@ build:
   push:
   cache: true
   cache_dir_list:
+
+integrations:
+  notifications:
+    - integrationName: email
+      type: email
+      recipients:
+        - belt@santoslab.org
+      sendConsoleLogs: true
