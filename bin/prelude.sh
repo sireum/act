@@ -4,7 +4,7 @@ set -e
 BIN_DIR=${ACT_HOME}/bin
 ZULU_VERSION=10.3+5-jdk10.0.2
 MILL_URL=http://files.sireum.org/mill-standalone # see https://github.com/sireum/mill-build
-MILL_SHA3=e011a0596fe8b91d2fb079add77f927a98a545fa37247987879820e56e08a3a4
+MILL_SHA3=6e000470f87d919bb9f6f604d06f49f8b0366b3ef5b56cd553075ccfd0c2db36
 MILL=${BIN_DIR}/mill
 LIB_URL=https://raw.githubusercontent.com/sireum/kekinian/0ee88fbc16e26a1cf7d7a81510206070fda208db/versions.properties
 LIB_SHA3=cb497ea8cb94a875d63aae7e465be26330f164d475d6ce7f7631f1c31ad10caa
