@@ -6,7 +6,7 @@ cd ${ACT_HOME}
 git submodule update --init --recursive --remote
 export JAVA_HOME=${ACT_HOME}/bin/${PLATFORM}/jdk
 export PATH=${JAVA_HOME}/bin:$PATH
-# ${ACT_HOME}/bin/mill clean
+${ACT_HOME}/bin/mill resolve _
 ${ACT_HOME}/bin/mill all \
   cli.assembly \
   act.jvm.tests \
