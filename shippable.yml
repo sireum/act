@@ -13,7 +13,8 @@ build:
   - >
     if [[ ! `git show -s HEAD | grep -F -q "[skip shippable]"` ]]; then
       git submodule update --init --recursive &&
-      export SIREUM_SOURCE_BUILD=true
+      export SIREUM_SOURCE_BUILD=true &&
+      rm -fR out ~/.mill &&
       bin/test.sh &&
       bin/act;
     fi
