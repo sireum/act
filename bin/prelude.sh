@@ -81,12 +81,12 @@ if [ ! -d jdk ] || [ "${ZULU_UPDATE}" = "true" ]; then
 fi
 if [ ! -f ${SHA3} ]; then
   echo "Downloading sha3 ..."
-  curl -Lo ${SHA3} ${SHA3_URL}
+  curl -c /dev/null -Lo ${SHA3} ${SHA3_URL}
   chmod +x ${SHA3}
 fi
 if [ ! -f ${MILL} ] || [ "$(${SHA3} 256 < ${MILL})" != ${MILL_SHA3} ]; then
   echo "Downloading mill ..."
-  curl -Lo ${MILL} ${MILL_URL}
+  curl -c /dev/null -Lo ${MILL} ${MILL_URL}
   chmod +x ${MILL}
   MILL_SHA3_LOCAL="$(${SHA3} 256 < ${MILL})"
   if [ "$(${SHA3} 256 < ${MILL})" != ${MILL_SHA3} ]; then
@@ -103,7 +103,7 @@ if [ ! -f ${LIB} ] || [ "$(${SHA3} 256 < ${LIB})" != ${LIB_SHA3} ]; then
 fi
 if [ ! -f ${SIREUM} ] || [ "$(${SHA3} 256 < ${SIREUM})" != ${SIREUM_SHA3} ]; then
   echo "Downloading sireum ..."
-  curl -Lo ${SIREUM} ${SIREUM_URL}
+  curl -c /dev/null -Lo ${SIREUM} ${SIREUM_URL}
   chmod +x ${SIREUM}
   SIREUM_SHA3_LOCAL="$(${SHA3} 256 < ${SIREUM})"
   if [ ${SIREUM_SHA3_LOCAL} != ${SIREUM_SHA3} ]; then
