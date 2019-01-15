@@ -24,7 +24,7 @@ cache:
 build_script:
   - bash -lc "pacman --noconfirm -S unzip zip"
   - bash -lc "rm -rf $APPVEYOR_BUILD_FOLDER/out $APPVEYOR_BUILD_FOLDER/versions.properties"
-  - RD /S /Q %USERPROFILE%\.mill
+  - IF EXIST %USERPROFILE%\.mill RD /S /Q %USERPROFILE%\.mill
   - git submodule update --init --recursive
   - bash -lc "$APPVEYOR_BUILD_FOLDER/bin/test.sh"
   - bin\act.bat
