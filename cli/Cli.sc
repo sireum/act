@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2018, Robby, Kansas State University
+ Copyright (c) 2019, Robby, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@ trait Module extends JvmOnly {
 
   final override def crossDeps = Seq(actObject)
 
-  final override def ivyDeps = Agg(ivy"com.lihaoyi::ammonite-ops:$ammoniteOpsVersion")
+  final override def ivyDeps = Agg(ivy"com.lihaoyi::os-lib:$osLibVersion")
 
   final override def deps = Seq()
 

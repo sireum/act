@@ -1,13 +1,12 @@
-#!/usr/bin/env bash
-set -e
+#!/bin/bash -e
 export ACT_HOME=$( cd "$( dirname "$0" )"/.. &> /dev/null && pwd )
-. ${ACT_HOME}/bin/prelude.sh
 cd ${ACT_HOME}
 git submodule update --init --recursive --remote
-export JAVA_HOME=${ACT_HOME}/bin/${PLATFORM}/jdk
+bin/prelude.sh
+export JAVA_HOME=${ACT_HOME}/sireum/bin/java
 export PATH=${JAVA_HOME}/bin:$PATH
-${ACT_HOME}/bin/mill version
-${ACT_HOME}/bin/mill all \
+${ACT_HOME}/sireum/bin/mill/mill-standalone version
+${ACT_HOME}/sireum/bin/mill/mill-standalone all \
   cli.assembly \
   act.jvm.tests \
   cli.tests
