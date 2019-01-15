@@ -18,7 +18,7 @@ environment:
   SIREUM_SOURCE_BUILD: true
 
 cache:
-  - sireum\bin\java -> sireum\bin\prelude.sh
+  - sireum\bin\win\java -> sireum\bin\prelude.sh
   - sireum\bin\scala -> sireum\bin\prelude.sh
 
 build_script:

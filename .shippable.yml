@@ -24,7 +24,7 @@ build:
   push:
   cache: true
   cache_dir_list:
-    - $SHIPPABLE_BUILD_DIR/sireum/bin/java
+    - $SHIPPABLE_BUILD_DIR/sireum/bin/linux/java
     - $SHIPPABLE_BUILD_DIR/sireum/bin/scala
 
 integrations:

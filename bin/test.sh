@@ -1,16 +1,16 @@
 #!/bin/bash -e
 export ACT_HOME=$( cd "$( dirname "$0" )"/.. &> /dev/null && pwd )
+export SIREUM_HOME=${ACT_HOME}/sireum
 cd ${ACT_HOME}
 git submodule update --init --recursive --remote
 bin/prelude.sh
-export JAVA_HOME=${ACT_HOME}/sireum/bin/java
-export PATH=${JAVA_HOME}/bin:$PATH
+source sireum/bin/platform.sh
 ${ACT_HOME}/sireum/bin/mill/mill-standalone version
 ${ACT_HOME}/sireum/bin/mill/mill-standalone all \
   cli.assembly \
   act.jvm.tests \
   cli.tests
-if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then
+if [[ ${PLATFORM} = "win" ]]; then
   cp out/cli/assembly/dest/out.jar bin/act.bat
 else
   cp out/cli/assembly/dest/out.jar bin/act
