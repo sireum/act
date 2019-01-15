@@ -2,11 +2,6 @@ os: osx
 
 osx_image: xcode10.1
 
-cache:
-  directories:
-    - sireum/bin/mac/java
-    - sireum/bin/scala
-
 script:
 - if echo "$TRAVIS_COMMIT_MESSAGE" | grep -F -q "[skip travis]" ; then echo "skip travis" && exit 0 ; fi
 - if echo "$TRAVIS_COMMIT_MESSAGE" | grep -F -q "[travis skip]" ; then echo "travis skip" && exit 0 ; fi
