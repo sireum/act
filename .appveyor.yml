@@ -18,8 +18,8 @@ environment:
   SIREUM_SOURCE_BUILD: true
 
 cache:
-  - sireum\bin\win\java -> sireum\bin\prelude.sh
-  - sireum\bin\scala -> sireum\bin\prelude.sh
+  - sireum\bin\win\java
+  - sireum\bin\scala
 
 build_script:
   - bash -lc "pacman --noconfirm -S unzip zip"
