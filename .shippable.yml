@@ -22,10 +22,7 @@ build:
   on_success:
   on_failure:
   push:
-  cache: true
-  cache_dir_list:
-    - $SHIPPABLE_BUILD_DIR/sireum/bin/linux/java
-    - $SHIPPABLE_BUILD_DIR/sireum/bin/scala
+  cache: false
 
 integrations:
   notifications:
