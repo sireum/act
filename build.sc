@@ -25,32 +25,35 @@
 
 import mill._
 import ammonite.ops._
-import $file.runtime.Runtime
+import $file.sireum.runtime.Runtime
 import $file.air.Air
 import $file.act.Act
 import $file.cli.Cli
 
+object sireum {
 
-object runtime extends mill.Module {
+  object runtime extends mill.Module {
 
-  object macros extends Runtime.Module.Macros
+    object macros extends Runtime.Module.Macros
 
-  object test extends Runtime.Module.Test {
-    override def macrosObject = macros
-  }
+    object test extends Runtime.Module.Test {
+      override def macrosObject = macros
+    }
 
-  trait testProvider extends Runtime.Module.TestProvider {
-    override def testObject = test
-  }
+    trait testProvider extends Runtime.Module.TestProvider {
+      override def testObject = test
+    }
 
-  object library extends Runtime.Module.Library with testProvider {
-    override def macrosObject = macros
+    object library extends Runtime.Module.Library with testProvider {
+      override def macrosObject = macros
+    }
+
   }
 
 }
 
-object air extends Air.Module with runtime.testProvider {
-  final override def libraryObject = runtime.library
+object air extends Air.Module with sireum.runtime.testProvider {
+  final override def libraryObject = sireum.runtime.library
 }
 
 
@@ -64,16 +67,16 @@ object cli extends Cli.Module {
 }
 
 def regenCli() = T.command {
-  val out = pwd / 'bin / "sireum"
+  val out = pwd / 'sireum / 'bin / "sireum.jar"
   val sireumPackagePath = pwd / 'cli / 'jvm / 'src / 'main / 'scala / 'org / 'sireum
-  log(%%(out, 'tools, 'cligen, "-p", "org.sireum", "-l", pwd / "license.txt",
+  log(%%('java, "-jar", out, 'tools, 'cligen, "-p", "org.sireum", "-l", pwd / "license.txt",
     sireumPackagePath / "cli.sc")(sireumPackagePath))
 }
 
 def tipe() = T.command {
-  val out = pwd/ 'bin / "sireum"
-  val paths = s"${pwd / 'act}:${pwd / 'air}"
-  log(%%(out, 'slang, 'tipe, "-s", paths)(pwd))
+  val out = pwd / 'sireum / 'bin / "sireum.jar"
+  val paths = s"${pwd / 'act}${java.io.File.pathSeparatorChar}${pwd / 'air}"
+  log(%%('java, "-jar", out, 'slang, 'tipe, "-s", paths)(pwd))
 }
 
 private def log(r: CommandResult)(implicit ctx: mill.util.Ctx.Log): Unit = {

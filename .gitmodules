@@ -1,6 +1,3 @@
-[submodule "runtime"]
-	path = runtime
-	url = https://github.com/sireum/runtime.git
 [submodule "air"]
 	path = air
 	url = https://github.com/sireum/air.git

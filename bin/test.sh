@@ -6,11 +6,13 @@ git submodule update --init --recursive --remote
 bin/prelude.sh
 source sireum/bin/platform.sh
 ${ACT_HOME}/sireum/bin/mill/mill-standalone all \
+  tipe \
   cli.assembly \
   act.jvm.tests \
   cli.tests
 if [[ ${PLATFORM} = "win" ]]; then
   cp out/cli/assembly/dest/out.jar bin/act.bat
+  chmod +x bin/act.bat
 else
   cp out/cli/assembly/dest/out.jar bin/act
   chmod +x bin/act
