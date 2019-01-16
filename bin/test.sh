@@ -5,7 +5,6 @@ cd ${ACT_HOME}
 git submodule update --init --recursive --remote
 bin/prelude.sh
 source sireum/bin/platform.sh
-${ACT_HOME}/sireum/bin/mill/mill-standalone version
 ${ACT_HOME}/sireum/bin/mill/mill-standalone all \
   cli.assembly \
   act.jvm.tests \
