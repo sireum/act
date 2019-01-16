@@ -233,7 +233,7 @@ import org.sireum.aadl.act.ast._
 
               } else {
                 addError(st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread}:  Could not locate component '${owner}'.  Please use one of the following:
-                             |  ${(threads.map(m => m.classifier.get.name), "\n")}""".render)
+                             |  ${(threads.map((m: ir.Component) => m.classifier.get.name), "\n")}""".render)
               }
             case _ =>
           }
@@ -344,9 +344,9 @@ import org.sireum.aadl.act.ast._
     }
 
     resolveSharedDataFeatures(c.connectionInstances)
-    val missingFeatures = sharedData.values.withFilter(f => f.ownerFeature == None[ir.FeatureAccess])
+    val missingFeatures = sharedData.values.withFilter((f: SharedData) => f.ownerFeature.isEmpty)
     if(missingFeatures.nonEmpty) {
-      addError(s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map(f => f.subcomponentId), ", ")}")
+      addError(s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
     }
 
     for(conn <- c.connectionInstances) {
@@ -482,7 +482,7 @@ import org.sireum.aadl.act.ast._
           handleDataAccess()
 
         case _ =>
-          Console.err.println(s"Not expecting AccessType: ${Util.getName(f.identifier)}")
+          eprintln(s"Not expecting AccessType: ${Util.getName(f.identifier)}")
       }
     }
 
