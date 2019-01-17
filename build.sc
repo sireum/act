@@ -30,7 +30,7 @@ import $file.air.Air
 import $file.act.Act
 import $file.cli.Cli
 
-object sireum {
+object sireum extends mill.Module {
 
   object runtime extends mill.Module {
 
