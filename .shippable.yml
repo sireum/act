@@ -16,6 +16,7 @@ build:
       export SIREUM_SOURCE_BUILD=true &&
       rm -fR out ~/.mill versions.properties &&
       bin/test.sh &&
+      source sireum/bin/platform.sh &&
       bin/act;
     fi
   post_ci:
