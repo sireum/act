@@ -17,6 +17,7 @@ build:
       rm -fR out ~/.mill versions.properties &&
       bin/test.sh;
       if [ -e "bin/act" ]; then
+        export SIREUM_HOME=sireum/;
         source sireum/bin/platform.sh;
         bin/act;
       fi
