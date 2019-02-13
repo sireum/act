@@ -80,7 +80,7 @@ object Util {
   }
 
   @pure def getPropertyValues(properties: ISZ[ir.Property], propertyName: String): ISZ[ir.PropertyValue] = {
-    return properties.withFilter(p => getLastName(p.name) == propertyName).flatMap(p => p.propertyValues)
+    return properties.filter(p => getLastName(p.name) == propertyName).flatMap(p => p.propertyValues)
   }
 
   def getLastName(n : ir.Name) : String = {
