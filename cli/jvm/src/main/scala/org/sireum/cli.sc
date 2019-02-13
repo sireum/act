@@ -21,39 +21,38 @@
  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */ {
+ */
 
-  import org.sireum._
+import org.sireum._
   import org.sireum.cli.CliOpt._
 
-  val actTool: Tool = Tool(
-    name = "act",
-    command = "act",
-    description = "",
-    header = "Sireum ACT: An AADL-to-CAmkES Translator",
-    usage = "<option>* <file>+",
-    opts = ISZ(
-      Opt (name = "input", longKey = "input", shortKey = Some('i'),
-        tpe = Type.Choice(name = "format", sep = None(), elements = ISZ("air", "camkesir", "aadl")),
-        description = "Input format"
-      ),
-      Opt (name = "mode", longKey = "mode", shortKey = Some('m'),
-        tpe = Type.Choice(name = "mode", sep = None(), elements = ISZ("json", "msgpack")),
-        description = "Serialization method (only valid for air/camkesir input"
-      ),
-      Opt (name = "outputDir", longKey = "output-dir", shortKey = Some('o'),
-        tpe = Type.Path(multiple = F, default = Some(".")),
-        description = "Output directory for the generated project files"
-      ),
-      Opt (name = "auxDirs", longKey = "aux-directories", shortKey = Some('a'),
-        tpe = Type.Path(multiple = T, default = None()),
-        description = "Directories containing C files to be included in build"),
-      Opt (name = "aadlRootDir", longKey = "root-dir", shortKey = Some('r'),
-        tpe = Type.Path(multiple = F, default = None()),
-        description = "")
+val actTool: Tool = Tool(
+  name = "act",
+  command = "act",
+  description = "",
+  header = "Sireum ACT: An AADL-to-CAmkES Translator",
+  usage = "<option>* <file>+",
+  opts = ISZ(
+    Opt (name = "input", longKey = "input", shortKey = Some('i'),
+      tpe = Type.Choice(name = "format", sep = None(), elements = ISZ("air", "camkesir", "aadl")),
+      description = "Input format"
     ),
-    groups = ISZ()
-  )
+    Opt (name = "mode", longKey = "mode", shortKey = Some('m'),
+      tpe = Type.Choice(name = "mode", sep = None(), elements = ISZ("json", "msgpack")),
+      description = "Serialization method (only valid for air/camkesir input"
+    ),
+    Opt (name = "outputDir", longKey = "output-dir", shortKey = Some('o'),
+      tpe = Type.Path(multiple = F, default = Some(".")),
+      description = "Output directory for the generated project files"
+    ),
+    Opt (name = "auxDirs", longKey = "aux-directories", shortKey = Some('a'),
+      tpe = Type.Path(multiple = T, default = None()),
+      description = "Directories containing C files to be included in build"),
+    Opt (name = "aadlRootDir", longKey = "root-dir", shortKey = Some('r'),
+      tpe = Type.Path(multiple = F, default = None()),
+      description = "")
+  ),
+  groups = ISZ()
+)
 
-  actTool
-}
+println(org.sireum.cli.JSON.fromCliOpt(actTool, T))

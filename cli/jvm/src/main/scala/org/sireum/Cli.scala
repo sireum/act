@@ -2,7 +2,7 @@
 // @formatter:off
 
 /*
- Copyright (c) 2018, Kansas State University
+ Copyright (c) 2019, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
