@@ -43,7 +43,7 @@ import org.sireum.aadl.act.ast._
 
   def process(model : ir.Aadl, cSources: ISZ[String]) : Option[ActContainer] = {
 
-    val components = model.components.withFilter(f => f.category != ir.ComponentCategory.Data)
+    val components = model.components.filter(f => f.category != ir.ComponentCategory.Data)
     if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
       halt(s"Model contains ${components.size} components.  Should only contain a single top-level system")
     }
@@ -53,7 +53,7 @@ import org.sireum.aadl.act.ast._
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
-    val dataSubcomponents = componentMap.values.withFilter(f => f.category == ir.ComponentCategory.Data)
+    val dataSubcomponents = componentMap.values.filter(f => f.category == ir.ComponentCategory.Data)
     for(d <- (model.dataComponents ++ dataSubcomponents)){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
     val sortedData = sortData(model.dataComponents)
 
@@ -215,8 +215,8 @@ import org.sireum.aadl.act.ast._
 
           Util.getCamkesOwnerThread(sc.properties) match {
             case Some(owner) =>
-              val threads = componentMap.values.withFilter(f => f.category == ir.ComponentCategory.Thread)
-              val thread = threads.withFilter(f => f.classifier.get.name == owner || Util.getClassifier(f.classifier.get) == owner)
+              val threads = componentMap.values.filter(f => f.category == ir.ComponentCategory.Thread)
+              val thread = threads.filter(f => f.classifier.get.name == owner || Util.getClassifier(f.classifier.get) == owner)
 
               if(thread.nonEmpty) {
                 val theOwner = thread(0)
@@ -344,7 +344,7 @@ import org.sireum.aadl.act.ast._
     }
 
     resolveSharedDataFeatures(c.connectionInstances)
-    val missingFeatures = sharedData.values.withFilter((f: SharedData) => f.ownerFeature.isEmpty)
+    val missingFeatures = sharedData.values.filter((f: SharedData) => f.ownerFeature.isEmpty)
     if(missingFeatures.nonEmpty) {
       addError(s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
     }
@@ -425,7 +425,7 @@ import org.sireum.aadl.act.ast._
     var cPreInits: ISZ[ST] = ISZ()
     var cDrainQueues: ISZ[(ST, ST)] = ISZ()
 
-    for(f <- c.features.withFilter(_f => _f.isInstanceOf[ir.FeatureAccess])) {
+    for(f <- c.features.filter(_f => _f.isInstanceOf[ir.FeatureAccess])) {
       def handleSubprogramAccess(): Unit = {
         val fend = f.asInstanceOf[ir.FeatureAccess]
         val fpath = Util.getName(fend.identifier)
@@ -486,7 +486,7 @@ import org.sireum.aadl.act.ast._
       }
     }
 
-    for(f <- c.features.withFilter(_f => _f.isInstanceOf[ir.FeatureEnd])) {
+    for(f <- c.features.filter(_f => _f.isInstanceOf[ir.FeatureEnd])) {
       val fend = f.asInstanceOf[ir.FeatureEnd]
       val fpath = Util.getName(fend.identifier)
       val fid = Util.getLastName(f.identifier)
@@ -672,7 +672,7 @@ import org.sireum.aadl.act.ast._
   }
 
   def buildMonitors(): Unit = {
-    for (portPath <- outConnections.keys.withFilter(p => outConnections.get(p).get.size > 0)) {
+    for (portPath <- outConnections.keys.filter(p => outConnections.get(p).get.size > 0)) {
       var i: Z = 0
       for (connInst <- outConnections.get(portPath).get()) {
 
@@ -799,7 +799,7 @@ import org.sireum.aadl.act.ast._
   }
 
   def processDataTypes(values: ISZ[ir.Component]): ST = {
-    val defs: ISZ[ST] = values.withFilter(v => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).map(v => processDataType(v, F))
+    val defs: ISZ[ST] = values.filter(v => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).map(v => processDataType(v, F))
     val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
     return StringTemplate.tbTypeHeaderFile(macroname, typeHeaderFileName, defs, preventBadging)
   }
@@ -1166,7 +1166,7 @@ import org.sireum.aadl.act.ast._
 
 
   def resolveSharedDataFeatures(conns: ISZ[ir.ConnectionInstance]): Unit = {
-    val dataConnections = conns.withFilter(f => f.kind == ir.ConnectionKind.Access).withFilter(
+    val dataConnections = conns.filter(f => f.kind == ir.ConnectionKind.Access).filter(
       f => featureMap.get(Util.getName(f.dst.feature.get)).get.category == ir.FeatureCategory.DataAccess)
 
     for(conn <- dataConnections) {
@@ -1184,7 +1184,7 @@ import org.sireum.aadl.act.ast._
           val dstId = Util.getName(dstComp.identifier)
 
           if(ownerId == dstId) {
-            val _f = dstComp.features.withFilter(f => Util.getName(f.identifier) == Util.getName(conn.dst.feature.get))
+            val _f = dstComp.features.filter(f => Util.getName(f.identifier) == Util.getName(conn.dst.feature.get))
             if(_f.size != 1) {
               addError(s"There are ${_f.size} matching features for ${Util.getName(conn.dst.feature.get)}, expecting only 1.")
             } else if(!_f(0).isInstanceOf[ir.FeatureAccess]) {
@@ -1220,7 +1220,7 @@ import org.sireum.aadl.act.ast._
       sort(graph.outgoing(c).map(m => m.dest)).foreach(o => build(o))
       sorted = sorted :+ c
     }
-    sort(graph.nodes.keys.withFilter(k => graph.incoming(k).size == z"0")).foreach(r => build(r))
+    sort(graph.nodes.keys.filter(k => graph.incoming(k).size == z"0")).foreach(r => build(r))
     return sorted
   }
 
