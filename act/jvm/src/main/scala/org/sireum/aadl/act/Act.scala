@@ -4,11 +4,11 @@ import org.sireum.aadl.ir
 import java.io.File
 import java.nio.file.StandardCopyOption
 
-import org.sireum.{B, Either, F, ISZ, None, Option, Some, String, T, Z}
+import org.sireum.{B, Either, F, ISZ, None, Option, Some, T, Z}
 
 object Act {
 
-  def main(args: Array[scala.Predef.String]): Unit = {
+  def main(args: Array[Predef.String]): Unit = {
     val inputFile = path2fileOpt("input file", Some(args(0)), F)
     val input = scala.io.Source.fromFile(inputFile.get).getLines.mkString
     val destDir = new File(args(1))
@@ -20,11 +20,11 @@ object Act {
     }
   }
 
-  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[String]) : Int = {
+  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[Predef.String]) : Int = {
     run(destDir, m, auxDirectories, None[File])
   }
 
-  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[String], aadlRootDir: Option[File]) : Int = {
+  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[Predef.String], aadlRootDir: Option[File]) : Int = {
 
     if(m.components.isEmpty) {
       Console.err.println("Model is empty")
@@ -38,8 +38,8 @@ object Act {
       return -1
     }
 
-    var cFiles: ISZ[String] = ISZ()
-    var hFiles: ISZ[String] = ISZ()
+    var cFiles: ISZ[org.sireum.String] = ISZ()
+    var hFiles: ISZ[org.sireum.String] = ISZ()
 
     if(auxDirectories.nonEmpty) {
       val auxSrcDir = new File(_destDir, "aux/src")
@@ -63,7 +63,7 @@ object Act {
       }
 
       for (d <- auxDirectories) {
-        val dir = new File(d.native)
+        val dir = new File(d)
         if (dir.isDirectory) processDir(dir)
       }
     }
@@ -80,9 +80,9 @@ object Act {
     }
   }
 
-  def path2fileOpt(pathFor: String, path: Option[String], checkExist: B): scala.Option[File] = {
+  def path2fileOpt(pathFor: Predef.String, path: Option[Predef.String], checkExist: B): scala.Option[File] = {
     if (path.isEmpty) return scala.None
-    val f = new File(path.get.value)
+    val f = new File(path.get)
     if (checkExist && !f.exists) error(s"File '$path' does not exist.")
     return scala.Some(f.getCanonicalFile.getAbsoluteFile)
   }
