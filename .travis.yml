@@ -13,7 +13,7 @@ script:
 - git submodule update --init --recursive
 - export SIREUM_SOURCE_BUILD=true
 - rm -fr out ~/.mill versions.properties
-- bin/test.sh
+- bin/build.cmd build
 - bin/act
 
 notifications:

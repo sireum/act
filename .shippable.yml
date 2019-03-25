@@ -15,12 +15,8 @@ build:
       git submodule update --init --recursive &&
       export SIREUM_SOURCE_BUILD=true &&
       rm -fR out ~/.mill versions.properties &&
-      bin/test.sh;
-      if [ -e "bin/act" ]; then
-        export SIREUM_HOME=sireum/;
-        source sireum/bin/platform.sh;
-        bin/act;
-      fi
+      bin/build.cmd build &&
+      bin/act;
     fi
   post_ci:
   on_success:
