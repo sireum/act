@@ -32,7 +32,7 @@ package org.sireum
 
 import org.sireum._
 
-object Cli {
+object ActCli {
 
   @datatype trait ActTopOption
 
@@ -60,9 +60,9 @@ object Cli {
   ) extends ActTopOption
 }
 
-import Cli._
+import ActCli._
 
-@record class Cli(pathSep: C) {
+@record class ActCli(pathSep: C) {
 
   def parseFormatH(arg: String): Option[Format.Type] = {
     arg.native match {

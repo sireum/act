@@ -26,17 +26,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.sireum
 
 import java.io.File
-import Cli.{Format, Mode}
+import ActCli.{Format, Mode}
 import org.sireum.aadl.ir.{Aadl, JSON, MsgPack}
 
 object Act extends scala.App {
-  Cli(File.pathSeparatorChar).parseAct(ISZ(args.toSeq.map(s => s: String):_ *), 0) match {
-    case Some(o: Cli.ActOption) => act(o)
-    case Some(_: Cli.HelpOption) => 0
+  ActCli(File.pathSeparatorChar).parseAct(ISZ(args.toSeq.map(s => s: String):_ *), 0) match {
+    case Some(o: ActCli.ActOption) => act(o)
+    case Some(_: ActCli.HelpOption) => 0
     case _ => -1
   }
 
-  def act(o: Cli.ActOption): Int = {
+  def act(o: ActCli.ActOption): Int = {
     o.args.size match {
       case z"0" => println(o.help); return 0
       case _ =>

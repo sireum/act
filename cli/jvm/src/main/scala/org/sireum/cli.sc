@@ -24,7 +24,7 @@
  */
 
 import org.sireum._
-  import org.sireum.cli.CliOpt._
+import org.sireum.cli.CliOpt._
 
 val actTool: Tool = Tool(
   name = "act",

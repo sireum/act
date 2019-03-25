@@ -7,4 +7,5 @@ scratch.scala
 scratch.sc
 /bin/act
 /bin/act.bat
+/bin/build.cmd.jar
 /versions.properties

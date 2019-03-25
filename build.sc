@@ -30,6 +30,9 @@ import $file.air.Air
 import $file.act.Act
 import $file.cli.Cli
 
+import mill.scalalib.ScalaModule
+import org.sireum.mill.SireumModule
+
 object sireum extends mill.Module {
 
   object runtime extends mill.Module {
@@ -66,24 +69,15 @@ object cli extends Cli.Module {
   final override def actObject = act
 }
 
-def regenCli() = T.command {
-  val out = pwd / 'sireum / 'bin / "sireum.jar"
-  val sireumPackagePath = pwd / 'cli / 'jvm / 'src / 'main / 'scala / 'org / 'sireum
-  log(%%('java, "-jar", out, 'tools, 'cligen, "-p", "org.sireum", "-l", pwd / "license.txt",
-    sireumPackagePath / "cli.sc")(sireumPackagePath))
-}
 
-def tipe() = T.command {
-  val out = pwd / 'sireum / 'bin / "sireum.jar"
-  val paths = s"${pwd / 'act}${java.io.File.pathSeparatorChar}${pwd / 'air}"
-  log(%%('java, "-jar", out, 'slang, 'tipe, "-s", paths)(pwd))
-}
+object bin extends ScalaModule {
+  final override def scalaVersion = SireumModule.scalaVersion
+  final override def moduleDeps = Seq(sireum.runtime.library.jvm)
 
-private def log(r: CommandResult)(implicit ctx: mill.util.Ctx.Log): Unit = {
-  val logger = ctx.log
-  val out = r.out.string
-  val err = r.err.string
-  if (out.trim.nonEmpty) logger.info(out)
-  if (err.trim.nonEmpty) logger.error(err)
-  if (r.exitCode != 0) System.exit(r.exitCode)
+  object `mill-build` extends mill.Module {
+    object bin extends ScalaModule {
+      final override def scalaVersion = SireumModule.scalaVersion
+      final override def moduleDeps = Seq(sireum.runtime.library.jvm)
+    }
+  }
 }
