@@ -6,23 +6,11 @@ init:
   - cmd: git config --global core.autocrlf true
   - cmd: git config --global core.symlinks true
 
-environment:
-  matrix:
-  - COMPILER: msys2
-    PLATFORM: x64
-    MSYS2_ARCH: x86_64
-    MSYS2_DIR: msys64
-    MSYSTEM: MINGW64
-    BIT: 64
-  PATH: 'C:\%MSYS2_DIR%\%MSYSTEM%\bin;C:\%MSYS2_DIR%\usr\bin;%PATH%'
-  SIREUM_SOURCE_BUILD: true
+install:
+- git submodule update --init --recursive
 
 build_script:
-  - bash -lc "pacman --noconfirm -S unzip zip"
-  - bash -lc "rm -rf $APPVEYOR_BUILD_FOLDER/out $APPVEYOR_BUILD_FOLDER/versions.properties"
-  - IF EXIST %USERPROFILE%\.mill RD /S /Q %USERPROFILE%\.mill
-  - git submodule update --init --recursive
-  - bin\build.cmd build"
+  - bin\build.cmd build
   - bin\act.bat
 
 notifications:

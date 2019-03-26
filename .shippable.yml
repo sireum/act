@@ -12,9 +12,8 @@ build:
   ci:
   - >
     if [[ ! `git show -s HEAD | grep -F -q "[skip shippable]"` ]]; then
+      mkdir -p $HOME/.coursier &&
       git submodule update --init --recursive &&
-      export SIREUM_SOURCE_BUILD=true &&
-      rm -fR out ~/.mill versions.properties &&
       bin/build.cmd build &&
       bin/act;
     fi
@@ -22,7 +21,11 @@ build:
   on_success:
   on_failure:
   push:
-  cache: false
+  cache: true
+  cache_dir_list:
+    - $SHIPPABLE_BUILD_DIR/bin/linux/java
+    - $SHIPPABLE_BUILD_DIR/bin/scala
+    - $SHIPPABLE_BUILD_DIR/bin/z3
 
 integrations:
   notifications:
