@@ -34,6 +34,7 @@ val mill = sireumBin / (if (Os.isWin) "mill.bat" else "mill")
 
 val options: HashSMap[String, () => Unit] = HashSMap ++ ISZ(
   ("build", build _),
+  ("min-jar", minJar _),
   ("regen-cli", regenCli _),
   ("tipe", tipe _),
   ("-h", usage _),
@@ -76,6 +77,17 @@ def build(): Unit = {
   println(s"ACT available at: ${dest}")
 }
 
+def minJar(): Unit = {
+  println("Building ACT min jar ...")
+
+  Os.proc(ISZ(mill.string, "act.jvm.jar")).at(home).console.runCheck()
+
+  val f = home / "out" / "act" / "jvm" / "jar" / "dest" / "out.jar"
+
+  if(f.exists) {
+    println(s"ACT min jar available at: ${f}")
+  }
+}
 
 def usage(): Unit = {
   println(st"""Act /build
