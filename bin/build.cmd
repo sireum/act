@@ -6,7 +6,12 @@ export ACT_HOME=$(cd -P $(dirname "$0")/.. && pwd -P)         #
 export SIREUM_HOME=${ACT_HOME}/sireum                         #
 ${SIREUM_HOME}/bin/build.cmd                                  #
                                                               #
-exec ${SIREUM_HOME}/bin/sireum slang run -s -n "$0" "$@"      #
+if [ -f "$0.com" ] && [ "$0.com" -nt "$0" ]; then             #
+  exec "$0.com" "$@"                                          #
+else                                                          #
+  rm -fR "$0.com"                                             #
+  exec ${SIREUM_HOME}/bin/sireum slang run -s -n "$0" "$@"    #
+fi                                                            #
 :BOF
 set SIREUM_BIN=%cd%\sireum\bin
 if defined SIREUM_PROVIDED_SCALA set SIREUM_PROVIDED_JAVA=true
@@ -59,7 +64,7 @@ def build(): Unit = {
 
   (sireumHome / "versions.properties").copyOverTo(home / "versions.properties")
 
-  println("Building ...")
+  println("Building ACT ...")
 
   Os.proc(ISZ(mill.string, "all", "cli.assembly", "act.jvm.tests", "cli.tests")).at(home).console.runCheck()
 

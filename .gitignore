@@ -8,4 +8,5 @@ scratch.sc
 /bin/act
 /bin/act.bat
 /bin/build.cmd.jar
+/bin/*.com
 /versions.properties
