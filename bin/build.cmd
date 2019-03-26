@@ -8,10 +8,11 @@ ${SIREUM_HOME}/bin/build.cmd                                  #
                                                               #
 exec ${SIREUM_HOME}/bin/sireum slang run -s -n "$0" "$@"      #
 :BOF
+set SIREUM_BIN=%cd%\sireum\bin
 if defined SIREUM_PROVIDED_SCALA set SIREUM_PROVIDED_JAVA=true
-if not exist "%~dp0sireum.jar" call "%~dp0init.bat"
-if not defined SIREUM_PROVIDED_JAVA set PATH=%~dp0win\java\bin;%~dp0win\z3\bin;%PATH%
-"%~dp0sireum.bat" slang run -s "%0" %*
+if not exist "%SIREUM_BIN%\sireum.jar" call "%SIREUM_BIN%\init.bat"
+if not defined SIREUM_PROVIDED_JAVA set PATH=%SIREUM_BIN%\win\java\bin;%SIREUM_BIN%\win\z3\bin;%PATH%
+"%SIREUM_BIN%\sireum.bat" slang run -s "%0" %*
 exit /B %errorlevel%
 ::!#
 // #Sireum
