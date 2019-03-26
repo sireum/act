@@ -13,9 +13,9 @@
 * Use the following to build ACT's CLI
 
    ```bash
-   git clone https://github.com/sireum/act.git
+   git clone --recursive https://github.com/sireum/act.git
    cd act
-   bin/test.sh
+   bin/build.cmd build
    ```
 * Run ``bin/act`` (or ``bin/act.bat`` under Windows) to view the available command line options
 

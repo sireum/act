@@ -21,11 +21,7 @@ build:
   on_success:
   on_failure:
   push:
-  cache: true
-  cache_dir_list:
-    - $SHIPPABLE_BUILD_DIR/bin/linux/java
-    - $SHIPPABLE_BUILD_DIR/bin/scala
-    - $SHIPPABLE_BUILD_DIR/bin/z3
+  cache: false
 
 integrations:
   notifications:
