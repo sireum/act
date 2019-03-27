@@ -15,7 +15,7 @@ fi                                                            #
 :BOF
 set SIREUM_BIN=%cd%\sireum\bin
 if defined SIREUM_PROVIDED_SCALA set SIREUM_PROVIDED_JAVA=true
-if not exist "%SIREUM_BIN%\sireum.jar" call "%SIREUM_BIN%\init.bat"
+"%SIREUM_BIN%\build.cmd" compile
 if not defined SIREUM_PROVIDED_JAVA set PATH=%SIREUM_BIN%\win\java\bin;%SIREUM_BIN%\win\z3\bin;%PATH%
 "%SIREUM_BIN%\sireum.bat" slang run -s "%0" %*
 exit /B %errorlevel%
