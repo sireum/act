@@ -4,7 +4,7 @@ package org.sireum.aadl.act
 
 import org.sireum._
 import org.sireum.ops.ISZOps
-import org.sireum.aadl.{act, ir}
+import org.sireum.aadl.ir
 import org.sireum.aadl.act.ast._
 
 @record class Gen() {
@@ -13,7 +13,7 @@ import org.sireum.aadl.act.ast._
   var typeHeaderFileName: String = ""
 
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
-  var typeMap: HashMap[String, ir.Component] = HashMap.empty
+  var typeMap: HashSMap[String, ir.Component] = HashSMap.empty
   //var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
   var featureMap: HashMap[String, ir.Feature] = HashMap.empty
   var sharedData: HashMap[String, SharedData] = HashMap.empty
@@ -53,9 +53,8 @@ import org.sireum.aadl.act.ast._
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
-    val dataSubcomponents = componentMap.values.filter(f => f.category == ir.ComponentCategory.Data)
-    for(d <- (model.dataComponents ++ dataSubcomponents)){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
-    val sortedData = sortData(model.dataComponents)
+    for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
+    val sortedData = sortData(typeMap.values)
 
     resolve(system)
 
@@ -428,7 +427,6 @@ import org.sireum.aadl.act.ast._
     for(f <- c.features.filter(_f => _f.isInstanceOf[ir.FeatureAccess])) {
       def handleSubprogramAccess(): Unit = {
         val fend = f.asInstanceOf[ir.FeatureAccess]
-        val fpath = Util.getName(fend.identifier)
         val fid = Util.getLastName(f.identifier)
 
         val proc = Util.getClassifier(fend.classifier.get)
@@ -450,7 +448,6 @@ import org.sireum.aadl.act.ast._
 
       def handleDataAccess(): Unit = {
         val fend = f.asInstanceOf[ir.FeatureAccess]
-        val fpath = Util.getName(fend.identifier)
         val fid = Util.getLastName(f.identifier)
 
         val typeName = Util.getClassifierFullyQualified(fend.classifier.get)
@@ -537,7 +534,7 @@ import org.sireum.aadl.act.ast._
         fend.direction match {
           case ir.Direction.In =>
             Util.getComputeEntrypointSourceText(fend.properties) match {
-              case Some(v) =>
+              case Some(_) =>
                 val name = Util.genMonitorNotificationFeatureName(fend)
                 val handlerName = s"${name}_handler"
                 val regCallback = s"${name}_reg_callback"
@@ -828,6 +825,21 @@ import org.sireum.aadl.act.ast._
         st"${TypeUtil.translateBaseType(c.classifier.get.name)}"
       } else if (isField) {
         st"${Util.getClassifierFullyQualified(c.classifier.get)}"
+      } else if (TypeUtil.isMissingType(c.classifier.get)) {
+        StringTemplate.tbMissingType()
+      } else if (TypeUtil.isEnumDef(c)) {
+        val enums = Util.getPropertyValues(c.properties, Util.PROP_DATA_MODEL__ENUMERATORS)
+        val values: ISZ[String] = enums.map((e: ir.PropertyValue) => {
+          e match {
+            case ir.ValueProp(value) => value
+            case _ =>
+              addError(s"Unexpected enum value: ${e}")
+              ""
+          }
+        })
+        val ename = Util.getClassifierFullyQualified(c.classifier.get)
+        st"""typedef
+            |  enum {${(values, ", ")}} ${ename};"""
       } else if (TypeUtil.isArrayDef(c)) {
         // TODO multidim arrays
         val name = Util.getClassifierFullyQualified(c.classifier.get)
@@ -906,7 +918,7 @@ import org.sireum.aadl.act.ast._
 
         val genMethodName = s"${name}_${suffix}"
         var inter = Some(st"""bool ${genMethodName}(${mod}${paramType} * ${name});""")
-        var preInit: Option[ST] = None[ST]()
+        val preInit: Option[ST] = None[ST]()
         var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
 
         val impl: Option[ST] = if(suffix == "enqueue") {
@@ -947,7 +959,7 @@ import org.sireum.aadl.act.ast._
 
           val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
             case Some(v) =>
-              val varName = s"tb_${simpleName}";
+              val varName = s"tb_${simpleName}"
               drainQueue = Some((st"""${paramType} ${varName};""",
                 st"""while (${genMethodName}((${paramType} *) &${varName})) {
                     |  ${methodName}(&${varName});
@@ -1106,7 +1118,7 @@ import org.sireum.aadl.act.ast._
         f match {
           case fe: ir.FeatureEnd =>
             if (Util.isDataport(fe) && fe.classifier.isEmpty) {
-              addError(s"Data type required for ${fe.category} ${Util.getName(fe.identifier)}")
+              addWarning(s"Data type missing for feature ${fe.category} ${Util.getName(fe.identifier)}")
             }
           case _ =>
         }
@@ -1222,6 +1234,10 @@ import org.sireum.aadl.act.ast._
     }
     sort(graph.nodes.keys.filter(k => graph.incoming(k).size == z"0")).foreach(r => build(r))
     return sorted
+  }
+
+  def addWarning(msg:String):Unit = {
+    Util.addWarning(msg)
   }
 
   def addError(msg:String): Unit = {

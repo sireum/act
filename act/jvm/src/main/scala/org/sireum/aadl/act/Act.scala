@@ -68,7 +68,9 @@ object Act {
       }
     }
 
-    Gen().process(m, hFiles) match {
+    val _m = ir.Transformer(Transformers.MissingTypeRewriter()).transformAadl(F, m).resultOpt.get
+
+    Gen().process(_m, hFiles) match {
       case Some(con) =>
         val rootDir = aadlRootDir match {
           case Some(f) => f.getAbsolutePath

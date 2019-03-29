@@ -5,6 +5,7 @@ package org.sireum.aadl.act
 import org.sireum._
 import org.sireum.ops._
 import org.sireum.aadl.ir
+import org.sireum.aadl.ir.{Aadl, Component, FeatureEnd, Transformer}
 
 object Util {
 
@@ -23,6 +24,7 @@ object Util {
   val PROP_DATA_MODEL__DATA_REPRESENTATION: String = "Data_Model::Data_Representation"
   val PROP_DATA_MODEL__DIMENSION: String = "Data_Model::Dimension"
   val PROP_DATA_MODEL__BASE_TYPE: String = "Data_Model::Base_Type"
+  val PROP_DATA_MODEL__ENUMERATORS: String = "Data_Model::Enumerators"
 
   val PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL: String = "Thread_Properties::Dispatch_Protocol"
   val PROP_THREAD_PROPERTIES__PRIORITY: String =  "Thread_Properties::Priority"
@@ -56,6 +58,8 @@ object Util {
     "else", "enum", "extern", "float", "for", "goto", "if", "int", "long", "register", "return", "short",
     "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while")
 
+  val MISSING_AADL_TYPE: String = "MISSING_AADL_TYPE"
+
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
     val t: String = TypeUtil.translateBaseType(c.name) match {
       case Some(v) => v
@@ -66,7 +70,7 @@ object Util {
 
   def getClassifier(c : ir.Classifier) : String = {
     var s = StringOps(c.name)
-    var index = s.lastIndexOf(':') + 1
+    val index = s.lastIndexOf(':') + 1
     s = StringOps(s.substring(index, c.name.size))
     return StringUtil.replaceAll(s.s, ".", "_")
   }
@@ -211,7 +215,7 @@ object Util {
 
   def getPriority(c: ir.Component): Option[Z] = {
     val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__PRIORITY) match {
-      case Some(ir.UnitProp(z, u)) =>
+      case Some(ir.UnitProp(z, _)) =>
         R(z) match {
           case Some(v) => Some(conversions.R.toZ(v))
           case _ => None[Z]()
@@ -313,6 +317,14 @@ object TypeUtil {
     return c.category == ir.ComponentCategory.Data && c.subComponents.size > 0
   }
 
+  def isEnumDef(c: ir.Component): B = {
+    val ret: B = Util.getDiscreetPropertyValue(c.properties, Util.PROP_DATA_MODEL__DATA_REPRESENTATION) match {
+      case Some(ir.ValueProp("Enum")) => T
+      case _ => F
+    }
+    return ret
+  }
+
   def isArrayDef(c: ir.Component): B = {
     val ret: B = Util.getDiscreetPropertyValue(c.properties, Util.PROP_DATA_MODEL__DATA_REPRESENTATION) match {
       case Some(ir.ValueProp("Array")) => T
@@ -359,15 +371,25 @@ object TypeUtil {
       case "Base_Types::Float_32" => Some("double")
       case "Base_Types::Float_64" => Some("double")
 
+
+      case "Base_Types::String" =>
+        Util.addWarning("String type not currently supported?????")
+        //None[String]()
+        Some("char*")
+      case "Base_Types::Integer" =>
+        Util.addWarning("Unbounded Base_Types::Integer currently translated to int32_t")
+        Some("int32_t")
+
       case "Base_Types::Character" =>
         Util.addError("Character type not currently supported")
-        None[String]()
-      case "Base_Types::String" =>
-        Util.addError("String type not currently supported")
         None[String]()
 
       case _ => None[String]()
     }
+  }
+
+  def isMissingType(c: ir.Classifier) : B = {
+    return c.name == Util.MISSING_AADL_TYPE
   }
 }
 
@@ -487,7 +509,12 @@ object StringTemplate{
     return body
   }
 
-  def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
+  def tbMissingType() : ST = {
+    return st"""// placeholder for unspecified types in the AADL model
+               |typedef bool ${Util.MISSING_AADL_TYPE};"""
+  }
+
+   def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
                      preventBadging: B): ST = {
     val read: ST = st"""*m = contents;
                        |return true;"""
@@ -529,7 +556,7 @@ object StringTemplate{
           |bool mon_write(const $typeName * m) {
           |  ${mon_write}
           |}"""
-    return r;
+    return r
   }
 
   def tbEnqueueDequeue(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
@@ -981,4 +1008,53 @@ object TimerUtil {
   'seL4RPCCall
   'seL4SharedData
   'seL4TimeServer
+}
+
+object Transformers {
+
+  @datatype class MissingTypeRewriter extends ir.Transformer.PrePost[B] {
+
+    val missingType: ir.Component = ir.Component(
+      ir.Name(ISZ()), // identifier
+      ir.ComponentCategory.Data, // category
+      Some(ir.Classifier(Util.MISSING_AADL_TYPE)), // classifier
+      ISZ(), // features
+      ISZ(), // subComponents
+      ISZ(), // connections
+      ISZ(), // connectionInstances
+      ISZ(), // properties
+      ISZ(), // flows
+      ISZ(), // modes
+      ISZ() // annexes
+    )
+
+    override def postAadl(ctx: B, o: Aadl): Transformer.Result[B, Aadl] = {
+      if(ctx) {
+        ir.Transformer.Result(ctx, Some(o(dataComponents = o.dataComponents :+ missingType)))
+      } else {
+        ir.Transformer.Result(ctx, None[ir.Aadl]())
+      }
+    }
+
+    override def postComponent(ctx: B, o: Component): Transformer.Result[B, Component] = {
+
+      if(o.category == ir.ComponentCategory.Data && o.classifier.isEmpty) {
+        //println(s"No datatype specified for data component ${o.identifier}, replacing with ${Util.MISSING_AADL_TYPE} ")
+
+        ir.Transformer.Result(T, Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
+      } else {
+        ir.Transformer.Result(ctx, None[ir.Component]())
+      }
+    }
+
+    override def postFeatureEnd(ctx: B, o: FeatureEnd): Transformer.Result[B, FeatureEnd] = {
+      if (Util.isDataport(o) && o.classifier.isEmpty) {
+        //println(s"No datatype specified for data port ${o.identifier}, replacing with ${Util.MISSING_AADL_TYPE} ")
+
+        ir.Transformer.Result(T, Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
+      } else {
+        ir.Transformer.Result(ctx, None[ir.FeatureEnd]())
+      }
+    }
+  }
 }
