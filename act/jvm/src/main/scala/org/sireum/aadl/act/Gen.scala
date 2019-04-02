@@ -843,6 +843,12 @@ import org.sireum.aadl.act.ast._
       } else if (TypeUtil.isArrayDef(c)) {
         // TODO multidim arrays
         val name = Util.getClassifierFullyQualified(c.classifier.get)
+        val dim: Z = TypeUtil.getArrayDimension(c) match {
+          case Some(d) => d
+          case _ =>
+            addError(s"Array dimension not specified for ${c.classifier.get.name}")
+            z"-1"
+        }
         val container = Util.getContainerName(name)
         st"""typedef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
             |
@@ -1246,7 +1252,7 @@ import org.sireum.aadl.act.ast._
                |  ${(edges, ";\n")}
                |}"""
     println(g.render)
-   */
+    */
 
     var sorted: ISZ[ir.Component] = ISZ()
     def sortByClassifier(s: ISZ[ir.Component]): ISZ[ir.Component] = { return ISZOps(s).sortWith((a,b) => u(a) < u(b)) }
