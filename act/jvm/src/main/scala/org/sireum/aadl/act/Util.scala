@@ -313,6 +313,24 @@ object Util {
 }
 
 object TypeUtil {
+
+
+  def isMissingType(c: ir.Component) : B = {
+    return isMissingTypeClassifier(c.classifier.get)
+  }
+
+  def isMissingTypeClassifier(c: ir.Classifier) : B = {
+    return c.name == Util.MISSING_AADL_TYPE
+  }
+
+  def isBaseType(c: ir.Component): B = {
+    return isBaseTypeString(c.classifier.get.name)
+  }
+
+  def isBaseTypeString(c: String): B = {
+    return translateBaseType(c).nonEmpty
+  }
+
   def isRecordType(c: ir.Component): B = {
     return c.category == ir.ComponentCategory.Data && c.subComponents.size > 0
   }
@@ -336,7 +354,7 @@ object TypeUtil {
   def getArrayBaseType(c: ir.Component): Option[String] = {
     Util.getDiscreetPropertyValue(c.properties, Util.PROP_DATA_MODEL__BASE_TYPE) match {
       case Some(i: ir.ClassifierProp) =>
-        if(isBaseType(i.name)) {
+        if(isBaseTypeString(i.name)) {
           Some(translateBaseType(i.name).get)
         } else {
           Some(Util.getClassifierFullyQualified(ir.Classifier(i.name)))
@@ -347,10 +365,6 @@ object TypeUtil {
 
   def getArrayDimension(c: ir.Component): Option[Z] = {
     return Util.getUnitPropZ(c.properties, Util.PROP_DATA_MODEL__DIMENSION)
-  }
-
-  def isBaseType(c: String): B = {
-    return translateBaseType(c).nonEmpty
   }
 
   def translateBaseType(c: String): Option[String] = {
@@ -371,11 +385,9 @@ object TypeUtil {
       case "Base_Types::Float_32" => Some("double")
       case "Base_Types::Float_64" => Some("double")
 
-
       case "Base_Types::String" =>
-        Util.addWarning("String type not currently supported?????")
-        //None[String]()
         Some("char*")
+
       case "Base_Types::Integer" =>
         Util.addWarning("Unbounded Base_Types::Integer currently translated to int32_t")
         Some("int32_t")
@@ -386,10 +398,6 @@ object TypeUtil {
 
       case _ => None[String]()
     }
-  }
-
-  def isMissingType(c: ir.Classifier) : B = {
-    return c.name == Util.MISSING_AADL_TYPE
   }
 }
 
@@ -404,55 +412,13 @@ object StringUtil {
     }
   }
 
-  def replaceAll(s: String, f: String, replacement: String): String = {
-    var split: ISZ[String] = ISZ()
-
-    val sops = StringOps(s)
-    val cms = conversions.String.toCms(s)
-    val fcms = conversions.String.toCms(f)
-
-    var start: Z = 0
-    var index: Z = 0
-    var i: Z = 0
-    for(c <- cms) {
-      if(c == fcms(index)){
-        index = index + 1
-      }
-      if(index == fcms.size) {
-        split = split :+ sops.substring(start, i - fcms.size + 1)
-        start = i + 1
-        index = 0
-      }
-      i = i + 1
-    }
-    if(start < cms.size) {
-      split = split :+ sops.substring(start, cms.size)
-    }
-
-    return  st"""${(split, replacement)}""".render
+  def replaceAll(s: String, from: String, to: String): String = {
+    return StringOps(s).replaceAllLiterally(from, to)
   }
 
   def toLowerCase(s: String):String = {
     val cms = conversions.String.toCms(s)
     return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
-  }
-
-  def endsWith(s: String, suffix: String): B = {
-    val cms = conversions.String.toCms(s)
-    val scms = conversions.String.toCms(suffix)
-    if(scms.isEmpty || cms.size < scms.size) {
-      return F
-    }
-    var i = scms.size - 1
-    var j = cms.size - 1
-    while(i > 0) {
-      if(cms(j) != scms(i)) {
-        return F
-      }
-      i = i - 1
-      j = j - 1
-    }
-    return T
   }
 }
 

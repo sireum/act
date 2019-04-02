@@ -4,6 +4,7 @@ package org.sireum.aadl.act
 
 import org.sireum._
 import org.sireum.aadl.act.ast._
+import org.sireum.ops.StringOps
 
 @record class BijiPrettyPrint() {
 
@@ -36,10 +37,10 @@ import org.sireum.aadl.act.ast._
           val path = s"${aadlRootDir}/${st}"
           if(NativeIO.fileExists(path)) {
 
-            if(StringUtil.endsWith(st, ".c")) {
+            if(StringOps(st).endsWith(".c")) {
               val fname = NativeIO.copyFile(path, s"${rootDestDir}/src")
               sources = sources :+ s"${dir}/src/${fname}"
-            } else if(StringUtil.endsWith(st, ".h")) {
+            } else if(StringOps(st).endsWith(".h")) {
               val fname = NativeIO.copyFile(path, s"${rootDestDir}/includes")
               includes = includes :+ s"${dir}/includes/${fname}"
             } else {

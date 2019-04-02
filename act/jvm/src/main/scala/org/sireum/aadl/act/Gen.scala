@@ -479,7 +479,7 @@ import org.sireum.aadl.act.ast._
           handleDataAccess()
 
         case _ =>
-          eprintln(s"Not expecting AccessType: ${Util.getName(f.identifier)}")
+          addError(s"Not expecting AccessType: ${Util.getName(f.identifier)}")
       }
     }
 
@@ -821,11 +821,11 @@ import org.sireum.aadl.act.ast._
               |    ${(fields, "\n")}
               |  } ${name};"""
         }
-      } else if (TypeUtil.isBaseType(c.classifier.get.name)) {
+      } else if (TypeUtil.isBaseType(c)) {
         st"${TypeUtil.translateBaseType(c.classifier.get.name)}"
       } else if (isField) {
         st"${Util.getClassifierFullyQualified(c.classifier.get)}"
-      } else if (TypeUtil.isMissingType(c.classifier.get)) {
+      } else if (TypeUtil.isMissingType(c)) {
         StringTemplate.tbMissingType()
       } else if (TypeUtil.isEnumDef(c)) {
         val enums = Util.getPropertyValues(c.properties, Util.PROP_DATA_MODEL__ENUMERATORS)
@@ -910,8 +910,10 @@ import org.sireum.aadl.act.ast._
 
       case ir.FeatureCategory.EventDataPort =>
         val (suffix, mod, paramType): (String, String, String) = feature.direction match {
-          case ir.Direction.In => ("dequeue", "", Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
-          case ir.Direction.Out => ("enqueue", "const ", Util.getClassifierFullyQualified(feature.classifier.get))
+          case ir.Direction.In => ("dequeue", "",
+            Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
+          case ir.Direction.Out => ("enqueue", "const ",
+            Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
           case x => halt(s"Unexpected direction: ${x}")
         }
         val name = Util.genMonitorFeatureName(feature, None[Z]())
@@ -1220,11 +1222,34 @@ import org.sireum.aadl.act.ast._
     var graph: Graph[ir.Component, String] = Graph(HashMap.empty, ISZ(), HashMap.empty, HashMap.empty, 0, F)
     for(d <- data){
       graph = graph * d
-      for(s <- d.subComponents) {
-        val pair = (d, typeMap.get(u(s)).get)
+      if(TypeUtil.isRecordType(d)) {
+        for (s <- d.subComponents) {
+          val pair = (d, typeMap.get(u(s)).get)
+          graph = graph + pair
+        }
+      } else if(TypeUtil.isArrayDef(d)) {
+        val pair = (d, typeMap.get(TypeUtil.getArrayBaseType(d).get).get)
         graph = graph + pair
+      } else {
+        if(!(TypeUtil.isBaseType(d) || TypeUtil.isEnumDef(d) || TypeUtil.isMissingType(d))) {
+          addError(s"Unexpected data type ${d}")
+        }
       }
     }
+
+    /*
+    def rx(r: String): String = { return StringUtil.replaceAll(r, "*", "star") }
+    val nodes: ISZ[String] = graph.nodes.keys.map(c => s"${rx(u(c))}")
+    val edges = graph.allEdges.map(e => st"${rx(u(e.source))} -> ${rx(u(e.dest))}")
+
+    val g =st"""digraph {
+               |  ${(nodes, ";\n")}
+               |
+               |  ${(edges, ";\n")}
+               |}"""
+
+    println(g.render)
+    */
 
     var sorted: ISZ[ir.Component] = ISZ()
     def build(c : ir.Component): Unit = {
