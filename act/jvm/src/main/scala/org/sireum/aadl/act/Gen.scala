@@ -1216,7 +1216,6 @@ import org.sireum.aadl.act.ast._
 
   def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {
     def u(_c:ir.Component): String = { return Util.getClassifierFullyQualified(_c.classifier.get) }
-    def sort(s: ISZ[ir.Component]): ISZ[ir.Component] = { return ISZOps(s).sortWith((a,b) => u(a) < u(b)) }
 
     // build dependence graph so that required data types are processed first
     var graph: Graph[ir.Component, String] = Graph(HashMap.empty, ISZ(), HashMap.empty, HashMap.empty, 0, F)
@@ -1241,23 +1240,22 @@ import org.sireum.aadl.act.ast._
     def rx(r: String): String = { return StringUtil.replaceAll(r, "*", "star") }
     val nodes: ISZ[String] = graph.nodes.keys.map(c => s"${rx(u(c))}")
     val edges = graph.allEdges.map(e => st"${rx(u(e.source))} -> ${rx(u(e.dest))}")
-
     val g =st"""digraph {
                |  ${(nodes, ";\n")}
                |
                |  ${(edges, ";\n")}
                |}"""
-
     println(g.render)
-    */
+   */
 
     var sorted: ISZ[ir.Component] = ISZ()
-    def build(c : ir.Component): Unit = {
+    def sortByClassifier(s: ISZ[ir.Component]): ISZ[ir.Component] = { return ISZOps(s).sortWith((a,b) => u(a) < u(b)) }
+    def sortDependents(c : ir.Component): Unit = {
       if(ISZOps(sorted).contains(c)){ return }
-      sort(graph.outgoing(c).map(m => m.dest)).foreach(o => build(o))
+      sortByClassifier(graph.outgoing(c).map(m => m.dest)).foreach(dependent => sortDependents(dependent))
       sorted = sorted :+ c
     }
-    sort(graph.nodes.keys.filter(k => graph.incoming(k).size == z"0")).foreach(r => build(r))
+    sortByClassifier(graph.nodes.keys.filter(k => graph.incoming(k).size == z"0")).foreach(r => sortDependents(r))
     return sorted
   }
 
