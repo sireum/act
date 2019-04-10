@@ -9,6 +9,13 @@ import org.sireum.aadl.ir.{Aadl, Component, FeatureEnd, Transformer}
 
 object Util {
 
+  val DEVELOPER_MODE: B = if(org.sireum.Os.env("ACT_DEVELOPER_MODE").nonEmpty) {
+    addWarning("ACT developer mode enabled")
+    T
+  } else {
+    F
+  }
+
   val GEN_ARTIFACT_PREFIX: String = "tb"
 
   val MONITOR_COMP_SUFFIX: String  = "Monitor"
@@ -18,7 +25,7 @@ object Util {
 
   val NOTIFICATION_TYPE: String = "Notification"
 
-  val INTERFACE_PREFIX: String  = s"${GEN_ARTIFACT_PREFIX}_Monitor"
+  val INTERFACE_PREFIX: String  = brand("Monitor")
 
 
   val PROP_DATA_MODEL__DATA_REPRESENTATION: String = "Data_Model::Data_Representation"
@@ -59,6 +66,10 @@ object Util {
     "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while")
 
   val MISSING_AADL_TYPE: String = "MISSING_AADL_TYPE"
+
+  def brand(s: String): String = {
+    return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
+  }
 
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
     val t: String = TypeUtil.translateBaseType(c.name) match {
@@ -104,7 +115,7 @@ object Util {
   def getMonitorName(comp: ir.Component, feature: ir.Feature) : String = {
     val cname = Util.getLastName(comp.identifier)
     val fname = Util.getLastName(feature.identifier)
-    return s"${GEN_ARTIFACT_PREFIX}_${cname}_${fname}_${MONITOR_COMP_SUFFIX}"
+    return brand(s"${cname}_${fname}_${MONITOR_COMP_SUFFIX}")
   }
 
   def getMonitorNotificationType(t: ir.FeatureCategory.Type) : String = {
@@ -118,11 +129,11 @@ object Util {
   }
 
   def genMonitorFeatureName(f: ir.Feature, num: Option[Z]): String = {
-    return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}"
+    return brand(s"${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}")
   }
 
   def genMonitorNotificationFeatureName(f: ir.Feature): String = {
-    return s"${GEN_ARTIFACT_PREFIX}_${Util.getLastName(f.identifier)}_notification"
+    return brand(s"${Util.getLastName(f.identifier)}_notification")
   }
 
   def getMonitorWriterName(f: ir.FeatureEnd): String = {
@@ -134,7 +145,7 @@ object Util {
   }
 
   def getSharedDataInterfaceName(c: ir.Classifier): String = {
-    return s"${GEN_ARTIFACT_PREFIX}_${Util.getClassifierFullyQualified(c)}_shared_var"
+    return brand(s"${Util.getClassifierFullyQualified(c)}_shared_var")
   }
 
 
@@ -168,11 +179,11 @@ object Util {
       case Some(v : ir.ReferenceProp) => getLastName(v.value)
       case _ => return None[String]()
     }
-    return Some(s"${GEN_ARTIFACT_PREFIX}_${procName}_types")
+    return Some(brand(s"${procName}_types"))
   }
 
   def getContainerName(s: String) : String = {
-    return s"${GEN_ARTIFACT_PREFIX}_${s}_container"
+    return brand(s"${s}_container")
   }
 
 
@@ -385,15 +396,11 @@ object TypeUtil {
       case "Base_Types::Float_32" => Some("double")
       case "Base_Types::Float_64" => Some("double")
 
-      case "Base_Types::String" =>
-        Some("char*")
+      case "Base_Types::Character" => Some("char")
+      case "Base_Types::String" => Some("char*")
 
       case "Base_Types::Integer" =>
-        Util.addWarning("Unbounded Base_Types::Integer currently translated to int32_t")
-        Some("int32_t")
-
-      case "Base_Types::Character" =>
-        Util.addError("Character type not currently supported")
+        Util.addError("Unbounded Base_Types::Integer is not supported")
         None[String]()
 
       case _ => None[String]()
@@ -652,11 +659,14 @@ object StringTemplate{
     return st"${name}._control_stack_size = ${size};"
   }
 
+  val SEM_WAIT: String = Util.brand("dispatch_sem_wait")
+  val SEM_POST: String = Util.brand("dispatch_sem_post")
+
   def componentTypeImpl(filename: String, auxCSources: ISZ[ST], stmts: ISZ[ST],
                         preInitComments: ISZ[ST], runPreEntries: ISZ[ST], cDrainQueues: ISZ[ST],
                         isSporadic: B): ST = {
     val initialLock: ST = if(isSporadic) { st"" } else { st"""// Initial lock to await dispatch input.
-                                                             |MUTEXOP(tb_dispatch_sem_wait())"""}
+                                                             |MUTEXOP(${SEM_WAIT}())"""}
     val ret:ST = st"""#include "../${Util.DIR_INCLUDES}/${filename}.h"
         |${(auxCSources, "\n")}
         |#include <string.h>
@@ -676,7 +686,7 @@ object StringTemplate{
         |  ${(runPreEntries, "\n")}
         |  ${initialLock}
         |  for(;;) {
-        |    MUTEXOP(tb_dispatch_sem_wait())
+        |    MUTEXOP(${SEM_WAIT}())
         |    // Drain the queues
         |    ${(cDrainQueues, "\n")}
         |  }
@@ -687,7 +697,7 @@ object StringTemplate{
   }
 
   def componentInitializeEntryPoint(componentName: String, methodName: String): (ST, ST) = {
-    val init: String = s"tb_entrypoint_${componentName}_initializer"
+    val init: String = Util.brand(s"entrypoint_${componentName}_initializer")
     val ret: ST =
       st"""/************************************************************************
           | *  ${init}:
@@ -700,9 +710,10 @@ object StringTemplate{
           |void ${init}(const int64_t * in_arg) {
           |  ${methodName}((int64_t *) in_arg);
           |}"""
+    val dummy = Util.brand("dummy")
     val runEntry: ST = st"""{
-                           |  int64_t tb_dummy;
-                           |  ${init}(&tb_dummy);
+                           |  int64_t ${dummy};
+                           |  ${init}(&${dummy});
                            |}"""
     return (ret, runEntry)
   }
@@ -710,7 +721,7 @@ object StringTemplate{
   def cEventNotificiationHandler(handlerName: String, regCallback: String): ST = {
     val ret: ST =
       st"""static void ${handlerName}(void * unused) {
-          |  MUTEXOP(tb_dispatch_sem_post())
+          |  MUTEXOP(${SEM_POST}())
           |  CALLBACKOP(${regCallback}(${handlerName}, NULL));
           |}"""
     return ret
@@ -720,16 +731,70 @@ object StringTemplate{
     val ret: ST = st"CALLBACKOP(${regCallback}(${handlerName}, NULL));"
     return ret
   }
+
+  val VAR_PERIODIC_OCCURRED : String = Util.brand("occurred_periodic_dispatcher")
+  val VAR_PERIODIC_TIME : String = Util.brand("time_periodic_dispatcher")
+  val METHOD_PERIODIC_CALLBACK : String = Util.brand("timer_complete_callback")
+
+  def periodicDispatchElems() : ST = {
+    val ret = st"""static bool ${VAR_PERIODIC_OCCURRED};
+                  |static int64_t ${VAR_PERIODIC_TIME};
+                  |
+                  |/************************************************************************
+                  | * periodic_dispatcher_write_int64_t
+                  | * Invoked from remote periodic dispatch thread.
+                  | *
+                  | * This function records the current time and triggers the active thread
+                  | * dispatch from a periodic event.  Note that the periodic dispatch
+                  | * thread is the *only* thread that triggers a dispatch, so we do not
+                  | * mutex lock the function.
+                  | *
+                  | ************************************************************************/
+                  |
+                  |bool periodic_dispatcher_write_int64_t(const int64_t * arg) {
+                  |    ${VAR_PERIODIC_OCCURRED} = true;
+                  |    ${VAR_PERIODIC_TIME} = *arg;
+                  |    MUTEXOP(${SEM_POST});
+                  |    return true;
+                  |}
+                  |
+                  |void ${METHOD_PERIODIC_CALLBACK}(void *_ UNUSED) {
+                  |   // we want time in microseconds, not nanoseconds, so we divide by 1000.
+                  |   int64_t ${VAR_PERIODIC_TIME} = ${Util.brand("timer_time()")} / 1000LL;
+                  |   (void)periodic_dispatcher_write_int64_t(&${VAR_PERIODIC_TIME});
+                  |   ${registerPeriodicCallback()}
+                  |}
+                  |"""
+    return ret
+  }
+
+  def registerPeriodicCallback(): ST = {
+    return st"CALLBACKOP(${Util.brand("timer_complete_reg_callback")}(${METHOD_PERIODIC_CALLBACK}, NULL));"
+  }
+
+  def drainPeriodicQueue(componentName: String, userEntrypoint: Option[String]): (ST, ST) = {
+    val methodName = Util.brand(s"entrypoint_${componentName}_periodic_dispatcher")
+
+    val impl = st"""void ${methodName}(const int64_t * in_arg) {
+                   |  ${if(userEntrypoint.nonEmpty) s"${userEntrypoint.get}((int64_t *) in_arg);" else ""}
+                   |}"""
+
+    val drain = st"""if(${VAR_PERIODIC_OCCURRED}){
+                    |  ${VAR_PERIODIC_OCCURRED} = false;
+                    |  ${methodName}(&${VAR_PERIODIC_TIME});
+                    |}"""
+    return (impl, drain)
+  }
 }
 
 object TimerUtil {
 
-  val SEM_DISPATCH: String = s"${Util.GEN_ARTIFACT_PREFIX}_dispatch_sem"
+  val SEM_DISPATCH: String = Util.brand("dispatch_sem")
 
-  val TIMER_ID: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer"
+  val TIMER_ID: String = Util.brand("timer")
   val TIMER_ID_DISPATCHER: String = "timer"
 
-  val TIMER_NOTIFICATION_ID: String = s"${Util.GEN_ARTIFACT_PREFIX}_timer_complete"
+  val TIMER_NOTIFICATION_ID: String = Util.brand("timer_complete")
   val TIMER_NOTIFICATION_DISPATCHER_ID: String = "timer_complete"
 
   val TIMER_TYPE: String = "Timer"
@@ -780,6 +845,7 @@ object TimerUtil {
   }
 
   def dispatchComponentCSource(modelTypesHeader: String, calendars: ISZ[ST]): Resource = {
+    val THREAD_CALENDAR = Util.brand("thread_calendar")
     val st: ST = st"""#include <string.h>
                      |#include <camkes.h>
                      |#include ${modelTypesHeader}
@@ -797,7 +863,7 @@ object TimerUtil {
                      |uint32_t aadl_calendar_counter = 0;
                      |uint32_t aadl_calendar_ticks = 0;
                      |
-                     |void tb_thread_calendar() {
+                     |void ${THREAD_CALENDAR}() {
                      |  ${(calendars, "\n")}
                      |
                      |  aadl_calendar_counter = (aadl_calendar_counter + 1) % aadl_hyperperiod_subdivisions;
@@ -805,7 +871,7 @@ object TimerUtil {
                      |}
                      |
                      |void ${TIMER_NOTIFICATION_DISPATCHER_ID}_callback() {
-                     |  tb_thread_calendar();
+                     |  ${THREAD_CALENDAR}();
                      |}
                      |
                      |// no op under the new time server scheme.
@@ -832,7 +898,7 @@ object TimerUtil {
                      |}
                      |"""
 
-    val compTypeFileName:String = s"${Util.GEN_ARTIFACT_PREFIX}_${DISPATCH_CLASSIFIER}"
+    val compTypeFileName:String = Util.brand(DISPATCH_CLASSIFIER)
     return Resource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st)
   }
 
@@ -897,7 +963,7 @@ object TimerUtil {
                      |}
                      |"""
 
-    val compTypeFileName:String = s"${Util.GEN_ARTIFACT_PREFIX}_${TIMER_INSTANCE}"
+    val compTypeFileName:String = Util.brand(TIMER_INSTANCE)
     return Resource(s"${Util.DIR_COMPONENTS}/${TIMER_SERVER_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st)
   }
 
@@ -978,7 +1044,35 @@ object TimerUtil {
 
 object Transformers {
 
-  @datatype class MissingTypeRewriter extends ir.Transformer.PrePost[B] {
+  @datatype class UnboundedIntegerRewriter extends ir.Transformer.PrePost[B] {
+    val unboundInt: String = "Base_Types::Integer"
+    val int32: String = "Base_Types::Integer_32"
+
+    override def postClassifier(ctx: B, o: ir.Classifier): ir.Transformer.Result[B, ir.Classifier] = {
+      if(o.name == unboundInt) {
+        Util.addWarning(s"Replacing classifier ${unboundInt} with ${int32}")
+        return ir.Transformer.Result(T, Some(ir.Classifier(int32)))
+      } else {
+        return ir.Transformer.Result(ctx, None())
+      }
+    }
+
+    override def postClassifierProp(ctx: B, o: ir.ClassifierProp): ir.Transformer.Result[B, ir.PropertyValue] = {
+      if(o.name == unboundInt) {
+        Util.addWarning(s"Replacing classifier ${unboundInt} with ${int32}")
+        return ir.Transformer.Result(T, Some(ir.ClassifierProp(int32)))
+      } else {
+        return ir.Transformer.Result(ctx, None())
+      }
+    }
+  }
+
+
+
+  @datatype class CTX(requiresMissingType: B,
+                      hasErrors: B)
+
+  @datatype class MissingTypeRewriter extends ir.Transformer.PrePost[CTX] {
 
     val missingType: ir.Component = ir.Component(
       ir.Name(ISZ()), // identifier
@@ -994,30 +1088,63 @@ object Transformers {
       ISZ() // annexes
     )
 
-    override def postAadl(ctx: B, o: Aadl): Transformer.Result[B, Aadl] = {
-      if(ctx) {
+    val missingArrayBaseType: ir.Property = ir.Property(
+      name = ir.Name(ISZ(Util.PROP_DATA_MODEL__BASE_TYPE)),
+      propertyValues = ISZ(ir.ClassifierProp(Util.MISSING_AADL_TYPE)))
+
+    val sporadicProp: ir.Property = ir.Property(
+      name = ir.Name(ISZ(Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL)),
+      propertyValues = ISZ(ir.ValueProp("Sporadic")))
+
+
+    override def postAadl(ctx: CTX, o: Aadl): Transformer.Result[CTX, Aadl] = {
+      if(ctx.requiresMissingType) {
         ir.Transformer.Result(ctx, Some(o(dataComponents = o.dataComponents :+ missingType)))
       } else {
         ir.Transformer.Result(ctx, None[ir.Aadl]())
       }
     }
 
-    override def postComponent(ctx: B, o: Component): Transformer.Result[B, Component] = {
+    override def postComponent(ctx: CTX, o: Component): Transformer.Result[CTX, Component] = {
 
-      if(o.category == ir.ComponentCategory.Data && o.classifier.isEmpty) {
-        //println(s"No datatype specified for data component ${o.identifier}, replacing with ${Util.MISSING_AADL_TYPE} ")
+      o.category match {
+        case ir.ComponentCategory.Data =>
+          if(o.classifier.isEmpty) {
+            Util.addWarning(s"Classifier not specified for ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE}")
 
-        ir.Transformer.Result(T, Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
-      } else {
-        ir.Transformer.Result(ctx, None[ir.Component]())
+            ir.Transformer.Result(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
+          } else if (TypeUtil.isArrayDef(o) && TypeUtil.getArrayBaseType(o).isEmpty) {
+            Util.addWarning(s"Base type not specified for ${o.classifier.get.name}.  Substituting ${Util.MISSING_AADL_TYPE}")
+
+            ir.Transformer.Result(ctx(requiresMissingType = T), Some(o(properties = o.properties :+ missingArrayBaseType)))
+          } else {
+            ir.Transformer.Result(ctx, None[ir.Component]())
+          }
+
+        case ir.ComponentCategory.Thread =>
+          Util.getDiscreetPropertyValue(o.properties, Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
+            case Some(ir.ValueProp(x)) =>
+              if(x != "Periodic" && x != "Sporadic") {
+                Util.addError(s"${o.classifier.get.name} has unsupported dispatch protocol ${x}.")
+
+                ir.Transformer.Result(ctx(hasErrors = T), None[ir.Component]())
+              } else {
+                ir.Transformer.Result(ctx, None[ir.Component]())
+              }
+            case _ =>
+              Util.addWarning(s"${Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL} not specified for thread ${o.classifier.get.name}.  Treating it as sporadic.")
+
+              ir.Transformer.Result(ctx, Some(o(properties =  o.properties :+ sporadicProp)))
+          }
+        case _ => ir.Transformer.Result(ctx, None[ir.Component]())
       }
     }
 
-    override def postFeatureEnd(ctx: B, o: FeatureEnd): Transformer.Result[B, FeatureEnd] = {
+    override def postFeatureEnd(ctx: CTX, o: FeatureEnd): Transformer.Result[CTX, FeatureEnd] = {
       if (Util.isDataport(o) && o.classifier.isEmpty) {
-        //println(s"No datatype specified for data port ${o.identifier}, replacing with ${Util.MISSING_AADL_TYPE} ")
+        Util.addWarning(s"No datatype specified for data port ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
 
-        ir.Transformer.Result(T, Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
+        ir.Transformer.Result(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
       } else {
         ir.Transformer.Result(ctx, None[ir.FeatureEnd]())
       }

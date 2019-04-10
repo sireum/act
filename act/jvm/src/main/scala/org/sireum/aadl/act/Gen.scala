@@ -142,7 +142,7 @@ import org.sireum.aadl.act.ast._
               typ = Util.NOTIFICATION_TYPE)
 
             val period: Z = if(Util.getPeriod(sc).isEmpty) {
-              Util.addWarning(s"Period not provided for ${classifier}, using ${Util.DEFAULT_PERIOD}")
+              Util.addWarning(s"Period not provided for periodic component ${classifier}, using ${Util.DEFAULT_PERIOD}")
               Util.DEFAULT_PERIOD
             } else {
               Util.getPeriod(sc).get
@@ -602,6 +602,10 @@ import org.sireum.aadl.act.ast._
     //binarySemaphores = binarySemaphores :+ BinarySemaphore(TimerUtil.SEM_DISPATCH)
     semaphores = semaphores :+ Semaphore(TimerUtil.SEM_DISPATCH)
 
+    var cRunPreEntries: ISZ[ST] = cDrainQueues.map(x => x._1)
+
+    var stDrainQueues: ISZ[ST] = cDrainQueues.map(x => x._2)
+
     Util.getDispatchProtocol(c) match {
       case Some(Dispatch_Protocol.Periodic) =>
         // import Timer.idl4
@@ -619,30 +623,40 @@ import org.sireum.aadl.act.ast._
           typ = Util.NOTIFICATION_TYPE,
           optional = F)
 
-        cIncludes = cIncludes :+ st"""
-                                     |// user entrypoints for periodic dispatch
-                                     |void component_entry(const int64_t * periodic_dispatcher);
-                                     |void component_init(const int64_t *arg);"""
+        cImpls = StringTemplate.periodicDispatchElems() +: cImpls
+
+        cRunPreEntries = cRunPreEntries :+ StringTemplate.registerPeriodicCallback()
+
+        val componentEntrypointMethodName = Util.getComputeEntrypointSourceText(c.properties)
+        if(componentEntrypointMethodName.isEmpty) {
+          addWarning(s"Missing entrypoint property for ${cid}")
+        }
+        val drains = StringTemplate.drainPeriodicQueue(cid, componentEntrypointMethodName)
+
+        cImpls = cImpls :+ drains._1
+        stDrainQueues = stDrainQueues :+ drains._2
 
       case Some(Dispatch_Protocol.Sporadic) =>
 
-      case _ =>
-        Util.addWarning(s"Dispatch Protocol not specified for ${Util.getLastName(c.identifier)}")
+      case x =>
+        if(x.nonEmpty) {
+          Util.addError(s"Dispatch protocol $x for ${Util.getLastName(c.identifier)} is not supported")
+        } else {
+          Util.addWarning(s"Dispatch Protocol not specified for ${Util.getLastName(c.identifier)}, assuming Sporadic")
+        }
     }
-
-    var cRunEntries: ISZ[ST] = cDrainQueues.map(x => x._1)
 
     Util.getInitializeEntryPoint(c.properties) match {
       case Some(methodName) =>
         cIncludes = cIncludes :+ st"""void ${methodName}(const int64_t *arg);"""
         val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(cid, methodName)
         cImpls = cImpls :+ cimpl
-        cRunEntries = cRunEntries :+ runEntry
+        cRunPreEntries = cRunPreEntries :+ runEntry
       case _ =>
     }
 
     containers = containers :+ C_Container(cid,
-      ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunEntries, cDrainQueues.map(x => x._2))),
+      ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunPreEntries, stDrainQueues)),
       ISZ(genComponentTypeInterfaceFile(c, cIncludes)),
       Util.getSourceText(c.properties)
     )
@@ -758,6 +772,7 @@ import org.sireum.aadl.act.ast._
               case _ =>
                 halt(s"not expecting ${dst}")
             }
+          case ir.ConnectionKind.Access => // no monitor needed
           case _ =>
             Util.addWarning(s"processInConnections: Not handling ${connInst}")
         }
@@ -883,8 +898,9 @@ import org.sireum.aadl.act.ast._
               case Some(conns) =>
                 var accum: ISZ[ST] = ISZ()
                 var i = 0
+                val result = Util.brand("result")
                 while (i < conns.size) {
-                  accum = accum :+ st"""tb_result &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
+                  accum = accum :+ st"""${result} &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
                   i = i + 1
                 }
 
@@ -903,9 +919,9 @@ import org.sireum.aadl.act.ast._
                     | *
                     | ************************************************************************/
                     |bool ${methodName}(${mod}${paramType} * ${name}){
-                    |  bool tb_result = true;
+                    |  bool ${result} = true;
                     |  ${(accum, "\n")}
-                    |  return tb_result;
+                    |  return ${result};
                     |}""")
               case _ => None[ST]()
             }
@@ -935,8 +951,9 @@ import org.sireum.aadl.act.ast._
             case Some(conns) =>
               var accum: ISZ[ST] = ISZ()
               var i = 0
+              val result = Util.brand("result")
               while(i < conns.size) {
-                accum = accum :+ st"""tb_result &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
+                accum = accum :+ st"""${result} &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
                 i = i + 1
               }
               val methodName: String = s"${name}_${suffix}"
@@ -955,19 +972,19 @@ import org.sireum.aadl.act.ast._
                   | *
                   | ************************************************************************/
                   |bool ${methodName}(${mod}${paramType} * ${name}){
-                  |  bool tb_result = true;
+                  |  bool ${result} = true;
                   |  ${(accum, "\n")}
-                  |  return tb_result;
+                  |  return ${result};
                   |}""")
             case _ => None[ST]()
           }
         } else {
           val simpleName = Util.getLastName(feature.identifier)
-          val methodName = s"tb_entrypoint_tb_${Util.getClassifier(component.classifier.get)}_${simpleName}"
+          val methodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
 
           val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
             case Some(v) =>
-              val varName = s"tb_${simpleName}"
+              val varName = Util.brand(simpleName)
               drainQueue = Some((st"""${paramType} ${varName};""",
                 st"""while (${genMethodName}((${paramType} *) &${varName})) {
                     |  ${methodName}(&${varName});
@@ -1052,6 +1069,7 @@ import org.sireum.aadl.act.ast._
 
         } else {
           val emit = s"${methodName}_emit()"
+          val resultVar = Util.brand("result")
           Some(st"""/************************************************************************
               | * ${name}
               | * Invoked from user code in the local thread.
@@ -1061,9 +1079,9 @@ import org.sireum.aadl.act.ast._
               | *
               | ************************************************************************/
               |bool ${name}(void) {
-              |  bool tb_result = true;
+              |  bool ${resultVar} = true;
               |  ${emit};
-              |  return tb_result;
+              |  return ${resultVar};
               |}
               |""")
         }
@@ -1096,7 +1114,8 @@ import org.sireum.aadl.act.ast._
                                          cRunPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): Resource = {
     val name = Util.getClassifier(component.classifier.get)
     val compTypeFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
-    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, sts, preInitComments, cRunPreEntries, cDrainQueues, Util.isSporadic(component))
+    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, sts, preInitComments,
+      cRunPreEntries, cDrainQueues, Util.isSporadic(component))
 
     return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret)
   }
@@ -1163,10 +1182,24 @@ import org.sireum.aadl.act.ast._
     }
 
     def findProcessor(): Option[ir.Component] = {
+      var processes:ISZ[ir.Component] = ISZ()
       for (c <- componentMap.values if (c.category == ir.ComponentCategory.Process) && Util.getTypeHeaderFileName(c).nonEmpty) {
-        return Some(c)
+        processes = processes :+ c
       }
-      return None[ir.Component]()
+      if(processes.size > 0) {
+        val candidates = processes.filter(f => ISZOps(f.subComponents).exists(p => p.category == ir.ComponentCategory.Thread))
+        if(candidates.isEmpty) {
+          addWarning(s"None of the bound processes contain subcomponents")
+          Some(processes(z"0"))
+        } else if (candidates.size > 1) {
+          addError(s"${candidates.size} bound processes discovered, each containing thread subcomponents.")
+          None[ir.Component]()
+        } else {
+          Some(candidates(z"0"))
+        }
+      } else {
+        None[ir.Component]()
+      }
     }
 
     findProcessor() match {

@@ -68,18 +68,32 @@ object Act {
       }
     }
 
-    val _m = ir.Transformer(Transformers.MissingTypeRewriter()).transformAadl(F, m).resultOpt.get
-
-    Gen().process(_m, hFiles) match {
-      case Some(con) =>
-        val rootDir = aadlRootDir match {
-          case Some(f) => f.getAbsolutePath
-          case _ => ""
-        }
-        val out = BijiPrettyPrint ().tempEntry (destDir.getAbsolutePath, con, cFiles, rootDir)
-        return 0
-      case _ => return 1
+    val m1 = if(Util.DEVELOPER_MODE) {
+      ir.Transformer(Transformers.UnboundedIntegerRewriter()).transformAadl(F, m).resultOpt match {
+        case Some(mod) => mod
+        case _ => m
+      }
+    } else {
+      m
     }
+
+    val result = ir.Transformer(Transformers.MissingTypeRewriter()).transformAadl(Transformers.CTX(F, F), m1)
+    val m2 = if(result.resultOpt.nonEmpty) result.resultOpt.get else m1
+
+    if(!result.ctx.hasErrors) {
+      Gen().process(m2, hFiles) match {
+        case Some(con) =>
+          val rootDir = aadlRootDir match {
+            case Some(f) => f.getAbsolutePath
+            case _ => ""
+          }
+          val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir)
+          return 0
+        case _ =>
+      }
+    }
+
+    return 1
   }
 
   def path2fileOpt(pathFor: Predef.String, path: Option[Predef.String], checkExist: B): scala.Option[File] = {
