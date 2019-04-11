@@ -17,6 +17,7 @@ object Util {
   }
 
   val GEN_ARTIFACT_PREFIX: String = "tb"
+  val GEN_ARTIFACT_CAP_PREFIX: String = "TB"
 
   val MONITOR_COMP_SUFFIX: String  = "Monitor"
 
@@ -46,6 +47,8 @@ object Util {
   val PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT: String = "Programming_Properties::Source_Text"
 
   val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
+  val PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "SB_SYS::Compute_Entrypoint_Source_Text"
+
   val PROP_TB_SYS__CAmkES_Owner_Thread: String = "TB_SYS::CAmkES_Owner_Thread"
 
   val DEFAULT_QUEUE_SIZE: Z = z"1"
@@ -57,7 +60,7 @@ object Util {
   val DIR_INCLUDES: String = "includes"
   val DIR_COMPONENTS: String = "components"
   val DIR_INTERFACES: String = "interfaces"
-  val DIR_MONITORS: String = "tb_Monitors"
+  val DIR_MONITORS: String = brand("Monitors")
 
   val CMAKE_VERSION: String = "3.8.2"
 
@@ -69,6 +72,10 @@ object Util {
 
   def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
+  }
+
+  def cbrand(s: String): String = {
+    return s"${Util.GEN_ARTIFACT_CAP_PREFIX}_$s"
   }
 
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
@@ -293,9 +300,18 @@ object Util {
   }
 
   def getComputeEntrypointSourceText(properties: ISZ[ir.Property]): Option[String] = {
-    val ret: Option[String] = getDiscreetPropertyValue(properties, PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT) match {
+    var ret: Option[String] = getDiscreetPropertyValue(properties, PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT) match {
       case Some(ir.ValueProp(v)) => Some(v)
       case _ => None[String]()
+    }
+    if(ret.isEmpty) {
+      ret = getDiscreetPropertyValue(properties, PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT) match {
+        case Some(ir.ValueProp(v)) =>
+          addWarning(s"Property ${PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} is deprecated, use ${PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} instead.")
+
+          Some(v)
+        case _ => None[String]()
+      }
     }
     return ret
   }
@@ -430,6 +446,11 @@ object StringUtil {
 }
 
 object StringTemplate{
+  val SB_VERIFY: String = Util.cbrand("VERIFY")
+
+  val MON_READ_ACCESS:String = Util.cbrand("MONITOR_READ_ACCESS")
+  val MON_WRITE_ACCESS:String = Util.cbrand("MONITOR_WRITE_ACCESS")
+
   def tbInterface(macroName: String): ST = {
     val r : ST = st"""#ifdef ${macroName}
                      |#define ${macroName}
@@ -441,22 +462,23 @@ object StringTemplate{
 
   def tbTypeHeaderFile(macroName: String, typeHeaderFileName: String, defs: ISZ[ST], preventBadging: B): ST = {
     val badges: ST = if(preventBadging) {st""} else {st"""
-                                                         |#define TB_MONITOR_READ_ACCESS 111
-                                                         |#define TB_MONITOR_WRITE_ACCESS 222"""}
-    val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
+                                                         |#define $MON_READ_ACCESS 111
+                                                         |#define $MON_WRITE_ACCESS 222"""}
+    val macroname = s"__${Util.cbrand("AADL")}_${typeHeaderFileName}__H"
+
     val body = st"""#ifndef ${macroname}
                    |#define ${macroname}
                    |
                    |#include <stdbool.h>
                    |#include <stdint.h>
                    |
-                   |#ifndef TB_VERIFY
+                   |#ifndef ${SB_VERIFY}
                    |#include <stddef.h>
-                   |#endif // TB_VERIFY
+                   |#endif // ${SB_VERIFY}
                    |
-                   |#define __TB_OS_CAMKES__${badges}
+                   |#define __${Util.cbrand("OS")}_CAMKES__${badges}
                    |
-                   |#ifndef TB_VERIFY
+                   |#ifndef ${SB_VERIFY}
                    |#define MUTEXOP(OP)\
                    |if((OP) != 0) {\
                    |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
@@ -464,8 +486,8 @@ object StringTemplate{
                    |}
                    |#else
                    |#define MUTEXOP(OP) OP
-                   |#endif // TB_VERIFY
-                   |#ifndef TB_VERIFY
+                   |#endif // ${SB_VERIFY}
+                   |#ifndef ${SB_VERIFY}
                    |#define CALLBACKOP(OP)\
                    |if((OP) != 0) {\
                    |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
@@ -473,11 +495,11 @@ object StringTemplate{
                    |}
                    |#else
                    |#define CALLBACKOP(OP) OP
-                   |#endif // TB_VERIFY
+                   |#endif // ${SB_VERIFY}
                    |
                    |${(defs, "\n\n")}
                    |
-                   |#endif // __TB_AADL_${typeHeaderFileName}__H
+                   |#endif // ${macroname}
                    |"""
     return body
   }
@@ -487,12 +509,12 @@ object StringTemplate{
                |typedef bool ${Util.MISSING_AADL_TYPE};"""
   }
 
-   def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
+  def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
                      preventBadging: B): ST = {
     val read: ST = st"""*m = contents;
                        |return true;"""
     val mon_read: ST = if(preventBadging) { read } else {
-      st"""if (mon_get_sender_id() != TB_MONITOR_READ_ACCESS) {
+      st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
           |  return false;
           |} else {
           |  ${read}}
@@ -504,7 +526,7 @@ object StringTemplate{
                         |return true;"""
     val mon_write: ST = if(preventBadging) { write } else {
       st"""bool mon_write(const $typeName * m) {
-          |  if (mon_get_sender_id() != TB_MONITOR_WRITE_ACCESS) {
+          |  if (mon_get_sender_id() != $MON_WRITE_ACCESS)  {
           |    return false;
           |  } else {
           |    ${write}
@@ -536,21 +558,21 @@ object StringTemplate{
                        preventBadging: B): ST = {
 
     val mon_dequeue: ST = if(preventBadging) { st"" } else {
-      st"""if (mon_get_sender_id() != TB_MONITOR_READ_ACCESS) {
+      st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
           |  return false;
           |} else """
     }
 
     val mon_enqueue: ST = if(preventBadging) { st"" } else {
-      st"""if (mon_get_sender_id() != TB_MONITOR_WRITE_ACCESS) {
+      st"""if (mon_get_sender_id() != $MON_WRITE_ACCESS) {
           |    return false;
           |} else """
     }
 
     val r: ST =
-    st"""#ifndef TB_VERIFY
+    st"""#ifndef $SB_VERIFY
         |#include <stdio.h>
-        |#endif // TB_VERIFY
+        |#endif // $SB_VERIFY
         |
         |#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
         |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
@@ -772,11 +794,11 @@ object StringTemplate{
     return st"CALLBACKOP(${Util.brand("timer_complete_reg_callback")}(${METHOD_PERIODIC_CALLBACK}, NULL));"
   }
 
-  def drainPeriodicQueue(componentName: String, userEntrypoint: Option[String]): (ST, ST) = {
+  def drainPeriodicQueue(componentName: String, userEntrypoint: String): (ST, ST) = {
     val methodName = Util.brand(s"entrypoint_${componentName}_periodic_dispatcher")
 
     val impl = st"""void ${methodName}(const int64_t * in_arg) {
-                   |  ${if(userEntrypoint.nonEmpty) s"${userEntrypoint.get}((int64_t *) in_arg);" else ""}
+                   |  ${userEntrypoint}((int64_t *) in_arg);
                    |}"""
 
     val drain = st"""if(${VAR_PERIODIC_OCCURRED}){

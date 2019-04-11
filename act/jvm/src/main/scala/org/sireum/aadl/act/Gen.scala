@@ -14,7 +14,8 @@ import org.sireum.aadl.act.ast._
 
   var componentMap: HashMap[String, ir.Component] = HashMap.empty
   var typeMap: HashSMap[String, ir.Component] = HashSMap.empty
-  //var featureEndMap: HashMap[String, ir.FeatureEnd] = HashMap.empty
+  var classifierMap: HashMap[String, ir.Component] = HashMap.empty
+
   var featureMap: HashMap[String, ir.Feature] = HashMap.empty
   var sharedData: HashMap[String, SharedData] = HashMap.empty
 
@@ -188,11 +189,47 @@ import org.sireum.aadl.act.ast._
           astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
 
         case ir.ComponentCategory.SubprogramGroup =>
-          if(sc.features.nonEmpty) { halt(s"Need to handle subprogram group features: ${sc}")}
-          if(sc.subComponents.nonEmpty) { halt(s"Need to handle subprogram group subComponents: ${sc}")}
+          var methods: ISZ[Method] = ISZ()
+
+          for(m <- sc.features) {
+            m match {
+              case spa: ir.FeatureAccess =>
+                if(spa.classifier.nonEmpty) {
+                  val spComp = classifierMap.get(spa.classifier.get.name).get
+                  assert(spComp.category == ir.ComponentCategory.Subprogram)
+
+                  val methodName = Util.getLastName(spa.identifier)
+                  var params: ISZ[Parameter] = ISZ()
+                  for(param <- spComp.features) {
+                    param match {
+                      case p: ir.FeatureEnd =>
+                        assert(param.category == ir.FeatureCategory.Parameter)
+
+                        val paramName = Util.getLastName(param.identifier)
+                        val dir: Direction.Type = p.direction match {
+                          case ir.Direction.In => Direction.In
+                          case ir.Direction.Out => Direction.Out
+                          case x => halt(s"Unexpected direction ${x}")
+                        }
+                        val typName = Util.getClassifierFullyQualified(p.classifier.get)
+
+                        params = params :+ Parameter(array = F, direction = dir, name = paramName, typ = typName)
+
+                    }
+                  }
+
+                  methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String]())
+                } else{
+                  addError(s"Could not resolve feature ${Util.getName(spa.identifier)} from ${Util.getName(sc.identifier)}")
+                }
+              case _ =>
+            }
+          }
+
+          if(sc.subComponents.nonEmpty) { halt(s"Subprogram group subcomponents not currently handled: ${sc}")}
 
           val procName = Util.getClassifier(sc.classifier.get)
-          astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(), includes = ISZ())
+          astObjects = astObjects :+ Procedure(name = procName, methods = methods, includes = ISZ())
 
         case ir.ComponentCategory.Data =>
           val typeName = Util.getClassifierFullyQualified(sc.classifier.get)
@@ -627,15 +664,16 @@ import org.sireum.aadl.act.ast._
 
         cRunPreEntries = cRunPreEntries :+ StringTemplate.registerPeriodicCallback()
 
-        val componentEntrypointMethodName = Util.getComputeEntrypointSourceText(c.properties)
-        if(componentEntrypointMethodName.isEmpty) {
-          addWarning(s"Missing entrypoint property for ${cid}")
+        Util.getComputeEntrypointSourceText(c.properties) match {
+          case Some(handler) =>
+            cIncludes = cIncludes :+ st"void ${handler}(int64_t *);"
+
+            val drains = StringTemplate.drainPeriodicQueue(cid, handler)
+
+            cImpls = cImpls :+ drains._1
+            stDrainQueues = stDrainQueues :+ drains._2
+          case _ => addError(s"Periodic thread ${cid} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
         }
-        val drains = StringTemplate.drainPeriodicQueue(cid, componentEntrypointMethodName)
-
-        cImpls = cImpls :+ drains._1
-        stDrainQueues = stDrainQueues :+ drains._2
-
       case Some(Dispatch_Protocol.Sporadic) =>
 
       case x =>
@@ -812,7 +850,7 @@ import org.sireum.aadl.act.ast._
 
   def processDataTypes(values: ISZ[ir.Component]): ST = {
     val defs: ISZ[ST] = values.filter(v => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).map(v => processDataType(v, F))
-    val macroname = s"__TB_AADL_${typeHeaderFileName}__H"
+    val macroname = s"__${Util.cbrand("AADL")}_${typeHeaderFileName}__H"
     return StringTemplate.tbTypeHeaderFile(macroname, typeHeaderFileName, defs, preventBadging)
   }
 
@@ -1131,6 +1169,9 @@ import org.sireum.aadl.act.ast._
     val name = Util.getName(c.identifier)
     assert(!componentMap.contains(name))
     componentMap = componentMap + (name ~> c)
+    if(c.classifier.nonEmpty) {
+      classifierMap = classifierMap + (c.classifier.get.name ~> c)
+    }
     c.subComponents.foreach(sc => buildComponentMap(sc))
     hasPeriodicComponents = hasPeriodicComponents | Util.isPeriodic(c)
   }
