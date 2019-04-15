@@ -16,8 +16,8 @@ object Util {
     F
   }
 
-  val GEN_ARTIFACT_PREFIX: String = "tb"
-  val GEN_ARTIFACT_CAP_PREFIX: String = "TB"
+  val GEN_ARTIFACT_PREFIX: String = "sb"
+  val GEN_ARTIFACT_CAP_PREFIX: String = "SB"
 
   val MONITOR_COMP_SUFFIX: String  = "Monitor"
 
@@ -49,6 +49,7 @@ object Util {
   val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
   val PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "SB_SYS::Compute_Entrypoint_Source_Text"
 
+  val PROP_SB_SYS__CAmkES_Owner_Thread: String = "SB_SYS::CAmkES_Owner_Thread"
   val PROP_TB_SYS__CAmkES_Owner_Thread: String = "TB_SYS::CAmkES_Owner_Thread"
 
   val DEFAULT_QUEUE_SIZE: Z = z"1"
@@ -317,9 +318,18 @@ object Util {
   }
 
   def getCamkesOwnerThread(p: ISZ[ir.Property]): Option[String] = {
-    val ret: Option[String] = getDiscreetPropertyValue(p, PROP_TB_SYS__CAmkES_Owner_Thread) match {
+    var ret: Option[String] = getDiscreetPropertyValue(p, PROP_SB_SYS__CAmkES_Owner_Thread) match {
       case Some(ir.ValueProp(v)) => Some(v)
       case _ => None[String]()
+    }
+    if(ret.isEmpty) {
+      ret = getDiscreetPropertyValue(p, PROP_TB_SYS__CAmkES_Owner_Thread) match {
+        case Some(ir.ValueProp(v)) =>
+          addWarning(s"Property ${PROP_TB_SYS__CAmkES_Owner_Thread} is deprecated, use ${PROP_SB_SYS__CAmkES_Owner_Thread} instead.")
+
+          Some(v)
+        case _ => None[String]()
+      }
     }
     return ret
   }
@@ -382,11 +392,11 @@ object TypeUtil {
     Util.getDiscreetPropertyValue(c.properties, Util.PROP_DATA_MODEL__BASE_TYPE) match {
       case Some(i: ir.ClassifierProp) =>
         if(isBaseTypeString(i.name)) {
-          Some(translateBaseType(i.name).get)
+          return translateBaseType(i.name)
         } else {
-          Some(Util.getClassifierFullyQualified(ir.Classifier(i.name)))
+          return Some(Util.getClassifierFullyQualified(ir.Classifier(i.name)))
         }
-      case _ => None[String]()
+      case _ => return None[String]()
     }
   }
 

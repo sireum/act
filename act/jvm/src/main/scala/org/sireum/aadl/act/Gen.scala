@@ -272,6 +272,7 @@ import org.sireum.aadl.act.ast._
                              |  ${(threads.map((m: ir.Component) => m.classifier.get.name), "\n")}""".render)
               }
             case _ =>
+              addError(st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property missing""".render)
           }
 
         case _ =>
