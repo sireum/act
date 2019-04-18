@@ -38,11 +38,11 @@ object cli {
     usage = "<option>* <file>+",
     opts = ISZ(
       Opt(name = "input", longKey = "input", shortKey = Some('i'),
-        tpe = Type.Choice(name = "format", sep = None(), elements = ISZ("air", "camkesir", "aadl")),
+        tpe = Type.Choice(name = "actFormat", sep = None(), elements = ISZ("air", "camkesir", "aadl")),
         description = "Input format"
       ),
       Opt(name = "mode", longKey = "mode", shortKey = Some('m'),
-        tpe = Type.Choice(name = "mode", sep = None(), elements = ISZ("json", "msgpack")),
+        tpe = Type.Choice(name = "actMode", sep = None(), elements = ISZ("json", "msgpack")),
         description = "Serialization method (only valid for air/camkesir input"
       ),
       Opt(name = "outputDir", longKey = "output-dir", shortKey = Some('o'),
