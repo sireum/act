@@ -25,59 +25,44 @@
 
 import mill._
 import ammonite.ops._
-import $file.sireum.runtime.Runtime
+import $file.runtime.Runtime
 import $file.air.Air
-import $file.act.Act
-import $file.cli.Cli
+import $file.Act
 
 import mill.scalalib.ScalaModule
 import org.sireum.mill.SireumModule
 
-object sireum extends mill.Module {
+object runtime extends mill.Module {
 
-  object runtime extends mill.Module {
+  object macros extends Runtime.Module.Macros
 
-    object macros extends Runtime.Module.Macros
+  object test extends Runtime.Module.Test {
+    override def macrosObject = macros
+  }
 
-    object test extends Runtime.Module.Test {
-      override def macrosObject = macros
-    }
+  trait testProvider extends Runtime.Module.TestProvider {
+    override def testObject = test
+  }
 
-    trait testProvider extends Runtime.Module.TestProvider {
-      override def testObject = test
-    }
-
-    object library extends Runtime.Module.Library with testProvider {
-      override def macrosObject = macros
-    }
-
+  object library extends Runtime.Module.Library with testProvider {
+    override def macrosObject = macros
   }
 
 }
 
-object air extends Air.Module with sireum.runtime.testProvider {
-  final override def libraryObject = sireum.runtime.library
+object air extends Air.Module with runtime.testProvider {
+  final override def libraryObject = runtime.library
 }
 
 
 object act extends Act.Module {
+  final override def millSourcePath = super.millSourcePath / up
+
   final override def airObject = air
-}
-
-
-object cli extends Cli.Module {
-  final override def actObject = act
 }
 
 
 object bin extends ScalaModule {
   final override def scalaVersion = SireumModule.scalaVersion
-  final override def moduleDeps = Seq(sireum.runtime.library.jvm)
-
-  object `mill-build` extends mill.Module {
-    object bin extends ScalaModule {
-      final override def scalaVersion = SireumModule.scalaVersion
-      final override def moduleDeps = Seq(sireum.runtime.library.jvm)
-    }
-  }
+  final override def moduleDeps = Seq(runtime.library.jvm)
 }

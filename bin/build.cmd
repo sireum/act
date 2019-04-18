@@ -1,108 +1,207 @@
-::#! 2> /dev/null                                             #
-@ 2>/dev/null # 2>nul & echo off & goto BOF                   #
-                                                              #
-export ACT_HOME=$(cd -P $(dirname "$0")/.. && pwd -P)         #
-                                                              #
-export SIREUM_HOME=${ACT_HOME}/sireum                         #
-${SIREUM_HOME}/bin/build.cmd                                  #
-                                                              #
-if [ -f "$0.com" ] && [ "$0.com" -nt "$0" ]; then             #
-  exec "$0.com" "$@"                                          #
-else                                                          #
-  rm -fR "$0.com"                                             #
-  exec ${SIREUM_HOME}/bin/sireum slang run -s -n "$0" "$@"    #
-fi                                                            #
+::#! 2> /dev/null                                                                                           #
+@ 2>/dev/null # 2>nul & echo off & goto BOF                                                                 #
+export SIREUM_HOME=$(cd -P $(dirname "$0")/.. && pwd -P)                                                    #
+if [ ! -z ${SIREUM_PROVIDED_SCALA++} ]; then                                                                #
+  SIREUM_PROVIDED_JAVA=true                                                                                 #
+fi                                                                                                          #
+if [ ! -f "${SIREUM_HOME}/bin/sireum.jar" ]; then                                                           #
+  "${SIREUM_HOME}/bin/init.sh"                                                                              #
+elif [ "${SIREUM_HOME}/versions.properties" -nt "${SIREUM_HOME}/bin/sireum.jar" ]; then                     #
+  "${SIREUM_HOME}/bin/init.sh"                                                                              #
+fi                                                                                                          #
+if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then                                                                 #
+  PLATFORM="win"                                                                                            #
+  export SIREUM_HOME=$(cygpath -C OEM -w -a ${SIREUM_HOME})                                                 #
+  if [ -z ${SIREUM_PROVIDED_JAVA++} ]; then                                                                 #
+    export JAVA_HOME="${SIREUM_HOME}\\bin\\win\\java"                                                       #
+    export Z3_HOME="${SIREUM_HOME}\\bin\\win\\z3"                                                           #
+    export PATH="${SIREUM_HOME}/bin/win/java":"${SIREUM_HOME}/bin/win/z3":$PATH                             #
+    export PATH="$(cygpath -C OEM -w -a ${JAVA_HOME}/bin)":"$(cygpath -C OEM -w -a ${Z3_HOME}/bin)":$PATH   #
+  fi                                                                                                        #
+elif [ "$(uname)" = "Darwin" ]; then                                                                        #
+  PLATFORM="mac"                                                                                            #
+  if [ -z ${SIREUM_PROVIDED_JAVA++} ]; then                                                                 #
+    export JAVA_HOME="${SIREUM_HOME}/bin/mac/java"                                                          #
+    export Z3_HOME="${SIREUM_HOME}/bin/mac/z3"                                                              #
+    export PATH="${JAVA_HOME}/bin":"${Z3_HOME}/bin":$PATH                                                   #
+  fi                                                                                                        #
+elif [ "$(expr substr $(uname -s) 1 5)" = "Linux" ]; then                                                   #
+  PLATFORM="linux"                                                                                          #
+  if [ -z ${SIREUM_PROVIDED_JAVA++} ]; then                                                                 #
+    export JAVA_HOME="${SIREUM_HOME}/bin/linux/java"                                                        #
+    export Z3_HOME="${SIREUM_HOME}/bin/linux/z3"                                                            #
+    export PATH="${JAVA_HOME}/bin":"${Z3_HOME}/bin":$PATH                                                   #
+  fi                                                                                                        #
+fi                                                                                                          #
+if [ -f "$0.com" ] && [ "$0.com" -nt "$0" ]; then                                                           #
+  exec "$0.com" "$@"                                                                                        #
+else                                                                                                        #
+  rm -fR "$0.com"                                                                                           #
+  exec "${SIREUM_HOME}/bin/sireum" slang run -s -n "$0" "$@"                                                #
+fi                                                                                                          #
 :BOF
-set SIREUM_BIN=%cd%\sireum\bin
 if defined SIREUM_PROVIDED_SCALA set SIREUM_PROVIDED_JAVA=true
-call "%SIREUM_BIN%\build.cmd" 
-if not defined SIREUM_PROVIDED_JAVA set PATH=%SIREUM_BIN%\win\java\bin;%SIREUM_BIN%\win\z3\bin;%PATH%
-"%SIREUM_BIN%\sireum.bat" slang run -s "%0" %*
+if not exist "%~dp0sireum.jar" call "%~dp0init.bat"
+if not defined SIREUM_PROVIDED_JAVA set PATH=%~dp0win\java\bin;%~dp0win\z3\bin;%PATH%
+"%~dp0sireum.bat" slang run -s "%0" %*
 exit /B %errorlevel%
 ::!#
 // #Sireum
 import org.sireum._
 
-val homeBin: Os.Path = Os.slashDir
-val home = homeBin.up
-
-val sireumHome = home / "sireum"
-val sireumBin = sireumHome / "bin"
-val sireum = sireumBin / (if (Os.isWin) "sireum.bat" else "sireum")
-val mill = sireumBin / (if (Os.isWin) "mill.bat" else "mill")
-
-
-val options: HashSMap[String, () => Unit] = HashSMap ++ ISZ(
-  ("build", build _),
-  ("min-jar", minJar _),
-  ("regen-cli", regenCli _),
-  ("tipe", tipe _),
-  ("-h", usage _),
-  ("--help", usage _))
-
-
-def regenCli(): Unit = {
-  val sireumPackagePath = home / "cli" / "jvm" / "src" / "main" / "scala" / "org" / "sireum"
-
-  println("Generating CLI")
-
-  Os.proc(ISZ(sireum.value, "tools", "cligen", "-p", "org.sireum", "-n", "ActCli", "-l", (home / "license.txt").value,
-    (sireumPackagePath / "cli.sc").value)).at(sireumPackagePath).console.runCheck()
-
-  println()
-}
-
-def tipe(): Unit = {
-  println("Slang type checking ...")
-
-  Os.proc(ISZ(sireum.value, "slang", "tipe", "--verbose", "-r", "-s", home.value)).at(home).console.runCheck()
-
-  println()
-}
-
-def build(): Unit = {
-  tipe()
-
-  (sireumHome / "versions.properties").copyOverTo(home / "versions.properties")
-
-  println("Building ACT ...")
-
-  Os.proc(ISZ(mill.string, "all", "cli.assembly", "act.jvm.tests", "cli.tests")).at(home).console.runCheck()
-
-  val out = home / "out" / "cli" / "assembly" / "dest" / "out.jar"
-  val dest = homeBin / s"act${if(Os.isWin) ".bat" else ""}"
-  out.copyOverTo(dest)
-  dest.chmod("+x")
-
-  println(s"ACT available at: ${dest}")
-}
-
-def minJar(): Unit = {
-  println("Building ACT min jar ...")
-
-  Os.proc(ISZ(mill.string, "act.jvm.jar")).at(home).console.runCheck()
-
-  val f = home / "out" / "act" / "jvm" / "jar" / "dest" / "out.jar"
-
-  if(f.exists) {
-    println(s"ACT min jar available at: ${f}")
-  }
-}
 
 def usage(): Unit = {
-  println(st"""Act /build
-              |Usage: (${(options.keys, " | ")})""".render)
+  println("ACT /build")
+  println("Usage: ( compile | test | test-js | m2 | jitpack )+")
 }
+
 
 if (Os.cliArgs.isEmpty) {
   usage()
-} else {
-  Os.cliArgs.foreach { arg =>
-    options.get(arg) match {
-      case Some(f) => f()
-      case _ =>
-        eprintln(s"Unrecognized command: $arg")
-        Os.exit(-1)
+  Os.exit(0)
+}
+
+
+val homeBin = Os.slashDir
+val home = homeBin.up
+val sireumJar = homeBin / "sireum.jar"
+val mill = homeBin / "mill.bat"
+var didTipe = F
+var didCompile = F
+var didM2 = F
+
+
+def downloadMill(): Unit = {
+  if (!mill.exists) {
+    println("Downloading mill ...")
+    mill.downloadFrom("http://files.sireum.org/mill-standalone")
+    mill.chmod("+x")
+    println()
+  }
+}
+
+
+def clone(repo: String): Unit = {
+  if (!(home / repo).exists) {
+    Os.proc(ISZ("git", "clone", "--depth=1", s"https://github.com/sireum/$repo")).at(home).console.runCheck()
+  } else {
+    Os.proc(ISZ("git", "pull", "--recurse-submodules")).at(home / repo).console.runCheck()
+  }
+  println()
+}
+
+
+def tipe(): Unit = {
+  if (!didTipe) {
+    didTipe = T
+    println("Slang type checking ...")
+    Os.proc(ISZ("java", "-jar", sireumJar.string, "slang", "tipe", "--verbose", "-r", "-s", home.string)).
+      at(home).console.runCheck()
+    println()
+  }
+}
+
+
+def compile(): Unit = {
+  if (!didCompile) {
+    didCompile = T
+    if (didM2) {
+      didM2 = F
+      (home / "out").removeAll()
     }
+    tipe()
+    println("Compiling ...")
+    Os.proc(ISZ(mill.string, "all", "act.jvm.tests.compile",
+      "act.js.tests.compile")).at(home).console.runCheck()
+    println()
+  }
+}
+
+
+def test(): Unit = {
+  compile()
+  println("Running shared tests ...")
+  Os.proc(ISZ(mill.string, "act.jvm.tests")).at(home).console.runCheck()
+  println()
+}
+
+
+def testJs(): Unit = {
+  compile()
+  println("Running js tests ...")
+  Os.proc(ISZ(mill.string, "act.js.tests")).at(home).console.runCheck()
+  println()
+}
+
+
+def jitpack(): Unit = {
+  println("Triggering jitpack ...")
+  val r = Os.proc(ISZ(mill.string, "jitPack", "--owner", "sireum", "--repo", "act")).
+    at(home).console.run()
+  r match {
+    case r: Os.Proc.Result.Normal =>
+      println(r.out)
+      println(r.err)
+      if (!r.ok) {
+        eprintln(s"Exit code: ${r.exitCode}")
+      }
+    case r: Os.Proc.Result.Exception =>
+      eprintln(s"Exception: ${r.err}")
+    case _: Os.Proc.Result.Timeout =>
+      eprintln("Timeout")
+      eprintln()
+  }
+  println()
+}
+
+
+def m2(): Unit = {
+  didM2 = T
+  didCompile = F
+
+  val m2s: ISZ[ISZ[String]] =
+    for (pkg <- ISZ("act"); plat <- ISZ("jvm", "js"))
+      yield ISZ(pkg, plat, "m2")
+
+  val m2Paths: ISZ[Os.Path] =
+    for (cd <- for (m2 <- m2s) yield st"${(m2, Os.fileSep)}".render) yield  home / "out" / cd
+
+  for (m2p <- m2Paths) {
+    m2p.removeAll()
+  }
+
+  (home / "out").removeAll()
+
+  Os.proc(ISZ[String](mill.string, "all") ++ (for (m2 <- m2s) yield st"${(m2, ".")}".render)).
+    at(home).env(ISZ("SIREUM_SOURCE_BUILD" ~> "false")).console.runCheck()
+
+  val repository = Os.home / ".m2" / "repository"
+  repository.removeAll()
+
+  println()
+  println("Artifacts")
+  for (m2p <- m2Paths; p <- (m2p / "dest").overlayMove(repository, F, F, _ => T, T).values) {
+    println(s"* $p")
+  }
+  println()
+}
+
+
+downloadMill()
+
+clone("runtime")
+clone("air")
+
+for (i <- 0 until Os.cliArgs.size) {
+  Os.cliArgs(i) match {
+    case string"compile" => compile()
+    case string"test" => test()
+    case string"test-js" => testJs()
+    case string"m2" => m2()
+    case string"jitpack" => jitpack()
+    case cmd =>
+      usage()
+      eprintln(s"Unrecognized command: $cmd")
+      Os.exit(-1)
   }
 }

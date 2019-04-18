@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2019, Robby, Kansas State University
+ Copyright (c) 2018, Robby, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -27,25 +27,41 @@ import mill._
 import mill.scalalib._
 import org.sireum.mill.SireumModule._
 
-trait Module extends JvmOnly {
+trait Module extends CrossJvmJsJitPack {
 
-  final override def crossDeps = Seq(actObject)
+  final override def description: String = "Sireum AADL-to-CAmkES Translator (ACT)"
 
-  final override def ivyDeps = Agg(ivy"com.lihaoyi::os-lib:$osLibVersion")
+  final override def artifactName = "air"
 
-  final override def deps = Seq()
+  final override def subUrl: String = "air"
 
-  final override def testFrameworks = Seq()
+  final override def developers = Seq(
+    Developers.jason
+  )
+
+  final override def jvmTestIvyDeps = Agg.empty
+
+  final override def jsTestIvyDeps = Agg.empty
+
+  final override def jvmDeps = Seq()
+
+  final override def jsDeps = Seq()
 
   final override def testIvyDeps = Agg.empty
 
-  final override def scalacPluginIvyDeps = testScalacPluginIvyDeps
+  final override def ivyDeps = Agg.empty
 
-  final override def testScalacPluginIvyDeps = Agg(
+  final override lazy val scalacPluginIvyDeps = Agg(
     ivy"org.sireum::scalac-plugin:$scalacPluginVersion"
   )
 
-  def actObject: CrossJvmJs
+  final override def testScalacPluginIvyDeps = scalacPluginIvyDeps
 
-  final override def mainClass = Some("org.sireum.Act")
+  final override def deps = Seq(airObject)
+
+  final override val jvmTestFrameworks = Seq("org.scalatest.tools.Framework")
+
+  final override def jsTestFrameworks = jvmTestFrameworks
+
+  def airObject: CrossJvmJsPublish
 }

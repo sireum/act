@@ -1,6 +1,0 @@
-[submodule "air"]
-	path = air
-	url = https://github.com/sireum/air.git
-[submodule "sireum"]
-	path = sireum
-	url = https://github.com/sireum/kekinian.git
