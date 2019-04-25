@@ -10,8 +10,7 @@ install:
 - git submodule update --init --recursive
 
 build_script:
-  - bin\build.cmd build
-  - bin\act.bat
+  - bin\build.cmd test
 
 notifications:
   - provider: Email
