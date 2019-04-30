@@ -1107,7 +1107,7 @@ object Transformers {
   @datatype class MissingTypeRewriter extends ir.Transformer.PrePost[CTX] {
 
     val missingType: ir.Component = ir.Component(
-      ir.Name(ISZ()), // identifier
+      ir.Name(ISZ(), None()), // identifier
       ir.ComponentCategory.Data, // category
       Some(ir.Classifier(Util.MISSING_AADL_TYPE)), // classifier
       ISZ(), // features
@@ -1121,11 +1121,11 @@ object Transformers {
     )
 
     val missingArrayBaseType: ir.Property = ir.Property(
-      name = ir.Name(ISZ(Util.PROP_DATA_MODEL__BASE_TYPE)),
+      name = ir.Name(ISZ(Util.PROP_DATA_MODEL__BASE_TYPE), None()),
       propertyValues = ISZ(ir.ClassifierProp(Util.MISSING_AADL_TYPE)))
 
     val sporadicProp: ir.Property = ir.Property(
-      name = ir.Name(ISZ(Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL)),
+      name = ir.Name(ISZ(Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL), None()),
       propertyValues = ISZ(ir.ValueProp("Sporadic")))
 
 
