@@ -403,7 +403,7 @@ import org.sireum.aadl.act.ast._
               createDataConnection(conn)
 
             case ir.FeatureCategory.EventPort =>
-              createNotificationConnection(srcComponent, srcFeature, dstComponent, dstFeature)
+              createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
             case _ => halt (s"not expecting ${fdst.category}")
           }
         case ir.ConnectionKind.Access =>
@@ -601,13 +601,13 @@ import org.sireum.aadl.act.ast._
             case ir.Direction.In =>
               // consumes notification
               consumes = consumes :+ Consumes(
-                name = fid,
+                name = Util.brand(fid),
                 typ = Util.NOTIFICATION_TYPE,
                 optional = F)
             case ir.Direction.Out =>
               // emits notification
               emits = emits :+ Emits(
-                name = fid,
+                name = Util.brand(fid),
                 typ = Util.NOTIFICATION_TYPE)
             case _ => halt(s"${fpath}: not expecting direction ${fend.direction}")
           }
@@ -1064,9 +1064,9 @@ import org.sireum.aadl.act.ast._
         val inter = Some(st"""bool ${name}(void);""")
 
         val impl: Option[ST] = if(dir == "read") {
-          val varName = s"${methodName}_index"
-          val callback = s"${methodName}_callback"
-          val callback_reg = s"${methodName}_reg_callback"
+          val varName = Util.brand(s"${methodName}_index")
+          val callback = Util.brand(s"${methodName}_callback")
+          val callback_reg = Util.brand(s"${methodName}_reg_callback")
 
           Some(st"""/************************************************************************
               | *
@@ -1086,7 +1086,8 @@ import org.sireum.aadl.act.ast._
               | ************************************************************************/
               |bool ${callback}(void *_ UNUSED){
               |  $varName = true;
-              |  //CALLBACK(${callback_reg}(${callback}, NULL));
+              |  MUTEXOP(${StringTemplate.SEM_POST}());
+              |  CALLBACKOP(${callback_reg}(${callback}, NULL));
               |  return true;
               |}
               |
@@ -1107,7 +1108,7 @@ import org.sireum.aadl.act.ast._
               |""")
 
         } else {
-          val emit = s"${methodName}_emit()"
+          val emit = Util.brand(s"${methodName}_emit()")
           val resultVar = Util.brand("result")
           Some(st"""/************************************************************************
               | * ${name}
