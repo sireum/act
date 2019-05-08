@@ -140,8 +140,9 @@ object Util {
     return brand(s"${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}")
   }
 
-  def genMonitorNotificationFeatureName(f: ir.Feature): String = {
-    return brand(s"${Util.getLastName(f.identifier)}_notification")
+  def genMonitorNotificationFeatureName(f: ir.Feature, isDataPort: B): String = {
+    val name = s"${Util.getLastName(f.identifier)}${if(isDataPort) "_notification" else "" }"
+    return brand(name)
   }
 
   def getMonitorWriterName(f: ir.FeatureEnd): String = {

@@ -33,6 +33,7 @@ import org.sireum.ops.StringOps
         val dir = s"components/${c.component}/"
         val rootDestDir = s"${destDir}/${dir}"
 
+        var seenH = ISZ()
         for(st <- c.sourceText) {
           val path = s"${aadlRootDir}/${st}"
           if(NativeIO.fileExists(path)) {
@@ -41,8 +42,7 @@ import org.sireum.ops.StringOps
               val fname = NativeIO.copyFile(path, s"${rootDestDir}/src")
               sources = sources :+ s"${dir}/src/${fname}"
             } else if(StringOps(st).endsWith(".h")) {
-              val fname = NativeIO.copyFile(path, s"${rootDestDir}/includes")
-              includes = includes :+ s"${dir}/includes/${fname}"
+              NativeIO.copyFile(path, s"${rootDestDir}/includes")
             } else {
               Util.addWarning(s"${path} does not appear to be a valid C source file")
             }

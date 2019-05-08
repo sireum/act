@@ -376,7 +376,7 @@ import org.sireum.aadl.act.ast._
       // notification monsig to dst
       createNotificationConnection(
         monitor.i.name, "monsig",
-        dstComponent, Util.genMonitorNotificationFeatureName(dstFeature)
+        dstComponent, Util.genMonitorNotificationFeatureName(dstFeature, T)
       )
     }
 
@@ -541,7 +541,7 @@ import org.sireum.aadl.act.ast._
                 optional = F)
 
               consumes = consumes :+ Consumes(
-                name = Util.genMonitorNotificationFeatureName(fend),
+                name = Util.genMonitorNotificationFeatureName(fend, T),
                 typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
             }
@@ -568,16 +568,18 @@ import org.sireum.aadl.act.ast._
         }
       }
 
-      def handleEventPort(): Unit = {
+      def handleEventPort(isEventData: B): Unit = {
         fend.direction match {
           case ir.Direction.In =>
             Util.getComputeEntrypointSourceText(fend.properties) match {
               case Some(_) =>
-                val name = Util.genMonitorNotificationFeatureName(fend)
+                val name = Util.genMonitorNotificationFeatureName(fend, isEventData)
                 val handlerName = s"${name}_handler"
                 val regCallback = s"${name}_reg_callback"
 
-                cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
+                if(isEventData) {
+                  cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
+                }
                 cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
               case _ =>
                 Util.addWarning(s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
@@ -592,10 +594,10 @@ import org.sireum.aadl.act.ast._
           handleDataPort()
         case ir.FeatureCategory.EventDataPort =>
           handleDataPort()
-          handleEventPort()
+          handleEventPort(T)
 
         case ir.FeatureCategory.EventPort =>
-          handleEventPort()
+          handleEventPort(F)
 
           fend.direction match {
             case ir.Direction.In =>
@@ -1059,16 +1061,18 @@ import org.sireum.aadl.act.ast._
         }
         val compName = Util.getClassifier(component.classifier.get)
         val methodName = Util.getLastName(feature.identifier)
-        val name = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
+        val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
 
-        val inter = Some(st"""bool ${name}(void);""")
+        var inter = Some(st"""bool ${checkMethodName}(void);""")
+        val preInit: Option[ST] = None[ST]()
+        var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
 
         val impl: Option[ST] = if(dir == "read") {
           val varName = Util.brand(s"${methodName}_index")
-          val callback = Util.brand(s"${methodName}_callback")
+          val callback = s"${Util.genMonitorNotificationFeatureName(feature, F)}_handler"
           val callback_reg = Util.brand(s"${methodName}_reg_callback")
 
-          Some(st"""/************************************************************************
+          var r = Some(st"""/************************************************************************
               | *
               | * Static variables and queue management functions for event port:
               | *     ${methodName}
@@ -1084,22 +1088,21 @@ import org.sireum.aadl.act.ast._
               | * input event port.  It increments a count of received messages.
               | *
               | ************************************************************************/
-              |bool ${callback}(void *_ UNUSED){
+              |static void ${callback}(void *_ UNUSED){
               |  $varName = true;
               |  MUTEXOP(${StringTemplate.SEM_POST}());
               |  CALLBACKOP(${callback_reg}(${callback}, NULL));
-              |  return true;
               |}
               |
               |/************************************************************************
-              | * ${name}:
+              | * ${checkMethodName}:
               | * Invoked from local active thread.
               | *
               | * This is the function invoked by the active thread to decrement the
               | * input event index.
               | *
               | ************************************************************************/
-              |bool ${name}(){
+              |bool ${checkMethodName}(){
               |  bool result;
               |  result = ${varName};
               |  ${varName} = false;
@@ -1107,25 +1110,63 @@ import org.sireum.aadl.act.ast._
               |}
               |""")
 
+
+          val simpleName = Util.getLastName(feature.identifier)
+          val genMethodName = "JFLFLKDJFLKSDJ"
+
+          val entrypointMethodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
+
+          val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
+            case Some(v) =>
+
+              drainQueue = Some(
+                (st"",
+                 st"""if(${checkMethodName}()){
+                    |  ${entrypointMethodName}();
+                    |}""")
+              )
+
+              inter = Some(st"""${inter.get}
+                               |
+                               |void ${v}(void);""")
+
+              s"${v}();"
+            case _ => ""
+          }
+
+          Some(st"""${r.get}
+                   |/************************************************************************
+                   | *  ${entrypointMethodName}
+                   | *
+                   | * This is the function invoked by an active thread dispatcher to
+                   | * call to a user-defined entrypoint function.  It sets up the dispatch
+                   | * context for the user-defined entrypoint, then calls it.
+                   | *
+                   | ************************************************************************/
+                   |void ${entrypointMethodName}(void){
+                   |  ${invokeHandler}
+                   |}""")
+
+
         } else {
           val emit = Util.brand(s"${methodName}_emit()")
           val resultVar = Util.brand("result")
           Some(st"""/************************************************************************
-              | * ${name}
+              | * ${checkMethodName}
               | * Invoked from user code in the local thread.
               | *
               | * This is the function invoked by the local thread to make a
               | * call to write to a remote data port.
               | *
               | ************************************************************************/
-              |bool ${name}(void) {
+              |bool ${checkMethodName}(void) {
               |  bool ${resultVar} = true;
               |  ${emit};
               |  return ${resultVar};
               |}
               |""")
         }
-        Some(C_SimpleContainer(inter, impl, None[ST](), None[(ST, ST)]()))
+        Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
 
       case _ => None[C_SimpleContainer]()
     }
