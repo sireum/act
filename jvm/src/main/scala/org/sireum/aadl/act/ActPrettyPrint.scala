@@ -33,7 +33,6 @@ import org.sireum.ops.StringOps
         val dir = s"components/${c.component}/"
         val rootDestDir = s"${destDir}/${dir}"
 
-        var seenH = ISZ()
         for(st <- c.sourceText) {
           val path = s"${aadlRootDir}/${st}"
           if(NativeIO.fileExists(path)) {
