@@ -703,7 +703,7 @@ import org.sireum.aadl.act.ast._
     )
 
     return Component(
-      control = uses.nonEmpty,
+      control = T,
       hardware = F,
       name = cid,
 
