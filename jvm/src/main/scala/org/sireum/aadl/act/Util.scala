@@ -1081,21 +1081,21 @@ object Transformers {
     val unboundInt: String = "Base_Types::Integer"
     val int32: String = "Base_Types::Integer_32"
 
-    override def postClassifier(ctx: B, o: ir.Classifier): ir.Transformer.Result[B, ir.Classifier] = {
+    override def postClassifier(ctx: B, o: ir.Classifier): ir.Transformer.TPostResult[B, ir.Classifier] = {
       if(o.name == unboundInt) {
         Util.addWarning(s"Replacing classifier ${unboundInt} with ${int32}")
-        return ir.Transformer.Result(T, Some(ir.Classifier(int32)))
+        return ir.Transformer.TPostResult(T, Some(ir.Classifier(int32)))
       } else {
-        return ir.Transformer.Result(ctx, None())
+        return ir.Transformer.TPostResult(ctx, None())
       }
     }
 
-    override def postClassifierProp(ctx: B, o: ir.ClassifierProp): ir.Transformer.Result[B, ir.PropertyValue] = {
+    override def postClassifierProp(ctx: B, o: ir.ClassifierProp): ir.Transformer.TPostResult[B, ir.PropertyValue] = {
       if(o.name == unboundInt) {
         Util.addWarning(s"Replacing classifier ${unboundInt} with ${int32}")
-        return ir.Transformer.Result(T, Some(ir.ClassifierProp(int32)))
+        return ir.Transformer.TPostResult(T, Some(ir.ClassifierProp(int32)))
       } else {
-        return ir.Transformer.Result(ctx, None())
+        return ir.Transformer.TPostResult(ctx, None())
       }
     }
   }
@@ -1130,28 +1130,28 @@ object Transformers {
       propertyValues = ISZ(ir.ValueProp("Sporadic")))
 
 
-    override def postAadl(ctx: CTX, o: Aadl): Transformer.Result[CTX, Aadl] = {
+    override def postAadl(ctx: CTX, o: Aadl): Transformer.TPostResult[CTX, Aadl] = {
       if(ctx.requiresMissingType) {
-        ir.Transformer.Result(ctx, Some(o(dataComponents = o.dataComponents :+ missingType)))
+        ir.Transformer.TPostResult(ctx, Some(o(dataComponents = o.dataComponents :+ missingType)))
       } else {
-        ir.Transformer.Result(ctx, None[ir.Aadl]())
+        ir.Transformer.TPostResult(ctx, None[ir.Aadl]())
       }
     }
 
-    override def postComponent(ctx: CTX, o: Component): Transformer.Result[CTX, Component] = {
+    override def postComponent(ctx: CTX, o: Component): Transformer.TPostResult[CTX, Component] = {
 
       o.category match {
         case ir.ComponentCategory.Data =>
           if(o.classifier.isEmpty) {
             Util.addWarning(s"Classifier not specified for ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE}")
 
-            ir.Transformer.Result(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
+            ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
           } else if (TypeUtil.isArrayDef(o) && TypeUtil.getArrayBaseType(o).isEmpty) {
             Util.addWarning(s"Base type not specified for ${o.classifier.get.name}.  Substituting ${Util.MISSING_AADL_TYPE}")
 
-            ir.Transformer.Result(ctx(requiresMissingType = T), Some(o(properties = o.properties :+ missingArrayBaseType)))
+            ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(properties = o.properties :+ missingArrayBaseType)))
           } else {
-            ir.Transformer.Result(ctx, None[ir.Component]())
+            ir.Transformer.TPostResult(ctx, None[ir.Component]())
           }
 
         case ir.ComponentCategory.Thread =>
@@ -1160,26 +1160,26 @@ object Transformers {
               if(x != "Periodic" && x != "Sporadic") {
                 Util.addError(s"${o.classifier.get.name} has unsupported dispatch protocol ${x}.")
 
-                ir.Transformer.Result(ctx(hasErrors = T), None[ir.Component]())
+                ir.Transformer.TPostResult(ctx(hasErrors = T), None[ir.Component]())
               } else {
-                ir.Transformer.Result(ctx, None[ir.Component]())
+                ir.Transformer.TPostResult(ctx, None[ir.Component]())
               }
             case _ =>
               Util.addWarning(s"${Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL} not specified for thread ${o.classifier.get.name}.  Treating it as sporadic.")
 
-              ir.Transformer.Result(ctx, Some(o(properties =  o.properties :+ sporadicProp)))
+              ir.Transformer.TPostResult(ctx, Some(o(properties =  o.properties :+ sporadicProp)))
           }
-        case _ => ir.Transformer.Result(ctx, None[ir.Component]())
+        case _ => ir.Transformer.TPostResult(ctx, None[ir.Component]())
       }
     }
 
-    override def postFeatureEnd(ctx: CTX, o: FeatureEnd): Transformer.Result[CTX, FeatureEnd] = {
+    override def postFeatureEnd(ctx: CTX, o: FeatureEnd): Transformer.TPostResult[CTX, FeatureEnd] = {
       if (Util.isDataport(o) && o.classifier.isEmpty) {
         Util.addWarning(s"No datatype specified for data port ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
 
-        ir.Transformer.Result(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
+        ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
       } else {
-        ir.Transformer.Result(ctx, None[ir.FeatureEnd]())
+        ir.Transformer.TPostResult(ctx, None[ir.FeatureEnd]())
       }
     }
   }
