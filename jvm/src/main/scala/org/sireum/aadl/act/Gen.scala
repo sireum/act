@@ -1341,7 +1341,7 @@ import org.sireum.aadl.act.ast._
     def u(_c:ir.Component): String = { return Util.getClassifierFullyQualified(_c.classifier.get) }
 
     // build dependence graph so that required data types are processed first
-    var graph: Graph[ir.Component, String] = Graph(HashMap.empty, ISZ(), HashMap.empty, HashMap.empty, 0, F)
+    var graph: Graph[ir.Component, String] = Graph.empty
     for(d <- data){
       graph = graph * d
       if(TypeUtil.isRecordType(d)) {
