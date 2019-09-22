@@ -71,12 +71,22 @@ object Util {
 
   val MISSING_AADL_TYPE: String = "MISSING_AADL_TYPE"
 
+  val SLANG_INCLUDES_NAME: String = "SLANG_INCLUDES"
+
+  val SLANG_LIB_NAME: String = "SLANG_LIB"
+
+  val AUX_CODE_DIRECTORY_NAME: String = "aux_code"
+
   def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
   }
 
   def cbrand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_CAP_PREFIX}_$s"
+  }
+
+  def nameToString(n: ir.Name): String = {
+    return org.sireum.ops.ISZOps(n.name).foldLeft((r: String, s: String) => if(r.size == 0) s else s"${r}_${s}", "")
   }
 
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
@@ -339,8 +349,121 @@ object Util {
     return getPropertyValues(properties, PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT).map(p => p.asInstanceOf[ir.ValueProp].value)
   }
 
-  def isDataport(f: ir.FeatureEnd): B = {
+  def isEventPort(f: ir.Feature): B = {
+    return f.category == ir.FeatureCategory.EventPort || f.category == ir.FeatureCategory.EventDataPort
+  }
+
+  def isDataPort(f: ir.Feature): B = {
     return f.category == ir.FeatureCategory.DataPort || f.category == ir.FeatureCategory.EventDataPort
+  }
+
+  def isInPort(f: ir.Feature): B = {
+    return (isEventPort(f) || isDataPort(f)) && f.asInstanceOf[FeatureEnd].direction == ir.Direction.In
+  }
+
+  def isOutPort(f: ir.Feature): B = {
+    return (isEventPort(f) || isDataPort(f)) && f.asInstanceOf[FeatureEnd].direction == ir.Direction.Out
+  }
+
+  def getInPorts(c: ir.Component): ISZ[ir.FeatureEnd] = {
+    return c.features.filter(f => f.isInstanceOf[ir.FeatureEnd] && Util.isInPort(f)).map(f => f.asInstanceOf[FeatureEnd])
+  }
+
+  def getOutPorts(c: ir.Component): ISZ[ir.FeatureEnd] = {
+    return c.features.filter(f => f.isInstanceOf[ir.FeatureEnd] && Util.isOutPort(f)).map(f => f.asInstanceOf[FeatureEnd])
+  }
+
+  def relativizePaths(anchorDir: String, toRel: String, pathSep: C, anchorResource: String) : String = {
+    val ais = conversions.String.toCis(anchorDir)
+    val tis = conversions.String.toCis(toRel)
+
+    var commonPrefix = 0
+    var stop = F
+    while(commonPrefix < ais.size && commonPrefix < tis.size && !stop) {
+      if(ais(commonPrefix) == tis(commonPrefix)){
+        commonPrefix = commonPrefix + 1;
+      } else {
+        stop = T
+      }
+    }
+
+    if(commonPrefix > 0) {
+      var seps = s""
+      val offset: Z = if(commonPrefix == ais.size) { 0 } else { -1 }
+
+      for(i <- commonPrefix - offset until ais.size) {
+        if(ais(i) == pathSep) {
+          seps = s"${pathSep}..${seps}"
+        }
+      }
+      val r = StringOps(toRel)
+      val ret = s"${anchorResource}${seps}${r.substring(commonPrefix - offset, r.size)}"
+
+      /*
+      println(st"""anchorDir = ${anchorDir}
+                  |toRel =     ${toRel}
+                  |ret =       ${ret}""".render)
+      */
+      return ret
+    } else {
+      return toRel
+    }
+  }
+
+  def getComponents(m: ir.Aadl): ISZ[ir.Component] = {
+    assert(m.components.size == 1)
+    var r: ISZ[ir.Component] = ISZ()
+    def s(c : ir.Component): Unit = {
+      r = r :+ c
+      c.subComponents.foreach(sc => s(sc))
+    }
+    s(m.components(0))
+    return r
+  }
+
+  def getComponent(m: ir.Aadl, compName: ir.Name): Option[ir.Component] = {
+    val f = getComponents(m).filter(p => p.identifier == compName)
+    return if(f.nonEmpty) Some(f(0)) else None()
+  }
+
+  def getPort(c: ir.Component, portName: ir.Name): Option[ir.FeatureEnd] = {
+    for(f <- c.features if(f.isInstanceOf[ir.FeatureEnd] && f.identifier == portName)) {
+      return Some(f.asInstanceOf[ir.FeatureEnd])
+    }
+    return None()
+  }
+
+  def getConnectedPorts(model: ir.Aadl, f: ir.FeatureEnd): ISZ[(ir.Component, ir.FeatureEnd)] = {
+    var ret: ISZ[(ir.Component, ir.FeatureEnd)] = ISZ()
+    assert(model.components.size == 1)
+
+    def search(m: ir.Component): Unit = {
+      if(m.connectionInstances.nonEmpty) {
+        for(ci <- m.connectionInstances) {
+          if(f.identifier == ci.dst.feature.get) {
+            val csrc = getComponent(model, ci.src.component)
+            val fsrc = getPort(csrc.get, ci.src.feature.get)
+            val pair = (csrc.get, fsrc.get)
+            ret = ret :+ pair
+          }
+          if(f.identifier == ci.src.feature.get){
+            val cDst = getComponent(model, ci.dst.component)
+            val fDst = getPort(cDst.get, ci.dst.feature.get)
+            val pair = (cDst.get, fDst.get)
+            ret = ret :+ pair
+          }
+        }
+      }
+      m.subComponents.foreach(sc => search(sc))
+    }
+    search(model.components(0))
+    return ret
+  }
+
+  def getNumberPorts(model: ir.Aadl): Z = {
+    val ports = getComponents(model).filter(c => c.category == ir.ComponentCategory.Thread)
+      .flatMap(c => c.features.filter(cf => Util.isDataPort(cf) || Util.isEventPort(cf)))
+    return ports.size
   }
 
   def addMessage(msg: String): Unit = { cprintln(F, msg) }
@@ -453,370 +576,6 @@ object StringUtil {
   def toLowerCase(s: String):String = {
     val cms = conversions.String.toCms(s)
     return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
-  }
-}
-
-object StringTemplate{
-  val SB_VERIFY: String = Util.cbrand("VERIFY")
-
-  val MON_READ_ACCESS:String = Util.cbrand("MONITOR_READ_ACCESS")
-  val MON_WRITE_ACCESS:String = Util.cbrand("MONITOR_WRITE_ACCESS")
-
-  def tbInterface(macroName: String): ST = {
-    val r : ST = st"""#ifdef ${macroName}
-                     |#define ${macroName}
-                     |
-                     |#endif // ${macroName}
-                     |"""
-    return r
-  }
-
-  def tbTypeHeaderFile(macroName: String, typeHeaderFileName: String, defs: ISZ[ST], preventBadging: B): ST = {
-    val badges: ST = if(preventBadging) {st""} else {st"""
-                                                         |#define $MON_READ_ACCESS 111
-                                                         |#define $MON_WRITE_ACCESS 222"""}
-    val macroname = s"__${Util.cbrand("AADL")}_${typeHeaderFileName}__H"
-
-    val body = st"""#ifndef ${macroname}
-                   |#define ${macroname}
-                   |
-                   |#include <stdbool.h>
-                   |#include <stdint.h>
-                   |
-                   |#ifndef ${SB_VERIFY}
-                   |#include <stddef.h>
-                   |#endif // ${SB_VERIFY}
-                   |
-                   |#define __${Util.cbrand("OS")}_CAMKES__${badges}
-                   |
-                   |#ifndef ${SB_VERIFY}
-                   |#define MUTEXOP(OP)\
-                   |if((OP) != 0) {\
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
-                   |  *((int*)0)=0xdeadbeef;\
-                   |}
-                   |#else
-                   |#define MUTEXOP(OP) OP
-                   |#endif // ${SB_VERIFY}
-                   |#ifndef ${SB_VERIFY}
-                   |#define CALLBACKOP(OP)\
-                   |if((OP) != 0) {\
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
-                   |  *((int*)0)=0xdeadbeef;\
-                   |}
-                   |#else
-                   |#define CALLBACKOP(OP) OP
-                   |#endif // ${SB_VERIFY}
-                   |
-                   |${(defs, "\n\n")}
-                   |
-                   |#endif // ${macroname}
-                   |"""
-    return body
-  }
-
-  def tbMissingType() : ST = {
-    return st"""// placeholder for unspecified types in the AADL model
-               |typedef bool ${Util.MISSING_AADL_TYPE};"""
-  }
-
-  def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
-                     preventBadging: B): ST = {
-    val read: ST = st"""*m = contents;
-                       |return true;"""
-    val mon_read: ST = if(preventBadging) { read } else {
-      st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
-          |  return false;
-          |} else {
-          |  ${read}}
-          |}"""
-    }
-
-    val write: ST = st"""contents = *m;
-                        |monsig_emit();
-                        |return true;"""
-    val mon_write: ST = if(preventBadging) { write } else {
-      st"""bool mon_write(const $typeName * m) {
-          |  if (mon_get_sender_id() != $MON_WRITE_ACCESS)  {
-          |    return false;
-          |  } else {
-          |    ${write}
-          |  }
-          |}"""
-    }
-
-    val senderSig: ST = if(preventBadging) { st"" } else { st"""
-                                                               |int mon_get_sender_id(void);""" }
-    val r : ST =
-      st"""#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
-          |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
-          |
-          |${senderSig}int monsig_emit(void);
-          |
-          |static $typeName contents;
-          |
-          |bool mon_read($typeName * m) {
-          |  ${mon_read}
-          |}
-          |
-          |bool mon_write(const $typeName * m) {
-          |  ${mon_write}
-          |}"""
-    return r
-  }
-
-  def tbEnqueueDequeue(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
-                       preventBadging: B): ST = {
-
-    val mon_dequeue: ST = if(preventBadging) { st"" } else {
-      st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
-          |  return false;
-          |} else """
-    }
-
-    val mon_enqueue: ST = if(preventBadging) { st"" } else {
-      st"""if (mon_get_sender_id() != $MON_WRITE_ACCESS) {
-          |    return false;
-          |} else """
-    }
-
-    val r: ST =
-    st"""#ifndef $SB_VERIFY
-        |#include <stdio.h>
-        |#endif // $SB_VERIFY
-        |
-        |#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
-        |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
-        |
-        |int mon_get_sender_id(void);
-        |int monsig_emit(void);
-        |
-        |${typeName} contents[${dim}];
-        |static uint32_t front = 0;
-        |static uint32_t length = 0;
-        |
-        |static bool is_full(void) {
-        |  return length == ${dim};
-        |}
-        |
-        |static bool is_empty(void) {
-        |  return length == 0;
-        |}
-        |
-        |bool mon_dequeue(${typeName} * m) {
-        |  ${mon_dequeue}if (is_empty()) {
-        |    return false;
-        |  } else {
-        |    *m = contents[front];
-        |    front = (front + 1) % ${dim};
-        |    length--;
-        |    return true;
-        |  }
-        |}
-        |
-        |bool mon_enqueue(const ${typeName} * m) {
-        |  ${mon_enqueue}if (is_full()) {
-        |    return false;
-        |  } else {
-        |    contents[(front + length) % ${dim}] = *m;
-        |    length++;
-        |    monsig_emit();
-        |    return true;
-        |  }
-        |}
-        |"""
-    return r
-  }
-
-  val AUX_C_SOURCES: String = "cSources"
-  val AUX_C_INCLUDES: String = "cIncludes"
-
-  def cmakeList(projectName: String, rootServer: String, components: ISZ[ST], cmakeVersion: String,
-                auxCSources: ISZ[ST], hasConnectorDefs: B): ST = {
-    val aux:ST = if(auxCSources.nonEmpty) {
-      st"""set(${AUX_C_SOURCES} "")
-          |set(${AUX_C_INCLUDES} "aux/includes")
-          |
-          |${(auxCSources, "\n")}
-          |"""
-    } else { st"""""" }
-
-    val connectors: ST = if(hasConnectorDefs) { st"""# add path to connector templates
-                                                    |CAmkESAddTemplatesPath(../../../../components/templates/)
-                                                    |"""}
-    else { st"" }
-
-    val r: ST =
-      st"""cmake_minimum_required(VERSION ${cmakeVersion})
-          |
-          |project (${rootServer} C)
-          |
-          |${connectors}
-          |${aux}
-          |${(components, "\n\n")}
-          |
-          |DeclareCAmkESRootserver(${rootServer}.camkes)
-          |"""
-    return r
-  }
-
-  def auxTemplate(i: String): ST = {
-    return st"list(APPEND ${AUX_C_SOURCES} ${i})"
-  }
-
-  def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String], hasAux: B): ST = {
-    val s: ST = if(sources.nonEmpty){
-      st"""SOURCES ${ if(hasAux) s"$${${AUX_C_SOURCES}} "  else "" }${(sources, " ")}"""
-    } else{
-      st""
-    }
-    val i: ST = if(includes.nonEmpty){
-      st"""INCLUDES ${ if(hasAux)  s"$${${AUX_C_INCLUDES}} "  else "" }${(includes, " ")}"""
-    } else{
-      st""
-    }
-
-    val r: ST =
-      st"""DeclareCAmkESComponent(${componentName}
-          |  ${s}
-          |  ${i}
-          |)"""
-    return r
-  }
-
-  def configurationPriority(name: String, priority: Z): ST = {
-    return st"${name}.priority = ${priority};"
-  }
-
-  def configurationStackSize(name: String, size: Z): ST = {
-    return st"${name}._control_stack_size = ${size};"
-  }
-
-  val SEM_WAIT: String = Util.brand("dispatch_sem_wait")
-  val SEM_POST: String = Util.brand("dispatch_sem_post")
-
-  def componentTypeImpl(filename: String, auxCSources: ISZ[ST], stmts: ISZ[ST],
-                        preInitComments: ISZ[ST], runPreEntries: ISZ[ST], cDrainQueues: ISZ[ST],
-                        isSporadic: B): ST = {
-    val initialLock: ST = if(isSporadic) { st"" } else { st"""// Initial lock to await dispatch input.
-                                                             |MUTEXOP(${SEM_WAIT}())"""}
-    val ret:ST = st"""#include "../${Util.DIR_INCLUDES}/${filename}.h"
-        |${(auxCSources, "\n")}
-        |#include <string.h>
-        |#include <camkes.h>
-        |
-        |${(stmts, "\n\n")}
-        |
-        |void pre_init(void) {
-        |  ${(preInitComments, "\n")}
-        |}
-        |
-        |/************************************************************************
-        | * int run(void)
-        | * Main active thread function.
-        | ************************************************************************/
-        |int run(void) {
-        |  ${(runPreEntries, "\n")}
-        |  ${initialLock}
-        |  for(;;) {
-        |    MUTEXOP(${SEM_WAIT}())
-        |    // Drain the queues
-        |    ${(cDrainQueues, "\n")}
-        |  }
-        |  return 0;
-        |}
-        |"""
-    return ret
-  }
-
-  def componentInitializeEntryPoint(componentName: String, methodName: String): (ST, ST) = {
-    val init: String = Util.brand(s"entrypoint_${componentName}_initializer")
-    val ret: ST =
-      st"""/************************************************************************
-          | *  ${init}:
-          | *
-          | * This is the function invoked by an active thread dispatcher to
-          | * call to a user-defined entrypoint function.  It sets up the dispatch
-          | * context for the user-defined entrypoint, then calls it.
-          | *
-          | ************************************************************************/
-          |void ${init}(const int64_t * in_arg) {
-          |  ${methodName}((int64_t *) in_arg);
-          |}"""
-    val dummy = Util.brand("dummy")
-    val runEntry: ST = st"""{
-                           |  int64_t ${dummy};
-                           |  ${init}(&${dummy});
-                           |}"""
-    return (ret, runEntry)
-  }
-
-  def cEventNotificiationHandler(handlerName: String, regCallback: String): ST = {
-    val ret: ST =
-      st"""static void ${handlerName}(void * unused) {
-          |  MUTEXOP(${SEM_POST}())
-          |  CALLBACKOP(${regCallback}(${handlerName}, NULL));
-          |}"""
-    return ret
-  }
-
-  def cRegCallback(handlerName: String, regCallback: String): ST = {
-    val ret: ST = st"CALLBACKOP(${regCallback}(${handlerName}, NULL));"
-    return ret
-  }
-
-  val VAR_PERIODIC_OCCURRED : String = Util.brand("occurred_periodic_dispatcher")
-  val VAR_PERIODIC_TIME : String = Util.brand("time_periodic_dispatcher")
-  val METHOD_PERIODIC_CALLBACK : String = Util.brand("timer_complete_callback")
-
-  def periodicDispatchElems() : ST = {
-    val ret = st"""static bool ${VAR_PERIODIC_OCCURRED};
-                  |static int64_t ${VAR_PERIODIC_TIME};
-                  |
-                  |/************************************************************************
-                  | * periodic_dispatcher_write_int64_t
-                  | * Invoked from remote periodic dispatch thread.
-                  | *
-                  | * This function records the current time and triggers the active thread
-                  | * dispatch from a periodic event.  Note that the periodic dispatch
-                  | * thread is the *only* thread that triggers a dispatch, so we do not
-                  | * mutex lock the function.
-                  | *
-                  | ************************************************************************/
-                  |
-                  |bool periodic_dispatcher_write_int64_t(const int64_t * arg) {
-                  |    ${VAR_PERIODIC_OCCURRED} = true;
-                  |    ${VAR_PERIODIC_TIME} = *arg;
-                  |    MUTEXOP(${SEM_POST});
-                  |    return true;
-                  |}
-                  |
-                  |void ${METHOD_PERIODIC_CALLBACK}(void *_ UNUSED) {
-                  |   // we want time in microseconds, not nanoseconds, so we divide by 1000.
-                  |   int64_t ${VAR_PERIODIC_TIME} = ${Util.brand("timer_time()")} / 1000LL;
-                  |   (void)periodic_dispatcher_write_int64_t(&${VAR_PERIODIC_TIME});
-                  |   ${registerPeriodicCallback()}
-                  |}
-                  |"""
-    return ret
-  }
-
-  def registerPeriodicCallback(): ST = {
-    return st"CALLBACKOP(${Util.brand("timer_complete_reg_callback")}(${METHOD_PERIODIC_CALLBACK}, NULL));"
-  }
-
-  def drainPeriodicQueue(componentName: String, userEntrypoint: String): (ST, ST) = {
-    val methodName = Util.brand(s"entrypoint_${componentName}_periodic_dispatcher")
-
-    val impl = st"""void ${methodName}(const int64_t * in_arg) {
-                   |  ${userEntrypoint}((int64_t *) in_arg);
-                   |}"""
-
-    val drain = st"""if(${VAR_PERIODIC_OCCURRED}){
-                    |  ${VAR_PERIODIC_OCCURRED} = false;
-                    |  ${methodName}(&${VAR_PERIODIC_TIME});
-                    |}"""
-    return (impl, drain)
   }
 }
 
@@ -1123,11 +882,13 @@ object Transformers {
 
     val missingArrayBaseType: ir.Property = ir.Property(
       name = ir.Name(ISZ(Util.PROP_DATA_MODEL__BASE_TYPE), None()),
-      propertyValues = ISZ(ir.ClassifierProp(Util.MISSING_AADL_TYPE)))
+      propertyValues = ISZ(ir.ClassifierProp(Util.MISSING_AADL_TYPE)),
+      appliesTo = ISZ())
 
     val sporadicProp: ir.Property = ir.Property(
       name = ir.Name(ISZ(Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL), None()),
-      propertyValues = ISZ(ir.ValueProp("Sporadic")))
+      propertyValues = ISZ(ir.ValueProp("Sporadic")),
+      appliesTo = ISZ())
 
 
     override def postAadl(ctx: CTX, o: Aadl): Transformer.TPostResult[CTX, Aadl] = {
@@ -1174,7 +935,7 @@ object Transformers {
     }
 
     override def postFeatureEnd(ctx: CTX, o: FeatureEnd): Transformer.TPostResult[CTX, FeatureEnd] = {
-      if (Util.isDataport(o) && o.classifier.isEmpty) {
+      if (Util.isDataPort(o) && o.classifier.isEmpty) {
         Util.addWarning(s"No datatype specified for data port ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
 
         ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))

@@ -14,17 +14,19 @@ object Act {
     val destDir = new File(args(1))
 
     ir.JSON.toAadl(input) match {
-      case Either.Left(m) => run(destDir, m, ISZ())
+      case Either.Left(m) => run(destDir, m, ISZ(), None())
       case Either.Right(m) =>
         Console.println(s"Json deserialization error at (${m.line}, ${m.column}): ${m.message}")
     }
   }
 
-  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[Predef.String]) : Int = {
-    run(destDir, m, auxDirectories, None[File])
+  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[Predef.String], aadlRootDir: Option[File]) : Int = {
+    run(destDir, m, auxDirectories, aadlRootDir,
+      F, ISZ(), None(), None())
   }
 
-  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[Predef.String], aadlRootDir: Option[File]) : Int = {
+  def run(destDir: File, m: ir.Aadl, auxDirectories: ISZ[Predef.String], aadlRootDir: Option[File],
+          hamrIntegration: B, hamrIncludeDirs: ISZ[Predef.String], hamrStaticLib: Option[Predef.String], hamrBasePackageName: Option[String]) : Int = {
 
     if(m.components.isEmpty) {
       Console.err.println("Model is empty")
@@ -42,8 +44,8 @@ object Act {
     var hFiles: ISZ[org.sireum.String] = ISZ()
 
     if(auxDirectories.nonEmpty) {
-      val auxSrcDir = new File(_destDir, "aux/src")
-      val auxIncludesDir = new File(_destDir, "aux/includes")
+      val auxSrcDir = new File(_destDir, s"${Util.AUX_CODE_DIRECTORY_NAME}/src")
+      val auxIncludesDir = new File(_destDir, s"${Util.AUX_CODE_DIRECTORY_NAME}/includes")
 
       auxSrcDir.mkdirs()
       auxIncludesDir.mkdirs()
@@ -52,12 +54,12 @@ object Act {
         dir.listFiles().filter(p => p.getName.endsWith(".c")).foreach(f => {
           val dfile = new File(auxSrcDir, f.getName)
           java.nio.file.Files.copy(f.toPath, dfile.toPath, StandardCopyOption.REPLACE_EXISTING)
-          cFiles = cFiles :+ s"aux/src/${dfile.getName}"
+          cFiles = cFiles :+ s"${Util.AUX_CODE_DIRECTORY_NAME}/src/${dfile.getName}"
         })
         dir.listFiles().filter(p => p.getName.endsWith(".h")).foreach(f => {
           val dfile = new File(auxIncludesDir, f.getName)
           java.nio.file.Files.copy(f.toPath, dfile.toPath, StandardCopyOption.REPLACE_EXISTING)
-          hFiles = hFiles :+ s"aux/includes/${dfile.getName}"
+          hFiles = hFiles :+ s"${Util.AUX_CODE_DIRECTORY_NAME}/includes/${dfile.getName}"
         })
         dir.listFiles().foreach(f => if (f.isDirectory) processDir(f))
       }
@@ -80,14 +82,45 @@ object Act {
     val result = ir.Transformer(Transformers.MissingTypeRewriter()).transformAadl(Transformers.CTX(F, F), m1)
     val m2 = if(result.resultOpt.nonEmpty) result.resultOpt.get else m1
 
+    def locateCResources(dirName: String): ISZ[org.sireum.String] = {
+      val dir = new File(dirName)
+      if(!dir.exists() || !dir.isDirectory) {
+        Console.err.println(s"${dirName} does not exist or is not a directory")
+        return ISZ()
+      }
+      var dirs = dir.listFiles().filter(p => p.isDirectory && !p.getName.contains("CMakeFiles")).flatMap(d => locateCResources(d.getAbsolutePath).elements)
+      if(dir.listFiles().filter(f => f.isFile && (f.getName.endsWith(".c") || f.getName.endsWith(".h"))).nonEmpty){
+        dirs = org.sireum.String(dir.getAbsolutePath) +: dirs
+      }
+      ISZ(dirs:_*)
+    }
+
     if(!result.ctx.hasErrors) {
-      Gen().process(m2, hFiles) match {
+      val pathSep: org.sireum.C = '/'
+      val _hamrIncludes:ISZ[org.sireum.String] = hamrIncludeDirs.flatMap(d => locateCResources(d)).map(m => {
+        val _m = org.sireum.String(new File(m.native).getCanonicalPath)
+        var rm = Util.relativizePaths(destDir.getCanonicalPath, _m, pathSep, "")
+        if(rm != _m && org.sireum.ops.StringOps(rm).startsWith(s"${pathSep}")) {
+          // was able to relativize, but has a leading path sep so remove it
+          rm = org.sireum.ops.StringOps(rm).substring(1, rm.size)
+        }
+        rm
+      })
+      val _hamrStaticLib: Option[org.sireum.String] = if(hamrStaticLib.nonEmpty) {
+        val f = new File(hamrStaticLib.get)
+        Some(Util.relativizePaths(destDir.getCanonicalPath, f.getCanonicalPath, pathSep, "${CMAKE_CURRENT_LIST_DIR}"))
+      } else {
+        None()
+      }
+      val _hamrBasePackageName: Option[org.sireum.String] = hamrBasePackageName.map(x => org.sireum.String(x))
+
+      Gen(m2, hamrIntegration, _hamrBasePackageName).process(hFiles) match {
         case Some(con) =>
           val rootDir = aadlRootDir match {
             case Some(f) => f.getAbsolutePath
             case _ => ""
           }
-          val out = BijiPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir)
+          val out = ActPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir, _hamrIncludes, _hamrStaticLib)
           return 0
         case _ =>
       }

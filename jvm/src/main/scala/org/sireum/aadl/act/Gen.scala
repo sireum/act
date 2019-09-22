@@ -7,7 +7,7 @@ import org.sireum.ops.ISZOps
 import org.sireum.aadl.ir
 import org.sireum.aadl.act.ast._
 
-@record class Gen() {
+@record class Gen(model: ir.Aadl, hamrIntegration: B, hamrBasePackageName: Option[String]) {
 
   var topLevelProcess: Option[ir.Component] = None[ir.Component]()
   var typeHeaderFileName: String = ""
@@ -42,7 +42,7 @@ import org.sireum.aadl.act.ast._
     return count - 1
   }
 
-  def process(model : ir.Aadl, cSources: ISZ[String]) : Option[ActContainer] = {
+  def process(cSources: ISZ[String]) : Option[ActContainer] = {
 
     val components = model.components.filter(f => f.category != ir.ComponentCategory.Data)
     if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
@@ -53,6 +53,10 @@ import org.sireum.aadl.act.ast._
     buildComponentMap(system)
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
+
+    if(hamrIntegration) {
+      auxCSources = auxCSources :+ st"#include <all.h>" :+ st"#include <ipc.h>"
+    }
 
     for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
     val sortedData = sortData(typeMap.values)
@@ -72,6 +76,13 @@ import org.sireum.aadl.act.ast._
         Util.addWarning("Branding disabled")
       }
       gen(system)
+    }
+
+    if(!hasErrors && hamrIntegration) {
+      val pair = StringTemplate.hamrIPC(Util.getNumberPorts(model), hamrBasePackageName.get)
+
+      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1)
+      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2)
     }
 
     if(!hasErrors) {
@@ -167,9 +178,12 @@ import org.sireum.aadl.act.ast._
             } else {
               Util.getStackSize(sc).get
             }
-            configuration = configuration :+ StringTemplate.configurationStackSize(componentId, stackSize)
+            configuration = configuration :+ StringTemplate.configurationControlStackSize(componentId, stackSize)
           }
 
+          if(hamrIntegration) {
+            configuration = configuration :+ StringTemplate.configurationStackSize(componentId, 8388608)
+          }
         case ir.ComponentCategory.Subprogram =>
           var params: ISZ[Parameter] = ISZ()
           for(f <- sc.features) {
@@ -644,7 +658,7 @@ import org.sireum.aadl.act.ast._
 
     var cRunPreEntries: ISZ[ST] = cDrainQueues.map(x => x._1)
 
-    var stDrainQueues: ISZ[ST] = cDrainQueues.map(x => x._2)
+    var stRunLoopEntries: ISZ[ST] = cDrainQueues.map(x => x._2)
 
     Util.getDispatchProtocol(c) match {
       case Some(Dispatch_Protocol.Periodic) =>
@@ -674,7 +688,7 @@ import org.sireum.aadl.act.ast._
             val drains = StringTemplate.drainPeriodicQueue(cid, handler)
 
             cImpls = cImpls :+ drains._1
-            stDrainQueues = stDrainQueues :+ drains._2
+            stRunLoopEntries = stRunLoopEntries :+ drains._2
           case _ => addError(s"Periodic thread ${cid} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
         }
       case Some(Dispatch_Protocol.Sporadic) =>
@@ -687,17 +701,90 @@ import org.sireum.aadl.act.ast._
         }
     }
 
-    Util.getInitializeEntryPoint(c.properties) match {
-      case Some(methodName) =>
-        cIncludes = cIncludes :+ st"""void ${methodName}(const int64_t *arg);"""
-        val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(cid, methodName)
-        cImpls = cImpls :+ cimpl
-        cRunPreEntries = cRunPreEntries :+ runEntry
-      case _ =>
+    if(!hamrIntegration) {
+      Util.getInitializeEntryPoint(c.properties) match {
+        case Some(methodName) =>
+          cIncludes = cIncludes :+ st"""void ${methodName}(const int64_t *arg);"""
+          val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(cid, methodName)
+          cImpls = cImpls :+ cimpl
+          cRunPreEntries = cRunPreEntries :+ runEntry
+        case _ =>
+      }
+    }
+
+    var sources: ISZ[Resource] = ISZ()
+
+    if(hamrIntegration) {
+      cPreInits = cPreInits :+ st"" // blank line
+
+      cPreInits = cPreInits :+ StringTemplate.hamrIntialise(hamrBasePackageName.get, cid)
+
+      cPreInits = cPreInits :+ st"// fetch assigned port ids"
+
+      var sends: ISZ[(ST, ST)] = ISZ()
+
+      val outgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c)
+      for(f <- outgoingPorts) {
+        val ports: ISZ[(ir.Component, ir.FeatureEnd)]  = Util.getConnectedPorts(model, f)
+        cPreInits = cPreInits ++ ports.map(pair => {
+          val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, pair._1)
+          val dstPortName = Util.getLastName(pair._2.identifier)
+          val camkesId = s"${Util.nameToString(pair._2.identifier)}_id"
+
+          cImpls = st"int32_t ${camkesId};" +: cImpls
+
+          val stpair =  (st"port == ${camkesId}",
+            st"${StringTemplate.hamrEnqueue(f, pair._2, hamrBasePackageName.get, typeMap)}")
+
+          sends = sends :+ stpair
+
+          st"${camkesId} = ${archId}(SF)->${dstPortName}.id + seed;"
+        })
+      }
+
+      var receives: ISZ[ST] = ISZ()
+      
+      val inPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c)
+
+      val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, c)
+      cPreInits = cPreInits ++ inPorts.map(m => {
+        val portName = Util.getLastName(m.identifier)
+        val camkesId = s"${portName}_id"
+
+        cImpls = st"int32_t ${camkesId};" +: cImpls
+
+        receives = receives :+ StringTemplate.hamrDrainQueue(m, hamrBasePackageName.get, typeMap)
+
+        st"${camkesId} = ${archId}(SF)->${portName}.id + seed;"
+      })
+
+      cPreInits = cPreInits :+ st"" // blank line
+
+      cPreInits = cPreInits :+ StringTemplate.hamrInitialiseEntrypoint(hamrBasePackageName.get, cid)
+
+      cRunPreEntries = ISZ()
+
+      stRunLoopEntries = StringTemplate.hamrRunLoopEntries(hamrBasePackageName.get, c)
+
+      val id = st"${cid} camkes_sendAsync"
+      val ifElses = StringTemplate.ifEsleHelper(sends,
+        Some(st"""printf("${id}: not expecting port id %i\n", port);"""))
+
+      cImpls = cImpls :+ st"""void camkes_sendAsync(Z port, art_DataContent d) {
+                             |  ${ifElses}
+                             |}
+                             |"""
+
+      cImpls = cImpls :+ st"""void transferIncomingDataToArt() {
+                             |  ${(receives, "\n")}
+                             |}
+                             |"""
+
+      sources = sources :+ Resource("includes/ipc.c", st"")
     }
 
     containers = containers :+ C_Container(cid,
-      ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunPreEntries, stDrainQueues)),
+      ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunPreEntries, stRunLoopEntries)) ++ sources,
       ISZ(genComponentTypeInterfaceFile(c, cIncludes)),
       Util.getSourceText(c.properties)
     )
@@ -1019,7 +1106,7 @@ import org.sireum.aadl.act.ast._
                   |}""")
             case _ => None[ST]()
           }
-        } else {
+        } else if(!hamrIntegration) {
           val simpleName = Util.getLastName(feature.identifier)
           val methodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
 
@@ -1050,7 +1137,10 @@ import org.sireum.aadl.act.ast._
               |void ${methodName}(const ${paramType} * in_arg) {
               |  ${invokeHandler}
               |}""")
+        } else {
+          None()
         }
+
         Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
 
       case ir.FeatureCategory.EventPort =>
@@ -1191,11 +1281,11 @@ import org.sireum.aadl.act.ast._
     return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_INCLUDES}/${compTypeHeaderFileName}.h", ret)
   }
 
-  def genComponentTypeImplementationFile(component:ir.Component, sts: ISZ[ST], preInitComments: ISZ[ST],
+  def genComponentTypeImplementationFile(component:ir.Component, blocks: ISZ[ST], preInitComments: ISZ[ST],
                                          cRunPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): Resource = {
     val name = Util.getClassifier(component.classifier.get)
     val compTypeFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
-    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, sts, preInitComments,
+    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, blocks, preInitComments,
       cRunPreEntries, cDrainQueues, Util.isSporadic(component))
 
     return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret)
@@ -1228,7 +1318,7 @@ import org.sireum.aadl.act.ast._
 
         f match {
           case fe: ir.FeatureEnd =>
-            if (Util.isDataport(fe) && fe.classifier.isEmpty) {
+            if (Util.isDataPort(fe) && fe.classifier.isEmpty) {
               addWarning(s"Data type missing for feature ${fe.category} ${Util.getName(fe.identifier)}")
             }
           case _ =>

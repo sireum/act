@@ -6,7 +6,7 @@ import org.sireum._
 import org.sireum.aadl.act.ast._
 import org.sireum.ops.StringOps
 
-@record class BijiPrettyPrint() {
+@record class ActPrettyPrint() {
 
   var out : ISZ[(String, ST)] = ISZ()
   var rootServer: String = ""
@@ -14,7 +14,9 @@ import org.sireum.ops.StringOps
 
   def tempEntry(destDir: String, container: ActContainer,
                 cFiles: ISZ[String],
-                aadlRootDir: String
+                aadlRootDir: String,
+                hamrIncludeDirs: ISZ[String],
+                hamrStaticLib: Option[String]
                ): ISZ[(String, ST)] = {
     rootServer = container.rootServer
     actContainer = Some(container)
@@ -53,14 +55,14 @@ import org.sireum.ops.StringOps
 
       sources = sources ++ c.cSources.map((r: Resource) => r.path)
       includes = includes ++ c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
-      StringTemplate.cmakeComponent(c.component, sources, includes, cFiles.nonEmpty)
+      StringTemplate.cmakeComponent(c.component, sources, includes, cFiles.nonEmpty, hamrIncludeDirs.nonEmpty, hamrStaticLib.nonEmpty)
     })
 
     container.monitors.foreach(m => {
       prettyPrint(ISZ(m.writer, m.interface))
 
       cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
-        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), cFiles.nonEmpty)
+        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, F, F)
 
       NativeIO.writeToFile(s"${destDir}/${m.cimplementation.path}", m.cimplementation.contents.render, T)
       NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
@@ -68,9 +70,9 @@ import org.sireum.ops.StringOps
     })
 
 
-    val auxCFiles: ISZ[ST] = cFiles.map(c => StringTemplate.auxTemplate(c))
+    //val auxCFiles: ISZ[ST] = cFiles.map(c => StringTemplate.auxTemplate(c))
     val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, cmakeComponents, Util.CMAKE_VERSION,
-      auxCFiles, container.connectors.nonEmpty)
+      cFiles, container.connectors.nonEmpty, hamrIncludeDirs, hamrStaticLib)
     NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
 
     (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))

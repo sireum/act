@@ -51,10 +51,27 @@ object cli {
       ),
       Opt(name = "auxDirs", longKey = "aux-directories", shortKey = Some('a'),
         tpe = Type.Path(multiple = T, default = None()),
-        description = "Directories containing C files to be included in build"),
+        description = "Directories containing C files to be included in build"
+      ),
       Opt(name = "aadlRootDir", longKey = "root-dir", shortKey = Some('r'),
         tpe = Type.Path(multiple = F, default = None()),
-        description = "")
+        description = ""
+      ),
+      Opt(name = "hamr", longKey = "hamr", shortKey = Some('h'),
+        tpe = Type.Flag(F),
+        description = "Perform HAMR integration"
+      ),
+      Opt(name = "hamrIncludeDirs", longKey = "hamr-include-dirs", shortKey = None(),
+        tpe = Type.Path(multiple = T, default = None()),
+        description = "Directory to scan for C header files"
+      ),
+      Opt(name = "hamrStaticLib", longKey = "hamr-static-lib", shortKey = None(),
+        tpe = Type.Path(multiple = F, default = None()),
+        description = "Path to HARM static library"
+      ),
+      Opt(name = "hamrBasePackageName", longKey = "hamr-base-package-name", shortKey = None(),
+        tpe = Type.Str(sep = None(), default = None()),
+        description = "Slang base package name")
     ),
     groups = ISZ()
   )
