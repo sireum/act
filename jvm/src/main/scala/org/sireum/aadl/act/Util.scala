@@ -461,8 +461,8 @@ object Util {
   }
 
   def getNumberPorts(model: ir.Aadl): Z = {
-    val ports = getComponents(model).filter(c => c.category == ir.ComponentCategory.Thread)
-      .flatMap(c => c.features.filter(cf => Util.isDataPort(cf) || Util.isEventPort(cf)))
+    val ports = getComponents(model).filter((c: ir.Component) => c.category == ir.ComponentCategory.Thread)
+      .flatMap((c: ir.Component) => c.features.filter(cf => Util.isDataPort(cf) || Util.isEventPort(cf)))
     return ports.size
   }
 

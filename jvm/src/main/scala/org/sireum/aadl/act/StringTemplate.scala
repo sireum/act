@@ -541,7 +541,7 @@ object StringTemplate{
   }
 
   def ifElseST(ifbranch: Option[(ST, ST)], elsifs: ISZ[(ST, ST)], els: Option[ST]): ST = {
-    val e = elsifs.map(x => st"""else if(${x._1}) {
+    val e = elsifs.map((x: (ST, ST)) => st"""else if(${x._1}) {
                                 |  ${x._2}
                                 |}
                                 |""")
@@ -554,11 +554,11 @@ object StringTemplate{
     }
 
     if(elsifs.nonEmpty) {
-      val e = elsifs.map(x => st"""else if(${x._1}) {
-                                  |  ${x._2}
-                                  |}""")
+      val ei = elsifs.map((x: (ST, ST)) => st"""else if(${x._1}) {
+                                               |  ${x._2}
+                                               |}""")
       body = st"""${body}
-                 |${e}"""
+                 |${ei}"""
     }
 
     if(els.nonEmpty) {

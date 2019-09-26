@@ -726,7 +726,7 @@ import org.sireum.aadl.act.ast._
       val outgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c)
       for(f <- outgoingPorts) {
         val ports: ISZ[(ir.Component, ir.FeatureEnd)]  = Util.getConnectedPorts(model, f)
-        cPreInits = cPreInits ++ ports.map(pair => {
+        val tports: ISZ[ST] = ports.map((pair : (ir.Component, ir.FeatureEnd)) => {
           val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, pair._1)
           val dstPortName = Util.getLastName(pair._2.identifier)
           val camkesId = s"${Util.nameToString(pair._2.identifier)}_id"
@@ -740,6 +740,7 @@ import org.sireum.aadl.act.ast._
 
           st"${camkesId} = ${archId}(SF)->${dstPortName}.id + seed;"
         })
+        cPreInits = cPreInits ++ tports
       }
 
       var receives: ISZ[ST] = ISZ()
@@ -747,7 +748,7 @@ import org.sireum.aadl.act.ast._
       val inPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c)
 
       val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, c)
-      cPreInits = cPreInits ++ inPorts.map(m => {
+      val tinPorts: ISZ[ST] = inPorts.map((m: ir.FeatureEnd) => {
         val portName = Util.getLastName(m.identifier)
         val camkesId = s"${portName}_id"
 
@@ -757,6 +758,7 @@ import org.sireum.aadl.act.ast._
 
         st"${camkesId} = ${archId}(SF)->${portName}.id + seed;"
       })
+      cPreInits = cPreInits ++ tinPorts
 
       cPreInits = cPreInits :+ st"" // blank line
 
