@@ -57,7 +57,7 @@ object hamrCodeGenCli {
       )),
       OptGroup(name = "Transpiler", opts = ISZ(
         Opt(name = "ipc", longKey = "ipc-mechanism", shortKey = None(),
-          tpe = Type.Choice(name = "ipcMechanism", sep = None(), elements = ISZ("MessageQueue", "SharedMemory")),
+          tpe = Type.Choice(name = "ipcMechanism", sep = None(), elements = ISZ("SharedMemory", "MessageQueue")),
           description = "IPC communication mechanism (requires 'trans' option)"),
         Opt(name = "slangAuxCodeDir", longKey = "slang-aux-code-dir", shortKey = None(),
           tpe = Type.Path(multiple = F, default = None()),

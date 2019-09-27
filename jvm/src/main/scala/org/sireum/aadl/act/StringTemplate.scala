@@ -6,12 +6,12 @@ import org.sireum._
 import org.sireum.aadl.ir
 import org.sireum.aadl.ir.Component
 
-object StringTemplate{
+object StringTemplate {
 
   val SB_VERIFY: String = Util.cbrand("VERIFY")
 
-  val MON_READ_ACCESS:String = Util.cbrand("MONITOR_READ_ACCESS")
-  val MON_WRITE_ACCESS:String = Util.cbrand("MONITOR_WRITE_ACCESS")
+  val MON_READ_ACCESS: String = Util.cbrand("MONITOR_READ_ACCESS")
+  val MON_WRITE_ACCESS: String = Util.cbrand("MONITOR_WRITE_ACCESS")
 
   def tbInterface(macroName: String): ST = {
     val r : ST = st"""#ifdef ${macroName}
@@ -182,81 +182,54 @@ object StringTemplate{
   val AUX_C_SOURCES: String = "AUX_C_SOURCES"
   val AUX_C_INCLUDES: String = "AUX_C_INCLUDES"
 
-  def cmakeList(projectName: String, rootServer: String, components: ISZ[ST], cmakeVersion: String,
-                auxCSources: ISZ[String], hasConnectorDefs: B,
-                hamrIncludeDirs: ISZ[String], hamrStaticLib: Option[String]
-               ): ST = {
+  def cmakeHamrIncludes(hamrIncludeDirs: ISZ[String]): ST = {
+    return st"""set(${Util.HAMR_INCLUDES_NAME}
+               |  ${(hamrIncludeDirs, "\n")}
+               |)"""
+  }
 
-    val slangIncludes: ST = if(hamrIncludeDirs.nonEmpty) {
-      st"""set(${Util.SLANG_INCLUDES_NAME}
-          |  ${(hamrIncludeDirs, "\n")}
-          |)
-          |"""
-    } else {
-      st""
-    }
+  def cmakeAuxSources(auxCSources: ISZ[String]): ST = {
+    return st"""set(${AUX_C_SOURCES} ${(auxCSources, " ")})
+               |set(${AUX_C_INCLUDES} ${Util.AUX_CODE_DIRECTORY_NAME}/includes)"""
+  }
 
-    val slangLib: ST = if(hamrStaticLib.nonEmpty) {
-      st"""set(${Util.SLANG_LIB_NAME} ${hamrStaticLib.get})
-          """
-    } else {
-      st""
-    }
+  def cmakeHamrLib(hamrStaticLib: String): ST = {
+    return st"set(${Util.HAMR_LIB_NAME} ${hamrStaticLib})"
+  }
 
-    val aux:ST = if(auxCSources.nonEmpty) {
-      st"""set(${AUX_C_SOURCES} ${(auxCSources, " ")})
-          |set(${AUX_C_INCLUDES} ${Util.AUX_CODE_DIRECTORY_NAME}/includes)
-          |"""
-    } else { st"""""" }
+  def cmakeHamrExecuteProcess(): ST = {
+    return st"""execute_process(COMMAND bash -c "$${CMAKE_CURRENT_LIST_DIR}/compile-hamr-lib.sh")"""
+  }
 
-    val connectors: ST = if(hasConnectorDefs) { st"""# add path to connector templates
-                                                    |CAmkESAddTemplatesPath(../../../../components/templates/)
-                                                    |"""
-    } else { st"" }
-
-    val r: ST =
-      st"""cmake_minimum_required(VERSION ${cmakeVersion})
-          |
-          |project (${rootServer} C)
-          |
-          |${slangLib}
-          |${slangIncludes}
-          |${connectors}
-          |${aux}
-          |${(components, "\n\n")}
-          |
-          |DeclareCAmkESRootserver(${rootServer}.camkes)
-          |"""
-    return r
+  def cmakeLists(cmakeVersion: String, rootServer: String, entries: ISZ[ST]): ST = {
+    return st"""cmake_minimum_required(VERSION ${cmakeVersion})
+               |
+               |project (${rootServer} C)
+               |
+               |${(entries, "\n\n")}
+               |
+               |DeclareCAmkESRootserver(${rootServer}.camkes)
+               |"""
   }
 
   def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String], hasAux: B,
                      hasHamrIncl: B, hasHamrLib: B): ST = {
     var srcs: ISZ[ST] = ISZ()
     if(hasAux) { srcs = srcs :+ st"$${${AUX_C_SOURCES}} " }
+    if(sources.nonEmpty) { srcs = srcs :+ st"""${(sources, " ")}""" }
 
     var incls: ISZ[ST] = ISZ()
     if(hasAux) { incls = incls :+ st"$${${AUX_C_INCLUDES}} " }
-    if(hasHamrIncl){ incls = incls :+ st"$${${Util.SLANG_INCLUDES_NAME}} "}
+    if(hasHamrIncl){ incls = incls :+ st"$${${Util.HAMR_INCLUDES_NAME}} "}
+    if(includes.nonEmpty) { incls = incls :+ st"""${(includes, " ")}""" }
 
-    val libs: ST = if(hasHamrLib) { st"LIBS $${${Util.SLANG_LIB_NAME}}"}
+    val libs: ST = if(hasHamrLib) { st"LIBS $${${Util.HAMR_LIB_NAME}}"}
     else { st"" }
-
-    val s: ST = if(sources.nonEmpty){
-      st"""SOURCES ${(srcs, " ")}${(sources, " ")}"""
-    } else{
-      st""
-    }
-    val i: ST = if(includes.nonEmpty){
-      st"""INCLUDES ${(incls, " ")}${(includes, " ")}"""
-    } else{
-      st""
-    }
 
     val r: ST =
       st"""DeclareCAmkESComponent(${componentName}
-          |  ${s}
-          |  ${i}
+          |  SOURCES $srcs
+          |  INCLUDES $incls
           |  ${libs}
           |)"""
     return r

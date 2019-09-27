@@ -69,10 +69,32 @@ import org.sireum.ops.StringOps
       NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
     })
 
+    var cmakeEntries: ISZ[ST] = ISZ()
 
-    //val auxCFiles: ISZ[ST] = cFiles.map(c => StringTemplate.auxTemplate(c))
-    val cmakelist = StringTemplate.cmakeList(container.rootServer, container.rootServer, cmakeComponents, Util.CMAKE_VERSION,
-      cFiles, container.connectors.nonEmpty, hamrIncludeDirs, hamrStaticLib)
+    if(hamrStaticLib.nonEmpty) {
+      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess() :+
+        StringTemplate.cmakeHamrLib(hamrStaticLib.get)
+    }
+
+    if(hamrIncludeDirs.nonEmpty) {
+      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(hamrIncludeDirs)
+    }
+
+    if(container.connectors.nonEmpty) {
+      cmakeEntries = cmakeEntries :+
+        st"""# add path to connector templates
+            |CAmkESAddTemplatesPath(../../../../components/templates/)
+            |"""
+    }
+
+    if(cFiles.nonEmpty) {
+      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeAuxSources(cFiles)
+    }
+
+    cmakeEntries = cmakeEntries ++ cmakeComponents
+
+    val cmakelist = StringTemplate.cmakeLists(Util.CMAKE_VERSION, container.rootServer, cmakeEntries)
+
     NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
 
     (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))

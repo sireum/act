@@ -71,9 +71,9 @@ object Util {
 
   val MISSING_AADL_TYPE: String = "MISSING_AADL_TYPE"
 
-  val SLANG_INCLUDES_NAME: String = "SLANG_INCLUDES"
+  val HAMR_INCLUDES_NAME: String = "HAMR_INCLUDES"
 
-  val SLANG_LIB_NAME: String = "SLANG_LIB"
+  val HAMR_LIB_NAME: String = "HAMR_LIB"
 
   val AUX_CODE_DIRECTORY_NAME: String = "aux_code"
 
