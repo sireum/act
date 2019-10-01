@@ -1,4 +1,4 @@
-package org.sireum.aadl.act
+package org.sireum.hamr.act
 
 import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.StandardCopyOption

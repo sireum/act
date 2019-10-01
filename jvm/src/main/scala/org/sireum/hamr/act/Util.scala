@@ -1,11 +1,11 @@
 // #Sireum
 
-package org.sireum.aadl.act
+package org.sireum.hamr.act
 
 import org.sireum._
 import org.sireum.ops._
-import org.sireum.aadl.ir
-import org.sireum.aadl.ir.{Aadl, Component, FeatureEnd, Transformer}
+import org.sireum.hamr.ir
+import org.sireum.hamr.ir.{Aadl, Component, FeatureEnd, Transformer}
 
 object Util {
 

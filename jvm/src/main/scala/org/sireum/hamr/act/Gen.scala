@@ -1,13 +1,15 @@
 // #Sireum
 
-package org.sireum.aadl.act
+package org.sireum.hamr.act
 
 import org.sireum._
 import org.sireum.ops.ISZOps
-import org.sireum.aadl.ir
-import org.sireum.aadl.act.ast._
+import org.sireum.hamr.act.ast._
+import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
+import org.sireum.hamr.ir
+import org.sireum.hamr.ir.Aadl
 
-@record class Gen(model: ir.Aadl, hamrIntegration: B, hamrBasePackageName: Option[String]) {
+@record class Gen(model: Aadl, hamrIntegration: B, hamrBasePackageName: Option[String]) {
 
   var topLevelProcess: Option[ir.Component] = None[ir.Component]()
   var typeHeaderFileName: String = ""

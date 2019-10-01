@@ -1,9 +1,10 @@
 // #Sireum
 
-package org.sireum.aadl.act
+package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.aadl.act.ast._
+import org.sireum.hamr.act.ast._
+import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Composition, Consumes, Dataport, Direction, Emits, Instance, Method, Procedure, Provides, Semaphore, Uses}
 import org.sireum.ops.StringOps
 
 @record class ActPrettyPrint() {

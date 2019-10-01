@@ -23,7 +23,7 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.sireum.aadl.act
+package org.sireum.hamr.act
 
 import org.sireum._
 import org.sireum.cli.CliOpt._

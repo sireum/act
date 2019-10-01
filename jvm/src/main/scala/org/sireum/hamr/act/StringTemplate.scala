@@ -1,10 +1,10 @@
 // #Sireum
 
-package org.sireum.aadl.act
+package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.aadl.ir
-import org.sireum.aadl.ir.Component
+import org.sireum.hamr.ir
+import org.sireum.hamr.ir.Component
 
 object StringTemplate {
 

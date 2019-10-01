@@ -1,10 +1,11 @@
-package org.sireum.aadl.act
+package org.sireum.hamr.act
 
-import org.sireum.aadl.ir
 import java.io.File
 import java.nio.file.StandardCopyOption
-import org.sireum.String
 
+import org.sireum.String
+import org.sireum.hamr.ir
+import org.sireum.hamr.ir.Transformer
 import org.sireum.{B, Either, F, ISZ, None, Option, Some, T, Z}
 
 object Act {
@@ -79,7 +80,7 @@ object Act {
     }
 
     val m1 = if(Util.DEVELOPER_MODE) {
-      ir.Transformer(Transformers.UnboundedIntegerRewriter()).transformAadl(F, m).resultOpt match {
+      Transformer(Transformers.UnboundedIntegerRewriter()).transformAadl(F, m).resultOpt match {
         case Some(mod) => mod
         case _ => m
       }
