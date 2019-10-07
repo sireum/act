@@ -4,11 +4,11 @@ import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.StandardCopyOption
 
 import org.sireum.B
-import org.sireum.println
+import org.sireum.message.Reporter
 
 object NativeIO_Ext {
 
-  def writeToFile(path: org.sireum.String, contents: org.sireum.String, overwrite: org.sireum.B): Unit = {
+  def writeToFile(path: org.sireum.String, contents: org.sireum.String, overwrite: org.sireum.B, reporter: Reporter): Unit = {
     val fname = new File(path.toString)
 
     try {
@@ -22,16 +22,16 @@ object NativeIO_Ext {
         bw.write(contents.toString)
         bw.close()
 
-        println("Wrote: " + fname)
+        reporter.info(org.sireum.None(), Util.toolName, ("Wrote: " + fname))
       }
     } catch {
       case e: Throwable =>
-        Util.addError("Error encountered while trying to create file: " + fname)
-        Util.addError(e.getMessage)
+        reporter.error(org.sireum.None(), Util.toolName, "Error encountered while trying to create file: " + fname)
+        reporter.error(org.sireum.None(), Util.toolName, e.getMessage)
     }
   }
 
-  def copyFile(srcPath: org.sireum.String, outputPath: org.sireum.String): String = {
+  def copyFile(srcPath: org.sireum.String, outputPath: org.sireum.String, reporter: Reporter): String = {
     val src = new File(srcPath.native)
 
     val outputDir = new File(outputPath.native)
@@ -42,7 +42,7 @@ object NativeIO_Ext {
 
     java.nio.file.Files.copy(src.toPath, outputFile.toPath, StandardCopyOption.REPLACE_EXISTING)
 
-    Util.addMessage(s"Wrote: ${outputFile}")
+    reporter.info(org.sireum.None(), Util.toolName, s"Wrote: ${outputFile}")
 
     return src.getName
   }

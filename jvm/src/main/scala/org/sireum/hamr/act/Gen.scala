@@ -8,8 +8,9 @@ import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Aadl
+import org.sireum.message.Reporter
 
-@record class Gen(model: Aadl, hamrIntegration: B, hamrBasePackageName: Option[String]) {
+@record class Gen(model: Aadl, hamrIntegration: B, hamrBasePackageName: Option[String], reporter: Reporter) {
 
   var topLevelProcess: Option[ir.Component] = None[ir.Component]()
   var typeHeaderFileName: String = ""
@@ -75,7 +76,7 @@ import org.sireum.hamr.ir.Aadl
 
     if(!hasErrors) {
       if(preventBadging) {
-        Util.addWarning("Branding disabled")
+        reporter.warn(None(), Util.toolName, "Branding disabled")
       }
       gen(system)
     }
@@ -156,7 +157,7 @@ import org.sireum.hamr.ir.Aadl
               typ = Util.NOTIFICATION_TYPE)
 
             val period: Z = if(Util.getPeriod(sc).isEmpty) {
-              Util.addWarning(s"Period not provided for periodic component ${classifier}, using ${Util.DEFAULT_PERIOD}")
+              reporter.warn(None(), Util.toolName, s"Period not provided for periodic component ${classifier}, using ${Util.DEFAULT_PERIOD}")
               Util.DEFAULT_PERIOD
             } else {
               Util.getPeriod(sc).get
@@ -167,7 +168,7 @@ import org.sireum.hamr.ir.Aadl
             configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(componentId, classifier, TimerUtil.TIMER_ID)
 
             val priority: Z = if(Util.getPriority(sc).isEmpty){
-              Util.addWarning(s"Priority not provided for ${classifier}, using ${Util.DEFAULT_PRIORITY}")
+              reporter.warn(None(), Util.toolName, s"Priority not provided for ${classifier}, using ${Util.DEFAULT_PRIORITY}")
               Util.DEFAULT_PRIORITY
             } else {
               Util.getPriority(sc).get
@@ -175,7 +176,7 @@ import org.sireum.hamr.ir.Aadl
             configuration = configuration :+ StringTemplate.configurationPriority(componentId, priority)
 
             val stackSize: Z = if(Util.getStackSize(sc).isEmpty) {
-              Util.addWarning(s"Stack Size not provided for ${classifier}, using ${Util.DEFAULT_STACK_SIZE}")
+              reporter.warn(None(), Util.toolName, s"Stack Size not provided for ${classifier}, using ${Util.DEFAULT_STACK_SIZE}")
               Util.DEFAULT_STACK_SIZE
             } else {
               Util.getStackSize(sc).get
@@ -236,7 +237,7 @@ import org.sireum.hamr.ir.Aadl
 
                   methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String]())
                 } else{
-                  addError(s"Could not resolve feature ${Util.getName(spa.identifier)} from ${Util.getName(sc.identifier)}")
+                  reporter.error(None(), Util.toolName, s"Could not resolve feature ${Util.getName(spa.identifier)} from ${Util.getName(sc.identifier)}")
                 }
               case _ =>
             }
@@ -273,10 +274,10 @@ import org.sireum.hamr.ir.Aadl
               if(thread.nonEmpty) {
                 val theOwner = thread(0)
                 if(thread.size > 1) {
-                  Util.addWarning(s"Found multiple matches for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property: ${owner}")
+                  reporter.warn(None(), Util.toolName, s"Found multiple matches for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property: ${owner}")
                 }
                 if(Util.getClassifier(theOwner.classifier.get) == owner){
-                  Util.addWarning(s"Fully qualified name '${theOwner.classifier.get.name}' should be used for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property")
+                  reporter.warn(None(), Util.toolName, s"Fully qualified name '${theOwner.classifier.get.name}' should be used for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property")
                 }
 
                 val subcomponentId = Util.getLastName(sc.identifier)
@@ -284,11 +285,11 @@ import org.sireum.hamr.ir.Aadl
                   (Util.getName(sc.identifier) ~> SharedData(theOwner, None[ir.FeatureAccess](), sc.classifier.get, subcomponentId))
 
               } else {
-                addError(st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread}:  Could not locate component '${owner}'.  Please use one of the following:
+                reporter.error(None(), Util.toolName, st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread}:  Could not locate component '${owner}'.  Please use one of the following:
                              |  ${(threads.map((m: ir.Component) => m.classifier.get.name), "\n")}""".render)
               }
             case _ =>
-              addError(st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property missing""".render)
+              reporter.error(None(), Util.toolName, st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property missing""".render)
           }
 
         case _ =>
@@ -399,7 +400,7 @@ import org.sireum.hamr.ir.Aadl
     resolveSharedDataFeatures(c.connectionInstances)
     val missingFeatures = sharedData.values.filter((f: SharedData) => f.ownerFeature.isEmpty)
     if(missingFeatures.nonEmpty) {
-      addError(s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
+      reporter.error(None(), Util.toolName, s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
     }
 
     for(conn <- c.connectionInstances) {
@@ -533,7 +534,7 @@ import org.sireum.hamr.ir.Aadl
           handleDataAccess()
 
         case _ =>
-          addError(s"Not expecting AccessType: ${Util.getName(f.identifier)}")
+          reporter.error(None(), Util.toolName, s"Not expecting AccessType: ${Util.getName(f.identifier)}")
       }
     }
 
@@ -598,7 +599,7 @@ import org.sireum.hamr.ir.Aadl
                 }
                 cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
               case _ =>
-                Util.addWarning(s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
+                reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
             }
 
           case _ =>
@@ -631,7 +632,7 @@ import org.sireum.hamr.ir.Aadl
           }
 
         case _ =>
-          Util.addWarning(s"Skipping ${f.category} for ${fid}.${fid}")
+          reporter.warn(None(), Util.toolName, s"Skipping ${f.category} for ${fid}.${fid}")
       }
 
       generateC_InterfaceMethod(c, f.asInstanceOf[ir.FeatureEnd]) match {
@@ -691,15 +692,15 @@ import org.sireum.hamr.ir.Aadl
 
             cImpls = cImpls :+ drains._1
             stRunLoopEntries = stRunLoopEntries :+ drains._2
-          case _ => addError(s"Periodic thread ${cid} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
+          case _ => reporter.error(None(), Util.toolName, s"Periodic thread ${cid} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
         }
       case Some(Dispatch_Protocol.Sporadic) =>
 
       case x =>
         if(x.nonEmpty) {
-          Util.addError(s"Dispatch protocol $x for ${Util.getLastName(c.identifier)} is not supported")
+          Util.reporter.error(None(), Util.toolName, s"Dispatch protocol $x for ${Util.getLastName(c.identifier)} is not supported")
         } else {
-          Util.addWarning(s"Dispatch Protocol not specified for ${Util.getLastName(c.identifier)}, assuming Sporadic")
+          reporter.warn(None(), Util.toolName, s"Dispatch Protocol not specified for ${Util.getLastName(c.identifier)}, assuming Sporadic")
         }
     }
 
@@ -906,7 +907,7 @@ import org.sireum.hamr.ir.Aadl
             }
           case ir.ConnectionKind.Access => // no monitor needed
           case _ =>
-            Util.addWarning(s"processInConnections: Not handling ${connInst}")
+            reporter.warn(None(), Util.toolName, s"processInConnections: Not handling ${connInst}")
         }
 
         i = i + 1
@@ -958,7 +959,7 @@ import org.sireum.hamr.ir.Aadl
           val fields: ISZ[ST] = c.subComponents.map(sub => {
             val fname: String = Util.getLastName(sub.identifier)
             if(ISZOps(Util.cKeywords).contains(fname)) {
-              addError(s"The attribute '${fname}' from data type ${name} is a reserved keyword")
+              reporter.error(None(), Util.toolName, s"The attribute '${fname}' from data type ${name} is a reserved keyword")
             }
             st"${processDataType(sub, T)} ${fname};"
           })
@@ -980,7 +981,7 @@ import org.sireum.hamr.ir.Aadl
           e match {
             case ir.ValueProp(value) => value
             case _ =>
-              addError(s"Unexpected enum value: ${e}")
+              reporter.error(None(), Util.toolName, s"Unexpected enum value: ${e}")
               ""
           }
         })
@@ -993,7 +994,7 @@ import org.sireum.hamr.ir.Aadl
         val dim: Z = TypeUtil.getArrayDimension(c) match {
           case Some(d) => d
           case _ =>
-            addError(s"Array dimension not specified for ${c.classifier.get.name}")
+            reporter.error(None(), Util.toolName, s"Array dimension not specified for ${c.classifier.get.name}")
             z"-1"
         }
         val container = Util.getContainerName(name)
@@ -1004,7 +1005,7 @@ import org.sireum.hamr.ir.Aadl
             |    ${name} f;
             |  } ${container};"""
       } else {
-        addError(s"Unexpected datatype: ${c}")
+        reporter.error(None(), Util.toolName, s"Unexpected datatype: ${c}")
         st" "
       }
 
@@ -1323,7 +1324,7 @@ import org.sireum.hamr.ir.Aadl
         f match {
           case fe: ir.FeatureEnd =>
             if (Util.isDataPort(fe) && fe.classifier.isEmpty) {
-              addWarning(s"Data type missing for feature ${fe.category} ${Util.getName(fe.identifier)}")
+              reporter.warn(None(), Util.toolName, s"Data type missing for feature ${fe.category} ${Util.getName(fe.identifier)}")
             }
           case _ =>
         }
@@ -1354,7 +1355,7 @@ import org.sireum.hamr.ir.Aadl
           val dst = componentMap.get(Util.getName(ci.dst.component)).get
           val srcName = s"${Util.getLastName(src.identifier)}.${Util.getLastName(ci.src.feature.get)}"
           val dstName = s"${Util.getLastName(dst.identifier)}.${Util.getLastName(ci.src.feature.get)}"
-          Util.addMessage(s"Ignoring ${src.category} to ${dst.category} connection: ${srcName} -> ${dstName}")
+          reporter.info(None(), Util.toolName, s"Ignoring ${src.category} to ${dst.category} connection: ${srcName} -> ${dstName}")
         }
       }
     }
@@ -1367,10 +1368,10 @@ import org.sireum.hamr.ir.Aadl
       if(processes.size > 0) {
         val candidates = processes.filter(f => ISZOps(f.subComponents).exists(p => p.category == ir.ComponentCategory.Thread))
         if(candidates.isEmpty) {
-          addWarning(s"None of the bound processes contain subcomponents")
+          reporter.warn(None(), Util.toolName, "None of the bound processes contain subcomponents")
           Some(processes(z"0"))
         } else if (candidates.size > 1) {
-          addError(s"${candidates.size} bound processes discovered, each containing thread subcomponents.")
+          reporter.error(None(), Util.toolName, s"${candidates.size} bound processes discovered, each containing thread subcomponents.")
           None[ir.Component]()
         } else {
           Some(candidates(z"0"))
@@ -1385,7 +1386,7 @@ import org.sireum.hamr.ir.Aadl
         topLevelProcess = Some(p)
         typeHeaderFileName = Util.getTypeHeaderFileName(p).get
       case _ =>
-        addError("No processor bound process defined")
+        reporter.error(None(), Util.toolName, "No processor bound process defined")
     }
 
     if(!hasErrors) {
@@ -1404,7 +1405,7 @@ import org.sireum.hamr.ir.Aadl
       val srcComp = componentMap.get(Util.getName(conn.src.component)).get
 
       if(srcComp.category != ir.ComponentCategory.Data) {
-        addError(s"${Util.getLastName(conn.src.component)} is not a data component")
+        reporter.error(None(), Util.toolName, s"${Util.getLastName(conn.src.component)} is not a data component")
       }
 
       val dataKey = Util.getName(conn.src.feature.get)
@@ -1417,16 +1418,16 @@ import org.sireum.hamr.ir.Aadl
           if(ownerId == dstId) {
             val _f = dstComp.features.filter(f => Util.getName(f.identifier) == Util.getName(conn.dst.feature.get))
             if(_f.size != 1) {
-              addError(s"There are ${_f.size} matching features for ${Util.getName(conn.dst.feature.get)}, expecting only 1.")
+              reporter.error(None(), Util.toolName, s"There are ${_f.size} matching features for ${Util.getName(conn.dst.feature.get)}, expecting only 1.")
             } else if(!_f(0).isInstanceOf[ir.FeatureAccess]) {
-              addError(s"${Util.getName(conn.dst.feature.get)} is not a FeatureAccess.")
+              reporter.error(None(), Util.toolName, s"${Util.getName(conn.dst.feature.get)} is not a FeatureAccess.")
             } else {
               // add the owner's feature
               sharedData = sharedData + (dataKey ~> SharedData(sd.owner, Some(_f(0).asInstanceOf[ir.FeatureAccess]), sd.typ, sd.subcomponentId))
             }
           }
         case _ =>
-          addError(s"Could not find data subcomponent: ${dataKey}")
+          reporter.error(None(), Util.toolName, s"Could not find data subcomponent: ${dataKey}")
       }
     }
   }
@@ -1448,7 +1449,7 @@ import org.sireum.hamr.ir.Aadl
         graph = graph + pair
       } else {
         if(!(TypeUtil.isBaseType(d) || TypeUtil.isEnumDef(d) || TypeUtil.isMissingType(d))) {
-          addError(s"Unexpected data type ${d}")
+          reporter.error(None(), Util.toolName, s"Unexpected data type ${d}")
         }
       }
     }
@@ -1474,15 +1475,6 @@ import org.sireum.hamr.ir.Aadl
     }
     sortByClassifier(graph.nodes.keys.filter(k => graph.incoming(k).size == z"0")).foreach(r => sortDependents(r))
     return sorted
-  }
-
-  def addWarning(msg:String):Unit = {
-    Util.addWarning(msg)
-  }
-
-  def addError(msg:String): Unit = {
-    hasErrors = T
-    Util.addError(msg)
   }
 }
 

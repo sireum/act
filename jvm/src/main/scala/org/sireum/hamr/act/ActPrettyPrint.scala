@@ -3,11 +3,12 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Composition, Consumes, Dataport, Direction, Emits, Instance, Method, Procedure, Provides, Semaphore, Uses}
+import org.sireum.message.Reporter
 import org.sireum.ops.StringOps
+import org.sireum.hamr.act.Util.reporter
 
-@record class ActPrettyPrint() {
+@record class ActPrettyPrint {
 
   var out : ISZ[(String, ST)] = ISZ()
   var rootServer: String = ""
@@ -19,6 +20,7 @@ import org.sireum.ops.StringOps
                 hamrIncludeDirs: ISZ[String],
                 hamrStaticLib: Option[String]
                ): ISZ[(String, ST)] = {
+
     rootServer = container.rootServer
     actContainer = Some(container)
 
@@ -41,15 +43,15 @@ import org.sireum.ops.StringOps
           if(NativeIO.fileExists(path)) {
 
             if(StringOps(st).endsWith(".c")) {
-              val fname = NativeIO.copyFile(path, s"${rootDestDir}/src")
+              val fname = NativeIO.copyFile(path, s"${rootDestDir}/src", reporter)
               sources = sources :+ s"${dir}/src/${fname}"
             } else if(StringOps(st).endsWith(".h")) {
-              NativeIO.copyFile(path, s"${rootDestDir}/includes")
+              NativeIO.copyFile(path, s"${rootDestDir}/includes", reporter)
             } else {
-              Util.addWarning(s"${path} does not appear to be a valid C source file")
+              reporter.warn(None(), Util.toolName, s"${path} does not appear to be a valid C source file")
             }
           } else {
-            Util.addWarning(s"${path} does not exist")
+            reporter.warn(None(), Util.toolName, s"${path} does not exist")
           }
         }
       }
@@ -65,9 +67,9 @@ import org.sireum.ops.StringOps
       cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
         ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, F, F)
 
-      NativeIO.writeToFile(s"${destDir}/${m.cimplementation.path}", m.cimplementation.contents.render, T)
-      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
-      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T)
+      NativeIO.writeToFile(s"${destDir}/${m.cimplementation.path}", m.cimplementation.contents.render, T, reporter)
+      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T, reporter)
+      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T, reporter)
     })
 
     var cmakeEntries: ISZ[ST] = ISZ()
@@ -96,9 +98,10 @@ import org.sireum.ops.StringOps
 
     val cmakelist = StringTemplate.cmakeLists(Util.CMAKE_VERSION, container.rootServer, cmakeEntries)
 
-    NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T)
+    NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T, reporter)
 
-    (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T))
+    (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T, reporter))
+
     return out
   }
 
@@ -114,7 +117,7 @@ import org.sireum.ops.StringOps
       case o: Assembly => visitAssembly(o)
       case o: Procedure => visitProcedure(o)
       case _ =>
-        Util.addError(s"Not handling: ast object ${a}")
+        reporter.error(None(), Util.toolName, s"Not handling: ast object ${a}")
     }
     return None()
   }
@@ -259,7 +262,7 @@ import org.sireum.ops.StringOps
 
 
 @ext object NativeIO {
-  def writeToFile(path: String, contents: String, overwrite: B): Unit = $
-  def copyFile(srcPath: org.sireum.String, outputPath: org.sireum.String): String = $
+  def writeToFile(path: String, contents: String, overwrite: B, reporter: Reporter): Unit = $
+  def copyFile(srcPath: org.sireum.String, outputPath: org.sireum.String, reporter: Reporter): String = $
   def fileExists(path: String): B = $
 }

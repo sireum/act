@@ -41,7 +41,7 @@ object hamrCodeGenCli {
       Opt(name = "verbose", longKey = "verbose", shortKey = None(),
         tpe = Type.Flag(F), description = "Enable verbose mode"),
       Opt(name = "platform", longKey = "platform", shortKey = None(),
-        tpe = Type.Choice(name = "platform", sep = None(), elements = ISZ("JVM", "Linux", "Cygwin", "MacOS", "seL4")),
+        tpe = Type.Choice(name = "HamrPlatform", sep = None(), elements = ISZ("JVM", "Linux", "Cygwin", "MacOS", "seL4", "seL4_Only", "seL4_TB")),
         description = "Target platform")
     ),
     groups = ISZ(
@@ -57,10 +57,10 @@ object hamrCodeGenCli {
       )),
       OptGroup(name = "Transpiler", opts = ISZ(
         Opt(name = "ipc", longKey = "ipc-mechanism", shortKey = None(),
-          tpe = Type.Choice(name = "ipcMechanism", sep = None(), elements = ISZ("SharedMemory", "MessageQueue")),
+          tpe = Type.Choice(name = "HamrIpcMechanism", sep = None(), elements = ISZ("SharedMemory", "MessageQueue")),
           description = "IPC communication mechanism (requires 'trans' option)"),
-        Opt(name = "slangAuxCodeDir", longKey = "slang-aux-code-dir", shortKey = None(),
-          tpe = Type.Path(multiple = F, default = None()),
+        Opt(name = "slangAuxCodeDirs", longKey = "slang-aux-code-dirs", shortKey = None(),
+          tpe = Type.Path(multiple = T, default = None()),
           description = "Auxiliary C source code directory"),
         Opt(name = "slangOutputCDir", longKey = "slang-output-c-dir", shortKey = None(),
           tpe = Type.Path(multiple = F, default = None()),
@@ -87,9 +87,6 @@ object hamrCodeGenCli {
           tpe = Type.Path(multiple = T, default = None()),
           description = "Directories containing C files to be included in CAmkES build"
         ),
-        Opt(name = "trustedBuildProfile", longKey = "trusted-build-profile", shortKey = None(),
-          tpe = Type.Flag(F),
-          description = "Used Trusted Build profile"),
         Opt(name = "aadlRootDir", longKey = "aadl-root-dir", shortKey = Some('r'),
           tpe = Type.Path(multiple = F, default = None()),
           description = "Root directory containing the AADL project"

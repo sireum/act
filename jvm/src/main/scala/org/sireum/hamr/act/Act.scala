@@ -1,52 +1,52 @@
 package org.sireum.hamr.act
 
+import org.sireum._
+
 import java.io.File
 import java.nio.file.StandardCopyOption
 
-import org.sireum.String
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Transformer
-import org.sireum.{B, Either, F, ISZ, None, Option, Some, T, Z}
+import org.sireum.message.Reporter
+import org.sireum.hamr.act.Util.reporter
 
 object Act {
 
-  def main(args: Array[Predef.String]): Unit = {
-    val inputFile = path2fileOpt("input file", Some(args(0)), F)
-    val input = scala.io.Source.fromFile(inputFile.get).getLines.mkString
+  def run(optOutputDir: Option[String], m: ir.Aadl, auxDirectories: ISZ[String], aadlRootDir: Option[String],
+          hamrIntegration: B, hamrIncludeDirs: ISZ[String], hamrStaticLib: Option[String], hamrBasePackageName: Option[String],
+          reporter: Reporter) : ACTResult = {
 
-    ir.JSON.toAadl(input) match {
-      case Either.Left(m) => run(None(), m, ISZ(), None())
-      case Either.Right(m) =>
-        Console.println(s"Json deserialization error at (${m.line}, ${m.column}): ${m.message}")
-    }
+    Util.reporter = reporter
+
+    val files = runInternal(optOutputDir, m, auxDirectories, aadlRootDir,
+      hamrIntegration, hamrIncludeDirs, hamrStaticLib, hamrBasePackageName)
+
+    return ACTResult(files)
   }
 
-  def run(optOutputDir: Option[Predef.String], m: ir.Aadl, auxDirectories: ISZ[Predef.String], aadlRootDir: Option[Predef.String]) : Int = {
-    run(optOutputDir, m, auxDirectories, aadlRootDir,
-      F, ISZ(), None(), None())
-  }
+  private def runInternal(optOutputDir: Option[String], m: ir.Aadl, auxDirectories: ISZ[String], aadlRootDir: Option[String],
+                          hamrIntegration: B, hamrIncludeDirs: ISZ[String], hamrStaticLib: Option[String], hamrBasePackageName: Option[String],
+                          ) : HashSMap[String, ST] = {
 
-  def run(optOutputDir: Option[Predef.String], m: ir.Aadl, auxDirectories: ISZ[Predef.String], aadlRootDir: Option[Predef.String],
-          hamrIntegration: B, hamrIncludeDirs: ISZ[Predef.String], hamrStaticLib: Option[Predef.String], hamrBasePackageName: Option[Predef.String]) : Int = {
+    var files: HashSMap[String, ST] = HashSMap.empty
 
     val outDir: String = if(optOutputDir.nonEmpty) optOutputDir.get else "."
 
     val destDir: File = new File(outDir.native)
     if(!destDir.exists()) {
       if(!destDir.mkdirs()){
-        Console.err.println(s"Could not create directory ${destDir.getPath}")
-        return -1
+        reporter.error(None(), Util.toolName, s"Could not create directory ${destDir.getPath}")
+        return files
       }
     }
     if (!destDir.isDirectory) {
-      Console.err.println(s"Path ${destDir.getPath} is not a directory")
-      return -1
+      reporter.error(None(), Util.toolName, s"Path ${destDir.getPath} is not a directory")
+      return files
     }
 
-
     if(m.components.isEmpty) {
-      Console.err.println("Model is empty")
-      return -1
+      reporter.error(None(), Util.toolName, "Model is empty")
+      return files
     }
 
     var cFiles: ISZ[org.sireum.String] = ISZ()
@@ -74,7 +74,7 @@ object Act {
       }
 
       for (d <- auxDirectories) {
-        val dir = new File(d)
+        val dir = new File(d.native)
         if (dir.isDirectory) processDir(dir)
       }
     }
@@ -94,7 +94,7 @@ object Act {
     def locateCResources(dirName: String): ISZ[org.sireum.String] = {
       val dir = new File(dirName.native)
       if(!dir.exists() || !dir.isDirectory) {
-        Console.err.println(s"${dirName} does not exist or is not a directory")
+        reporter.error(None(), Util.toolName, s"${dirName} does not exist or is not a directory")
         return ISZ()
       }
       var dirs = dir.listFiles().filter(p => p.isDirectory && !p.getName.contains("CMakeFiles")).flatMap(d => locateCResources(d.getAbsolutePath).elements)
@@ -116,32 +116,34 @@ object Act {
         rm
       })
       val _hamrStaticLib: Option[org.sireum.String] = if(hamrStaticLib.nonEmpty) {
-        val f = new File(hamrStaticLib.get)
+        val f = new File(hamrStaticLib.get.native)
         Some(Util.relativizePaths(destDir.getCanonicalPath, f.getCanonicalPath, pathSep, "${CMAKE_CURRENT_LIST_DIR}"))
       } else {
         None()
       }
-      val _hamrBasePackageName: Option[org.sireum.String] = hamrBasePackageName.map(x => org.sireum.String(x))
 
-      Gen(m2, hamrIntegration, _hamrBasePackageName).process(hFiles) match {
+      Gen(m2, hamrIntegration, hamrBasePackageName, reporter).process(hFiles) match {
         case Some(con) =>
           val rootDir = aadlRootDir match {
-            case Some(f) => new File(f).getAbsolutePath
+            case Some(f) => new File(f.native).getAbsolutePath
             case _ => ""
           }
-          val out = ActPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir, _hamrIncludes, _hamrStaticLib)
-          return 0
+          ActPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir, _hamrIncludes, _hamrStaticLib)
+          return files
         case _ =>
       }
     }
 
-    return 1
+    return files
   }
 
   def path2fileOpt(pathFor: Predef.String, path: Option[Predef.String], checkExist: B): scala.Option[File] = {
     if (path.isEmpty) return scala.None
     val f = new File(path.get)
-    if (checkExist && !f.exists) error(s"File '$path' does not exist.")
+    if (checkExist && !f.exists) {
+      error(s"File '$path' does not exist.")
+    }
+
     return scala.Some(f.getCanonicalFile.getAbsoluteFile)
   }
 

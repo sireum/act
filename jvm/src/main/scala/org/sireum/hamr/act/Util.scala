@@ -6,11 +6,17 @@ import org.sireum._
 import org.sireum.ops._
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, Component, FeatureEnd, Transformer}
+import org.sireum.message.{Position, Reporter}
 
 object Util {
 
+  var reporter: Reporter = Reporter.create
+  var verbose: B = T
+
+  val toolName: String = "ACT"
+
   val DEVELOPER_MODE: B = if(org.sireum.Os.env("ACT_DEVELOPER_MODE").nonEmpty) {
-    addWarning("ACT developer mode enabled")
+    reporter.warn(None(), Util.toolName, "ACT developer mode enabled")
     T
   } else {
     F
@@ -319,7 +325,7 @@ object Util {
     if(ret.isEmpty) {
       ret = getDiscreetPropertyValue(properties, PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT) match {
         case Some(ir.ValueProp(v)) =>
-          addWarning(s"Property ${PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} is deprecated, use ${PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} instead.")
+          reporter.warn(None(), Util.toolName, s"Property ${PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} is deprecated, use ${PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} instead.")
 
           Some(v)
         case _ => None[String]()
@@ -336,7 +342,7 @@ object Util {
     if(ret.isEmpty) {
       ret = getDiscreetPropertyValue(p, PROP_TB_SYS__CAmkES_Owner_Thread) match {
         case Some(ir.ValueProp(v)) =>
-          addWarning(s"Property ${PROP_TB_SYS__CAmkES_Owner_Thread} is deprecated, use ${PROP_SB_SYS__CAmkES_Owner_Thread} instead.")
+          reporter.warn(None(), Util.toolName, s"Property ${PROP_TB_SYS__CAmkES_Owner_Thread} is deprecated, use ${PROP_SB_SYS__CAmkES_Owner_Thread} instead.")
 
           Some(v)
         case _ => None[String]()
@@ -465,12 +471,6 @@ object Util {
       .flatMap((c: ir.Component) => c.features.filter(cf => Util.isDataPort(cf) || Util.isEventPort(cf)))
     return ports.size
   }
-
-  def addMessage(msg: String): Unit = { cprintln(F, msg) }
-
-  def addWarning(msg: String): Unit = { cprintln(F, s"WARNING: $msg") }
-
-  def addError(msg:String): Unit = { cprintln(T, s"ERROR: $msg") }
 }
 
 object TypeUtil {
@@ -550,7 +550,7 @@ object TypeUtil {
       case "Base_Types::String" => Some("char*")
 
       case "Base_Types::Integer" =>
-        Util.addError("Unbounded Base_Types::Integer is not supported")
+        Util.reporter.error(None(), Util.toolName, "Unbounded Base_Types::Integer is not supported")
         None[String]()
 
       case _ => None[String]()
@@ -842,7 +842,7 @@ object Transformers {
 
     override def postClassifier(ctx: B, o: ir.Classifier): ir.Transformer.TPostResult[B, ir.Classifier] = {
       if(o.name == unboundInt) {
-        Util.addWarning(s"Replacing classifier ${unboundInt} with ${int32}")
+        Util.reporter.warn(None(), Util.toolName, s"Replacing classifier ${unboundInt} with ${int32}")
         return ir.Transformer.TPostResult(T, Some(ir.Classifier(int32)))
       } else {
         return ir.Transformer.TPostResult(ctx, None())
@@ -851,7 +851,7 @@ object Transformers {
 
     override def postClassifierProp(ctx: B, o: ir.ClassifierProp): ir.Transformer.TPostResult[B, ir.PropertyValue] = {
       if(o.name == unboundInt) {
-        Util.addWarning(s"Replacing classifier ${unboundInt} with ${int32}")
+        Util.reporter.warn(None(), Util.toolName, s"Replacing classifier ${unboundInt} with ${int32}")
         return ir.Transformer.TPostResult(T, Some(ir.ClassifierProp(int32)))
       } else {
         return ir.Transformer.TPostResult(ctx, None())
@@ -904,11 +904,11 @@ object Transformers {
       o.category match {
         case ir.ComponentCategory.Data =>
           if(o.classifier.isEmpty) {
-            Util.addWarning(s"Classifier not specified for ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE}")
+            Util.reporter.warn(None(), Util.toolName, s"Classifier not specified for ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE}")
 
             ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
           } else if (TypeUtil.isArrayDef(o) && TypeUtil.getArrayBaseType(o).isEmpty) {
-            Util.addWarning(s"Base type not specified for ${o.classifier.get.name}.  Substituting ${Util.MISSING_AADL_TYPE}")
+            Util.reporter.warn(None(), Util.toolName, s"Base type not specified for ${o.classifier.get.name}.  Substituting ${Util.MISSING_AADL_TYPE}")
 
             ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(properties = o.properties :+ missingArrayBaseType)))
           } else {
@@ -919,14 +919,14 @@ object Transformers {
           Util.getDiscreetPropertyValue(o.properties, Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
             case Some(ir.ValueProp(x)) =>
               if(x != "Periodic" && x != "Sporadic") {
-                Util.addError(s"${o.classifier.get.name} has unsupported dispatch protocol ${x}.")
+                Util.reporter.error(None(), Util.toolName, s"${o.classifier.get.name} has unsupported dispatch protocol ${x}.")
 
                 ir.Transformer.TPostResult(ctx(hasErrors = T), None[ir.Component]())
               } else {
                 ir.Transformer.TPostResult(ctx, None[ir.Component]())
               }
             case _ =>
-              Util.addWarning(s"${Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL} not specified for thread ${o.classifier.get.name}.  Treating it as sporadic.")
+              Util.reporter.warn(None(), Util.toolName, s"${Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL} not specified for thread ${o.classifier.get.name}.  Treating it as sporadic.")
 
               ir.Transformer.TPostResult(ctx, Some(o(properties =  o.properties :+ sporadicProp)))
           }
@@ -936,7 +936,7 @@ object Transformers {
 
     override def postFeatureEnd(ctx: CTX, o: FeatureEnd): Transformer.TPostResult[CTX, FeatureEnd] = {
       if (Util.isDataPort(o) && o.classifier.isEmpty) {
-        Util.addWarning(s"No datatype specified for data port ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
+        Util.reporter.warn(None(), Util.toolName, s"No datatype specified for data port ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
 
         ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
       } else {
@@ -944,4 +944,12 @@ object Transformers {
       }
     }
   }
+}
+
+@datatype class ACTResult(files: HashSMap[String, ST])
+
+@enum object ReportKind{
+  'Info
+  'Warning
+  'Error
 }
