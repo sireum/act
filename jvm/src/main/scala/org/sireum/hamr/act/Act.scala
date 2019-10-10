@@ -128,7 +128,7 @@ object Act {
             case Some(f) => new File(f.native).getAbsolutePath
             case _ => ""
           }
-          ActPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir, _hamrIncludes, _hamrStaticLib)
+          ActPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir, _hamrIncludes, _hamrStaticLib, hamrIntegration)
           return files
         case _ =>
       }
