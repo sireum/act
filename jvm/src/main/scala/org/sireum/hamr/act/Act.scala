@@ -13,19 +13,19 @@ import org.sireum.hamr.act.Util.reporter
 object Act {
 
   def run(optOutputDir: Option[String], m: ir.Aadl, auxDirectories: ISZ[String], aadlRootDir: Option[String],
-          hamrIntegration: B, hamrIncludeDirs: ISZ[String], hamrStaticLib: Option[String], hamrBasePackageName: Option[String],
+          platform: ActPlatform.Type, hamrIncludeDirs: ISZ[String], hamrStaticLib: Option[String], hamrBasePackageName: Option[String],
           reporter: Reporter) : ACTResult = {
 
     Util.reporter = reporter
 
     val files = runInternal(optOutputDir, m, auxDirectories, aadlRootDir,
-      hamrIntegration, hamrIncludeDirs, hamrStaticLib, hamrBasePackageName)
+      platform, hamrIncludeDirs, hamrStaticLib, hamrBasePackageName)
 
     return ACTResult(files)
   }
 
   private def runInternal(optOutputDir: Option[String], m: ir.Aadl, auxDirectories: ISZ[String], aadlRootDir: Option[String],
-                          hamrIntegration: B, hamrIncludeDirs: ISZ[String], hamrStaticLib: Option[String], hamrBasePackageName: Option[String],
+                          platform: ActPlatform.Type, hamrIncludeDirs: ISZ[String], hamrStaticLib: Option[String], hamrBasePackageName: Option[String],
                           ) : HashSMap[String, ST] = {
 
     var files: HashSMap[String, ST] = HashSMap.empty
@@ -122,13 +122,13 @@ object Act {
         None()
       }
 
-      Gen(m2, hamrIntegration, hamrBasePackageName, reporter).process(hFiles) match {
+      Gen(m2, platform, hamrBasePackageName, reporter).process(hFiles) match {
         case Some(con) =>
           val rootDir = aadlRootDir match {
             case Some(f) => new File(f.native).getAbsolutePath
             case _ => ""
           }
-          ActPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir, _hamrIncludes, _hamrStaticLib, hamrIntegration)
+          ActPrettyPrint().tempEntry(destDir.getAbsolutePath, con, cFiles, rootDir, _hamrIncludes, _hamrStaticLib, platform)
           return files
         case _ =>
       }

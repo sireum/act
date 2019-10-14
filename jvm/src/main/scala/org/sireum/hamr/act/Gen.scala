@@ -10,7 +10,7 @@ import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Aadl
 import org.sireum.message.Reporter
 
-@record class Gen(model: Aadl, hamrIntegration: B, hamrBasePackageName: Option[String], reporter: Reporter) {
+@record class Gen(model: Aadl, platform: ActPlatform.Type, hamrBasePackageName: Option[String], reporter: Reporter) {
 
   var topLevelProcess: Option[ir.Component] = None[ir.Component]()
   var typeHeaderFileName: String = ""
@@ -57,7 +57,7 @@ import org.sireum.message.Reporter
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
-    if(hamrIntegration) {
+    if(Util.hamrIntegration(platform)) {
       auxCSources = auxCSources :+ st"#include <all.h>" :+ st"#include <ipc.h>"
     }
 
@@ -81,7 +81,7 @@ import org.sireum.message.Reporter
       gen(system)
     }
 
-    if(!hasErrors && hamrIntegration) {
+    if(!hasErrors && Util.hamrIntegration(platform)) {
       val pair = StringTemplate.hamrIPC(Util.getNumberPorts(model), hamrBasePackageName.get)
 
       auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1)
@@ -184,7 +184,7 @@ import org.sireum.message.Reporter
             configuration = configuration :+ StringTemplate.configurationControlStackSize(componentId, stackSize)
           }
 
-          if(hamrIntegration) {
+          if(Util.hamrIntegration(platform)) {
             configuration = configuration :+ StringTemplate.configurationStackSize(componentId, 8388608)
           }
         case ir.ComponentCategory.Subprogram =>
@@ -704,7 +704,7 @@ import org.sireum.message.Reporter
         }
     }
 
-    if(!hamrIntegration) {
+    if(!Util.hamrIntegration(platform)) {
       Util.getInitializeEntryPoint(c.properties) match {
         case Some(methodName) =>
           cIncludes = cIncludes :+ st"""void ${methodName}(const int64_t *arg);"""
@@ -717,7 +717,7 @@ import org.sireum.message.Reporter
 
     var sources: ISZ[Resource] = ISZ()
 
-    if(hamrIntegration) {
+    if(Util.hamrIntegration(platform)) {
       cPreInits = cPreInits :+ st"" // blank line
 
       cPreInits = cPreInits :+ StringTemplate.hamrIntialise(hamrBasePackageName.get, cid)
@@ -1111,7 +1111,7 @@ import org.sireum.message.Reporter
                   |}""")
             case _ => None[ST]()
           }
-        } else if(!hamrIntegration) {
+        } else if(!Util.hamrIntegration(platform)) {
           val simpleName = Util.getLastName(feature.identifier)
           val methodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
 

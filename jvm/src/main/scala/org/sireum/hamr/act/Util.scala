@@ -471,6 +471,14 @@ object Util {
       .flatMap((c: ir.Component) => c.features.filter(cf => Util.isDataPort(cf) || Util.isEventPort(cf)))
     return ports.size
   }
+
+  def hamrIntegration(platform: ActPlatform.Type): B = {
+    platform match {
+      case ActPlatform.SeL4 => return T
+      case ActPlatform.SeL4_Only => return F
+      case ActPlatform.SeL4_TB => return F
+    }
+  }
 }
 
 object TypeUtil {
@@ -952,4 +960,10 @@ object Transformers {
   'Info
   'Warning
   'Error
+}
+
+@enum object ActPlatform {
+  'SeL4
+  'SeL4_Only
+  'SeL4_TB
 }

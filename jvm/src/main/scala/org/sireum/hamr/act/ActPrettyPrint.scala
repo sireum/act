@@ -19,7 +19,7 @@ import org.sireum.hamr.act.Util.reporter
                 aadlRootDir: String,
                 hamrIncludeDirs: ISZ[String],
                 hamrStaticLib: Option[String],
-                hamrIntegration: B
+                platform: ActPlatform.Type
                ): ISZ[(String, ST)] = {
 
     rootServer = container.rootServer
@@ -60,7 +60,8 @@ import org.sireum.hamr.act.Util.reporter
       sources = sources ++ c.cSources.map((r: Resource) => r.path)
       includes = includes ++ c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) :+ Util.DIR_INCLUDES
       StringTemplate.cmakeComponent(c.component, sources, includes, cFiles.nonEmpty,
-        hamrIntegration && hamrIncludeDirs.nonEmpty, hamrIntegration && hamrStaticLib.nonEmpty)
+        Util.hamrIntegration(platform) && hamrIncludeDirs.nonEmpty,
+        Util.hamrIntegration(platform) && hamrStaticLib.nonEmpty)
     })
 
     container.monitors.foreach(m => {
@@ -76,12 +77,12 @@ import org.sireum.hamr.act.Util.reporter
 
     var cmakeEntries: ISZ[ST] = ISZ()
 
-    if(hamrIntegration && hamrStaticLib.nonEmpty) {
+    if(Util.hamrIntegration(platform) && hamrStaticLib.nonEmpty) {
       cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess() :+
         StringTemplate.cmakeHamrLib(hamrStaticLib.get)
     }
 
-    if(hamrIntegration && hamrIncludeDirs.nonEmpty) {
+    if(Util.hamrIntegration(platform) && hamrIncludeDirs.nonEmpty) {
       cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(hamrIncludeDirs)
     }
 
