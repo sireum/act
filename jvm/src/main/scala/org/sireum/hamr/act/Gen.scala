@@ -67,7 +67,7 @@ import org.sireum.message.Reporter
     resolve(system)
 
     if(!hasErrors) {
-      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData))
+      auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData), T)
     }
 
     if(hasPeriodicComponents) {
@@ -84,8 +84,8 @@ import org.sireum.message.Reporter
     if(!hasErrors && Util.hamrIntegration(platform)) {
       val pair = StringTemplate.hamrIPC(Util.getNumberPorts(model), hamrBasePackageName.get)
 
-      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1)
-      auxFiles = auxFiles :+ Resource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2)
+      auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1, T)
+      auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2, T)
     }
 
     if(!hasErrors) {
@@ -785,7 +785,7 @@ import org.sireum.message.Reporter
                              |}
                              |"""
 
-      sources = sources :+ Resource("includes/ipc.c", st"")
+      sources = sources :+ Util.createResource("includes/ipc.c", st"", T)
     }
 
     containers = containers :+ C_Container(cid,
@@ -880,13 +880,13 @@ import org.sireum.message.Reporter
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
           val cimplementation: Resource =
             if(f.category == ir.FeatureCategory.DataPort) {
-              Resource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging))
+              Util.createResource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging), T)
             } else {
-              Resource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging))
+              Util.createResource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging), T)
             }
 
           val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
-          val cincludes = Resource(interName, StringTemplate.tbInterface(s"__${monitorName}_H__"))
+          val cincludes = Util.createResource(interName, StringTemplate.tbInterface(s"__${monitorName}_H__"), T)
 
           monitors = monitors + (connInstName ~> Monitor(inst, interface, writer, cimplementation, cincludes, i, connInst))
         }
@@ -1283,7 +1283,7 @@ import org.sireum.message.Reporter
                   |#endif // $macroName
                   |"""
 
-    return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_INCLUDES}/${compTypeHeaderFileName}.h", ret)
+    return Util.createResource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_INCLUDES}/${compTypeHeaderFileName}.h", ret, T)
   }
 
   def genComponentTypeImplementationFile(component:ir.Component, blocks: ISZ[ST], preInitComments: ISZ[ST],
@@ -1293,7 +1293,7 @@ import org.sireum.message.Reporter
     val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, blocks, preInitComments,
       cRunPreEntries, cDrainQueues, Util.isSporadic(component))
 
-    return Resource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret)
+    return Util.createResource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret, T)
   }
 
   def isThreadConnection(ci: ir.ConnectionInstance): B = {

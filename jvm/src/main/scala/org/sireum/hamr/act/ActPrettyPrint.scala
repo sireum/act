@@ -10,25 +10,26 @@ import org.sireum.hamr.act.Util.reporter
 
 @record class ActPrettyPrint {
 
-  var out : ISZ[(String, ST)] = ISZ()
+  var resources : ISZ[Resource] = ISZ()
   var rootServer: String = ""
   var actContainer: Option[ActContainer] = None[ActContainer]()
 
-  def tempEntry(destDir: String, container: ActContainer,
+  def tempEntry(destDir: String,
+                container: ActContainer,
                 cFiles: ISZ[String],
                 aadlRootDir: String,
                 hamrIncludeDirs: ISZ[String],
                 hamrStaticLib: Option[String],
                 platform: ActPlatform.Type
-               ): ISZ[(String, ST)] = {
+               ): ISZ[Resource] = {
 
     rootServer = container.rootServer
     actContainer = Some(container)
 
     prettyPrint(container.models)
 
-    val c = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes).map((x: Resource) => (x.path, x.contents))
-    val aux = container.auxFiles.map((x: Resource) => (x.path, x.contents))
+    val c = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)//.map((x: Resource) => (x.path, x.content))
+    val aux = container.auxFiles//.map((x: Resource) => (x.path, x.content))
 
 
     var cmakeComponents: ISZ[ST] = container.cContainers.map((c: C_Container) => {
@@ -37,17 +38,22 @@ import org.sireum.hamr.act.Util.reporter
 
       if(c.sourceText.nonEmpty) {
         val dir = s"components/${c.component}/"
-        val rootDestDir = s"${destDir}/${dir}"
+        val rootDestDir = dir
 
         for(st <- c.sourceText) {
           val path = s"${aadlRootDir}/${st}"
-          if(NativeIO.fileExists(path)) {
+          val p = Os.path(path)
 
+          if(p.exists) {
             if(StringOps(st).endsWith(".c")) {
-              val fname = NativeIO.copyFile(path, s"${rootDestDir}/src", reporter)
-              sources = sources :+ s"${dir}/src/${fname}"
+              val fname = s"${rootDestDir}/src/${p.name}"
+              add(fname, st"""${p.read}""")
+
+              sources = sources :+ fname
+
             } else if(StringOps(st).endsWith(".h")) {
-              NativeIO.copyFile(path, s"${rootDestDir}/includes", reporter)
+              val fname = s"${rootDestDir}/includes/${p.name}"
+              add(fname, st"""${p.read}""")
             } else {
               reporter.warn(None(), Util.toolName, s"${path} does not appear to be a valid C source file")
             }
@@ -70,9 +76,9 @@ import org.sireum.hamr.act.Util.reporter
       cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
         ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, F, F)
 
-      NativeIO.writeToFile(s"${destDir}/${m.cimplementation.path}", m.cimplementation.contents.render, T, reporter)
-      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T, reporter)
-      NativeIO.writeToFile(s"${destDir}/${m.cinclude.path}", m.cinclude.contents.render, T, reporter)
+      add(s"${m.cimplementation.path}", m.cimplementation.content)
+      add(s"${m.cinclude.path}", m.cinclude.content)
+      add(s"${m.cinclude.path}", m.cinclude.content)
     })
 
     var cmakeEntries: ISZ[ST] = ISZ()
@@ -101,18 +107,17 @@ import org.sireum.hamr.act.Util.reporter
 
     val cmakelist = StringTemplate.cmakeLists(Util.CMAKE_VERSION, container.rootServer, cmakeEntries)
 
-    NativeIO.writeToFile(s"${destDir}/CMakeLists.txt", cmakelist.render, T, reporter)
+    add(s"CMakeLists.txt", cmakelist)
 
-    (out ++ c ++ aux).foreach(o => NativeIO.writeToFile(s"${destDir}/${o._1}", o._2.render, T, reporter))
+    val ret = (resources ++ c ++ aux).map(o => Util.createResource(s"${destDir}/${o.path}", o.content, T))
 
-    return out
+    return ret
   }
 
-  def prettyPrint(objs: ISZ[ASTObject]): ISZ[(String, ST)] = {
+  def prettyPrint(objs: ISZ[ASTObject]): Unit = {
     for(a <- objs) {
       visit(a)
     }
-    return out
   }
 
   def visit(a: ASTObject) : Option[ST] = {
@@ -130,7 +135,7 @@ import org.sireum.hamr.act.Util.reporter
 
     val comp = visitComposition(a.composition)
 
-    val imports = out.map((o: (String, ST)) => st"""import "${o._1}";""")
+    val imports = resources.map((o: Resource) => st"""import "${o.path}";""")
 
     val connectors: ISZ[ST] = actContainer.get.connectors.map(c => {
       val fromType: ST = if(c.from_template.nonEmpty) st"""template "${c.from_template.get}"""" else st"""TODO"""
@@ -257,15 +262,7 @@ import org.sireum.hamr.act.Util.reporter
     return Some(st)
   }
 
-  def add(s: String, st: ST) : Unit = {
-    val p = (s, st)
-    out = out :+ p
+  def add(path: String, content: ST) : Unit = {
+    resources = resources :+ Util.createResource(path, content, T)
   }
-}
-
-
-@ext object NativeIO {
-  def writeToFile(path: String, contents: String, overwrite: B, reporter: Reporter): Unit = $
-  def copyFile(srcPath: org.sireum.String, outputPath: org.sireum.String, reporter: Reporter): String = $
-  def fileExists(path: String): B = $
 }

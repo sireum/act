@@ -479,6 +479,10 @@ object Util {
       case ActPlatform.SeL4_TB => return F
     }
   }
+
+  def createResource(path: String, contents: ST, overwrite: B): Resource = {
+    return Resource(path, contents, overwrite, F)
+  }
 }
 
 object TypeUtil {
@@ -699,7 +703,7 @@ object TimerUtil {
                      |"""
 
     val compTypeFileName:String = Util.brand(DISPATCH_CLASSIFIER)
-    return Resource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st)
+    return Util.createResource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
   }
 
   def timerComponent(): ast.Instance = {
@@ -764,7 +768,7 @@ object TimerUtil {
                      |"""
 
     val compTypeFileName:String = Util.brand(TIMER_INSTANCE)
-    return Resource(s"${Util.DIR_COMPONENTS}/${TIMER_SERVER_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st)
+    return Util.createResource(s"${Util.DIR_COMPONENTS}/${TIMER_SERVER_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
   }
 
   def timerInterface(): Resource = {
@@ -778,7 +782,7 @@ object TimerUtil {
                       |  uint64_t tsc_frequency();
                       |};
                       |"""
-    return Resource(s"${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4", _st)
+    return Util.createResource(s"${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4", _st, T)
   }
 
   def componentNotificationName(name: String): String = {
@@ -820,9 +824,6 @@ object TimerUtil {
                                   cIncl: Option[ST],
                                   preInits: Option[ST],
                                   drainQueues: Option[(ST, ST)])
-
-@datatype class Resource(path: String,
-                         contents: ST)
 
 @enum object Dispatch_Protocol {
   'Periodic
@@ -954,7 +955,12 @@ object Transformers {
   }
 }
 
-@datatype class ACTResult(files: HashSMap[String, ST])
+@datatype class Resource(path: String,
+                         content: ST,
+                         overwrite: B,
+                         makeExecutable: B)
+
+@datatype class ActResult(val resources: ISZ[Resource])
 
 @enum object ReportKind{
   'Info
