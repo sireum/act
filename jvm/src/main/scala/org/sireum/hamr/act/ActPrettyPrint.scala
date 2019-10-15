@@ -109,7 +109,7 @@ import org.sireum.hamr.act.Util.reporter
 
     add(s"CMakeLists.txt", cmakelist)
 
-    val ret = (resources ++ c ++ aux).map(o => Util.createResource(s"${destDir}/${o.path}", o.content, T))
+    val ret = (resources ++ c ++ aux).map((o: Resource) => Util.createResource(s"${destDir}/${o.path}", o.content, T))
 
     return ret
   }
