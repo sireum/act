@@ -2,7 +2,7 @@
 // @formatter:off
 
 /*
- Copyright (c) 2018, Robby, Kansas State University
+ Copyright (c) 2019, Robby, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -70,7 +70,9 @@ object MsgPack {
 
     val Semaphore: Z = -16
 
-    val TODO: Z = -15
+    val Mutex: Z = -15
+
+    val TODO: Z = -14
 
   }
 
@@ -98,6 +100,7 @@ object MsgPack {
         case o: Parameter => writeParameter(o)
         case o: BinarySemaphore => writeBinarySemaphore(o)
         case o: Semaphore => writeSemaphore(o)
+        case o: Mutex => writeMutex(o)
         case o: TODO => writeTODO(o)
       }
     }
@@ -128,7 +131,7 @@ object MsgPack {
       writer.writeB(o.control)
       writer.writeB(o.hardware)
       writer.writeString(o.name)
-      writer.writeISZ(o.mutexes, writeTODO _)
+      writer.writeISZ(o.mutexes, writeMutex _)
       writer.writeISZ(o.binarySemaphores, writeBinarySemaphore _)
       writer.writeISZ(o.semaphores, writeSemaphore _)
       writer.writeISZ(o.dataports, writeDataport _)
@@ -242,6 +245,11 @@ object MsgPack {
       writer.writeString(o.name)
     }
 
+    def writeMutex(o: Mutex): Unit = {
+      writer.writeZ(Constants.Mutex)
+      writer.writeString(o.name)
+    }
+
     def writeTODO(o: TODO): Unit = {
       writer.writeZ(Constants.TODO)
     }
@@ -282,6 +290,7 @@ object MsgPack {
         case Constants.Parameter => val r = readParameterT(T); return r
         case Constants.BinarySemaphore => val r = readBinarySemaphoreT(T); return r
         case Constants.Semaphore => val r = readSemaphoreT(T); return r
+        case Constants.Mutex => val r = readMutexT(T); return r
         case Constants.TODO => val r = readTODOT(T); return r
         case _ =>
           reader.error(i, s"$t is not a valid type of ASTObject.")
@@ -347,7 +356,7 @@ object MsgPack {
       val control = reader.readB()
       val hardware = reader.readB()
       val name = reader.readString()
-      val mutexes = reader.readISZ(readTODO _)
+      val mutexes = reader.readISZ(readMutex _)
       val binarySemaphores = reader.readISZ(readBinarySemaphore _)
       val semaphores = reader.readISZ(readSemaphore _)
       val dataports = reader.readISZ(readDataport _)
@@ -566,6 +575,19 @@ object MsgPack {
       }
       val name = reader.readString()
       return Semaphore(name)
+    }
+
+    def readMutex(): Mutex = {
+      val r = readMutexT(F)
+      return r
+    }
+
+    def readMutexT(typeParsed: B): Mutex = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.Mutex)
+      }
+      val name = reader.readString()
+      return Mutex(name)
     }
 
     def readTODO(): TODO = {
@@ -859,6 +881,21 @@ object MsgPack {
       return r
     }
     val r = to(data, fSemaphore _)
+    return r
+  }
+
+  def fromMutex(o: Mutex, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeMutex(o)
+    return w.result
+  }
+
+  def toMutex(data: ISZ[U8]): Either[Mutex, MessagePack.ErrorMsg] = {
+    def fMutex(reader: Reader): Mutex = {
+      val r = reader.readMutex()
+      return r
+    }
+    val r = to(data, fMutex _)
     return r
   }
 

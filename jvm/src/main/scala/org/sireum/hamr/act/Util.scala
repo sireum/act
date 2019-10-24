@@ -27,6 +27,7 @@ object Util {
 
   val MONITOR_COMP_SUFFIX: String  = "Monitor"
 
+  val MONITOR_EVENT_DATA_NOTIFICATION_TYPE: String =  "ReceiveEvent"
   val MONITOR_EVENT_NOTIFICATION_TYPE: String =  "QueuedData"
   val MONITOR_DATA_NOTIFICATION_TYPE: String  = "DataportWrite"
 
@@ -68,6 +69,7 @@ object Util {
   val DIR_COMPONENTS: String = "components"
   val DIR_INTERFACES: String = "interfaces"
   val DIR_MONITORS: String = brand("Monitors")
+  val DIR_SAMPLING_PORTS: String = "sampling_ports"
 
   val CMAKE_VERSION: String = "3.8.2"
 
@@ -83,6 +85,9 @@ object Util {
 
   val AUX_CODE_DIRECTORY_NAME: String = "aux_code"
 
+  val camkesStdConnectors: String = "<std_connector.camkes>"
+  val camkesGlobalConnectors: String = "<global-connectors.camkes>"
+  
   def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
   }
@@ -194,6 +199,15 @@ object Util {
       return s"${INTERFACE_PREFIX}_${typeName}"
     } else {
       return s"${INTERFACE_PREFIX}_${typeName}_${getQueueSize(feature)}"
+    }
+  }
+
+  def getInterfaceNameIhor(feature: ir.FeatureEnd, isSender: B): String = {
+    val base = getInterfaceName(feature)
+    if(isSender){
+      return s"${base}_Sender"
+    } else {
+      return s"${base}_Receiver"
     }
   }
 
@@ -608,6 +622,8 @@ object TimerUtil {
   val TIMER_SERVER_TIMER_ID: String = "the_timer"
   val TIMER_SERVER_NOTIFICATION_ID: String = "timer_notification"
 
+  val TIMER_SERVER_IMPORT: String = "<TimeServer/TimeServer.camkes>;"
+  
   val DISPATCH_CLASSIFIER: String = "dispatch_periodic"
   val DISPATCH_PERIODIC_INSTANCE: String = "dispatch_periodic_inst"
   val DISPATCH_TIMER_ID: String = "timer"
@@ -617,7 +633,7 @@ object TimerUtil {
       address_space = "",
       name = DISPATCH_PERIODIC_INSTANCE,
       component = ast.Component(
-        control = F,
+        control = T,
         hardware = F,
         name = DISPATCH_CLASSIFIER,
         mutexes = ISZ(),
@@ -636,7 +652,7 @@ object TimerUtil {
         provides = ISZ(),
         includes = ISZ(),
         attributes = ISZ(),
-        imports = ISZ(st""""../../${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4"""".render)
+        imports = ISZ(Util.camkesGlobalConnectors)
       ))
     return i
   }
@@ -663,14 +679,14 @@ object TimerUtil {
                      |
                      |// Declarations for managing periodic thread dispatch
                      |const uint32_t aadl_tick_interval = 1;
-                     |const uint32_t aadl_hyperperiod_subdivisions = 5;
+                     |const uint32_t aadl_hyperperiod_subdivisions = 1;
                      |uint32_t aadl_calendar_counter = 0;
                      |uint32_t aadl_calendar_ticks = 0;
                      |
                      |void ${THREAD_CALENDAR}() {
                      |  ${(calendars, "\n")}
                      |
-                     |  aadl_calendar_counter = (aadl_calendar_counter + 1) % aadl_hyperperiod_subdivisions;
+                     |  aadl_calendar_counter = (aadl_calendar_counter + 1); // % aadl_hyperperiod_subdivisions;
                      |  aadl_calendar_ticks++;
                      |}
                      |
@@ -734,57 +750,6 @@ object TimerUtil {
     return i
   }
 
-  def timerCSource(): Resource = {
-    val st: ST = st"""#include <stdio.h>
-                     |#include <camkes.h>
-                     |
-                     |int the_timer_oneshot_relative(int id, uint64_t ns) {
-                     |    return -1;
-                     |}
-                     |
-                     |int the_timer_oneshot_absolute(int id, uint64_t ns) {
-                     |    return -1;
-                     |}
-                     |
-                     |int the_timer_periodic(int id, uint64_t ns) {
-                     |    return -1;
-                     |}
-                     |
-                     |int the_timer_stop(int id) {
-                     |    return -1;
-                     |}
-                     |
-                     |unsigned int the_timer_completed() {
-                     |    return 1;
-                     |}
-                     |
-                     |uint64_t the_timer_time() {
-                     |    return 1;
-                     |}
-                     |
-                     |uint64_t the_timer_tsc_frequency() {
-                     |    return 1;
-                     |}
-                     |"""
-
-    val compTypeFileName:String = Util.brand(TIMER_INSTANCE)
-    return Util.createResource(s"${Util.DIR_COMPONENTS}/${TIMER_SERVER_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
-  }
-
-  def timerInterface(): Resource = {
-    val _st: ST = st"""procedure Timer {
-                      |  unsigned int completed();
-                      |  int periodic(in int tid, in uint64_t ns);
-                      |  int oneshot_absolute(in int tid, in uint64_t ns);
-                      |  int oneshot_relative(in int tid, in uint64_t ns);
-                      |  int stop(in int tid);
-                      |  uint64_t time();
-                      |  uint64_t tsc_frequency();
-                      |};
-                      |"""
-    return Util.createResource(s"${Util.DIR_INTERFACES}/${TIMER_TYPE}.idl4", _st, T)
-  }
-
   def componentNotificationName(name: String): String = {
     return s"${name}_periodic_dispatcher"
   }
@@ -797,37 +762,80 @@ object TimerUtil {
   def configurationTimerGlobalEndpoint(instanceName: String, classifier: String, id: String): ST = {
     return st"""${instanceName}.${id}_global_endpoint = "${classifier}_${id}";"""
   }
+
+  def configurationTimerCompleteGlobalEndpoint(instanceName: String, classifier: String, id: String): ST = {
+    return st"""${instanceName}.${id}_complete_global_endpoint = "${classifier}_${id}";"""
+  }
 }
 
 @datatype class ActContainer(rootServer: String,
                              connectors: ISZ[ast.Connector],
                              models: ISZ[ast.ASTObject],
                              monitors: ISZ[Monitor],
+                             samplingPorts: ISZ[SamplingPortInterface],
                              cContainers: ISZ[C_Container],
-                             auxFiles: ISZ[Resource])
+                             auxFiles: ISZ[Resource],
+                             globalImports: ISZ[String],
+                             requiresTimeServer: B
+                            )
 
+@sig trait Monitor {
+  def i: ast.Instance
+  def cimplementation: Resource
+  def cinclude: Resource
+  def index: Z
+  def ci: ir.ConnectionInstance
+}
 
-@datatype class Monitor (i: ast.Instance,           // camkes monitor
-                         interface: ast.Procedure,  // camkes interface
-                         writer: ast.Procedure,     // writer interface
-                         cimplementation: Resource,
-                         cinclude: Resource,
-                         index: Z,                  // fan-out index
-                         ci: ir.ConnectionInstance) // aadl connection
+@datatype class TB_Monitor (i: ast.Instance,           // camkes monitor
+                            interface: ast.Procedure,  // camkes interface
+                            writer: ast.Procedure,     // writer interface
+                            providesVarName: String,
+                            cimplementation: Resource,
+                            cinclude: Resource,
+                            index: Z,                  // fan-out index
+                            ci: ir.ConnectionInstance  // aadl connection
+                           ) extends Monitor
+
+@datatype class Ihor_Monitor (i: ast.Instance,           // camkes monitor
+                              interfaceReceiver: ast.Procedure,  // camkes interface
+                              interfaceSender: ast.Procedure,  // camkes interface
+                              providesReceiverVarName: String,
+                              providesSenderVarName: String,
+                              dataportReceiverVarName: String,
+                              dataportSenderVarName: String,
+                              cimplementation: Resource,
+                              cinclude: Resource,
+                              index: Z,                  // fan-out index
+                              ci: ir.ConnectionInstance // aadl connection 
+                             ) extends Monitor
 
 @datatype class C_Container(component: String,
                             cSources: ISZ[Resource],
                             cIncludes: ISZ[Resource],
-                            sourceText: ISZ[String])
+                            sourceText: ISZ[String],
+                            externalCSources: ISZ[String],
+                            externalCIncludeDirs: ISZ[String])
 
-@datatype class C_SimpleContainer(cImpl: Option[ST],
-                                  cIncl: Option[ST],
+@datatype class C_SimpleContainer(cInterface: Option[ST],
+                                  cImplementation: Option[ST],
                                   preInits: Option[ST],
                                   drainQueues: Option[(ST, ST)])
 
 @enum object Dispatch_Protocol {
   'Periodic
   'Sporadic
+}
+
+@datatype class SamplingPortInterface(name: String,
+                                      structName: String,
+                                      typ: ir.Classifier,
+                                      headerPath: String,
+                                      implPath: String) {
+
+  def portType(): String = {
+    return Util.getClassifierFullyQualified(typ)
+  }
 }
 
 @datatype class SharedData(owner: ir.Component,
@@ -973,3 +981,11 @@ object Transformers {
   'SeL4_Only
   'SeL4_TB
 }
+
+@datatype class ActOptions(outputDir: String,
+                           auxFiles: Map[String, String],
+                           aadlRootDirectory: Option[String],
+                           platform: ActPlatform.Type,
+                           hamrIncludeDirs: ISZ[String],
+                           hamrStaticLib: Option[String],
+                           hamrBasePackageName: Option[String])

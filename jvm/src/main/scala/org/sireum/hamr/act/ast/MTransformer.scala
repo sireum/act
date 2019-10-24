@@ -121,6 +121,10 @@ object MTransformer {
 
   val PostResultSemaphore: MOption[Semaphore] = MNone()
 
+  val PreResultMutex: PreResult[Mutex] = PreResult(T, MNone())
+
+  val PostResultMutex: MOption[Mutex] = MNone()
+
   val PreResultTODO: PreResult[TODO] = PreResult(T, MNone())
 
   val PostResultTODO: MOption[TODO] = MNone()
@@ -217,6 +221,13 @@ import MTransformer._
          case PreResult(continu, _) => PreResult(continu, MNone[ASTObject]())
         }
         return r
+      case o: Mutex =>
+        val r: PreResult[ASTObject] = preMutex(o) match {
+         case PreResult(continu, MSome(r: ASTObject)) => PreResult(continu, MSome[ASTObject](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type ASTObject")
+         case PreResult(continu, _) => PreResult(continu, MNone[ASTObject]())
+        }
+        return r
       case o: TODO =>
         val r: PreResult[ASTObject] = preTODO(o) match {
          case PreResult(continu, MSome(r: ASTObject)) => PreResult(continu, MSome[ASTObject](r))
@@ -293,6 +304,10 @@ import MTransformer._
 
   def preSemaphore(o: Semaphore): PreResult[Semaphore] = {
     return PreResultSemaphore
+  }
+
+  def preMutex(o: Mutex): PreResult[Mutex] = {
+    return PreResultMutex
   }
 
   def preTODO(o: TODO): PreResult[TODO] = {
@@ -385,6 +400,13 @@ import MTransformer._
          case _ => MNone[ASTObject]()
         }
         return r
+      case o: Mutex =>
+        val r: MOption[ASTObject] = postMutex(o) match {
+         case MSome(result: ASTObject) => MSome[ASTObject](result)
+         case MSome(_) => halt("Can only produce object of type ASTObject")
+         case _ => MNone[ASTObject]()
+        }
+        return r
       case o: TODO =>
         val r: MOption[ASTObject] = postTODO(o) match {
          case MSome(result: ASTObject) => MSome[ASTObject](result)
@@ -463,6 +485,10 @@ import MTransformer._
     return PostResultSemaphore
   }
 
+  def postMutex(o: Mutex): MOption[Mutex] = {
+    return PostResultMutex
+  }
+
   def postTODO(o: TODO): MOption[TODO] = {
     return PostResultTODO
   }
@@ -495,7 +521,7 @@ import MTransformer._
           else
             MNone()
         case o2: Component =>
-          val r0: MOption[IS[Z, TODO]] = transformISZ(o2.mutexes, transformTODO _)
+          val r0: MOption[IS[Z, Mutex]] = transformISZ(o2.mutexes, transformMutex _)
           val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
           val r2: MOption[IS[Z, Semaphore]] = transformISZ(o2.semaphores, transformSemaphore _)
           val r3: MOption[IS[Z, Dataport]] = transformISZ(o2.dataports, transformDataport _)
@@ -548,6 +574,11 @@ import MTransformer._
           else
             MNone()
         case o2: Semaphore =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+        case o2: Mutex =>
           if (hasChanged)
             MSome(o2)
           else
@@ -665,7 +696,7 @@ import MTransformer._
     val r: MOption[Component] = if (preR.continu) {
       val o2: Component = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: MOption[IS[Z, TODO]] = transformISZ(o2.mutexes, transformTODO _)
+      val r0: MOption[IS[Z, Mutex]] = transformISZ(o2.mutexes, transformMutex _)
       val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
       val r2: MOption[IS[Z, Semaphore]] = transformISZ(o2.semaphores, transformSemaphore _)
       val r3: MOption[IS[Z, Dataport]] = transformISZ(o2.dataports, transformDataport _)
@@ -1028,6 +1059,32 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Semaphore = r.getOrElse(o)
     val postR: MOption[Semaphore] = postSemaphore(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformMutex(o: Mutex): MOption[Mutex] = {
+    val preR: PreResult[Mutex] = preMutex(o)
+    val r: MOption[Mutex] = if (preR.continu) {
+      val o2: Mutex = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: Mutex = r.getOrElse(o)
+    val postR: MOption[Mutex] = postMutex(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {

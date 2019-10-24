@@ -2,7 +2,7 @@
 // @formatter:off
 
 /*
- Copyright (c) 2018, Robby, Kansas State University
+ Copyright (c) 2019, Robby, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -51,6 +51,7 @@ object JSON {
         case o: Parameter => return printParameter(o)
         case o: BinarySemaphore => return printBinarySemaphore(o)
         case o: Semaphore => return printSemaphore(o)
+        case o: Mutex => return printMutex(o)
         case o: TODO => return printTODO(o)
       }
     }
@@ -88,7 +89,7 @@ object JSON {
         ("control", printB(o.control)),
         ("hardware", printB(o.hardware)),
         ("name", printString(o.name)),
-        ("mutexes", printISZ(F, o.mutexes, printTODO _)),
+        ("mutexes", printISZ(F, o.mutexes, printMutex _)),
         ("binarySemaphores", printISZ(F, o.binarySemaphores, printBinarySemaphore _)),
         ("semaphores", printISZ(F, o.semaphores, printSemaphore _)),
         ("dataports", printISZ(F, o.dataports, printDataport _)),
@@ -248,6 +249,13 @@ object JSON {
       ))
     }
 
+    @pure def printMutex(o: Mutex): ST = {
+      return printObject(ISZ(
+        ("type", st""""Mutex""""),
+        ("name", printString(o.name))
+      ))
+    }
+
     @pure def printTODO(o: TODO): ST = {
       return printObject(ISZ(
         ("type", st""""TODO"""")
@@ -264,7 +272,7 @@ object JSON {
     }
 
     def parseASTObject(): ASTObject = {
-      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "BinarySemaphore", "Semaphore", "TODO"))
+      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "BinarySemaphore", "Semaphore", "Mutex", "TODO"))
       t.native match {
         case "Assembly" => val r = parseAssemblyT(T); return r
         case "Composition" => val r = parseCompositionT(T); return r
@@ -278,6 +286,7 @@ object JSON {
         case "Parameter" => val r = parseParameterT(T); return r
         case "BinarySemaphore" => val r = parseBinarySemaphoreT(T); return r
         case "Semaphore" => val r = parseSemaphoreT(T); return r
+        case "Mutex" => val r = parseMutexT(T); return r
         case "TODO" => val r = parseTODOT(T); return r
         case _ => val r = parseTODOT(T); return r
       }
@@ -365,7 +374,7 @@ object JSON {
       val name = parser.parseString()
       parser.parseObjectNext()
       parser.parseObjectKey("mutexes")
-      val mutexes = parser.parseISZ(parseTODO _)
+      val mutexes = parser.parseISZ(parseMutex _)
       parser.parseObjectNext()
       parser.parseObjectKey("binarySemaphores")
       val binarySemaphores = parser.parseISZ(parseBinarySemaphore _)
@@ -721,6 +730,21 @@ object JSON {
       return Semaphore(name)
     }
 
+    def parseMutex(): Mutex = {
+      val r = parseMutexT(F)
+      return r
+    }
+
+    def parseMutexT(typeParsed: B): Mutex = {
+      if (!typeParsed) {
+        parser.parseObjectType("Mutex")
+      }
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
+      parser.parseObjectNext()
+      return Mutex(name)
+    }
+
     def parseTODO(): TODO = {
       val r = parseTODOT(F)
       return r
@@ -1071,6 +1095,24 @@ object JSON {
       return r
     }
     val r = to(s, fSemaphore _)
+    return r
+  }
+
+  def fromMutex(o: Mutex, isCompact: B): String = {
+    val st = Printer.printMutex(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toMutex(s: String): Either[Mutex, Json.ErrorMsg] = {
+    def fMutex(parser: Parser): Mutex = {
+      val r = parser.parseMutex()
+      return r
+    }
+    val r = to(s, fMutex _)
     return r
   }
 

@@ -129,6 +129,13 @@ object Transformer {
            case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[ASTObject]())
           }
           return r
+        case o: Mutex =>
+          val r: PreResult[Context, ASTObject] = preMutex(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: ASTObject)) => PreResult(preCtx, continu, Some[ASTObject](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type ASTObject")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[ASTObject]())
+          }
+          return r
         case o: TODO =>
           val r: PreResult[Context, ASTObject] = preTODO(ctx, o) match {
            case PreResult(preCtx, continu, Some(r: ASTObject)) => PreResult(preCtx, continu, Some[ASTObject](r))
@@ -204,6 +211,10 @@ object Transformer {
     }
 
     @pure def preSemaphore(ctx: Context, o: Semaphore): PreResult[Context, Semaphore] = {
+      return PreResult(ctx, T, None())
+    }
+
+    @pure def preMutex(ctx: Context, o: Mutex): PreResult[Context, Mutex] = {
       return PreResult(ctx, T, None())
     }
 
@@ -297,6 +308,13 @@ object Transformer {
            case TPostResult(postCtx, _) => TPostResult(postCtx, None[ASTObject]())
           }
           return r
+        case o: Mutex =>
+          val r: TPostResult[Context, ASTObject] = postMutex(ctx, o) match {
+           case TPostResult(postCtx, Some(result: ASTObject)) => TPostResult(postCtx, Some[ASTObject](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type ASTObject")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[ASTObject]())
+          }
+          return r
         case o: TODO =>
           val r: TPostResult[Context, ASTObject] = postTODO(ctx, o) match {
            case TPostResult(postCtx, Some(result: ASTObject)) => TPostResult(postCtx, Some[ASTObject](result))
@@ -375,6 +393,10 @@ object Transformer {
       return TPostResult(ctx, None())
     }
 
+    @pure def postMutex(ctx: Context, o: Mutex): TPostResult[Context, Mutex] = {
+      return TPostResult(ctx, None())
+    }
+
     @pure def postTODO(ctx: Context, o: TODO): TPostResult[Context, TODO] = {
       return TPostResult(ctx, None())
     }
@@ -433,7 +455,7 @@ import Transformer._
           else
             TPostResult(r0.ctx, None())
         case o2: Component =>
-          val r0: TPostResult[Context, IS[Z, TODO]] = transformISZ(preR.ctx, o2.mutexes, transformTODO _)
+          val r0: TPostResult[Context, IS[Z, Mutex]] = transformISZ(preR.ctx, o2.mutexes, transformMutex _)
           val r1: TPostResult[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
           val r2: TPostResult[Context, IS[Z, Semaphore]] = transformISZ(r1.ctx, o2.semaphores, transformSemaphore _)
           val r3: TPostResult[Context, IS[Z, Dataport]] = transformISZ(r2.ctx, o2.dataports, transformDataport _)
@@ -486,6 +508,11 @@ import Transformer._
           else
             TPostResult(preR.ctx, None())
         case o2: Semaphore =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+        case o2: Mutex =>
           if (hasChanged)
             TPostResult(preR.ctx, Some(o2))
           else
@@ -603,7 +630,7 @@ import Transformer._
     val r: TPostResult[Context, Component] = if (preR.continu) {
       val o2: Component = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: TPostResult[Context, IS[Z, TODO]] = transformISZ(preR.ctx, o2.mutexes, transformTODO _)
+      val r0: TPostResult[Context, IS[Z, Mutex]] = transformISZ(preR.ctx, o2.mutexes, transformMutex _)
       val r1: TPostResult[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
       val r2: TPostResult[Context, IS[Z, Semaphore]] = transformISZ(r1.ctx, o2.semaphores, transformSemaphore _)
       val r3: TPostResult[Context, IS[Z, Dataport]] = transformISZ(r2.ctx, o2.dataports, transformDataport _)
@@ -966,6 +993,32 @@ import Transformer._
     val hasChanged: B = r.resultOpt.nonEmpty
     val o2: Semaphore = r.resultOpt.getOrElse(o)
     val postR: TPostResult[Context, Semaphore] = pp.postSemaphore(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformMutex(ctx: Context, o: Mutex): TPostResult[Context, Mutex] = {
+    val preR: PreResult[Context, Mutex] = pp.preMutex(ctx, o)
+    val r: TPostResult[Context, Mutex] = if (preR.continu) {
+      val o2: Mutex = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        TPostResult(preR.ctx, Some(o2))
+      else
+        TPostResult(preR.ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: Mutex = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, Mutex] = pp.postMutex(r.ctx, o2)
     if (postR.resultOpt.nonEmpty) {
       return postR
     } else if (hasChanged) {

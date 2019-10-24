@@ -13,6 +13,9 @@ object StringTemplate {
   val MON_READ_ACCESS: String = Util.cbrand("MONITOR_READ_ACCESS")
   val MON_WRITE_ACCESS: String = Util.cbrand("MONITOR_WRITE_ACCESS")
 
+  val SeqNumName: String = "seqNum"
+  val SeqNumType: String = s"${SeqNumName}_t"
+  
   def tbInterface(macroName: String): ST = {
     val r : ST = st"""#ifdef ${macroName}
                      |#define ${macroName}
@@ -179,6 +182,166 @@ object StringTemplate {
     return r
   }
 
+  def tbEnqueueDequeueIhor(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
+                       preventBadging: B): ST = {
+
+    val mon_dequeue: ST = if(preventBadging) { st"" } else {
+      st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
+          |  return false;
+          |} else """
+    }
+
+    val mon_enqueue: ST = if(preventBadging) { st"" } else {
+      st"""if (mon_get_sender_id() != $MON_WRITE_ACCESS) {
+          |    return false;
+          |} else """
+    }
+
+    val r: ST =
+      st"""#ifndef $SB_VERIFY
+          |#include <stdio.h>
+          |#endif // $SB_VERIFY
+          |#include <camkes.h>
+          |#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
+          |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
+          |
+          |struct queue {
+          |    int head;
+          |    int tail;
+          |    int len;
+          |    ${typeName} elt[${dim}];
+          |} q = {.head=0, .tail=0, .len=0};
+          |
+          |static bool is_full(void) {
+          |  return q.len == ${dim};
+          |}
+          |
+          |static bool is_empty(void) {
+          |  return q.len == 0;
+          |}
+          |
+          |bool mon_receive_dequeue(${typeName} * m) {
+          |  ${mon_dequeue}if (is_empty()) {
+          |    return false;
+          |  } else {
+          |    m_lock();
+          |    *m = q.elt[q.tail];
+          |    q.tail = (q.tail + 1) % ${dim};
+          |    q.len--;
+          |    m_unlock();
+          |    return true;
+          |  }
+          |}
+          |
+          |bool mon_send_enqueue(const ${typeName} * m) {
+          |  ${mon_enqueue}if (is_full()) {
+          |    return false;
+          |  } else {
+          |    m_lock();
+          |    q.elt[q.head] = *m;
+          |    q.head = (q.head + 1) % ${dim};
+          |    q.len++;
+          |    m_unlock();
+          |    monsig_emit();    
+          |    return true;
+          |  }
+          |}
+          |"""
+    return r
+  }
+  
+  def seqNumHeader(): ST = {
+    return st"""#ifndef _SEQNUM_H_
+               |#define _SEQNUM_H_
+               |
+               |// Typedef for seqNum to make it easy to change the type. Keep these consistent!
+               |typedef uintmax_t seqNum_t;
+               |#define SEQNUM_MAX UINTMAX_MAX
+               |#define PRIseqNum PRIuMAX
+               |
+               |// DIRTY_SEQ_NUM is used to mark a sampling port message as dirty while it is
+               |// being writen. DIRTY_SEQ_NUM is not a valid sequence number. Valid sequence
+               |// numbers are from 0 to DIRTY_SEQ_NUM-1 is never a valid sequence number.
+               |static const seqNum_t DIRTY_SEQ_NUM = SEQNUM_MAX;
+               |
+               |#endif"""
+  }
+  
+  def sbSamplingPortGlobalVar(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    val portName = Util.getLastName(f.identifier)
+    val globalVarName = s"${Util.brand(portName)}_seqNum"
+    return st"$globalVarName"
+  }
+  
+  def sbSamplingPortGlobalVarDecl(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    return st"${StringTemplate.SeqNumType} ${sbSamplingPortGlobalVar(spi, f)};"
+  }
+
+  def sbSamplingPortInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    assert(f.category == ir.FeatureCategory.DataPort)
+
+    val portName = Util.getLastName(f.identifier)
+    val methodNamePrefix = Util.brand(portName)
+    
+    val ret: ST = f.direction match {
+      case ir.Direction.In => st"""bool ${methodNamePrefix}_read(${spi.portType()} * value);
+                                  |bool ${methodNamePrefix}_read_isFresh(${spi.portType()} * value, bool * isFresh);"""
+      case ir.Direction.Out => st"bool ${methodNamePrefix}_write(const ${spi.portType()} * value);"
+      case _ => halt(s"Unexpected direction ${f.direction}")
+    }
+    return ret
+  }
+  
+  def sbSamplingPortImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    assert(f.category == ir.FeatureCategory.DataPort)
+
+    val portName = Util.getLastName(f.identifier)
+    val methodNamePrefix = Util.brand(portName)
+    val globalVarName = sbSamplingPortGlobalVar(spi, f)
+
+    val ret: ST = f.direction match {
+      case ir.Direction.In => st"""bool ${methodNamePrefix}_read(${spi.portType()} * value) {
+                                  |  bool isFresh;
+                                  |  return ${methodNamePrefix}_read_isFresh(value, &isFresh);
+                                  |}
+                                  |
+                                  |bool ${methodNamePrefix}_read_isFresh(${spi.portType()} * value, bool * isFresh) {
+                                  |
+                                  |  ${StringTemplate.SeqNumType} new_seqNum;
+                                  |  
+                                  |  if ( read_${spi.name}(${portName}, value, &new_seqNum) ) {
+                                  |    *isFresh = ${globalVarName} < new_seqNum;
+                                  |    ${globalVarName} = new_seqNum;
+                                  |    return true;
+                                  |  } else {
+                                  |    return false;
+                                  |  } 
+                                  |}"""
+        
+      case ir.Direction.Out => st"""bool ${methodNamePrefix}_write(const ${spi.portType()} * value) {
+                                   |  return write_${spi.name}(${portName}, value, &${globalVarName});
+                                   |}"""
+        
+      case _ => halt(s"Unexpected direction ${f.direction}")
+    }
+    return ret
+  }
+  
+  def sbSamplingPortConfigurationEntry(componentVarName: String, spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    val portName = Util.getLastName(f.identifier)
+    
+    val ret: ST = f.direction match {
+      case ir.Direction.In => st"""${componentVarName}.${portName}_access = "R";"""
+      case ir.Direction.Out => st"""${componentVarName}.${portName}_access = "W";"""
+      case _ => halt(s"Unexpected direction ${f.direction}")
+    }
+    return ret
+  }
+  
+  def sbAccessRestrictionEntry(componentName: String, varName: String, permission: String): ST = {
+    return st"""${componentName}.${varName}_access = "${permission}";"""
+  }
+  
   val AUX_C_SOURCES: String = "AUX_C_SOURCES"
   val AUX_C_INCLUDES: String = "AUX_C_INCLUDES"
 
@@ -188,9 +351,9 @@ object StringTemplate {
                |)"""
   }
 
-  def cmakeAuxSources(auxCSources: ISZ[String]): ST = {
+  def cmakeAuxSources(auxCSources: ISZ[String], auxHDirectories: ISZ[String]): ST = {
     return st"""set(${AUX_C_SOURCES} ${(auxCSources, " ")})
-               |set(${AUX_C_INCLUDES} ${Util.AUX_CODE_DIRECTORY_NAME}/includes)"""
+               |set(${AUX_C_INCLUDES} ${(auxHDirectories, " ")})"""
   }
 
   def cmakeHamrLib(hamrStaticLib: String): ST = {
@@ -342,7 +505,7 @@ object StringTemplate {
                   |bool periodic_dispatcher_write_int64_t(const int64_t * arg) {
                   |    ${VAR_PERIODIC_OCCURRED} = true;
                   |    ${VAR_PERIODIC_TIME} = *arg;
-                  |    MUTEXOP(${SEM_POST});
+                  |    MUTEXOP(${SEM_POST}());
                   |    return true;
                   |}
                   |
@@ -507,6 +670,154 @@ object StringTemplate {
     return (header, impl)
   }
 
+  def samplingPortHeader(s: SamplingPortInterface): ST = {
+    val spName = s.name
+    val macroName = "MACRO_NAME"
+    val portType = Util.getClassifierFullyQualified(s.typ)
+    
+    val ret = st"""#ifndef ${macroName}
+#define ${macroName}
+
+#include "seqNum.h"
+
+// Sampling port message with bool data
+typedef struct ${spName} {
+
+  // The sampling port message data.
+  ///
+  // TODO: How do we handle differnet data types?  Possible options:
+  //
+  //   - HAMR could generate a dedicated struct for each data port type. In
+  //     the long run this may be the best options since AADL can specify the
+  //     message type.
+  //
+  //   - Generalize this struct with some C wizardry. Would it help to split
+  //     this into two data parts, one for the data and one for the sequence
+  //     number?
+  //
+  ${portType} data;
+  
+  // Sequence number incremented by the writer every time the sampling port is
+  // written. Read by the reciever to detect dropped messages and incoherant
+  // message reads.  An incoherant message is one that is formed of parts of
+  // more than one message.  An incoherent message can occure when writing
+  // happens durring read. If the component runs long enough, this counter
+  // will wrap back to zero.  This causes no problems unless the reciever is
+  // delayed for the wrap time. In that case the reciever may not detect
+  // dropped or incoherent messags. But if the reciver is delayed for that
+  // long the system is probably in a very bad state. Also see DIRTY_SEQ_NUM
+  // above.
+  //
+  // TODO: Currently using ggc builtin _Atomic. Would like to use c11 std, but
+  // have not figured out how to do this int the seL4 cmake build environment.
+  _Atomic seqNum_t seqNum;  
+
+} ${s.structName};
+
+void init_${spName}(${s.structName} *port, seqNum_t *seqNum);
+
+bool write_${spName}(${s.structName} *port, const ${portType} *data, seqNum_t *seqNum);
+
+bool read_${spName}(${s.structName} *port, ${portType} *data, seqNum_t *seqNum);
+
+#endif
+"""
+    return ret
+  }
+  
+  def samplingPortImpl(s: SamplingPortInterface): ST = {
+    val spName = s.name
+    val spType = s"${spName}_t"
+    val portType = Util.getClassifierFullyQualified(s.typ)
+    
+    val ret = st"""
+#include <camkes.h>
+#include <stdio.h>
+#include <sel4/sel4.h>
+#include <utils/util.h>
+#include <sel4utils/util.h>
+#include <sel4utils/helpers.h>
+
+#include "${spName}.h"
+
+void init_${spName}(${spType} *port, seqNum_t *seqNum) {
+  *seqNum = 0; // First message sequence number will be 1.
+  port->seqNum = DIRTY_SEQ_NUM;
+}
+
+// Write message to a sampling port (data type: int)
+//
+// Returns true when sucessful. Otherwise returns false. Currently there is no
+// way to fail and true is alwasy returned. But this may change in the
+// future. seqNum is incremented when a message is succefully sent. seqNum
+// should not be modified otherwise.
+//
+// TODO: Encapsulate this better. seqNum state should be maintained internaly. Possible solutions:
+//
+//    - Allow write to have read access to dataport. Then seqNum is simply in the data port.
+//
+//    - Create a wrapper struct.
+//
+// TODO: Currently using ggc builtin __atomic_thread_fence(__ATOMIC_RELEASE).
+// Would like to use c11 std, but have not figured out how to do this int the
+// seL4 cmake build environment.
+bool write_${spName}(${spType} *port, const ${portType} *data, seqNum_t *seqNum) {
+  // Mark the message dirty BEFORE we start writting.
+  port->seqNum = DIRTY_SEQ_NUM;
+  // Release memory fence - ensure write above to seqNum happens BEFORE reading data
+  __atomic_thread_fence(__ATOMIC_RELEASE);
+  // Write the data
+  port->data = *data;
+  // Increment the sequence number. We are the only writer of seqNum, so
+  // increment does not have to be atomic.
+  *seqNum = (*seqNum + 1) % DIRTY_SEQ_NUM;
+  port->seqNum = *seqNum;
+  // Release memory fence - ensure write above to seqNum happens BEFORE continuing
+  __atomic_thread_fence(__ATOMIC_RELEASE);
+  // Can't fail for now.
+  return true;
+}
+
+// Read a message from a sampling port (data type: int)
+//
+// Return true upon successful read. Data is updated with the read
+// message. The sequence number of the message is also returned. The messaage,
+// might be tha same previously read. The sequences number can be used to
+// detect rereading the same message or dropped messages.
+//
+// Return false if we fail to read a message. For now the only way to fail is
+// when we detect the possibliliy of a write durring read. In this case data
+// may be incoherent and should not be used. Sequence number is set to
+// DIRTY_SEQ_NUM;
+//
+// TODO: Currently using ggc builtin __atomic_thread_fence(__ATOMIC_ACQUIRE).
+// Would like to use c11 std, but have not figured out how to do this int the
+// seL4 cmake build environment.
+bool read_${spName}(${spType} *port, ${portType} *data, seqNum_t *seqNum) {
+  seqNum_t newSeqNum = port->seqNum;
+  // Acquire memory fence - Read seqNum BEFORE reading data
+  __atomic_thread_fence(__ATOMIC_ACQUIRE);
+  *data = port->data;
+  // Acquire memory fence - Read data BEFORE reading seqNum again 
+  //atomic_thread_fence(memory_order_acquire);
+  __atomic_thread_fence(__ATOMIC_ACQUIRE);
+  // The following logic will NOT catch case where the writer wrapped
+  // sequence numbers since our last read. For this to happen, this reader
+  // would have to be delayed for the entire time to wrap. 
+  if (newSeqNum != DIRTY_SEQ_NUM && newSeqNum == port->seqNum) {
+    // Message data is good.  Write did not occure durring read. 
+    *seqNum = newSeqNum;
+    return true;
+  } else {
+    // Writer may have updated data while we were reading. Do not use possibly incoherent data.
+    *seqNum = DIRTY_SEQ_NUM;
+    return false;
+  }
+}
+"""
+    return ret
+  }
+  
   def ifEsleHelper(options: ISZ[(ST, ST)], optElse: Option[ST]): ST = {
     val first: Option[(ST, ST)] = if(options.size > 0) { Some(options(0)) } else { None() }
     val rest: ISZ[(ST, ST)] = if(options.size > 1) { org.sireum.ops.ISZOps(options).drop(1) } else { ISZ() }
