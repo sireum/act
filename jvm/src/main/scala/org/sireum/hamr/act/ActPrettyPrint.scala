@@ -161,7 +161,7 @@ import org.sireum.hamr.act.Util.reporter
 
     val comp = visitComposition(a.composition)
 
-    var imports = actContainer.get.globalImports.map(m => st"import ${m};")
+    var imports = actContainer.get.globalImports.map((m: String) => st"import ${m};")
     
     imports = imports ++ resources.map((o: Resource) => st"""import "${o.path}";""")
     

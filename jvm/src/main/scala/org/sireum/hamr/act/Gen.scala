@@ -40,7 +40,7 @@ import org.sireum.message.Reporter
   var hasErrors: B = F
   val preventBadging: B = T
 
-  var globalImports: Set[String] = Set.empty + Util.camkesStdConnectors
+  var globalImports: Set[String] = Set.empty[String] + Util.camkesStdConnectors
   
   var count: Z = 0
   def counter(): Z = {
