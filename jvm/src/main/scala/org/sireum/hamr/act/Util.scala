@@ -55,7 +55,8 @@ object Util {
 
   val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
   val PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "SB_SYS::Compute_Entrypoint_Source_Text"
-
+  val PROP_PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "Programming_Properties::Compute_Entrypoint_Source_Text"
+  
   val PROP_SB_SYS__CAmkES_Owner_Thread: String = "SB_SYS::CAmkES_Owner_Thread"
   val PROP_TB_SYS__CAmkES_Owner_Thread: String = "TB_SYS::CAmkES_Owner_Thread"
 
@@ -114,7 +115,18 @@ object Util {
     s = StringOps(s.substring(index, c.name.size))
     return StringUtil.replaceAll(s.s, ".", "_")
   }
-
+  
+  @pure def getProperty(properties: ISZ[ir.Property], propertyName: String): Option[ir.Property] = {
+    val op = properties.filter(container => getLastName(container.name) == propertyName)
+    val ret: Option[ir.Property] = if(op.nonEmpty) {
+      assert(op.size == 1) // sanity check, OSATE doesn't allow properties to be assigned to more than once
+      Some(op(0))
+    } else {
+      None()
+    }
+    return ret
+  }
+  
   @pure def getDiscreetPropertyValue(properties: ISZ[ir.Property], propertyName: String): Option[ir.PropertyValue] = {
     val ret: Option[ir.PropertyValue] = getPropertyValues(properties, propertyName) match {
       case ISZ(a) => Some(a)
@@ -122,9 +134,9 @@ object Util {
     }
     return ret
   }
-
+  
   @pure def getPropertyValues(properties: ISZ[ir.Property], propertyName: String): ISZ[ir.PropertyValue] = {
-    return properties.filter(p => getLastName(p.name) == propertyName).flatMap(p => p.propertyValues)
+    return properties.filter(container => getLastName(container.name) == propertyName).flatMap(p => p.propertyValues)
   }
 
   def getLastName(n : ir.Name) : String = {
@@ -332,19 +344,42 @@ object Util {
   }
 
   def getComputeEntrypointSourceText(properties: ISZ[ir.Property]): Option[String] = {
-    var ret: Option[String] = getDiscreetPropertyValue(properties, PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT) match {
-      case Some(ir.ValueProp(v)) => Some(v)
-      case _ => None[String]()
+    val PROP_sb = PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
+    val PROP_tb = PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
+    val PROP_pp = PROP_PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT
+    
+    val sbcest = getProperty(properties, PROP_sb)
+    val tbcest = getProperty(properties, PROP_tb)
+    val ppcest = getProperty(properties, PROP_pp)
+    
+    if((sbcest.nonEmpty && tbcest.nonEmpty) || (sbcest.nonEmpty && ppcest.nonEmpty) || (tbcest.nonEmpty && ppcest.nonEmpty)){
+      val props = st"${PROP_sb}, ${PROP_tb}, ${PROP_pp}"
+      reporter.warn(sbcest.get.name.pos, Util.toolName, s"Only one of the following properties should be set for a component: ${props}")
     }
-    if(ret.isEmpty) {
-      ret = getDiscreetPropertyValue(properties, PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT) match {
-        case Some(ir.ValueProp(v)) =>
-          reporter.warn(None(), Util.toolName, s"Property ${PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} is deprecated, use ${PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} instead.")
 
-          Some(v)
-        case _ => None[String]()
+    val ret: Option[String] = if(sbcest.nonEmpty) {
+      val values = sbcest.get.propertyValues.map(m => m.asInstanceOf[ir.ValueProp])
+      assert(values.size > 0)
+      if(values.size > 1) {
+        reporter.warn(None(), Util.toolName, s"${Util.toolName} only supports a single compute entry point for property ${PROP_sb}")
       }
+      Some(values(0).value)
+    } else if (tbcest.nonEmpty) {
+      val values = tbcest.get.propertyValues.map(m => m.asInstanceOf[ir.ValueProp])
+      assert(values.size > 0)
+      reporter.warn(None(), Util.toolName, s"Property ${PROP_tb} is deprecated, use ${PROP_sb} or ${PROP_pp} instead.")
+      if(values.size > 1) {
+        reporter.warn(None(), Util.toolName, s"${Util.toolName} only supports a single compute entry point for property ${PROP_tb}")
+      }
+      Some(values(0).value)
+    } else if(ppcest.nonEmpty) {
+      val values = ppcest.get.propertyValues.map(m => m.asInstanceOf[ir.ValueProp])
+      assert(values.size == 1)
+      Some(values(0).value)
+    } else {
+      None()
     }
+    
     return ret
   }
 
