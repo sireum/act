@@ -31,6 +31,10 @@ object Util {
   val MONITOR_EVENT_NOTIFICATION_TYPE: String =  "QueuedData"
   val MONITOR_DATA_NOTIFICATION_TYPE: String  = "DataportWrite"
 
+  val MONITOR_INTERFACE_NAME_EVENT = "AADLEvent"
+  val MONITOR_INTERFACE_NAME_RECEIVER = s"${MONITOR_INTERFACE_NAME_EVENT}_Receiver"
+  val MONITOR_INTERFACE_NAME_SENDER = s"${MONITOR_INTERFACE_NAME_EVENT}_Sender"
+
   val NOTIFICATION_TYPE: String = "Notification"
 
   val INTERFACE_PREFIX: String  = brand("Monitor")
@@ -215,12 +219,21 @@ object Util {
   }
 
   def getInterfaceNameIhor(feature: ir.FeatureEnd, isSender: B): String = {
-    val base = getInterfaceName(feature)
-    if(isSender){
-      return s"${base}_Sender"
+    val ret: String = if(feature.category == ir.FeatureCategory.EventPort) {
+      if(isSender) {
+        Util.MONITOR_INTERFACE_NAME_SENDER
+      } else {
+        Util.MONITOR_INTERFACE_NAME_RECEIVER
+      }
     } else {
-      return s"${base}_Receiver"
+      val base = getInterfaceName(feature)
+      if(isSender){
+        s"${base}_Sender"
+      } else {
+        s"${base}_Receiver"
+      }
     }
+    return ret
   }
 
   def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
@@ -358,14 +371,14 @@ object Util {
     }
 
     val ret: Option[String] = if(sbcest.nonEmpty) {
-      val values = sbcest.get.propertyValues.map(m => m.asInstanceOf[ir.ValueProp])
+      val values = sbcest.get.propertyValues.map((m: ir.PropertyValue) => m.asInstanceOf[ir.ValueProp])
       assert(values.size > 0)
       if(values.size > 1) {
         reporter.warn(None(), Util.toolName, s"${Util.toolName} only supports a single compute entry point for property ${PROP_sb}")
       }
       Some(values(0).value)
     } else if (tbcest.nonEmpty) {
-      val values = tbcest.get.propertyValues.map(m => m.asInstanceOf[ir.ValueProp])
+      val values = tbcest.get.propertyValues.map((m: ir.PropertyValue) => m.asInstanceOf[ir.ValueProp])
       assert(values.size > 0)
       reporter.warn(None(), Util.toolName, s"Property ${PROP_tb} is deprecated, use ${PROP_sb} or ${PROP_pp} instead.")
       if(values.size > 1) {
@@ -373,7 +386,7 @@ object Util {
       }
       Some(values(0).value)
     } else if(ppcest.nonEmpty) {
-      val values = ppcest.get.propertyValues.map(m => m.asInstanceOf[ir.ValueProp])
+      val values = ppcest.get.propertyValues.map((m: ir.PropertyValue) => m.asInstanceOf[ir.ValueProp])
       assert(values.size == 1)
       Some(values(0).value)
     } else {
@@ -714,15 +727,12 @@ object TimerUtil {
                      |
                      |// Declarations for managing periodic thread dispatch
                      |const uint32_t aadl_tick_interval = 1;
-                     |const uint32_t aadl_hyperperiod_subdivisions = 1;
                      |uint32_t aadl_calendar_counter = 0;
-                     |uint32_t aadl_calendar_ticks = 0;
                      |
                      |void ${THREAD_CALENDAR}() {
                      |  ${(calendars, "\n")}
                      |
-                     |  aadl_calendar_counter = (aadl_calendar_counter + 1); // % aadl_hyperperiod_subdivisions;
-                     |  aadl_calendar_ticks++;
+                     |  aadl_calendar_counter++;
                      |}
                      |
                      |void ${TIMER_NOTIFICATION_DISPATCHER_ID}_callback() {
@@ -837,8 +847,8 @@ object TimerUtil {
                               interfaceSender: ast.Procedure,  // camkes interface
                               providesReceiverVarName: String,
                               providesSenderVarName: String,
-                              dataportReceiverVarName: String,
-                              dataportSenderVarName: String,
+                              dataportReceiverVarName: Option[String],
+                              dataportSenderVarName: Option[String],
                               cimplementation: Resource,
                               cinclude: Resource,
                               index: Z,                  // fan-out index
