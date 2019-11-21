@@ -2029,8 +2029,7 @@ import org.sireum.message.Reporter
       
       f.direction match {
         case ir.Direction.In =>
-          val s = Util.getQueueSize(f)
-          s.nonEmpty && s.get > 1
+          Util.getQueueSize(f) > 1
 
         case ir.Direction.Out =>
           val name = Util.getName(f.identifier)
@@ -2041,9 +2040,9 @@ import org.sireum.message.Reporter
             val dstFeatureName: ir.Name = ci.dst.feature.get
             val dstName = Util.getName(dstFeatureName)
             val dstFeature = featureMap.get(dstName).get
-            val qs = Util.getQueueSize(dstFeature)
+            val qs: Z = Util.getQueueSize(dstFeature)
 
-            if(qs.nonEmpty && qs.get > 1) {
+            if(qs > 1) {
               connectedToFeatureWithQueueGreaterThanOne = T
             }
           }
