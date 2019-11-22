@@ -336,16 +336,8 @@ object StringTemplate {
 
     val ret: ST = f.direction match {
       case ir.Direction.In => st"""bool ${methodNamePrefix}_read(${spi.portType()} * value) {
-                                  |  bool isFresh;
-                                  |  return ${methodNamePrefix}_read_isFresh(value, &isFresh);
-                                  |}
-                                  |
-                                  |bool ${methodNamePrefix}_read_isFresh(${spi.portType()} * value, bool * isFresh) {
-                                  |
                                   |  ${StringTemplate.SeqNumType} new_seqNum;
-                                  |  
                                   |  if ( read_${spi.name}(${portName}, value, &new_seqNum) ) {
-                                  |    *isFresh = ${globalVarName} < new_seqNum;
                                   |    ${globalVarName} = new_seqNum;
                                   |    return true;
                                   |  } else {
