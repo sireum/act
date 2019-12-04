@@ -27,6 +27,8 @@ object Util {
 
   val MONITOR_COMP_SUFFIX: String  = "Monitor"
 
+  val EVENT_NOTIFICATION_TYPE: String = "ReceiveEvent"
+  
   val MONITOR_EVENT_DATA_NOTIFICATION_TYPE: String =  "ReceiveEvent"
   val MONITOR_EVENT_NOTIFICATION_TYPE: String =  "QueuedData"
   val MONITOR_DATA_NOTIFICATION_TYPE: String  = "DataportWrite"
@@ -92,6 +94,8 @@ object Util {
 
   val camkesStdConnectors: String = "<std_connector.camkes>"
   val camkesGlobalConnectors: String = "<global-connectors.camkes>"
+  
+  val SB_EVENT_COUNTER_TYPE: String = "int32_t"
   
   def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
@@ -177,7 +181,7 @@ object Util {
     return brand(s"${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}")
   }
 
-  def genMonitorNotificationFeatureName(f: ir.Feature, isDataPort: B): String = {
+  def genSeL4CallbackMethodName(f: ir.Feature, isDataPort: B): String = {
     val name = s"${Util.getLastName(f.identifier)}${if(isDataPort) "_notification" else "" }"
     return brand(name)
   }
@@ -194,6 +198,13 @@ object Util {
     return brand(s"${Util.getClassifierFullyQualified(c)}_shared_var")
   }
 
+  def getEventSBNotificationName(featureId: String): String = {
+    return brand(s"${featureId}")
+  }
+  
+  def getEventSBCounterName(featureId: String): String = {
+    return brand(s"${featureId}_counter")
+  }
 
   def getMonitorWriterParamName(c: ir.Component): String = {
     val name = Util.getClassifierFullyQualified(c.classifier.get)

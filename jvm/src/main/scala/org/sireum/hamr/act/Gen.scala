@@ -313,13 +313,11 @@ import org.sireum.message.Reporter
 
       configuration = configuration :+ TimerUtil.configurationTimerAttribute(dispatchComponent.name, counter(), T)
 
-      // FIXME: TB uses "periodic_dispatcher" rather than the assigned classifier "dispatch_periodic"???
       configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(
         dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
       configuration = configuration :+ TimerUtil.configurationTimerCompleteGlobalEndpoint(
         dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
 
-      // FIXME: is there a default priority for dispatch component?
       configuration = configuration :+ StringTemplate.configurationPriority(dispatchComponent.name, Util.DEFAULT_PRIORITY)
       
       configuration = configuration :+ st"${TimerUtil.TIMER_INSTANCE}.timers_per_client = 1;"
@@ -356,6 +354,25 @@ import org.sireum.message.Reporter
     def createRPCConnection(srcComponent: String, srcFeature: String,
                             dstComponent: String, dstFeature: String) : Unit = {
       createConnection(Sel4ConnectorTypes.seL4RPCCall, srcComponent, srcFeature, dstComponent, dstFeature)
+    }
+
+    def createSharedDataCounterConnection(conn: ir.ConnectionInstance) : Unit = {
+      val srcComponent = Util.getLastName(conn.src.component)
+      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+
+      val dstComponent = Util.getLastName(conn.dst.component)
+      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+
+      val srcFeatureName = Util.getEventSBCounterName(Util.getLastName(srcFeature.identifier))
+      val dstFeatureName = Util.getEventSBCounterName(Util.getLastName(dstFeature.identifier))
+
+      createConnection(Sel4ConnectorTypes.seL4SharedData,
+        srcComponent, srcFeatureName,
+        dstComponent, dstFeatureName
+      )
+
+      configuration = configuration :+ st"""${srcComponent}.${srcFeatureName}_access = "W";"""
+      configuration = configuration :+ st"""${dstComponent}.${dstFeatureName}_access = "R";"""
     }
     
     def createSharedDataConnection(conn: ir.ConnectionInstance) : Unit = {
@@ -395,7 +412,7 @@ import org.sireum.message.Reporter
       // notification monsig to dst
       createNotificationConnection(
         monitor.i.name, "monsig",
-        dstComponent, Util.genMonitorNotificationFeatureName(dstFeature, T)
+        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
       )
     }
 
@@ -420,7 +437,7 @@ import org.sireum.message.Reporter
       // notification monsig to dst
       createNotificationConnection(
         monitor.i.name, "monsig",
-        dstComponent, Util.genMonitorNotificationFeatureName(dstFeature, T)
+        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
       )
     }
     
@@ -456,11 +473,26 @@ import org.sireum.message.Reporter
               }
               
             case ir.FeatureCategory.EventPort =>
-              if(shouldUseMonitor(fdst.asInstanceOf[ir.FeatureEnd])) {
-                createDataConnection_Ihor(conn) // ihor event port profile
-              } else {
-                createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature)) 
+              def eventPortSel4Profile(): Unit = {
+                if(shouldUseMonitorForEventPort(fdst)) {
+                  createDataConnection_Ihor(conn) // ihor aadl-event-monitor port profile
+                } else {
+                  createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
+                }
               }
+              
+              def eventPort_SB_Profile(): Unit = {
+                // notification plus shared counter
+                createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
+                createSharedDataCounterConnection(conn)
+              }
+              
+              platform match {
+                case ActPlatform.SeL4 => eventPortSel4Profile()
+                case ActPlatform.SeL4_TB => eventPortSel4Profile()
+                case ActPlatform.SeL4_Only => eventPort_SB_Profile() // ihor aadl-event-direct profile
+              }
+              
             case _ => halt (s"not expecting ${fdst.category}")
           }
         case ir.ConnectionKind.Access =>
@@ -628,7 +660,7 @@ import org.sireum.message.Reporter
                 optional = F)
 
               consumes = consumes :+ Consumes(
-                name = Util.genMonitorNotificationFeatureName(fend, T),
+                name = Util.genSeL4CallbackMethodName(fend, T),
                 typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
             }
@@ -660,7 +692,7 @@ import org.sireum.message.Reporter
           case ir.Direction.In =>
             Util.getComputeEntrypointSourceText(fend.properties) match {
               case Some(_) =>
-                val name = Util.genMonitorNotificationFeatureName(fend, isEventData)
+                val name = Util.genSeL4CallbackMethodName(fend, isEventData)
                 val handlerName = s"${name}_handler"
                 val regCallback = s"${name}_reg_callback"
 
@@ -691,13 +723,13 @@ import org.sireum.message.Reporter
                 optional = F)
 
               consumes = consumes :+ Consumes(
-                name = Util.genMonitorNotificationFeatureName(fend, T),
+                name = Util.genSeL4CallbackMethodName(fend, T),
                 typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                 optional = F)
 
               Util.getComputeEntrypointSourceText(fend.properties) match {
                 case Some(_) =>
-                  val name = Util.genMonitorNotificationFeatureName(fend, T)
+                  val name = Util.genSeL4CallbackMethodName(fend, T)
                   val handlerName = s"${name}_handler"
                   val regCallback = s"${name}_reg_callback"
 
@@ -753,51 +785,51 @@ import org.sireum.message.Reporter
           }
 
         case ir.FeatureCategory.EventPort =>
-          val useMonitor = shouldUseMonitor(fend)
-          
-          if(useMonitor) {
+          def eventPort_Sel4_TB_Profile(): Unit = {
+            if(shouldUseMonitorForEventPort(fend)) {
+              // monitor 
+              
+              fend.direction match {
+                case ir.Direction.In =>
+                  // import receiver interface
+                  imports = imports + s""""../../interfaces/${Util.MONITOR_INTERFACE_NAME_RECEIVER}.idl4""""
 
-            fend.direction match {
-              case ir.Direction.In =>
-                // import receiver interface
-                imports = imports + s""""../../interfaces/${Util.MONITOR_INTERFACE_NAME_RECEIVER}.idl4""""
+                  // uses 
+                  uses = uses :+ Uses(
+                    name = Util.genMonitorFeatureName(fend, None[Z]()),
+                    typ = Util.MONITOR_INTERFACE_NAME_RECEIVER,
+                    optional = F,
+                  )
 
-                // uses 
-                uses = uses :+ Uses(
-                  name = Util.genMonitorFeatureName(fend, None[Z]()),
-                  typ = Util.MONITOR_INTERFACE_NAME_RECEIVER,
-                  optional = F,
-                )
+                  // consumes notification
+                  consumes = consumes :+ Consumes(
+                    name = Util.genSeL4CallbackMethodName(fend, T),
+                    typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
+                    optional = F)
 
-                // consumes notification
-                consumes = consumes :+ Consumes(
-                  name = Util.genMonitorNotificationFeatureName(fend, T),
-                  typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
-                  optional = F)
+                case ir.Direction.Out =>
+                  // import sender interface
+                  imports = imports + s""""../../interfaces/${Util.MONITOR_INTERFACE_NAME_SENDER}.idl4""""
 
-              case ir.Direction.Out =>
-                // import sender interface
-                imports = imports + s""""../../interfaces/${Util.MONITOR_INTERFACE_NAME_SENDER}.idl4""""
+                  outConnections.get(fpath) match {
+                    case Some(outs) =>
+                      var i: Z = 0
+                      for (o <- outs) {
 
-                outConnections.get(fpath) match {
-                  case Some(outs) =>
-                    var i: Z = 0
-                    for (o <- outs) {
+                        uses = uses :+ Uses(
+                          name = Util.genMonitorFeatureName(fend, Some(i)),
+                          typ = Util.MONITOR_INTERFACE_NAME_SENDER,
+                          optional = F
+                        )
 
-                      uses = uses :+ Uses(
-                        name = Util.genMonitorFeatureName(fend, Some(i)),
-                        typ = Util.MONITOR_INTERFACE_NAME_SENDER,
-                        optional = F
-                      )
+                        i = i + 1
+                      }
+                  }
 
-                      i = i + 1
-                    }
-                }
-
-              case _ => halt(s"${fpath}: not expecting direction ${fend.direction}")
-            }
-          } else {   
-            // just notification
+                case _ => halt(s"${fpath}: not expecting direction ${fend.direction}")
+              }
+            } else {
+              // queue size == 1 so just an seL4Notification connection
               handleEventPort(F)
 
               fend.direction match {
@@ -814,6 +846,46 @@ import org.sireum.message.Reporter
                     typ = Util.NOTIFICATION_TYPE)
                 case _ => halt(s"${fpath}: not expecting direction ${fend.direction}")
               }
+            }
+          }
+          
+          def eventPort_SB_Profile(): Unit = {
+            // notification plus a shared counter
+            
+            // correct for fan out connections?
+            
+            val counterType = "int32_t"
+            
+            fend.direction match {
+              case ir.Direction.In =>
+                consumes = consumes :+ Consumes(
+                  name = Util.getEventSBNotificationName(fid),
+                  typ = Util.EVENT_NOTIFICATION_TYPE,
+                  optional = F)
+
+                dataports = dataports :+ Dataport(
+                  name = Util.getEventSBCounterName(fid),
+                  typ = counterType,
+                  optional = F)
+                
+              case ir.Direction.Out =>
+                emits = emits :+ Emits(
+                  name = Util.getEventSBNotificationName(fid),
+                  typ = Util.EVENT_NOTIFICATION_TYPE)
+                
+                dataports = dataports :+ Dataport(
+                  name = Util.getEventSBCounterName(fid),
+                  typ = counterType,
+                  optional = F)
+
+              case _ => halt(s"Unexpected port direction: ${fend.direction}")
+            }
+          }
+          
+          platform match {
+            case ActPlatform.SeL4 => eventPort_Sel4_TB_Profile()
+            case ActPlatform.SeL4_TB => eventPort_Sel4_TB_Profile()
+            case ActPlatform.SeL4_Only => eventPort_SB_Profile()
           }
 
         case _ =>
@@ -1301,11 +1373,17 @@ import org.sireum.message.Reporter
                 }
                 
               case ir.FeatureCategory.EventPort =>
-                val dstFeatureEnd = dstFeature.asInstanceOf[ir.FeatureEnd]
-                if(shouldUseMonitor(dstFeatureEnd)) {
-                  buildIhorEventMonitor(dstFeatureEnd)
-                } else {
-                  // will use Notification
+                def evenPort_Sel4_TB_Profile(): Unit = {
+                  if(shouldUseMonitorForEventPort(dstFeature)) {
+                    buildIhorEventMonitor(dstFeature.asInstanceOf[ir.FeatureEnd])
+                  } else {
+                    // will use Notification
+                  }
+                }
+                platform match {
+                  case ActPlatform.SeL4 => evenPort_Sel4_TB_Profile()
+                  case ActPlatform.SeL4_TB => evenPort_Sel4_TB_Profile()
+                  case ActPlatform.SeL4_Only => // not using monitors 
                 }
 
               case _ =>
@@ -1420,19 +1498,10 @@ import org.sireum.message.Reporter
   }
 
   def generateC_InterfaceMethod(component: ir.Component, feature: ir.FeatureEnd): Option[C_SimpleContainer] = {
-    val ret: Option[C_SimpleContainer] = feature.category match {
-      case ir.FeatureCategory.DataPort if platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only =>
+    
+    def handleDataPort(): Option[C_SimpleContainer] = {
 
-        val classifier = feature.classifier.get
-        val samplingPort: SamplingPortInterface = samplingPorts.get(classifier).get
-
-        val cImpl =  StringTemplate.sbSamplingPortImplementation(samplingPort, feature)
-        
-        val cInterface = StringTemplate.sbSamplingPortInterface(samplingPort, feature)
-        
-        Some(C_SimpleContainer(Some(cInterface), Some(cImpl), None(), None()))
-        
-      case ir.FeatureCategory.DataPort if platform == ActPlatform.SeL4_TB =>
+      def dataport_TB_Profile() : Option[C_SimpleContainer] = {
         val (suffix, mod) : (String, String) = feature.direction match {
           case ir.Direction.In => ("read", "")
           case ir.Direction.Out => ("write", "const ")
@@ -1456,359 +1525,554 @@ import org.sireum.message.Reporter
 
                 val methodName = s"${name}_${suffix}"
                 Some(st"""/************************************************************************
-                    | * ${methodName}:
-                    | * Invoked from user code in the local thread.
-                    | *
-                    | * This is the function invoked by the local thread to make a
-                    | * call to write to a remote data port.
-                    | *
-                    | * XXX: When simulating fan out, the caller of this function will only
-                    | * receive a positive response when all enqueues are successful. When a
-                    | * negative response is received it only indicates that at least one
-                    | * enqueue attempt failed.
-                    | *
-                    | ************************************************************************/
-                    |bool ${methodName}(${mod}${paramType} * ${name}){
-                    |  bool ${result} = true;
-                    |  ${(accum, "\n")}
-                    |  return ${result};
-                    |}""")
+                         | * ${methodName}:
+                         | * Invoked from user code in the local thread.
+                         | *
+                         | * This is the function invoked by the local thread to make a
+                         | * call to write to a remote data port.
+                         | *
+                         | * XXX: When simulating fan out, the caller of this function will only
+                         | * receive a positive response when all enqueues are successful. When a
+                         | * negative response is received it only indicates that at least one
+                         | * enqueue attempt failed.
+                         | *
+                         | ************************************************************************/
+                         |bool ${methodName}(${mod}${paramType} * ${name}){
+                         |  bool ${result} = true;
+                         |  ${(accum, "\n")}
+                         |  return ${result};
+                         |}""")
               case _ => None[ST]()
             }
           } else {
             None[ST]()
           }
-        Some(C_SimpleContainer(inter, impl, None[ST](), None[(ST, ST)]()))
+        return Some(C_SimpleContainer(inter, impl, None[ST](), None[(ST, ST)]()))        
+      } 
+      
+      def dataport_SB_Profile() : Option[C_SimpleContainer] = {
+        val classifier = feature.classifier.get
+        val samplingPort: SamplingPortInterface = samplingPorts.get(classifier).get
 
-      case ir.FeatureCategory.EventDataPort =>
-        val (suffix, mod, paramType): (String, String, String) = feature.direction match {
-          case ir.Direction.In => ("dequeue", "",
-            Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
-          case ir.Direction.Out => ("enqueue", "const ",
-            Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
-          case x => halt(s"Unexpected direction: ${x}")
+        val cImpl =  StringTemplate.sbSamplingPortImplementation(samplingPort, feature)
+
+        val cInterface = StringTemplate.sbSamplingPortInterface(samplingPort, feature)
+
+        return Some(C_SimpleContainer(Some(cInterface), Some(cImpl), None(), None()))
+      }
+      
+      val ret: Option[C_SimpleContainer] = platform match {
+        case ActPlatform.SeL4 => dataport_TB_Profile()
+        case ActPlatform.SeL4_TB => dataport_TB_Profile()
+        case ActPlatform.SeL4_Only => dataport_SB_Profile()
+      }
+      
+      return ret
+    }
+    
+    def handleEventDataPort(): Option[C_SimpleContainer] = {
+      val (suffix, mod, paramType): (String, String, String) = feature.direction match {
+        case ir.Direction.In => ("dequeue", "",
+          Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
+        case ir.Direction.Out => ("enqueue", "const ",
+          Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
+        case x => halt(s"Unexpected direction: ${x}")
+      }
+      val name = Util.genMonitorFeatureName(feature, None[Z]())
+
+      val genMethodName = s"${name}_${suffix}"
+      var inter = Some(st"""bool ${genMethodName}(${mod}${paramType} * ${name});""")
+      val preInit: Option[ST] = None[ST]()
+      var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
+
+      val impl: Option[ST] = if(suffix == "enqueue") {
+        // OUT
+        outConnections.get(Util.getName(feature.identifier)) match {
+          case Some(conns) =>
+            var accum: ISZ[ST] = ISZ()
+            var i = 0
+            val result = Util.brand("result")
+            while(i < conns.size) {
+              accum = accum :+ st"""${result} &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
+              i = i + 1
+            }
+            val methodName: String = s"${name}_${suffix}"
+
+            Some(st"""/************************************************************************
+                     | * ${methodName}:
+                     | * Invoked from user code in the local thread.
+                     | *
+                     | * This is the function invoked by the local thread to make a
+                     | * call to write to a remote data port.
+                     | *
+                     | * XXX: When simulating fan out, the caller of this function will only
+                     | * receive a positive response when all enqueues are successful. When a
+                     | * negative response is received it only indicates that at least one
+                     | * enqueue attempt failed.
+                     | *
+                     | ************************************************************************/
+                     |bool ${methodName}(${mod}${paramType} * ${name}){
+                     |  bool ${result} = true;
+                     |  ${(accum, "\n")}
+                     |  return ${result};
+                     |}""")
+          case _ => None[ST]()
         }
-        val name = Util.genMonitorFeatureName(feature, None[Z]())
+      } else if(!Util.hamrIntegration(platform)) {
+        val simpleName = Util.getLastName(feature.identifier)
+        val methodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
 
-        val genMethodName = s"${name}_${suffix}"
-        var inter = Some(st"""bool ${genMethodName}(${mod}${paramType} * ${name});""")
-        val preInit: Option[ST] = None[ST]()
-        var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
+        val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
+          case Some(v) =>
+            val varName = Util.brand(simpleName)
+            drainQueue = Some((st"""${paramType} ${varName};""",
+              st"""while (${genMethodName}((${paramType} *) &${varName})) {
+                  |  ${methodName}(&${varName});
+                  |}"""))
 
-        val impl: Option[ST] = if(suffix == "enqueue") {
-          // OUT
-          outConnections.get(Util.getName(feature.identifier)) match {
-            case Some(conns) =>
-              var accum: ISZ[ST] = ISZ()
-              var i = 0
-              val result = Util.brand("result")
-              while(i < conns.size) {
-                accum = accum :+ st"""${result} &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
-                i = i + 1
-              }
-              val methodName: String = s"${name}_${suffix}"
+            inter = Some(st"""${inter.get}
+                             |
+                             |void ${v}(const ${paramType} * in_arg);""")
 
-              Some(st"""/************************************************************************
-                  | * ${methodName}:
-                  | * Invoked from user code in the local thread.
-                  | *
-                  | * This is the function invoked by the local thread to make a
-                  | * call to write to a remote data port.
-                  | *
-                  | * XXX: When simulating fan out, the caller of this function will only
-                  | * receive a positive response when all enqueues are successful. When a
-                  | * negative response is received it only indicates that at least one
-                  | * enqueue attempt failed.
-                  | *
-                  | ************************************************************************/
-                  |bool ${methodName}(${mod}${paramType} * ${name}){
-                  |  bool ${result} = true;
-                  |  ${(accum, "\n")}
-                  |  return ${result};
-                  |}""")
-            case _ => None[ST]()
+            s"${v}((${paramType} *) in_arg);"
+          case _ => ""
+        }
+
+        Some(st"""/************************************************************************
+                 | * ${methodName}:
+                 | *
+                 | * This is the function invoked by an active thread dispatcher to
+                 | * call to a user-defined entrypoint function.  It sets up the dispatch
+                 | * context for the user-defined entrypoint, then calls it.
+                 | *
+                 | ************************************************************************/
+                 |void ${methodName}(const ${paramType} * in_arg) {
+                 |  ${invokeHandler}
+                 |}""")
+      } else {
+        None()
+      }
+
+      return Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
+    }
+    
+    def handleEventPort() : Option[C_SimpleContainer] = {
+      
+      def handleEventPort_TB_Profile(): Option[C_SimpleContainer] = {
+
+        def useMonitor(): Option[C_SimpleContainer] = {
+          val dir: String = feature.direction match {
+            case ir.Direction.In => "read"
+            case ir.Direction.Out => "write"
+            case x => halt(s"Unexpected direction: ${x}")
           }
-        } else if(!Util.hamrIntegration(platform)) {
-          val simpleName = Util.getLastName(feature.identifier)
-          val methodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
+          val compName = Util.getClassifier(component.classifier.get)
+          val methodName = Util.getLastName(feature.identifier)
+          val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
 
-          val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
-            case Some(v) =>
-              val varName = Util.brand(simpleName)
-              drainQueue = Some((st"""${paramType} ${varName};""",
-                st"""while (${genMethodName}((${paramType} *) &${varName})) {
-                    |  ${methodName}(&${varName});
-                    |}"""))
+          var inter = Some(st"""bool ${checkMethodName}(void);""")
+          var preInit: Option[ST] = None[ST]()
+          var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
 
-              inter = Some(st"""${inter.get}
-                               |
-                               |void ${v}(const ${paramType} * in_arg);""")
+          val impl: Option[ST] = if(dir == "read") {
 
-              s"${v}((${paramType} *) in_arg);"
-            case _ => ""
+            val varName = Util.brand(s"${methodName}_index")
+            val callback = s"${Util.genSeL4CallbackMethodName(feature, F)}_handler"
+            val callback_reg = Util.brand(s"${methodName}_notification_reg_callback")
+
+            val regCallback = st"CALLBACKOP(${callback_reg}(${callback}, NULL));"
+            preInit = Some(regCallback)
+
+            val interfaceName = Util.brand(s"${methodName}_get_events")
+
+            var r = Some(st"""/************************************************************************
+                             | *
+                             | * Static variables and queue management functions for event port:
+                             | *     ${methodName}
+                             | *
+                             | ************************************************************************/
+                             |static int32_t ${varName} = 0;
+                             |
+                             |/************************************************************************
+                             | * ${callback}:
+                             | * Invoked by: remote RPC
+                             | *
+                             | * This is the function invoked by a remote RPC to write to an active-thread
+                             | * input event port.  It increments a count of received messages.
+                             | *
+                             | ************************************************************************/
+                             |static void ${callback}(void *_ UNUSED){
+                             |  MUTEXOP(${StringTemplate.SEM_POST}());
+                             |  ${regCallback}
+                             |}
+                             |
+                             |/************************************************************************
+                             | * ${checkMethodName}:
+                             | * Invoked from local active thread.
+                             | *
+                             | * This is the function invoked by the active thread to decrement the
+                             | * input event index.
+                             | *
+                             | ************************************************************************/
+                             |bool ${checkMethodName}(){
+                             |  if(${varName} > 0) {
+                             |    $varName--;
+                             |    return true;
+                             |  } else {
+                             |    return false;
+                             |  }
+                             |}
+                             |""")
+
+
+            val simpleName = Util.getLastName(feature.identifier)
+            val entrypointMethodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
+
+            val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
+              case Some(v) =>
+
+                drainQueue = Some(
+                  (st"",
+                    st"""${varName} = ${interfaceName}();
+                        |if(${varName} > 0){
+                        |  ${entrypointMethodName}();
+                        |}""")
+                )
+
+                inter = Some(st"""${inter.get}
+                                 |
+                                 |void ${v}(void);""")
+
+                s"${v}();"
+              case _ => ""
+            }
+
+            Some(st"""${r.get}
+                     |/************************************************************************
+                     | *  ${entrypointMethodName}
+                     | *
+                     | * This is the function invoked by an active thread dispatcher to
+                     | * call to a user-defined entrypoint function.  It sets up the dispatch
+                     | * context for the user-defined entrypoint, then calls it.
+                     | *
+                     | ************************************************************************/
+                     |void ${entrypointMethodName}(void){
+                     |  ${invokeHandler}
+                     |}""")
+
+
+          } else {
+            var accum = ISZ[ST]()
+            val emit = Util.brand(s"${methodName}")
+
+            outConnections.get(Util.getName(feature.identifier)) match {
+              case Some(conns) =>
+                var i = 0
+                while (i < conns.size) {
+                  accum = accum :+ st"""${emit}${i}_raise();"""
+                  i = i + 1
+                }
+              case _ =>
+            }
+
+            Some(st"""/************************************************************************
+                     | * ${checkMethodName}
+                     | * Invoked from user code in the local thread.
+                     | *
+                     | * This is the function invoked by the local thread to make a
+                     | * call to send to a remote event port.
+                     | *
+                     | ************************************************************************/
+                     |bool ${checkMethodName}(void) {
+                     |  ${(accum, "\n")}
+                     |  return true;
+                     |}
+                     |""")
           }
+          
+          return Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
+        }
 
-          Some(st"""/************************************************************************
-              | * ${methodName}:
-              | *
-              | * This is the function invoked by an active thread dispatcher to
-              | * call to a user-defined entrypoint function.  It sets up the dispatch
-              | * context for the user-defined entrypoint, then calls it.
-              | *
-              | ************************************************************************/
-              |void ${methodName}(const ${paramType} * in_arg) {
-              |  ${invokeHandler}
-              |}""")
+        def useNotification(): Option[C_SimpleContainer] = {
+          val dir: String = feature.direction match {
+            case ir.Direction.In => "read"
+            case ir.Direction.Out => "write"
+            case x => halt(s"Unexpected direction: ${x}")
+          }
+          val compName = Util.getClassifier(component.classifier.get)
+          val methodName = Util.getLastName(feature.identifier)
+          val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
+
+          var inter = Some(st"""bool ${checkMethodName}(void);""")
+          val preInit: Option[ST] = None[ST]()
+          var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
+
+          val impl: Option[ST] = if(dir == "read") {
+            val varName = Util.brand(s"${methodName}_index")
+            val callback = s"${Util.genSeL4CallbackMethodName(feature, F)}_handler"
+            val callback_reg = Util.brand(s"${methodName}_reg_callback")
+
+            var r = Some(st"""/************************************************************************
+                             | *
+                             | * Static variables and queue management functions for event port:
+                             | *     ${methodName}
+                             | *
+                             | ************************************************************************/
+                             |static bool ${varName} = false;
+                             |
+                             |/************************************************************************
+                             | * ${callback}:
+                             | * Invoked by: seL4 notification callback
+                             | *
+                             | * This is the function invoked by a seL4 notification callback to 
+                             | * write to an active-thread input event port.  It increments a count 
+                             | * of received messages.
+                             | *
+                             | ************************************************************************/
+                             |static void ${callback}(void *_ UNUSED){
+                             |  $varName = true;
+                             |  MUTEXOP(${StringTemplate.SEM_POST}());
+                             |  CALLBACKOP(${callback_reg}(${callback}, NULL));
+                             |}
+                             |
+                             |/************************************************************************
+                             | * ${checkMethodName}:
+                             | * Invoked from local active thread.
+                             | *
+                             | * This is the function invoked by the active thread to decrement the
+                             | * input event index.
+                             | *
+                             | ************************************************************************/
+                             |bool ${checkMethodName}(){
+                             |  bool result;
+                             |  result = ${varName};
+                             |  ${varName} = false;
+                             |  return result;
+                             |}
+                             |""")
+
+
+            val simpleName = Util.getLastName(feature.identifier)
+            val entrypointMethodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
+
+            val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
+              case Some(v) =>
+
+                drainQueue = Some(
+                  (st"",
+                    st"""if(${checkMethodName}()){
+                        |  ${entrypointMethodName}();
+                        |}""")
+                )
+
+                inter = Some(st"""${inter.get}
+                                 |
+                                 |void ${v}(void);""")
+
+                s"${v}();"
+              case _ => ""
+            }
+
+            Some(st"""${r.get}
+                     |/************************************************************************
+                     | *  ${entrypointMethodName}
+                     | *
+                     | * This is the function invoked by an active thread dispatcher to
+                     | * call to a user-defined entrypoint function.  It sets up the dispatch
+                     | * context for the user-defined entrypoint, then calls it.
+                     | *
+                     | ************************************************************************/
+                     |void ${entrypointMethodName}(void){
+                     |  ${invokeHandler}
+                     |}""")
+
+
+          } else {
+            val emit = Util.brand(s"${methodName}_emit()")
+            val resultVar = Util.brand("result")
+            Some(st"""/************************************************************************
+                     | * ${checkMethodName}
+                     | * Invoked from user code in the local thread.
+                     | *
+                     | * This is the function invoked by the local thread to make a
+                     | * call to write to a remote data port.
+                     | *
+                     | ************************************************************************/
+                     |bool ${checkMethodName}(void) {
+                     |  bool ${resultVar} = true;
+                     |  ${emit};
+                     |  return ${resultVar};
+                     |}
+                     |""")
+          }
+          
+          return Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
+        }
+        
+        if(shouldUseMonitorForEventPort(feature)) {
+          return useMonitor()
         } else {
-          None()
+          return useNotification()
         }
-
-        Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
-
-      case ir.FeatureCategory.EventPort if shouldUseMonitor(feature) =>
-        val dir: String = feature.direction match {
-          case ir.Direction.In => "read"
-          case ir.Direction.Out => "write"
-          case x => halt(s"Unexpected direction: ${x}")
-        }
+      }
+      
+      def handleEventPort_SB_Profile(): Option[C_SimpleContainer] = {
+        val featureName = Util.getLastName(feature.identifier)
         val compName = Util.getClassifier(component.classifier.get)
-        val methodName = Util.getLastName(feature.identifier)
-        val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
+        val counterName = Util.getEventSBCounterName(featureName)
+        
+        feature.direction match {
+          case ir.Direction.In =>
 
-        var inter = Some(st"""bool ${checkMethodName}(void);""")
-        var preInit: Option[ST] = None[ST]()
-        var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
+            val currentEventsVarName = Util.brand(s"${featureName}_current_events")
+            val lastCounterVarName = Util.brand(s"${featureName}_last_counter")
+            
+            val globalVars = st"""/************************************************************************
+                             | *
+                             | * Static variables and queue management functions for event port:
+                             | *     ${featureName}
+                             | *
+                             | ************************************************************************/
+                             |static ${Util.SB_EVENT_COUNTER_TYPE} ${currentEventsVarName} = 0;
+                             |static ${Util.SB_EVENT_COUNTER_TYPE} ${lastCounterVarName} = 0;
+                             |"""
+            
+            val callback = s"${Util.genSeL4CallbackMethodName(feature, F)}_handler"
+            val callback_reg = Util.brand(s"${featureName}_reg_callback")
 
-        val impl: Option[ST] = if(dir == "read") {
-          
-          val varName = Util.brand(s"${methodName}_index")
-          val callback = s"${Util.genMonitorNotificationFeatureName(feature, F)}_handler"
-          val callback_reg = Util.brand(s"${methodName}_notification_reg_callback")
-          
-          val regCallback = st"CALLBACKOP(${callback_reg}(${callback}, NULL));"
-          preInit = Some(regCallback)
-          
-          val interfaceName = Util.brand(s"${methodName}_get_events")
-          
-          var r = Some(st"""/************************************************************************
-                           | *
-                           | * Static variables and queue management functions for event port:
-                           | *     ${methodName}
-                           | *
-                           | ************************************************************************/
-                           |static int32_t ${varName} = 0;
-                           |
-                           |/************************************************************************
-                           | * ${callback}:
-                           | * Invoked by: remote RPC
-                           | *
-                           | * This is the function invoked by a remote RPC to write to an active-thread
-                           | * input event port.  It increments a count of received messages.
-                           | *
-                           | ************************************************************************/
-                           |static void ${callback}(void *_ UNUSED){
-                           |  MUTEXOP(${StringTemplate.SEM_POST}());
-                           |  ${regCallback}
-                           |}
-                           |
-                           |/************************************************************************
-                           | * ${checkMethodName}:
-                           | * Invoked from local active thread.
-                           | *
-                           | * This is the function invoked by the active thread to decrement the
-                           | * input event index.
-                           | *
-                           | ************************************************************************/
-                           |bool ${checkMethodName}(){
-                           |  if(${varName} > 0) {
-                           |    $varName--;
-                           |    return true;
-                           |  } else {
-                           |    return false;
-                           |  }
-                           |}
-                           |""")
+            val callbackMethod = st"""/************************************************************************
+                                | * ${callback}:
+                                | * Invoked by: seL4 notification callback
+                                | *
+                                | * This is the function invoked by a seL4 notification callback to 
+                                | * dispatch the component due to the arrival of an event on port
+                                | * ${featureName}
+                                | *
+                                | ************************************************************************/
+                                |static void ${callback}(void *_ UNUSED){
+                                |  MUTEXOP(${StringTemplate.SEM_POST}());
+                                |  CALLBACKOP(${callback_reg}(${callback}, NULL));
+                                |}"""
+            
+            val preInit = Some(st"CALLBACKOP(${callback_reg}(${callback}, NULL));")
 
+            val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_read_${featureName}"
 
-          val simpleName = Util.getLastName(feature.identifier)
-          val entrypointMethodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
+            var cHeaderEntries = Some(st"""bool ${checkMethodName}(void);""")
+            
+            val readMethod = st"""/************************************************************************
+                                      | * ${checkMethodName}:
+                                      | * Invoked from local active thread.
+                                      | *
+                                      | * This is the function invoked by the active thread to decrement the
+                                      | * input event index.
+                                      | *
+                                      | ************************************************************************/
+                                      |bool ${checkMethodName}() {
+                                      |  if(${currentEventsVarName} > 0) {
+                                      |    ${currentEventsVarName}--;
+                                      |    return true;
+                                      |  } else {
+                                      |    return false;
+                                      |  }
+                                      |}"""
+            
+            var drainQueue: Option[(ST, ST)] =  None[(ST, ST)]()
+            val entrypointMethodName = s"${Util.brand("entrypoint")}_${Util.getClassifier(component.classifier.get)}_${featureName}"
+            
+            val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
+              case Some(v) =>
 
-          val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
-            case Some(v) =>
-
-              drainQueue = Some(
-                (st"",
-                  st"""${varName} = ${interfaceName}();
-                      |if(${varName} > 0){
-                      |  ${entrypointMethodName}();
-                      |}""")
-              )
-
-              inter = Some(st"""${inter.get}
-                               |
-                               |void ${v}(void);""")
-
-              s"${v}();"
-            case _ => ""
-          }
-
-          Some(st"""${r.get}
-                   |/************************************************************************
-                   | *  ${entrypointMethodName}
-                   | *
-                   | * This is the function invoked by an active thread dispatcher to
-                   | * call to a user-defined entrypoint function.  It sets up the dispatch
-                   | * context for the user-defined entrypoint, then calls it.
-                   | *
-                   | ************************************************************************/
-                   |void ${entrypointMethodName}(void){
-                   |  ${invokeHandler}
-                   |}""")
-
-
-        } else {
-          var accum = ISZ[ST]()
-          val emit = Util.brand(s"${methodName}")
-          
-          outConnections.get(Util.getName(feature.identifier)) match {
-            case Some(conns) =>
-              var i = 0
-              while (i < conns.size) {
-                accum = accum :+ st"""${emit}${i}_raise();"""
-                i = i + 1
-              }
-            case _ =>
-          }
-          
-          Some(st"""/************************************************************************
-                   | * ${checkMethodName}
-                   | * Invoked from user code in the local thread.
-                   | *
-                   | * This is the function invoked by the local thread to make a
-                   | * call to send to a remote event port.
-                   | *
-                   | ************************************************************************/
-                   |bool ${checkMethodName}(void) {
-                   |  ${(accum, "\n")}
-                   |  return true;
-                   |}
-                   |""")
-        }
-        Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
+                val currentCounter = Util.brand(s"${featureName}_current_counter")
                 
-      case ir.FeatureCategory.EventPort =>
-        val dir: String = feature.direction match {
-          case ir.Direction.In => "read"
-          case ir.Direction.Out => "write"
-          case x => halt(s"Unexpected direction: ${x}")
+                val queueSize = Util.getQueueSize(feature)
+                
+                drainQueue = Some(
+                  (st"${Util.SB_EVENT_COUNTER_TYPE} ${currentCounter};",
+                    st"""${currentCounter} = *${counterName};
+                        |if(${lastCounterVarName} < ${currentCounter}) {
+                        |  ${currentEventsVarName} = ${currentCounter} - ${lastCounterVarName};
+                        |  if(${currentEventsVarName} > ${queueSize}) {
+                        |    // drop events
+                        |    ${currentEventsVarName} = ${queueSize};
+                        |  }
+                        |  ${lastCounterVarName} = ${currentCounter};
+                        |  ${entrypointMethodName}();
+                        |}""")
+                )
+
+                cHeaderEntries = Some(st"""${cHeaderEntries.get}
+                                          |
+                                          |void ${v}(void);""")
+
+                s"${v}();"
+                
+              case _ => ""
+            }
+
+            val entryPointMethod = Some(st"""/************************************************************************
+                     | *  ${entrypointMethodName}
+                     | *
+                     | * This is the function invoked by an active thread dispatcher to
+                     | * call to a user-defined entrypoint function.  It sets up the dispatch
+                     | * context for the user-defined entrypoint, then calls it.
+                     | *
+                     | ************************************************************************/
+                     |void ${entrypointMethodName}(void){
+                     |  ${invokeHandler}
+                     |}""")
+
+            val cImplementationEntries = Some(st"""${globalVars}
+                                             |
+                                             |${callbackMethod}
+                                             |
+                                             |${readMethod}
+                                             |
+                                             |${entryPointMethod}
+                                             |""")
+            
+            return Some(C_SimpleContainer(cHeaderEntries, cImplementationEntries, preInit, drainQueue))
+            
+          case ir.Direction.Out =>
+
+            val sendMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_write_${featureName}"
+            val emit = Util.brand(s"${featureName}_emit()")
+
+            var cHeaderEntries = st"bool ${sendMethodName}(void);"
+            
+            val sendMethod = st"""/************************************************************************
+                     | * ${sendMethodName}
+                     | * Invoked from user code in the local thread.
+                     | *
+                     | * This is the function invoked by the local thread to make a
+                     | * call to send to a remote event port.
+                     | *
+                     | ************************************************************************/
+                     |bool ${sendMethodName}(void) {
+                     |  (*${counterName})++;
+                     |  ${emit};
+                     |  return true;
+                     |}
+                     |"""
+            
+            return Some(C_SimpleContainer(Some(cHeaderEntries), Some(sendMethod), None(), None()))
+            
+          case _ => halt(s"Unexpected direction ${feature.direction}")
         }
-        val compName = Util.getClassifier(component.classifier.get)
-        val methodName = Util.getLastName(feature.identifier)
-        val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
-
-        var inter = Some(st"""bool ${checkMethodName}(void);""")
-        val preInit: Option[ST] = None[ST]()
-        var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
-
-        val impl: Option[ST] = if(dir == "read") {
-          val varName = Util.brand(s"${methodName}_index")
-          val callback = s"${Util.genMonitorNotificationFeatureName(feature, F)}_handler"
-          val callback_reg = Util.brand(s"${methodName}_reg_callback")
-
-          var r = Some(st"""/************************************************************************
-              | *
-              | * Static variables and queue management functions for event port:
-              | *     ${methodName}
-              | *
-              | ************************************************************************/
-              |static bool ${varName} = false;
-              |
-              |/************************************************************************
-              | * ${callback}:
-              | * Invoked by: remote RPC
-              | *
-              | * This is the function invoked by a remote RPC to write to an active-thread
-              | * input event port.  It increments a count of received messages.
-              | *
-              | ************************************************************************/
-              |static void ${callback}(void *_ UNUSED){
-              |  $varName = true;
-              |  MUTEXOP(${StringTemplate.SEM_POST}());
-              |  CALLBACKOP(${callback_reg}(${callback}, NULL));
-              |}
-              |
-              |/************************************************************************
-              | * ${checkMethodName}:
-              | * Invoked from local active thread.
-              | *
-              | * This is the function invoked by the active thread to decrement the
-              | * input event index.
-              | *
-              | ************************************************************************/
-              |bool ${checkMethodName}(){
-              |  bool result;
-              |  result = ${varName};
-              |  ${varName} = false;
-              |  return result;
-              |}
-              |""")
-
-
-          val simpleName = Util.getLastName(feature.identifier)
-          val entrypointMethodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
-
-          val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
-            case Some(v) =>
-
-              drainQueue = Some(
-                (st"",
-                 st"""if(${checkMethodName}()){
-                    |  ${entrypointMethodName}();
-                    |}""")
-              )
-
-              inter = Some(st"""${inter.get}
-                               |
-                               |void ${v}(void);""")
-
-              s"${v}();"
-            case _ => ""
-          }
-
-          Some(st"""${r.get}
-                   |/************************************************************************
-                   | *  ${entrypointMethodName}
-                   | *
-                   | * This is the function invoked by an active thread dispatcher to
-                   | * call to a user-defined entrypoint function.  It sets up the dispatch
-                   | * context for the user-defined entrypoint, then calls it.
-                   | *
-                   | ************************************************************************/
-                   |void ${entrypointMethodName}(void){
-                   |  ${invokeHandler}
-                   |}""")
-
-
-        } else {
-          val emit = Util.brand(s"${methodName}_emit()")
-          val resultVar = Util.brand("result")
-          Some(st"""/************************************************************************
-              | * ${checkMethodName}
-              | * Invoked from user code in the local thread.
-              | *
-              | * This is the function invoked by the local thread to make a
-              | * call to write to a remote data port.
-              | *
-              | ************************************************************************/
-              |bool ${checkMethodName}(void) {
-              |  bool ${resultVar} = true;
-              |  ${emit};
-              |  return ${resultVar};
-              |}
-              |""")
-        }
-        Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
-
+      }
+      
+      val ret: Option[C_SimpleContainer] = platform match {
+        case ActPlatform.SeL4 => handleEventPort_TB_Profile()
+        case ActPlatform.SeL4_TB => handleEventPort_TB_Profile()
+        case ActPlatform.SeL4_Only => handleEventPort_SB_Profile()
+      }
+      return ret
+    }
+    
+    val ret: Option[C_SimpleContainer] = feature.category match {
+      case ir.FeatureCategory.DataPort => handleDataPort()
+      case ir.FeatureCategory.EventDataPort => handleEventDataPort()
+      case ir.FeatureCategory.EventPort => handleEventPort() 
       case _ => None[C_SimpleContainer]()
     }
     return ret
@@ -1982,14 +2246,17 @@ import org.sireum.message.Reporter
     }
   }
   
-  def shouldUseMonitor(f: ir.FeatureEnd): B = {
-    val ret: B = if(platform == ActPlatform.SeL4_Only) {
-      T
+  def shouldUseMonitorForEventPort(f: ir.Feature): B = {
+    val ret: B = if(!f.isInstanceOf[ir.FeatureEnd]) {
+      F
     }
     else {
+      assert(platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_TB)
       assert(f.category == ir.FeatureCategory.EventPort)
       
-      f.direction match {
+      val fend = f.asInstanceOf[ir.FeatureEnd]
+      
+      fend.direction match {
         case ir.Direction.In =>
           Util.getQueueSize(f) > 1
 
@@ -2011,7 +2278,7 @@ import org.sireum.message.Reporter
 
           connectedToFeatureWithQueueGreaterThanOne
         case _ =>
-          halt(s"Unexpected direction ${f.direction}")
+          halt(s"Unexpected direction ${fend.direction}")
       }
     }
     return ret
