@@ -847,8 +847,6 @@ object TimerUtil {
                               interfaceSender: ast.Procedure,  // camkes interface
                               providesReceiverVarName: String,
                               providesSenderVarName: String,
-                              dataportReceiverVarName: Option[String],
-                              dataportSenderVarName: Option[String],
                               cimplementation: Resource,
                               cinclude: Resource,
                               index: Z,                  // fan-out index

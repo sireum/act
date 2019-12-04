@@ -422,28 +422,6 @@ import org.sireum.message.Reporter
         monitor.i.name, "monsig",
         dstComponent, Util.genMonitorNotificationFeatureName(dstFeature, T)
       )
-      
-      if(monitor.dataportReceiverVarName.nonEmpty) {
-        createConnection(Sel4ConnectorTypes.seL4SharedData,
-          dstComponent, "d",
-          monitor.i.name, monitor.dataportReceiverVarName.get
-        )
-
-        configuration = configuration :+
-          StringTemplate.sbAccessRestrictionEntry(dstComponent, "d", "W") :+
-          StringTemplate.sbAccessRestrictionEntry(monitor.i.name, monitor.dataportReceiverVarName.get, "R")
-      }
-      
-      if(monitor.dataportSenderVarName.nonEmpty) {
-        createConnection(Sel4ConnectorTypes.seL4SharedData,
-          srcComponent, "d",
-          monitor.i.name, monitor.dataportSenderVarName.get
-        )
-
-        configuration = configuration :+
-          StringTemplate.sbAccessRestrictionEntry(srcComponent, "d", "R") :+
-          StringTemplate.sbAccessRestrictionEntry(monitor.i.name, monitor.dataportSenderVarName.get, "W")
-      }
     }
     
     resolveSharedDataFeatures(c.connectionInstances)
@@ -717,8 +695,6 @@ import org.sireum.message.Reporter
                 typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                 optional = F)
 
-              dataports = dataports :+ Dataport("d", "Buf", F)
-
               Util.getComputeEntrypointSourceText(fend.properties) match {
                 case Some(_) =>
                   val name = Util.genMonitorNotificationFeatureName(fend, T)
@@ -746,8 +722,6 @@ import org.sireum.message.Reporter
                     typ = monitor.interfaceSender.name,
                     optional = F
                   )
-
-                  dataports = dataports :+ Dataport("d", "Buf", F)
 
                   i = i + 1
                 }
@@ -1166,9 +1140,6 @@ import org.sireum.message.Reporter
           val providesReceiverVarName = "mon_receive"
           val providesSenderVarName = "mon_send"
 
-          val dataportReceiverVarName = "d_receive"
-          val dataportSenderVarName = "d_send"
-
           val paramType = typeMap.get(typeName).get
           val paramTypeName = Util.getMonitorWriterParamName(paramType)
 
@@ -1180,10 +1151,7 @@ import org.sireum.message.Reporter
             mutexes = ISZ(Mutex("m")),
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
-            dataports = ISZ(
-              Dataport(dataportReceiverVarName, "Buf", F),
-              Dataport(dataportSenderVarName, "Buf", F)
-            ),
+            dataports = ISZ(),
             emits = ISZ(
               Emits(name = "monsig", typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE)),
             uses = ISZ(),
@@ -1200,7 +1168,6 @@ import org.sireum.message.Reporter
 
           val inst: Instance = Instance(address_space = "", name = StringUtil.toLowerCase(monitorName), component = monitor)
 
-          //val dataptr_type = "dataport_ptr_t"
           val receiveMethod = Method(
             name = "dequeue",
             parameters = ISZ(
@@ -1238,7 +1205,6 @@ import org.sireum.message.Reporter
           monitors = monitors + (connInstName ~>
             Ihor_Monitor(inst, interfaceReceiver, interfaceSender,
               providesReceiverVarName, providesSenderVarName,
-              Some(dataportReceiverVarName), Some(dataportSenderVarName),
               cimplementation, cincludes, i, connInst))
         }
 
@@ -1251,9 +1217,6 @@ import org.sireum.message.Reporter
 
           val providesReceiverVarName = "mon_receive"
           val providesSenderVarName = "mon_send"
-
-          //val paramType = typeMap.get(typeName).get
-          //val paramTypeName = Util.getMonitorWriterParamName(paramType)
 
           val monitor = Component(
             control = F,
@@ -1317,7 +1280,6 @@ import org.sireum.message.Reporter
           monitors = monitors + (connInstName ~>
             Ihor_Monitor(inst, interfaceReceiver, interfaceSender,
               providesReceiverVarName, providesSenderVarName,
-              None(), None(),
               cimplementation, cincludes, i, connInst))
         }
         
