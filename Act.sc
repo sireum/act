@@ -29,11 +29,11 @@ import org.sireum.mill.SireumModule._
 
 trait Module extends CrossJvmJsJitPack {
 
-  final override def description: String = "Sireum AADL-to-CAmkES Translator (ACT)"
+  final override def description: String = "Sireum HAMR AADL-to-CAmkES Translator (ACT)"
 
-  final override def artifactName = "air"
+  final override def artifactName = "hamr-act"
 
-  final override def subUrl: String = "air"
+  final override def subUrl: String = "act"
 
   final override def developers = Seq(
     Developers.jason
