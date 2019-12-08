@@ -319,8 +319,7 @@ object StringTemplate {
     val methodNamePrefix = Util.brand(portName)
     
     val ret: ST = f.direction match {
-      case ir.Direction.In => st"""bool ${methodNamePrefix}_read(${spi.portType()} * value);
-                                  |bool ${methodNamePrefix}_read_isFresh(${spi.portType()} * value, bool * isFresh);"""
+      case ir.Direction.In => st"bool ${methodNamePrefix}_read(${spi.portType()} * value);"
       case ir.Direction.Out => st"bool ${methodNamePrefix}_write(const ${spi.portType()} * value);"
       case _ => halt(s"Unexpected direction ${f.direction}")
     }

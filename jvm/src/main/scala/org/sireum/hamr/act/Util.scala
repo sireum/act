@@ -845,7 +845,6 @@ object TimerUtil {
 
 @datatype class TB_Monitor (i: ast.Instance,           // camkes monitor
                             interface: ast.Procedure,  // camkes interface
-                            writer: ast.Procedure,     // writer interface
                             providesVarName: String,
                             cimplementation: Resource,
                             cinclude: Resource,

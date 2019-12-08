@@ -1173,16 +1173,6 @@ import org.sireum.message.Reporter
             includes = ISZ(s"<${typeHeaderFileName}.h>")
           )
 
-          val writer: Procedure = Procedure (
-            name = Util.getMonitorWriterName(f),
-            methods = ISZ(Method(
-              name = s"write_${typeName}",
-              parameters = ISZ(Parameter(F, Direction.Refin, "arg", paramTypeName)),
-              returnType = Some("bool")
-            )),
-            includes = ISZ(s"<${typeHeaderFileName}.h>")
-          )
-
           val connInstName = Util.getName(connInst.name)
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
@@ -1197,7 +1187,7 @@ import org.sireum.message.Reporter
           val cincludes = Util.createResource(interName, StringTemplate.tbInterface(s"__${monitorName}_H__"), T)
 
           monitors = monitors + (connInstName ~> 
-            TB_Monitor(inst, interface, writer,
+            TB_Monitor(inst, interface, 
               providesVarName,
               cimplementation, cincludes, i, connInst))
         }

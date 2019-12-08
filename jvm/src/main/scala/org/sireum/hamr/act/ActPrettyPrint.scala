@@ -72,7 +72,7 @@ import org.sireum.hamr.act.Util.reporter
 
     container.monitors.foreach(m => {
       m match {
-        case i: TB_Monitor => prettyPrint(ISZ(i.writer, i.interface))
+        case i: TB_Monitor => prettyPrint(ISZ(i.interface))
         case i: Ihor_Monitor => prettyPrint(ISZ(i.interfaceReceiver, i.interfaceSender))
       }
 
