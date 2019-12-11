@@ -107,14 +107,18 @@ import org.sireum.message.Reporter
   def gen(c: ir.Component) : Unit = {
     c.category match {
       case ir.ComponentCategory.System =>
-        c.subComponents.foreach(sc => gen(sc))
+        for (sc <- c.subComponents) {
+          gen(sc)
+        }
       case ir.ComponentCategory.Process =>
         val g = genContainer(c)
         astObjects = astObjects :+ Assembly(st"""${(configuration, "\n")}""".render, g)
       case ir.ComponentCategory.Thread =>
         genThread(c)
       case _ =>
-        c.subComponents.foreach(sc => gen(sc))
+        for (sc <- c.subComponents) {
+          gen(sc)
+        }
     }
   }
 
@@ -2110,7 +2114,9 @@ import org.sireum.message.Reporter
     if(c.classifier.nonEmpty) {
       classifierMap = classifierMap + (c.classifier.get.name ~> c)
     }
-    c.subComponents.foreach(sc => buildComponentMap(sc))
+    for (sc <- c.subComponents) {
+      buildComponentMap(sc)
+    }
     hasPeriodicComponents = hasPeriodicComponents | Util.isPeriodic(c)
   }
 
@@ -2312,10 +2318,14 @@ import org.sireum.message.Reporter
     def sortByClassifier(s: ISZ[ir.Component]): ISZ[ir.Component] = { return ISZOps(s).sortWith((a,b) => u(a) < u(b)) }
     def sortDependents(c : ir.Component): Unit = {
       if(ISZOps(sorted).contains(c)){ return }
-      sortByClassifier(graph.outgoing(c).map(m => m.dest)).foreach(dependent => sortDependents(dependent))
+      for (dependent <- sortByClassifier(graph.outgoing(c).map(m => m.dest))) {
+        sortDependents(dependent)
+      }
       sorted = sorted :+ c
     }
-    sortByClassifier(graph.nodes.keys.filter(k => graph.incoming(k).size == z"0")).foreach(r => sortDependents(r))
+    for (r <- sortByClassifier(graph.nodes.keys.filter(k => graph.incoming(k).size == z"0"))) {
+      sortDependents(r)
+    }
     return sorted
   }
 }

@@ -494,7 +494,9 @@ object Util {
     var r: ISZ[ir.Component] = ISZ()
     def s(c : ir.Component): Unit = {
       r = r :+ c
-      c.subComponents.foreach(sc => s(sc))
+      for (sc <- c.subComponents) {
+        s(sc)
+      }
     }
     s(m.components(0))
     return r
@@ -533,7 +535,9 @@ object Util {
           }
         }
       }
-      m.subComponents.foreach(sc => search(sc))
+      for (sc <- m.subComponents) {
+        search(sc)
+      }
     }
     search(model.components(0))
     return ret

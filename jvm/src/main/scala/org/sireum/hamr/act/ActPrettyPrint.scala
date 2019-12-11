@@ -70,7 +70,7 @@ import org.sireum.hamr.act.Util.reporter
         Util.hamrIntegration(platform) && hamrStaticLib.nonEmpty)
     })
 
-    container.monitors.foreach(m => {
+    for (m <- container.monitors) {
       m match {
         case i: TB_Monitor => prettyPrint(ISZ(i.interface))
         case i: Ihor_Monitor => prettyPrint(ISZ(i.interfaceReceiver, i.interfaceSender))
@@ -82,7 +82,7 @@ import org.sireum.hamr.act.Util.reporter
       add(s"${m.cimplementation.path}", m.cimplementation.content)
       add(s"${m.cinclude.path}", m.cinclude.content)
       add(s"${m.cinclude.path}", m.cinclude.content)
-    })
+    }
 
     if(container.samplingPorts.nonEmpty) {
       
