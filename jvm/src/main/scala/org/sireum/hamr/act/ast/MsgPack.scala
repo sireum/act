@@ -107,7 +107,7 @@ object MsgPack {
 
     def writeAssembly(o: Assembly): Unit = {
       writer.writeZ(Constants.Assembly)
-      writer.writeString(o.configuration)
+      writer.writeISZ(o.configuration, writer.writeString _)
       writeComposition(o.composition)
     }
 
@@ -308,7 +308,7 @@ object MsgPack {
       if (!typeParsed) {
         reader.expectZ(Constants.Assembly)
       }
-      val configuration = reader.readString()
+      val configuration = reader.readISZ(reader.readString _)
       val composition = readComposition()
       return Assembly(configuration, composition)
     }

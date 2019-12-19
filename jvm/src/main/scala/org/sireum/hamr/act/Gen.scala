@@ -32,20 +32,32 @@ import org.sireum.message.Reporter
   var monitors: HashSMap[String, Monitor] = HashSMap.empty // conn instname -> monitor
   var containers: ISZ[C_Container] = ISZ()
   var auxFiles: ISZ[Resource] = ISZ()
-
-  var configuration: ISZ[ST] = ISZ()
+  
+  var periodicDispatcherNotifications: ISZ[ast.Emits] = ISZ()
+  var periodicDispatcherCalendars: ISZ[ST] = ISZ()
+  
+  var camkesComponents: ISZ[ast.Component] = ISZ()
+  var camkesConnections: ISZ[ast.Connection] = ISZ()
+  var camkesConfiguration: ISZ[ST] = ISZ()
+  
   var auxCSources: ISZ[ST] = ISZ()
 
   var hasPeriodicComponents: B = F
   var hasErrors: B = F
   val preventBadging: B = T
 
+  var performHamrIntegration: B = Util.hamrIntegration(platform)
+  
   var globalImports: Set[String] = Set.empty[String] + Util.camkesStdConnectors
   
-  var count: Z = 0
-  def counter(): Z = {
+  var count: Z = 1 // 0 causes capability conflict issues
+  def getCounter(): Z = {
     count = count + 1
     return count - 1
+  }
+
+  def getTypeHeaderFileForInclude(): String = {
+    return s"<${typeHeaderFileName}.h>"
   }
 
   def process(cSources: ISZ[String]) : Option[ActContainer] = {
@@ -60,7 +72,7 @@ import org.sireum.message.Reporter
 
     auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
 
-    if(Util.hamrIntegration(platform)) {
+    if(performHamrIntegration) {
       auxCSources = auxCSources :+ st"#include <all.h>" :+ st"#include <ipc.h>"
     }
 
@@ -80,7 +92,7 @@ import org.sireum.message.Reporter
       gen(system)
     }
 
-    if(!hasErrors && Util.hamrIntegration(platform)) {
+    if(!hasErrors && performHamrIntegration) {
       val pair = StringTemplate.hamrIPC(Util.getNumberPorts(model), hamrBasePackageName.get)
 
       auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1, T)
@@ -88,6 +100,65 @@ import org.sireum.message.Reporter
     }
 
     if(!hasErrors) {
+      // merge assemblies
+      val assemblies: ISZ[Assembly] = astObjects.filter(f => f.isInstanceOf[Assembly]).map(m => m.asInstanceOf[Assembly])
+      val otherAstObjects: ISZ[ASTObject] =  astObjects.filter(f => !f.isInstanceOf[Assembly])
+      
+      var instances: Set[Instance] = Set.empty
+      var connections: Set[Connection] = Set.empty
+
+      for(assembly <- assemblies) {
+        instances = instances ++ assembly.composition.instances
+        connections = connections ++ assembly.composition.connections
+      }
+
+      connections = connections ++ camkesConnections
+      
+      if(hasPeriodicComponents) {
+        // add the dispatcher component
+
+        val dispatchComponent = TimerUtil.dispatchComponent(periodicDispatcherNotifications)
+        instances = instances + dispatchComponent
+        containers = containers :+ C_Container(dispatchComponent.component.name,
+          ISZ(TimerUtil.dispatchComponentCSource(getTypeHeaderFileForInclude(), periodicDispatcherCalendars)), ISZ(), ISZ(), ISZ(), ISZ())
+
+        // connect dispatch timer to time server
+        connections = connections + createConnection(Sel4ConnectorTypes.seL4TimeServer,
+          TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_ID_DISPATCHER,
+          TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
+
+        connections = connections + createConnection(Sel4ConnectorTypes.seL4GlobalAsynchCallback,
+          TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_NOTIFICATION_ID,
+          TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
+
+        camkesConfiguration = camkesConfiguration :+ st"${TimerUtil.TIMER_INSTANCE}.timers_per_client = 1;"
+
+        camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerAttribute(dispatchComponent.name, getCounter(), T)
+
+        camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerGlobalEndpoint(
+          dispatchComponent.name, TimerUtil.TIMER_ID_DISPATCHER,
+          dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
+        
+        camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerGlobalEndpoint(
+          dispatchComponent.name, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID,
+          dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
+
+        camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationPriority(dispatchComponent.name, Util.DEFAULT_PRIORITY)
+      }
+
+      val composition = Composition(
+        groups = ISZ(),
+        exports = ISZ(),
+        instances = instances.elements,
+        connections = connections.elements
+      )
+      
+      astObjects = ISZ(Assembly(
+        configuration = camkesConfiguration.map(m => m.render),
+        composition = composition))
+      
+      astObjects = astObjects ++ otherAstObjects
+      
       return Some(ActContainer(
         rootServer = Util.getLastName(topLevelProcess.get.identifier),
         connectors = connectors,
@@ -110,11 +181,16 @@ import org.sireum.message.Reporter
         for (sc <- c.subComponents) {
           gen(sc)
         }
+        camkesConnections = camkesConnections ++ processConnections(c)
+
       case ir.ComponentCategory.Process =>
         val g = genContainer(c)
-        astObjects = astObjects :+ Assembly(st"""${(configuration, "\n")}""".render, g)
+        astObjects = astObjects :+ Assembly(configuration = ISZ(),
+          composition = g)
+        
       case ir.ComponentCategory.Thread =>
         genThread(c)
+                
       case _ =>
         for (sc <- c.subComponents) {
           gen(sc)
@@ -122,17 +198,236 @@ import org.sireum.message.Reporter
     }
   }
 
+
+  var i: Z = 1
+
+  def newConn(): String = {
+    val ret = s"conn${i}"
+    i = i + 1
+    return ret
+  }
+  
+  def createConnection(connectionType: Sel4ConnectorTypes.Type,
+                       srcComponent: String, srcFeature: String,
+                       dstComponent: String, dstFeature: String): ast.Connection = {
+    val from_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
+      isFrom = T,
+      component = srcComponent,
+      end = srcFeature))
+
+    val to_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
+      isFrom = F,
+      component = dstComponent,
+      end = dstFeature))
+
+    val con = Connection(
+      name = newConn(),
+      connectionType = s"$connectionType",
+      from_ends = from_ends,
+      to_ends = to_ends
+    )
+
+    return con
+  }
+  
+  def processConnections(c: ir.Component): ISZ[ast.Connection] = {
+    
+    def createNotificationConnection(srcComponent: String, srcFeature: String,
+                                     dstComponent: String, dstFeature: String): ast.Connection = {
+      return createConnection(Sel4ConnectorTypes.seL4Notification, srcComponent, srcFeature, dstComponent, dstFeature)
+    }
+
+    def createRPCConnection(srcComponent: String, srcFeature: String,
+                            dstComponent: String, dstFeature: String) : ast.Connection = {
+      return createConnection(Sel4ConnectorTypes.seL4RPCCall, srcComponent, srcFeature, dstComponent, dstFeature)
+    }
+
+    def createSharedDataCounterConnection(conn: ir.ConnectionInstance) : ast.Connection = {
+      val srcComponent = Util.getLastName(conn.src.component)
+      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+
+      val dstComponent = Util.getLastName(conn.dst.component)
+      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+
+      val srcFeatureName = Util.getEventSBCounterName(Util.getLastName(srcFeature.identifier))
+      val dstFeatureName = Util.getEventSBCounterName(Util.getLastName(dstFeature.identifier))
+
+      camkesConfiguration = camkesConfiguration :+ st"""${srcComponent}.${srcFeatureName}_access = "W";"""
+      camkesConfiguration = camkesConfiguration :+ st"""${dstComponent}.${dstFeatureName}_access = "R";"""
+      
+      return createConnection(Sel4ConnectorTypes.seL4SharedData,
+        srcComponent, srcFeatureName,
+        dstComponent, dstFeatureName
+      )
+    }
+
+    def createSharedDataConnection(conn: ir.ConnectionInstance) : ast.Connection = {
+      val srcComponent = Util.getLastName(conn.src.component)
+      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+
+      val dstComponent = Util.getLastName(conn.dst.component)
+      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+
+      val srcFeatureName = Util.getLastName(srcFeature.identifier)
+      val dstFeatureName = Util.getLastName(dstFeature.identifier)
+
+      return createConnection(Sel4ConnectorTypes.seL4SharedData,
+        srcComponent, srcFeatureName,
+        dstComponent, dstFeatureName
+      )
+    }
+
+    def createDataConnection(conn: ir.ConnectionInstance) : ISZ[ast.Connection] = {
+      val monitor = getMonitorForConnectionInstance(conn).get.asInstanceOf[TB_Monitor]
+
+      val srcComponent = Util.getLastName(conn.src.component)
+      val dstComponent = Util.getLastName(conn.dst.component)
+
+      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+
+      val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
+      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
+
+      var ret: ISZ[ast.Connection] = ISZ()
+      
+      // rpc src to mon
+      ret = ret :+ createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, monitor.providesVarName)
+
+      // rpc mon to dst
+      ret = ret :+ createRPCConnection(dstComponent, dstFeatureName, monitor.i.name, monitor.providesVarName)
+
+      // notification monsig to dst
+      return ret :+ createNotificationConnection(
+        monitor.i.name, "monsig",
+        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
+      )
+    }
+
+    def createDataConnection_Ihor(conn: ir.ConnectionInstance) :ISZ[ast.Connection] = {
+      val monitor = getMonitorForConnectionInstance(conn).get.asInstanceOf[Ihor_Monitor]
+
+      val srcComponent = Util.getLastName(conn.src.component)
+      val dstComponent = Util.getLastName(conn.dst.component)
+
+      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+
+      val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
+      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
+
+      var ret: ISZ[ast.Connection] = ISZ()
+      
+      // rpc src to mon
+      ret = ret :+ createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, monitor.providesSenderVarName)
+
+      // rpc mon to dst
+      ret = ret :+ createRPCConnection(dstComponent, dstFeatureName, monitor.i.name, monitor.providesReceiverVarName)
+
+      // notification monsig to dst
+      return ret :+ createNotificationConnection(
+        monitor.i.name, "monsig",
+        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
+      )
+    }
+
+    var connections: ISZ[ast.Connection] = ISZ()
+
+    val handledConns = c.connectionInstances.filter(conn => isHandledConnection(conn))
+    val unhandledConns = c.connectionInstances.filter(conn => !isHandledConnection(conn))
+
+    resolveSharedDataFeatures(handledConns)
+    val missingFeatures = sharedData.values.filter((f: SharedData) => f.ownerFeature.isEmpty)
+    if(missingFeatures.nonEmpty) {
+      reporter.error(None(), Util.toolName, s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
+    }
+    
+    for(conn <- handledConns) {
+      val fdst = featureMap.get(Util.getName(conn.dst.feature.get)).get
+
+      val srcComponent = Util.getLastName(conn.src.component)
+      
+      val dstComponent = Util.getLastName(conn.dst.component)
+      val dstFeature = Util.getLastName(conn.dst.feature.get)
+
+      conn.kind match {
+        case ir.ConnectionKind.Port =>
+          fdst.category match {
+            case ir.FeatureCategory.DataPort =>
+              platform match {
+                case ActPlatform.SeL4_TB => connections = connections ++ createDataConnection(conn)
+                case ActPlatform.SeL4 => connections = connections ++ createDataConnection(conn)
+                case ActPlatform.SeL4_Only => connections = connections :+ createSharedDataConnection(conn) // adventium dataport profile
+              }
+
+            case ir.FeatureCategory.EventDataPort =>
+              platform match {
+                case ActPlatform.SeL4 => connections = connections ++ createDataConnection(conn)
+                case ActPlatform.SeL4_TB => connections = connections ++ createDataConnection(conn)
+                case ActPlatform.SeL4_Only => connections = connections ++ createDataConnection_Ihor(conn) // ihor eventdata port profile
+              }
+
+            case ir.FeatureCategory.EventPort =>
+              def eventPortSel4Profile(): Unit = {
+                if(shouldUseMonitorForEventPort(fdst)) {
+                  connections = connections ++ createDataConnection_Ihor(conn) // ihor aadl-event-monitor port profile
+                } else {
+                  val srcFeature = Util.getLastName(conn.src.feature.get)
+                  connections = connections :+ createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
+                }
+              }
+
+              def eventPort_SB_Profile(): Unit = {
+                // notification plus shared counter
+                val srcFeature = Util.getLastName(conn.src.feature.get)
+                connections = connections :+ createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
+                connections = connections :+ createSharedDataCounterConnection(conn)
+              }
+
+              platform match {
+                case ActPlatform.SeL4 => eventPortSel4Profile()
+                case ActPlatform.SeL4_TB => eventPortSel4Profile()
+                case ActPlatform.SeL4_Only => eventPort_SB_Profile() // ihor aadl-event-direct profile
+              }
+
+            case _ => halt (s"not expecting ${fdst.category}")
+          }
+        case ir.ConnectionKind.Access =>
+          fdst.category match {
+            case ir.FeatureCategory.SubprogramAccess =>
+              val srcFeature = Util.getLastName(conn.src.feature.get)
+              connections = connections :+ createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
+            case ir.FeatureCategory.SubprogramAccessGroup =>
+              val srcFeature = Util.getLastName(conn.src.feature.get)
+              connections = connections :+ createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
+
+            case ir.FeatureCategory.DataAccess =>
+              val sd = sharedData.get(Util.getName(conn.src.component)).get
+              val dstComp = componentMap.get(Util.getName(conn.dst.component)).get
+              val ownerId = Util.getName(sd.owner.identifier)
+              val dstId = Util.getName(dstComp.identifier)
+
+              if(ownerId != dstId) {
+                connections = connections :+ createConnection(Sel4ConnectorTypes.seL4SharedData,
+                  dstComponent, dstFeature,
+                  Util.getLastName(sd.owner.identifier), Util.getLastName(sd.ownerFeature.get.identifier)
+                )
+              } else {
+                // Ignore connection to the owner component
+              }
+            case _ =>  halt (s"not expecting ${fdst.category}")
+          }
+        case _ => halt(s"not expecting ${conn.kind}")
+      }
+    }
+
+    return connections
+  }  
+
   def genContainer(c : ir.Component) : Composition = {
     assert(c.category == ir.ComponentCategory.Process)
 
     var connections: ISZ[Connection] = ISZ()
-    var i: Z = 1
-
-    def newConn(): String = {
-      val ret = s"conn${i}"
-      i = i + 1
-      return ret
-    }
 
     var instances: ISZ[Instance] = ISZ()
     var dispatchNotifications: ISZ[Emits] = ISZ()
@@ -147,21 +442,25 @@ import org.sireum.message.Reporter
             Instance(address_space =  "",
               name = componentId,
               component = genThread(sc))
-
+          
           if(Util.getDispatchProtocol(sc) == Some(Dispatch_Protocol.Periodic)) {
+            
             // connect component to time server
-            createConnection(Sel4ConnectorTypes.seL4TimeServer,
+            connections = connections :+ createConnection(Sel4ConnectorTypes.seL4TimeServer,
               componentId, TimerUtil.TIMER_ID,
               TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
-
+            
+            val dispatcherNotificationName = TimerUtil.componentNotificationName(Some(sc))
+            val componentNotificationName = TimerUtil.componentNotificationName(None())
+            
             // connect dispatcher to component
-            createConnection(Sel4ConnectorTypes.seL4Notification,
-              TimerUtil.DISPATCH_PERIODIC_INSTANCE, 
-              TimerUtil.componentNotificationName(componentId),
-              componentId, TimerUtil.TIMER_NOTIFICATION_ID)
-
+            connections = connections :+ createConnection(Sel4ConnectorTypes.seL4Notification,
+              TimerUtil.DISPATCH_PERIODIC_INSTANCE, dispatcherNotificationName,
+              componentId, componentNotificationName)
+              
+            // emit notification when component's period occurs
             dispatchNotifications = dispatchNotifications :+ Emits(
-              name = TimerUtil.componentNotificationName(componentId),
+              name = dispatcherNotificationName,
               typ = Util.NOTIFICATION_TYPE)
 
             val period: Z = if(Util.getPeriod(sc).isEmpty) {
@@ -170,19 +469,22 @@ import org.sireum.message.Reporter
             } else {
               Util.getPeriod(sc).get
             }
-            calendars = calendars :+ TimerUtil.calendar(componentId, period)
+            calendars = calendars :+ TimerUtil.calendar(sc, period)
 
             // timer attribute
-            configuration = configuration :+ TimerUtil.configurationTimerAttribute(
-              componentId, counter(), F)
+            camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerAttribute(
+              componentId, getCounter(), F)
             
             // global endpoint
-            configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(
-              componentId, classifier, TimerUtil.TIMER_ID)
+            camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerGlobalEndpoint(
+              componentId, TimerUtil.TIMER_ID,
+              classifier, TimerUtil.TIMER_ID)
           }
-
-          if(Util.hamrIntegration(platform)) {
-            configuration = configuration :+ StringTemplate.configurationStackSize(componentId, 8388608)
+          
+          Util.getStackSizeInBytes(sc) match {
+            case Some(bytes) =>
+              camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(componentId, bytes)
+            case _ =>
           }
         case ir.ComponentCategory.Subprogram =>
           var params: ISZ[Parameter] = ISZ()
@@ -261,7 +563,11 @@ import org.sireum.message.Reporter
           )
 
           val procName = Util.getSharedDataInterfaceName(sc.classifier.get)
-          astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(readMethod, writeMethod), includes = ISZ(s"<${typeHeaderFileName}.h>"))
+          astObjects = astObjects :+ Procedure(
+            name = procName, 
+            methods = ISZ(readMethod, writeMethod), 
+            includes = ISZ(getTypeHeaderFileForInclude())
+          )
 
           Util.getCamkesOwnerThread(sc.properties) match {
             case Some(owner) =>
@@ -299,231 +605,9 @@ import org.sireum.message.Reporter
       globalImports = globalImports + Util.camkesStdConnectors
       globalImports = globalImports + Util.camkesGlobalConnectors
       globalImports = globalImports + TimerUtil.TIMER_SERVER_IMPORT
-      
-      // add the dispatcher component
-      val dispatchComponent = TimerUtil.dispatchComponent(dispatchNotifications)
-      instances = instances :+ dispatchComponent
-      containers = containers :+ C_Container(dispatchComponent.component.name,
-        ISZ(TimerUtil.dispatchComponentCSource(s"<${typeHeaderFileName}.h>", calendars)), ISZ(), ISZ(), ISZ(), ISZ())
 
-      // connect dispatch timer to time server
-      createConnection(Sel4ConnectorTypes.seL4TimeServer,
-        TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_ID_DISPATCHER,
-        TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
-
-      createConnection(Sel4ConnectorTypes.seL4GlobalAsynchCallback,
-        TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_NOTIFICATION_ID,
-        TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
-
-      configuration = configuration :+ TimerUtil.configurationTimerAttribute(dispatchComponent.name, counter(), T)
-
-      configuration = configuration :+ TimerUtil.configurationTimerGlobalEndpoint(
-        dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
-      configuration = configuration :+ TimerUtil.configurationTimerCompleteGlobalEndpoint(
-        dispatchComponent.name, dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
-
-      configuration = configuration :+ StringTemplate.configurationPriority(dispatchComponent.name, Util.DEFAULT_PRIORITY)
-      
-      configuration = configuration :+ st"${TimerUtil.TIMER_INSTANCE}.timers_per_client = 1;"
-    }
-
-    def createConnection(connectionType: Sel4ConnectorTypes.Type,
-                         srcComponent: String, srcFeature: String,
-                         dstComponent: String, dstFeature: String): Unit = {
-      val from_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
-        isFrom = T,
-        component = srcComponent,
-        end = srcFeature))
-
-      val to_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
-        isFrom = F,
-        component = dstComponent,
-        end = dstFeature))
-
-      val con = Connection(
-        name = newConn(),
-        connectionType = s"$connectionType",
-        from_ends = from_ends,
-        to_ends = to_ends
-      )
-
-      connections = connections :+ con
-    }
-
-    def createNotificationConnection(srcComponent: String, srcFeature: String,
-                                     dstComponent: String, dstFeature: String): Unit = {
-      createConnection(Sel4ConnectorTypes.seL4Notification, srcComponent, srcFeature, dstComponent, dstFeature)
-    }
-
-    def createRPCConnection(srcComponent: String, srcFeature: String,
-                            dstComponent: String, dstFeature: String) : Unit = {
-      createConnection(Sel4ConnectorTypes.seL4RPCCall, srcComponent, srcFeature, dstComponent, dstFeature)
-    }
-
-    def createSharedDataCounterConnection(conn: ir.ConnectionInstance) : Unit = {
-      val srcComponent = Util.getLastName(conn.src.component)
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
-
-      val dstComponent = Util.getLastName(conn.dst.component)
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.getEventSBCounterName(Util.getLastName(srcFeature.identifier))
-      val dstFeatureName = Util.getEventSBCounterName(Util.getLastName(dstFeature.identifier))
-
-      createConnection(Sel4ConnectorTypes.seL4SharedData,
-        srcComponent, srcFeatureName,
-        dstComponent, dstFeatureName
-      )
-
-      configuration = configuration :+ st"""${srcComponent}.${srcFeatureName}_access = "W";"""
-      configuration = configuration :+ st"""${dstComponent}.${dstFeatureName}_access = "R";"""
-    }
-    
-    def createSharedDataConnection(conn: ir.ConnectionInstance) : Unit = {
-      val srcComponent = Util.getLastName(conn.src.component)
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
-      
-      val dstComponent = Util.getLastName(conn.dst.component)
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.getLastName(srcFeature.identifier)
-      val dstFeatureName = Util.getLastName(dstFeature.identifier)
-
-      createConnection(Sel4ConnectorTypes.seL4SharedData,
-        srcComponent, srcFeatureName,
-        dstComponent, dstFeatureName
-      )
-    }
-
-    def createDataConnection(conn: ir.ConnectionInstance) : Unit = {
-      val monitor = getMonitorForConnectionInstance(conn).get.asInstanceOf[TB_Monitor]
-
-      val srcComponent = Util.getLastName(conn.src.component)
-      val dstComponent = Util.getLastName(conn.dst.component)
-
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
-      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
-
-      // rpc src to mon
-      createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, monitor.providesVarName)
-
-      // rpc mon to dst
-      createRPCConnection(dstComponent, dstFeatureName, monitor.i.name, monitor.providesVarName)
-
-      // notification monsig to dst
-      createNotificationConnection(
-        monitor.i.name, "monsig",
-        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
-      )
-    }
-
-    def createDataConnection_Ihor(conn: ir.ConnectionInstance) : Unit = {
-      val monitor = getMonitorForConnectionInstance(conn).get.asInstanceOf[Ihor_Monitor]
-
-      val srcComponent = Util.getLastName(conn.src.component)
-      val dstComponent = Util.getLastName(conn.dst.component)
-
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
-      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
-
-      // rpc src to mon
-      createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, monitor.providesSenderVarName)
-
-      // rpc mon to dst
-      createRPCConnection(dstComponent, dstFeatureName, monitor.i.name, monitor.providesReceiverVarName)
-
-      // notification monsig to dst
-      createNotificationConnection(
-        monitor.i.name, "monsig",
-        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
-      )
-    }
-    
-    resolveSharedDataFeatures(c.connectionInstances)
-    val missingFeatures = sharedData.values.filter((f: SharedData) => f.ownerFeature.isEmpty)
-    if(missingFeatures.nonEmpty) {
-      reporter.error(None(), Util.toolName, s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
-    }
-
-    for(conn <- c.connectionInstances) {
-      val fdst = featureMap.get(Util.getName(conn.dst.feature.get)).get
-
-      val srcComponent = Util.getLastName(conn.src.component)
-      val srcFeature = Util.getLastName(conn.src.feature.get)
-      val dstComponent = Util.getLastName(conn.dst.component)
-      val dstFeature = Util.getLastName(conn.dst.feature.get)
-
-      conn.kind match {
-        case ir.ConnectionKind.Port =>
-          fdst.category match {
-            case ir.FeatureCategory.DataPort =>
-              platform match {
-                case ActPlatform.SeL4_TB => createDataConnection(conn)
-                case ActPlatform.SeL4 => createDataConnection(conn)                  
-                case ActPlatform.SeL4_Only => createSharedDataConnection(conn) // adventium dataport profile
-              } 
-
-            case ir.FeatureCategory.EventDataPort =>
-              platform match {
-                case ActPlatform.SeL4 => createDataConnection(conn)
-                case ActPlatform.SeL4_TB => createDataConnection(conn)
-                case ActPlatform.SeL4_Only => createDataConnection_Ihor(conn) // ihor eventdata port profile
-              }
-              
-            case ir.FeatureCategory.EventPort =>
-              def eventPortSel4Profile(): Unit = {
-                if(shouldUseMonitorForEventPort(fdst)) {
-                  createDataConnection_Ihor(conn) // ihor aadl-event-monitor port profile
-                } else {
-                  createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
-                }
-              }
-              
-              def eventPort_SB_Profile(): Unit = {
-                // notification plus shared counter
-                createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
-                createSharedDataCounterConnection(conn)
-              }
-              
-              platform match {
-                case ActPlatform.SeL4 => eventPortSel4Profile()
-                case ActPlatform.SeL4_TB => eventPortSel4Profile()
-                case ActPlatform.SeL4_Only => eventPort_SB_Profile() // ihor aadl-event-direct profile
-              }
-              
-            case _ => halt (s"not expecting ${fdst.category}")
-          }
-        case ir.ConnectionKind.Access =>
-          fdst.category match {
-            case ir.FeatureCategory.SubprogramAccess =>
-              createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
-            case ir.FeatureCategory.SubprogramAccessGroup =>
-              createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
-
-            case ir.FeatureCategory.DataAccess =>
-              val sd = sharedData.get(Util.getName(conn.src.feature.get)).get
-              val dstComp = componentMap.get(Util.getName(conn.dst.component)).get
-              val ownerId = Util.getName(sd.owner.identifier)
-              val dstId = Util.getName(dstComp.identifier)
-
-              if(ownerId != dstId) {
-                 createConnection(Sel4ConnectorTypes.seL4SharedData,
-                   dstComponent, dstFeature,
-                   Util.getLastName(sd.owner.identifier), Util.getLastName(sd.ownerFeature.get.identifier)
-                 )
-              } else {
-                // Ignore connection to the owner component
-              }
-            case _ =>  halt (s"not expecting ${fdst.category}")
-          }
-        case _ => halt(s"not expecting ${conn.kind}")
-      }
+      periodicDispatcherNotifications = periodicDispatcherNotifications ++ dispatchNotifications
+      periodicDispatcherCalendars = periodicDispatcherCalendars ++ calendars
     }
 
     val monInstances = monitors.values.map((m: Monitor) => m.i)
@@ -531,7 +615,7 @@ import org.sireum.message.Reporter
       groups = ISZ(),
       exports = ISZ(),
       instances = instances ++ monInstances,
-      connections = connections
+      connections = connections ++ processConnections(c)
     )
   }
 
@@ -550,7 +634,7 @@ import org.sireum.message.Reporter
     
 
     var camkesIncludes: Set[String] = Set.empty
-    camkesIncludes = camkesIncludes + s"<${typeHeaderFileName}.h>"
+    camkesIncludes = camkesIncludes + getTypeHeaderFileForInclude()
 
     var externalCSources: ISZ[String] = ISZ()
     var externalCIncludeDirs: ISZ[String] = ISZ()
@@ -638,7 +722,7 @@ import org.sireum.message.Reporter
 
         cImpls = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, fend) +: cImpls
 
-        configuration = configuration :+ 
+        camkesConfiguration = camkesConfiguration :+ 
           StringTemplate.sbSamplingPortConfigurationEntry(
             Util.getLastName(c.identifier), samplingPort, fend)
         
@@ -928,20 +1012,20 @@ import org.sireum.message.Reporter
       case Some(Dispatch_Protocol.Periodic) =>
         // import Timer.idl4
         imports = imports + Util.camkesStdConnectors;
-
+        
         // uses Timer tb_timer;
         uses = uses :+ Uses(
           name = TimerUtil.TIMER_ID,
           typ = TimerUtil.TIMER_TYPE,
           optional = F)
         
-        // consumes Notification tb_timer_complete
+        // consumes Notification from periodic dispatcher
         consumes = consumes :+ Consumes(
-          name = TimerUtil.TIMER_NOTIFICATION_ID,
+          name = TimerUtil.componentNotificationName(None()),
           typ = Util.NOTIFICATION_TYPE,
           optional = F)
-
-        cImpls = StringTemplate.periodicDispatchElems() +: cImpls
+        
+        cImpls = StringTemplate.periodicDispatchElems(cid) +: cImpls
 
         cRunPreEntries = cRunPreEntries :+ StringTemplate.registerPeriodicCallback()
 
@@ -965,7 +1049,7 @@ import org.sireum.message.Reporter
         }
     }
 
-    if(!Util.hamrIntegration(platform)) {
+    if(!performHamrIntegration) {
       Util.getInitializeEntryPoint(c.properties) match {
         case Some(methodName) =>
           cIncludes = cIncludes :+ st"""void ${methodName}(const int64_t *arg);"""
@@ -978,7 +1062,7 @@ import org.sireum.message.Reporter
 
     var sources: ISZ[Resource] = ISZ()
 
-    if(Util.hamrIntegration(platform)) {
+    if(performHamrIntegration) {
       cPreInits = cPreInits :+ st"" // blank line
 
       cPreInits = cPreInits :+ StringTemplate.hamrIntialise(hamrBasePackageName.get, cid)
@@ -987,36 +1071,62 @@ import org.sireum.message.Reporter
 
       var sends: ISZ[(ST, ST)] = ISZ()
 
+      val destPortId = "destPortId"
+      
       val outgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c)
       for(f <- outgoingPorts) {
-        val ports: ISZ[(ir.Component, ir.FeatureEnd)]  = Util.getConnectedPorts(model, f)
-        val tports: ISZ[ST] = ports.map((pair : (ir.Component, ir.FeatureEnd)) => {
-          val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, pair._1)
-          val dstPortName = Util.getLastName(pair._2.identifier)
-          val camkesId = s"${Util.nameToString(pair._2.identifier)}_id"
+        val srcFeatureName = Util.getName(f.identifier)
+        if(outConnections.contains(srcFeatureName)) {
+          
+          {
+            val outgoingConnections: ISZ[ir.ConnectionInstance] = outConnections.get(srcFeatureName).get
 
-          cImpls = st"int32_t ${camkesId};" +: cImpls
+            val connectedPorts: ISZ[(ir.Component, ir.FeatureEnd)] = outgoingConnections.map(ci => {
+              val dstComponent = componentMap.get(Util.getName(ci.dst.component)).get
+              val dstFeature = featureMap.get(Util.getName(ci.dst.feature.get)).get.asInstanceOf[ir.FeatureEnd]
+              (dstComponent, dstFeature)
+            })
 
-          val stpair =  (st"port == ${camkesId}",
-            st"${StringTemplate.hamrEnqueue(f, pair._2, hamrBasePackageName.get, typeMap)}")
+            var counter: Z = 0
+            val assignOutgoingPortIds: ISZ[ST] = connectedPorts.map((pair: (ir.Component, ir.FeatureEnd)) => {
+              val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, pair._1)
+              val dstPortName = Util.getLastName(pair._2.identifier)
+              val dstGlobalVarId = s"${Util.nameToString(pair._2.identifier)}_id"
 
-          sends = sends :+ stpair
+              // create a global var for the destination's port id
+              cImpls = st"Z ${dstGlobalVarId};" +: cImpls
 
-          st"${camkesId} = ${archId}(SF)->${dstPortName}.id + seed;"
-        })
-        cPreInits = cPreInits ++ tports
+              // add entry to if else block
+              val stpair = (st"${destPortId} == ${dstGlobalVarId}",
+                st"${StringTemplate.hamrSendViaCAmkES(f, pair._1, pair._2, counter, hamrBasePackageName.get, typeMap)}")
+
+              sends = sends :+ stpair
+              
+              counter = counter + 1
+              
+              // add preInit entry that fetches the id of the destination port
+              st"${dstGlobalVarId} = ${archId}(SF)->${dstPortName}.id + seed;"
+
+            })
+
+            cPreInits = cPreInits ++ assignOutgoingPortIds
+          }
+        }
       }
 
       var receives: ISZ[ST] = ISZ()
       
-      val inPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c)
+      val inPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c).filter(inPort => {
+        val portId = Util.getName(inPort.identifier)
+        inConnections.contains(portId)
+      })
 
       val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, c)
       val tinPorts: ISZ[ST] = inPorts.map((m: ir.FeatureEnd) => {
         val portName = Util.getLastName(m.identifier)
         val camkesId = s"${portName}_id"
 
-        cImpls = st"int32_t ${camkesId};" +: cImpls
+        cImpls = st"Z ${camkesId};" +: cImpls
 
         receives = receives :+ StringTemplate.hamrDrainQueue(m, hamrBasePackageName.get, typeMap)
 
@@ -1025,18 +1135,16 @@ import org.sireum.message.Reporter
       cPreInits = cPreInits ++ tinPorts
 
       cPreInits = cPreInits :+ st"" // blank line
-
-      cPreInits = cPreInits :+ StringTemplate.hamrInitialiseEntrypoint(hamrBasePackageName.get, cid)
-
-      cRunPreEntries = ISZ()
-
+      
+      cRunPreEntries = cRunPreEntries :+ StringTemplate.hamrInitialiseEntrypoint(hamrBasePackageName.get, cid)
+      
       stRunLoopEntries = StringTemplate.hamrRunLoopEntries(hamrBasePackageName.get, c)
 
       val id = st"${cid} camkes_sendAsync"
       val ifElses = StringTemplate.ifEsleHelper(sends,
-        Some(st"""printf("${id}: not expecting port id %i\n", port);"""))
+        Some(st"""printf("${id}: not expecting port id %i\n", ${destPortId});"""))
 
-      cImpls = cImpls :+ st"""void camkes_sendAsync(Z port, art_DataContent d) {
+      cImpls = cImpls :+ st"""void camkes_sendAsync(Z ${destPortId}, art_DataContent d) {
                              |  ${ifElses}
                              |}
                              |"""
@@ -1054,7 +1162,7 @@ import org.sireum.message.Reporter
       cSources = ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunPreEntries, stRunLoopEntries)) ++ 
         sources,
       cIncludes = ISZ(genComponentTypeInterfaceFile(c, cIncludes)),
-      sourceText = if(Util.hamrIntegration(platform)) ISZ() else Util.getSourceText(c.properties),
+      sourceText = if(performHamrIntegration) ISZ() else Util.getSourceText(c.properties),
       externalCSources = externalCSources,
       externalCIncludeDirs = externalCIncludeDirs
     )
@@ -1161,8 +1269,8 @@ import org.sireum.message.Reporter
             name = StringUtil.toLowerCase(monitorName), 
             component = monitor)
 
-          val paramType = typeMap.get(typeName).get
-          val paramTypeName = Util.getMonitorWriterParamName(paramType)
+          val paramType: ir.Component = typeMap.get(typeName).get
+          val paramTypeName: String = Util.getMonitorWriterParamName(paramType)
 
           val methods: ISZ[Method] = f.category match {
             case ir.FeatureCategory.EventDataPort => createQueueMethods(paramTypeName)
@@ -1174,7 +1282,7 @@ import org.sireum.message.Reporter
           val interface: Procedure = Procedure(
             name = interfaceName,
             methods = methods,
-            includes = ISZ(s"<${typeHeaderFileName}.h>")
+            includes = ISZ(getTypeHeaderFileForInclude())
           )
 
           val connInstName = Util.getName(connInst.name)
@@ -1182,9 +1290,9 @@ import org.sireum.message.Reporter
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
           val cimplementation: Resource =
             if(f.category == ir.FeatureCategory.DataPort) {
-              Util.createResource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging), T)
+              Util.createResource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, getTypeHeaderFileForInclude(), preventBadging), T)
             } else {
-              Util.createResource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging), T)
+              Util.createResource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, getTypeHeaderFileForInclude(), preventBadging), T)
             }
 
           val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
@@ -1243,7 +1351,7 @@ import org.sireum.message.Reporter
           val interfaceReceiver: Procedure = Procedure(
             name = interfaceNameReceiver,
             methods = ISZ(receiveMethod),
-            includes = ISZ(s"<${typeHeaderFileName}.h>")
+            includes = ISZ(getTypeHeaderFileForInclude())
           )
 
           val sendMethod = Method(
@@ -1255,7 +1363,7 @@ import org.sireum.message.Reporter
           val interfaceSender: Procedure = Procedure(
             name = interfaceNameSender,
             methods = ISZ(sendMethod),
-            includes = ISZ(s"<${typeHeaderFileName}.h>")
+            includes = ISZ(getTypeHeaderFileForInclude())
           )
 
           val connInstName = Util.getName(connInst.name)
@@ -1263,7 +1371,7 @@ import org.sireum.message.Reporter
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
           val cimplementation: Resource =
             Util.createResource(implName,
-              StringTemplate.tbEnqueueDequeueIhor(paramTypeName, Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging), T)
+              StringTemplate.tbEnqueueDequeueIhor(paramTypeName, Util.getQueueSize(f), monitorName, getTypeHeaderFileForInclude(), preventBadging), T)
 
           val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
           val cincludes = Util.createResource(interName, StringTemplate.tbInterface(s"__${monitorName}_H__"), T)
@@ -1317,7 +1425,7 @@ import org.sireum.message.Reporter
           val interfaceReceiver: Procedure = Procedure(
             name = interfaceNameReceiver,
             methods = ISZ(receiveMethod),
-            includes = ISZ(s"<${typeHeaderFileName}.h>")
+            includes = ISZ(getTypeHeaderFileForInclude())
           )
 
           val sendMethod = Method(
@@ -1328,7 +1436,7 @@ import org.sireum.message.Reporter
           val interfaceSender: Procedure = Procedure(
             name = interfaceNameSender,
             methods = ISZ(sendMethod),
-            includes = ISZ(s"<${typeHeaderFileName}.h>")
+            includes = ISZ(getTypeHeaderFileForInclude())
           )
 
           val connInstName = Util.getName(connInst.name)
@@ -1337,7 +1445,7 @@ import org.sireum.message.Reporter
           val cimplementation: Resource =
             Util.createResource(
               implName,
-              StringTemplate.tbRaiseGetEvents(Util.getQueueSize(f), monitorName, typeHeaderFileName, preventBadging),
+              StringTemplate.tbRaiseGetEvents(Util.getQueueSize(f), monitorName, preventBadging),
               T)
 
           val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
@@ -1502,7 +1610,8 @@ import org.sireum.message.Reporter
           case x => halt(s"Unexpected direction: ${x}")
         }
         val name = Util.genMonitorFeatureName(feature, None[Z]())
-        val paramType = Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get)
+        val paramType = Util.getMonitorWriterParamName(
+          typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get)
 
         val inter = Some(st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});""")
         val impl: Option[ST] =
@@ -1512,6 +1621,7 @@ import org.sireum.message.Reporter
                 var accum: ISZ[ST] = ISZ()
                 var i = 0
                 val result = Util.brand("result")
+
                 while (i < conns.size) {
                   accum = accum :+ st"""${result} &= ${name}${i}_${suffix}((${paramType} *) ${name});"""
                   i = i + 1
@@ -1612,7 +1722,7 @@ import org.sireum.message.Reporter
                      |}""")
           case _ => None[ST]()
         }
-      } else if(!Util.hamrIntegration(platform)) {
+      } else if(!performHamrIntegration) {
         val simpleName = Util.getLastName(feature.identifier)
         val methodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
 
@@ -2080,7 +2190,7 @@ import org.sireum.message.Reporter
     val ret = st"""#ifndef $macroName
                   |#define $macroName
                   |
-                  |#include "../../../${Util.DIR_INCLUDES}/${typeHeaderFileName}.h"
+                  |#include ${getTypeHeaderFileForInclude()}
                   |
                   |${(sts, "\n\n")}
                   |
@@ -2100,19 +2210,23 @@ import org.sireum.message.Reporter
     return Util.createResource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret, T)
   }
 
-  def isThreadConnection(ci: ir.ConnectionInstance): B = {
-    val src = componentMap.get(Util.getName(ci.src.component)).get.category
-    val dst = componentMap.get(Util.getName(ci.dst.component)).get.category
-    return dst == ir.ComponentCategory.Thread && src == ir.ComponentCategory.Thread
-  }
-
-
   def buildComponentMap(c: ir.Component): Unit = {
     val name = Util.getName(c.identifier)
     assert(!componentMap.contains(name))
     componentMap = componentMap + (name ~> c)
     if(c.classifier.nonEmpty) {
       classifierMap = classifierMap + (c.classifier.get.name ~> c)
+    }
+    for(f <- c.features){
+      featureMap = featureMap + (Util.getName(f.identifier) ~> f)
+
+      f match {
+        case fe: ir.FeatureEnd =>
+          if (Util.isDataPort(fe) && fe.classifier.isEmpty) {
+            reporter.warn(None(), Util.toolName, s"Data type missing for feature ${fe.category} ${Util.getName(fe.identifier)}")
+          }
+        case _ =>
+      }
     }
     for (sc <- c.subComponents) {
       buildComponentMap(sc)
@@ -2123,21 +2237,10 @@ import org.sireum.message.Reporter
   def resolve(sys : ir.Component): B = {
 
     for(c <- componentMap.values){
-      for(f <- c.features){
-        //featureEndMap = featureEndMap + (Util.getName(f.identifier) ~> f.asInstanceOf[ir.FeatureEnd])
-        featureMap = featureMap + (Util.getName(f.identifier) ~> f)
 
-        f match {
-          case fe: ir.FeatureEnd =>
-            if (Util.isDataPort(fe) && fe.classifier.isEmpty) {
-              reporter.warn(None(), Util.toolName, s"Data type missing for feature ${fe.category} ${Util.getName(fe.identifier)}")
-            }
-          case _ =>
-        }
-      }
 
       for(ci <- c.connectionInstances){
-        if(isThreadConnection(ci)) {
+        if(isHandledConnection(ci)) {
           def add(portPath: String, isIn: B): Unit = {
             val map: HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
               case T => inConnections
@@ -2153,14 +2256,24 @@ import org.sireum.message.Reporter
               case F => outConnections = outConnections + (portPath ~> cis)
             }
           }
-
-          add(Util.getName(ci.src.feature.get), F)
-          add(Util.getName(ci.dst.feature.get), T)
+          val portNames = getPortConnectionNames(ci)
+          add(portNames._1, F)
+          add(portNames._2, T)
         } else {
           val src = componentMap.get(Util.getName(ci.src.component)).get
           val dst = componentMap.get(Util.getName(ci.dst.component)).get
-          val srcName = s"${Util.getLastName(src.identifier)}.${Util.getLastName(ci.src.feature.get)}"
-          val dstName = s"${Util.getLastName(dst.identifier)}.${Util.getLastName(ci.src.feature.get)}"
+          
+          val srcName: String = if(ci.src.feature.nonEmpty) {
+            s"${Util.getLastName(src.identifier)}.${Util.getLastName(ci.src.feature.get)}"
+          } else {
+            Util.getLastName(src.identifier)
+          }
+          
+          val dstName: String = if(ci.dst.feature.nonEmpty) {
+            s"${Util.getLastName(dst.identifier)}.${Util.getLastName(ci.dst.feature.get)}"
+          } else {
+            Util.getLastName(dst.identifier)
+          }
           reporter.info(None(), Util.toolName, s"Ignoring ${src.category} to ${dst.category} connection: ${srcName} -> ${dstName}")
         }
       }
@@ -2218,7 +2331,7 @@ import org.sireum.message.Reporter
         reporter.error(None(), Util.toolName, s"${Util.getLastName(conn.src.component)} is not a data component")
       }
 
-      val dataKey = Util.getName(conn.src.feature.get)
+      val (dataKey, dstFeatureName) = getPortConnectionNames(conn)
       sharedData.get(dataKey) match {
         case Some(sd) =>
           val dstComp = componentMap.get(Util.getName(conn.dst.component)).get
@@ -2328,5 +2441,71 @@ import org.sireum.message.Reporter
     }
     return sorted
   }
+  
+  def getPortConnectionNames(c: ir.ConnectionInstance): (String, String) = {
+    val src = componentMap.get(Util.getName(c.src.component)).get
+    val dst = componentMap.get(Util.getName(c.dst.component)).get
+
+    val ret: (String, String) = (src.category, dst.category) match {
+      case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
+        (Util.getName(c.src.feature.get), Util.getName(c.dst.feature.get))
+      case (ir.ComponentCategory.Data, ir.ComponentCategory.Thread) =>
+        (Util.getName(c.src.component), Util.getName(c.dst.feature.get))
+
+      case _ => halt(s"Unexpected connection: ${c}")
+    }
+    return ret
+  }
+  
+  def isHandledConnection(c: ir.ConnectionInstance): B = {
+
+    def validFeature(f: ir.Feature): B = {
+      var ret: B = f match {
+        case fend: ir.FeatureEnd =>
+          fend.category match {
+            case ir.FeatureCategory.DataAccess => T
+            case ir.FeatureCategory.DataPort => T
+            case ir.FeatureCategory.EventPort => T
+            case ir.FeatureCategory.EventDataPort => T
+            case ir.FeatureCategory.SubprogramAccessGroup => T
+
+            case ir.FeatureCategory.AbstractFeature => F
+            case ir.FeatureCategory.BusAccess => F
+            case ir.FeatureCategory.FeatureGroup => F
+            case ir.FeatureCategory.Parameter => F
+            case ir.FeatureCategory.SubprogramAccess => F
+          }
+        case faccess: ir.FeatureAccess =>
+          faccess.accessCategory match {
+            case ir.AccessCategory.Data => T
+            case ir.AccessCategory.SubprogramGroup => T
+            case _ => F
+          }
+        case _ => F
+      }
+      return ret
+    }
+    val src = componentMap.get(Util.getName(c.src.component)).get
+    val dst = componentMap.get(Util.getName(c.dst.component)).get
+
+    val ret : B = (src.category, dst.category) match {
+      case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
+
+        val srcFeature = featureMap.get(Util.getName(c.src.feature.get)).get
+        val dstFeature = featureMap.get(Util.getName(c.dst.feature.get)).get
+
+        validFeature(srcFeature) && validFeature(dstFeature)
+
+      case (ir.ComponentCategory.Data, ir.ComponentCategory.Thread) =>
+        val dstFeature = featureMap.get(Util.getName(c.dst.feature.get)).get
+        validFeature(dstFeature)
+
+      case _ =>
+        F
+    }
+
+    return ret
+  }
+
 }
 

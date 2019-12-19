@@ -74,11 +74,16 @@ object StringTemplate {
                |typedef bool ${Util.MISSING_AADL_TYPE};"""
   }
 
+  val receivedDataVar: String = "receivedData"
+  
   def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
                      preventBadging: B): ST = {
     val read: ST = st"""*m = contents;
-                       |return true;"""
-    val mon_read: ST = if(preventBadging) { read } else {
+                       |return ${receivedDataVar};"""
+    
+    val mon_read: ST = if(preventBadging) { 
+      read 
+    } else {
       st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
           |  return false;
           |} else {
@@ -86,10 +91,13 @@ object StringTemplate {
           |}"""
     }
 
-    val write: ST = st"""contents = *m;
+    val write: ST = st"""${receivedDataVar} = true;
+                        |contents = *m;
                         |monsig_emit();
-                        |return true;"""
-    val mon_write: ST = if(preventBadging) { write } else {
+                        |return ${receivedDataVar};"""
+    val mon_write: ST = if(preventBadging) { 
+      write 
+    } else {
       st"""bool mon_write(const $typeName * m) {
           |  if (mon_get_sender_id() != $MON_WRITE_ACCESS)  {
           |    return false;
@@ -102,12 +110,13 @@ object StringTemplate {
     val senderSig: ST = if(preventBadging) { st"" } else { st"""
                                                                |int mon_get_sender_id(void);""" }
     val r : ST =
-      st"""#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
+      st"""#include ${typeHeaderFilename}
           |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
           |
           |${senderSig}int monsig_emit(void);
           |
           |static $typeName contents;
+          |bool ${receivedDataVar} = false;
           |
           |bool mon_read($typeName * m) {
           |  ${mon_read}
@@ -116,6 +125,7 @@ object StringTemplate {
           |bool mon_write(const $typeName * m) {
           |  ${mon_write}
           |}"""
+    
     return r
   }
 
@@ -139,7 +149,7 @@ object StringTemplate {
           |#include <stdio.h>
           |#endif // $SB_VERIFY
           |
-          |#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
+          |#include ${typeHeaderFilename}
           |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
           |
           |int mon_get_sender_id(void);
@@ -182,7 +192,8 @@ object StringTemplate {
     return r
   }
 
-  def tbRaiseGetEvents(queueSize: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String, preventBadging: B): ST = {
+  def tbRaiseGetEvents(queueSize: Z, monitorTypeHeaderFilename: String, 
+                       preventBadging: B): ST = {
   var r: ST = 
     st"""#include <camkes.h>
         |#include <stdio.h>
@@ -237,7 +248,7 @@ object StringTemplate {
           |#include <stdio.h>
           |#endif // $SB_VERIFY
           |#include <camkes.h>
-          |#include "../../../../${Util.DIR_INCLUDES}/${typeHeaderFilename}.h"
+          |#include ${typeHeaderFilename}
           |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
           |
           |struct queue {
@@ -464,7 +475,7 @@ object StringTemplate {
                      |  ${initialLock}
                      |  for(;;) {
                      |    MUTEXOP(${SEM_WAIT}())
-                     |
+                     |    
                      |    ${(runLoopEntries, "\n")}
                      |  }
                      |  return 0;
@@ -511,9 +522,9 @@ object StringTemplate {
 
   val VAR_PERIODIC_OCCURRED : String = Util.brand("occurred_periodic_dispatcher")
   val VAR_PERIODIC_TIME : String = Util.brand("time_periodic_dispatcher")
-  val METHOD_PERIODIC_CALLBACK : String = Util.brand("timer_complete_callback")
-
-  def periodicDispatchElems() : ST = {
+  val METHOD_PERIODIC_CALLBACK : String = s"${TimerUtil.componentNotificationName(None())}_callback"
+  
+  def periodicDispatchElems(componentId: String) : ST = {
     val ret = st"""static bool ${VAR_PERIODIC_OCCURRED};
                   |static int64_t ${VAR_PERIODIC_TIME};
                   |
@@ -546,7 +557,8 @@ object StringTemplate {
   }
 
   def registerPeriodicCallback(): ST = {
-    return st"CALLBACKOP(${Util.brand("timer_complete_reg_callback")}(${METHOD_PERIODIC_CALLBACK}, NULL));"
+    val notificationName = TimerUtil.componentNotificationName(None())
+    return st"CALLBACKOP(${notificationName}_reg_callback(${METHOD_PERIODIC_CALLBACK}, NULL));"
   }
 
   def drainPeriodicQueue(componentName: String, userEntrypoint: String): (ST, ST) = {
@@ -586,42 +598,47 @@ object StringTemplate {
     return ISZ(st"transferIncomingDataToArt();", st"", st"${basePackageName}_${cname}_App_compute(SF);")
   }
 
-  def hamrPayload(c : ir.Classifier, base: String) : String = {
+  def hamrSlangPayloadType(c : ir.Classifier, base: String) : String = {
     val r = StringUtil.replaceAll(StringUtil.replaceAll(c.name, "::", "_"), ".", "_")
     return s"${base}_${r}_Payload"
   }
 
-  def hamrEnqueue(srcPort: ir.FeatureEnd, dstPort: ir.FeatureEnd, basePackageName: String, typeMap: HashSMap[String, ir.Component]) : ST = {
-    val srcEnqueue = Util.brand(s"${Util.getLastName(srcPort.identifier)}_enqueue")
-    val camkesType = Util.getClassifierFullyQualified(dstPort.classifier.get)
+  def hamrSendViaCAmkES(srcPort: ir.FeatureEnd, dstComponent: ir.Component, dstFeature: ir.FeatureEnd, connectionIndex: Z,
+                        basePackageName: String, typeMap: HashSMap[String, ir.Component]) : ST = {
+    val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "write" else "enqueue"
+    val srcEnqueue = Util.brand(s"${Util.getLastName(srcPort.identifier)}${connectionIndex}_${suffix}")
+    val dstComponentName = Util.getLastName(dstComponent.identifier)
+    val dstFeatureName = Util.getLastName(dstFeature.identifier)
+    val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
     val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
 
-    val payload = hamrPayload(dstPort.classifier.get, basePackageName)
-    return st"""${payload} payload = (${payload}) d;
+    val slangPayloadType = hamrSlangPayloadType(srcPort.classifier.get, basePackageName)
+    return st"""${slangPayloadType} payload = (${slangPayloadType}) d;
                |
                |// convert Slang type to CAmkES type
                |${ct} val;
                |convertTo_${ct}(payload, &val);
                |
-               |// deliver payload via CAmkES
+               |// deliver payload to ${dstComponentName}'s ${dstFeatureName} port via CAmkES
                |${srcEnqueue}(&val);"""
   }
 
   def hamrDrainQueue(f: ir.FeatureEnd, basePackageName: String, typeMap: HashSMap[String, ir.Component]): ST = {
     val portName = Util.getLastName(f.identifier)
     val camkesId = s"${portName}_id"
-    val dequeue = Util.brand(s"${portName}_dequeue")
+    val suffix: String = if(f.category == ir.FeatureCategory.DataPort) "read" else "dequeue" 
+    val dequeue = Util.brand(s"${portName}_${suffix}")
     val camkesType = Util.getClassifierFullyQualified(f.classifier.get)
     val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
-
-    val payload = s"${hamrPayload(f.classifier.get, basePackageName)}"
+    val condType: String = if(Util.isEventPort(f)) "while" else "if"
+    val slangPayloadType = hamrSlangPayloadType(f.classifier.get, basePackageName)
 
     return st"""{
                |  ${ct} val;
-               |  while(${dequeue}((${ct} *) &val)){
+               |  ${condType}(${dequeue}((${ct} *) &val)){
                |    // convert to slang payload
-               |    DeclNew${payload}(payload);
-               |    convertTo_${payload}(val, &payload);
+               |    DeclNew${slangPayloadType}(payload);
+               |    convertTo_${slangPayloadType}(val, &payload);
                |
                |    // deliver payload via ART
                |    camkes_In_Port_Data_Transfer(${camkesId}, (art_DataContent) &payload);
@@ -637,6 +654,8 @@ object StringTemplate {
                    |static union Option_8E9F45 camkes_buffer[${numPorts}] = { 0 };
                    |
                    |Z ${basePackageName}_SharedMemory_create(STACK_FRAME Z id) {
+                   |  //printf("${basePackageName}_Shared_Memory_create called with id %i\n", id);
+                   |  
                    |  DeclNewNone_964667(t_0);
                    |  None_964667_apply(CALLER &t_0);
                    |  Type_assign((camkes_buffer + id), (&t_0), sizeof(union Option_8E9F45));
@@ -659,12 +678,12 @@ object StringTemplate {
                    |  }
                    |}
                    |
-                   |Unit ${basePackageName}_SharedMemory_send(STACK_FRAME Z destid, Z port, art_DataContent d) {
-                   |  printf("${basePackageName}_SharedMemory_send called with port %i -- NOT IMPLEMENTED\n", port);
+                   |Unit ${basePackageName}_SharedMemory_send(STACK_FRAME Z destAppid, Z destPortId, art_DataContent d) {
+                   |  printf("${basePackageName}_SharedMemory_send called with port %i -- NOT IMPLEMENTED\n", destPortId);
                    |}
                    |
-                   |B ${basePackageName}_SharedMemory_sendAsync(STACK_FRAME Z id, Z port, art_DataContent d) {
-                   |  camkes_sendAsync(port, d);
+                   |B ${basePackageName}_SharedMemory_sendAsync(STACK_FRAME Z destAppId, Z destPortId, art_DataContent d) {
+                   |  camkes_sendAsync(destPortId, d);
                    |
                    |  return T;
                    |}
@@ -688,9 +707,11 @@ object StringTemplate {
                      |
                      |static const int seed = 1;
                      |
-                     |void camkes_In_Port_Data_Transfer (Z port, art_DataContent d);
+                     |// transfer data from CAmkES to ART
+                     |void camkes_In_Port_Data_Transfer (Z destPortId, art_DataContent payload);
                      |
-                     |void camkes_sendAsync(Z port, art_DataContent d);
+                     |// transfer data from ART to CAmkES
+                     |void camkes_sendAsync(Z destPortId, art_DataContent payload);
                      |
                      |#endif"""
     return (header, impl)
@@ -851,30 +872,25 @@ bool read_${spName}(${spType} *port, ${portType} *data, seqNum_t *seqNum) {
   }
 
   def ifElseST(ifbranch: Option[(ST, ST)], elsifs: ISZ[(ST, ST)], els: Option[ST]): ST = {
-    val e = elsifs.map((x: (ST, ST)) => st"""else if(${x._1}) {
-                                |  ${x._2}
-                                |}
-                                |""")
+
     var body = st""
 
     if(ifbranch.nonEmpty) {
       body = st"""if(${ifbranch.get._1}) {
                  |  ${ifbranch.get._2}
-                 |}"""
+                 |} """
     }
 
     if(elsifs.nonEmpty) {
       val ei = elsifs.map((x: (ST, ST)) => st"""else if(${x._1}) {
                                                |  ${x._2}
-                                               |}""")
-      body = st"""${body}
-                 |${ei}"""
+                                               |} """)
+      body = st"""${body}${ei}"""
     }
 
     if(els.nonEmpty) {
-      if(body.render.size > 0) {
-        body = st"""${body}
-                   |else {
+      if(ifbranch.nonEmpty) {
+        body = st"""${body}else {
                    |  ${els.get}
                    |}"""
       } else {

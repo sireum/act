@@ -208,7 +208,7 @@ object Util {
 
   def getMonitorWriterParamName(c: ir.Component): String = {
     val name = Util.getClassifierFullyQualified(c.classifier.get)
-    if(TypeUtil.isArrayDef(c)) {
+    if (TypeUtil.isArrayDef(c)) {
       return getContainerName(name)
     } else {
       return name
@@ -282,14 +282,6 @@ object Util {
     return ret
   }
 
-  def isPeriodic(c: ir.Component): B = {
-    return getDispatchProtocol(c) == Some(Dispatch_Protocol.Periodic)
-  }
-
-  def isSporadic(c: ir.Component): B = {
-    return getDispatchProtocol(c) == Some(Dispatch_Protocol.Sporadic)
-  }
-
   def getDispatchProtocol(c: ir.Component): Option[Dispatch_Protocol.Type] = {
     val ret: Option[Dispatch_Protocol.Type] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
       case Some(ir.ValueProp("Periodic")) => Some(Dispatch_Protocol.Periodic)
@@ -311,7 +303,8 @@ object Util {
     return ret
   }
 
-  def getStackSize(c: ir.Component): Option[Z] = {
+  /* unit conversions consistent with AADL/ISO */
+  def getStackSizeInBytes(c: ir.Component): Option[Z] = {
     val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_MEMORY_PROPERTIES__STACK_SIZE) match {
       case Some(ir.UnitProp(z, u)) =>
         R(z) match {
@@ -428,6 +421,16 @@ object Util {
     return getPropertyValues(properties, PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT).map(p => p.asInstanceOf[ir.ValueProp].value)
   }
 
+
+  def isThread(f: ir.Component): B = { return f.category == ir.ComponentCategory.Thread}
+
+  def isData(f: ir.Component): B = { return f.category == ir.ComponentCategory.Data }
+
+  def isPeriodic(c: ir.Component): B = { return getDispatchProtocol(c) == Some(Dispatch_Protocol.Periodic) }
+
+  def isSporadic(c: ir.Component): B = { return getDispatchProtocol(c) == Some(Dispatch_Protocol.Sporadic) }
+  
+  
   def isEventPort(f: ir.Feature): B = {
     return f.category == ir.FeatureCategory.EventPort || f.category == ir.FeatureCategory.EventDataPort
   }
@@ -436,6 +439,12 @@ object Util {
     return f.category == ir.FeatureCategory.DataPort || f.category == ir.FeatureCategory.EventDataPort
   }
 
+  def isDataAccesPort(f: ir.Feature): B = { return f.category == ir.FeatureCategory.DataAccess }
+  
+  def isSubprogramAccess(f: ir.Feature): B = { return f.category == ir.FeatureCategory.SubprogramAccess }
+  
+  def isSubprogramAccessGroup(f: ir.Feature): B = { return f.category == ir.FeatureCategory.SubprogramAccessGroup }
+  
   def isInPort(f: ir.Feature): B = {
     return (isEventPort(f) || isDataPort(f)) && f.asInstanceOf[FeatureEnd].direction == ir.Direction.In
   }
@@ -444,6 +453,7 @@ object Util {
     return (isEventPort(f) || isDataPort(f)) && f.asInstanceOf[FeatureEnd].direction == ir.Direction.Out
   }
 
+  
   def getInPorts(c: ir.Component): ISZ[ir.FeatureEnd] = {
     return c.features.filter(f => f.isInstanceOf[ir.FeatureEnd] && Util.isInPort(f)).map(f => f.asInstanceOf[FeatureEnd])
   }
@@ -514,39 +524,10 @@ object Util {
     return None()
   }
 
-  def getConnectedPorts(model: ir.Aadl, f: ir.FeatureEnd): ISZ[(ir.Component, ir.FeatureEnd)] = {
-    var ret: ISZ[(ir.Component, ir.FeatureEnd)] = ISZ()
-    assert(model.components.size == 1)
-
-    def search(m: ir.Component): Unit = {
-      if(m.connectionInstances.nonEmpty) {
-        for(ci <- m.connectionInstances) {
-          if(f.identifier == ci.dst.feature.get) {
-            val csrc = getComponent(model, ci.src.component)
-            val fsrc = getPort(csrc.get, ci.src.feature.get)
-            val pair = (csrc.get, fsrc.get)
-            ret = ret :+ pair
-          }
-          if(f.identifier == ci.src.feature.get){
-            val cDst = getComponent(model, ci.dst.component)
-            val fDst = getPort(cDst.get, ci.dst.feature.get)
-            val pair = (cDst.get, fDst.get)
-            ret = ret :+ pair
-          }
-        }
-      }
-      for (sc <- m.subComponents) {
-        search(sc)
-      }
-    }
-    search(model.components(0))
-    return ret
-  }
-
   def getNumberPorts(model: ir.Aadl): Z = {
     val ports = getComponents(model).filter((c: ir.Component) => c.category == ir.ComponentCategory.Thread)
       .flatMap((c: ir.Component) => c.features.filter(cf => Util.isDataPort(cf) || Util.isEventPort(cf)))
-    return ports.size
+    return 57 //ports.size
   }
 
   def hamrIntegration(platform: ActPlatform.Type): B = {
@@ -675,7 +656,7 @@ object TimerUtil {
   val TIMER_ID: String = Util.brand("timer")
   val TIMER_ID_DISPATCHER: String = "timer"
 
-  val TIMER_NOTIFICATION_ID: String = Util.brand("timer_complete")
+  // Notification from time server to the periodic dispatcher
   val TIMER_NOTIFICATION_DISPATCHER_ID: String = "timer_complete"
 
   val TIMER_TYPE: String = "Timer"
@@ -720,9 +701,10 @@ object TimerUtil {
     return i
   }
 
-  def calendar(componentName: String, period: Z): ST = {
+  def calendar(c: ir.Component, period: Z): ST = {
+    val notifName = TimerUtil.componentNotificationName(Some(c))
     val st = st"""if ((aadl_calendar_counter % (${period} / aadl_tick_interval)) == 0) {
-                 |  ${componentName}_periodic_dispatcher_emit();
+                 |  ${notifName}_emit();
                  |}"""
     return st
   }
@@ -809,22 +791,20 @@ object TimerUtil {
     )
     return i
   }
-
-  def componentNotificationName(name: String): String = {
-    return s"${name}_periodic_dispatcher"
+  
+  def componentNotificationName(c: Option[ir.Component]): String = {
+    val prefix: String = if(c.nonEmpty) s"${Util.getLastName(c.get.identifier)}_" else ""
+    return Util.brand(s"${prefix}periodic_dispatch_notification")
   }
-
+  
   def configurationTimerAttribute(instanceName: String, i: Z, isDispatcher: B): ST = {
     val id: String = if(isDispatcher) {TIMER_ID_DISPATCHER} else {TIMER_ID}
     return st"""${instanceName}.${id}_attributes = ${i};"""
   }
 
-  def configurationTimerGlobalEndpoint(instanceName: String, classifier: String, id: String): ST = {
-    return st"""${instanceName}.${id}_global_endpoint = "${classifier}_${id}";"""
-  }
-
-  def configurationTimerCompleteGlobalEndpoint(instanceName: String, classifier: String, id: String): ST = {
-    return st"""${instanceName}.${id}_complete_global_endpoint = "${classifier}_${id}";"""
+  def configurationTimerGlobalEndpoint(instanceName: String, interfaceName: String, classifier: String, id: String): ST = {
+    return st"""${instanceName}.${interfaceName}_global_endpoint = "${classifier}_${id}";"""
+    //return st"""${instanceName}.${id}_global_endpoint = "HAMR_TODO"; // attribute required by connector"""
   }
 }
 

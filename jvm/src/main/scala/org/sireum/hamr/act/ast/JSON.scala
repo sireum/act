@@ -59,7 +59,7 @@ object JSON {
     @pure def printAssembly(o: Assembly): ST = {
       return printObject(ISZ(
         ("type", st""""Assembly""""),
-        ("configuration", printString(o.configuration)),
+        ("configuration", printISZ(T, o.configuration, printString _)),
         ("composition", printComposition(o.composition))
       ))
     }
@@ -302,7 +302,7 @@ object JSON {
         parser.parseObjectType("Assembly")
       }
       parser.parseObjectKey("configuration")
-      val configuration = parser.parseString()
+      val configuration = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
       parser.parseObjectKey("composition")
       val composition = parseComposition()

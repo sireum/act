@@ -161,9 +161,10 @@ import org.sireum.hamr.act.Util.reporter
 
     val comp = visitComposition(a.composition)
 
-    var imports = actContainer.get.globalImports.map((m: String) => st"import ${m};")
+    var imports = Set.empty[String] ++ actContainer.get.globalImports.map((m: String) => s"import ${m};")
     
-    imports = imports ++ resources.map((o: Resource) => st"""import "${o.path}";""")
+    imports = imports ++ resources.map((o: Resource) => s"""import "${o.path}";""")
+    
     
     val connectors: ISZ[ST] = actContainer.get.connectors.map(c => {
       val fromType: ST = if(c.from_template.nonEmpty) st"""template "${c.from_template.get}"""" else st"""TODO"""
@@ -176,14 +177,14 @@ import org.sireum.hamr.act.Util.reporter
     })
 
     val st =
-      st"""${(imports, "\n")}
+      st"""${(imports.elements, "\n")}
           |
           |${(connectors, "\n")}
           |assembly {
           |  ${comp.get}
           |
           |  configuration {
-          |    ${a.configuration}
+          |    ${(a.configuration, "\n")}
           |  }
           |}
           |"""
@@ -204,7 +205,7 @@ import org.sireum.hamr.act.Util.reporter
       visitInstance(i)
       instances = instances :+ st"""component ${i.component.name} ${i.name};"""
     }
-    
+
     if(actContainer.get.requiresTimeServer) {
       instances = instances :+ st"component ${TimerUtil.TIMER_SERVER_CLASSIFIER} ${TimerUtil.TIMER_INSTANCE};"
     }
@@ -224,6 +225,12 @@ import org.sireum.hamr.act.Util.reporter
           |  ${(connections, "\n")}
           |}"""
 
+    /*
+    println("--------")
+    println(st.render)
+    println("--------")
+    */
+    
     return Some(st)
   }
 

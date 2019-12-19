@@ -6,7 +6,7 @@ import org.sireum._
 
 @sig trait ASTObject
 
-@datatype class Assembly(configuration: String,
+@datatype class Assembly(configuration: ISZ[String],
                          composition: Composition) extends ASTObject
 
 @datatype class Composition(groups: ISZ[TODO],
