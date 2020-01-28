@@ -155,6 +155,15 @@ object Util {
     return st"${(n.name, "_")}".render
   }
 
+  def getEventPortSendReceiveMethodName(feature: FeatureEnd): String = {
+    val featureName = Util.getLastName(feature.identifier)
+    val direction: String = feature.direction match {
+      case ir.Direction.In => "read"
+      case ir.Direction.Out => "write"
+      case x => halt(s"Unexpected direction ${x}")
+    } 
+    return Util.brand(s"${featureName}_${direction}")
+  }
 
   def isMonitor(s: String) : B = {
     val ss = StringOps(s)
@@ -522,12 +531,6 @@ object Util {
       return Some(f.asInstanceOf[ir.FeatureEnd])
     }
     return None()
-  }
-
-  def getNumberPorts(model: ir.Aadl): Z = {
-    val ports = getComponents(model).filter((c: ir.Component) => c.category == ir.ComponentCategory.Thread)
-      .flatMap((c: ir.Component) => c.features.filter(cf => Util.isDataPort(cf) || Util.isEventPort(cf)))
-    return 57 //ports.size
   }
 
   def hamrIntegration(platform: ActPlatform.Type): B = {

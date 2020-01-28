@@ -93,7 +93,10 @@ import org.sireum.message.Reporter
     }
 
     if(!hasErrors && performHamrIntegration) {
-      val pair = StringTemplate.hamrIPC(Util.getNumberPorts(model), hamrBasePackageName.get)
+      val bufferSize = 
+        featureMap.values.filter(f => Util.isEventPort(f) || Util.isDataPort(f)).size +  
+        componentMap.values.filter(c => Util.isThread(c)).size
+      val pair = StringTemplate.hamrIPC(bufferSize, hamrBasePackageName.get)
 
       auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1, T)
       auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2, T)
@@ -778,18 +781,20 @@ import org.sireum.message.Reporter
       def handleEventPort(isEventData: B): Unit = {
         fend.direction match {
           case ir.Direction.In =>
-            Util.getComputeEntrypointSourceText(fend.properties) match {
-              case Some(_) =>
-                val name = Util.genSeL4CallbackMethodName(fend, isEventData)
-                val handlerName = s"${name}_handler"
-                val regCallback = s"${name}_reg_callback"
+            
+            val isConnected = inConnections.contains(Util.getName(fend.identifier))
+            
+            if(isConnected && (Util.getComputeEntrypointSourceText(fend.properties).nonEmpty || performHamrIntegration)) {
+              val name = Util.genSeL4CallbackMethodName(fend, isEventData)
+              val handlerName = s"${name}_handler"
+              val regCallback = s"${name}_reg_callback"
 
-                if(isEventData) {
-                  cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
-                }
-                cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
-              case _ =>
-                reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
+              if (isEventData) {
+                cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
+              }
+              cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
+            } else {
+              reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
             }
 
           case _ =>
@@ -815,16 +820,17 @@ import org.sireum.message.Reporter
                 typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                 optional = F)
 
-              Util.getComputeEntrypointSourceText(fend.properties) match {
-                case Some(_) =>
-                  val name = Util.genSeL4CallbackMethodName(fend, T)
-                  val handlerName = s"${name}_handler"
-                  val regCallback = s"${name}_reg_callback"
+              val isConnected = inConnections.contains(Util.getName(fend.identifier))
+              
+              if(isConnected && (Util.getComputeEntrypointSourceText(fend.properties).nonEmpty || performHamrIntegration)) {
+                val name = Util.genSeL4CallbackMethodName(fend, T)
+                val handlerName = s"${name}_handler"
+                val regCallback = s"${name}_reg_callback"
 
-                  cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
-                  cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
-                case _ =>
-                  reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
+                cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
+                cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
+              } else {
+                reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
               }              
             }
 
@@ -1707,7 +1713,7 @@ import org.sireum.message.Reporter
                      | * Invoked from user code in the local thread.
                      | *
                      | * This is the function invoked by the local thread to make a
-                     | * call to write to a remote data port.
+                     | * call to write to a remote event data port.
                      | *
                      | * XXX: When simulating fan out, the caller of this function will only
                      | * receive a positive response when all enqueues are successful. When a
@@ -1742,17 +1748,21 @@ import org.sireum.message.Reporter
           case _ => ""
         }
 
-        Some(st"""/************************************************************************
-                 | * ${methodName}:
-                 | *
-                 | * This is the function invoked by an active thread dispatcher to
-                 | * call to a user-defined entrypoint function.  It sets up the dispatch
-                 | * context for the user-defined entrypoint, then calls it.
-                 | *
-                 | ************************************************************************/
-                 |void ${methodName}(const ${paramType} * in_arg) {
-                 |  ${invokeHandler}
-                 |}""")
+        if(Util.getComputeEntrypointSourceText(feature.properties).nonEmpty){
+          Some(st"""/************************************************************************
+                   | * ${methodName}:
+                   | *
+                   | * This is the function invoked by an active thread dispatcher to
+                   | * call to a user-defined entrypoint function.  It sets up the dispatch
+                   | * context for the user-defined entrypoint, then calls it.
+                   | *
+                   | ************************************************************************/
+                   |void ${methodName}(const ${paramType} * in_arg) {
+                   |  ${invokeHandler}
+                   |}""")          
+        } else {
+          None[ST]()
+        }
       } else {
         None()
       }
@@ -1770,9 +1780,9 @@ import org.sireum.message.Reporter
             case ir.Direction.Out => "write"
             case x => halt(s"Unexpected direction: ${x}")
           }
-          val compName = Util.getClassifier(component.classifier.get)
-          val methodName = Util.getLastName(feature.identifier)
-          val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
+          
+          val featureName = Util.getLastName(feature.identifier)
+          val checkMethodName = Util.getEventPortSendReceiveMethodName(feature)
 
           var inter = Some(st"""bool ${checkMethodName}(void);""")
           var preInit: Option[ST] = None[ST]()
@@ -1780,29 +1790,30 @@ import org.sireum.message.Reporter
 
           val impl: Option[ST] = if(dir == "read") {
 
-            val varName = Util.brand(s"${methodName}_index")
+            val varName = Util.brand(s"${featureName}_index")
             val callback = s"${Util.genSeL4CallbackMethodName(feature, F)}_handler"
-            val callback_reg = Util.brand(s"${methodName}_notification_reg_callback")
+            val callback_reg = Util.brand(s"${featureName}_notification_reg_callback")
 
             val regCallback = st"CALLBACKOP(${callback_reg}(${callback}, NULL));"
             preInit = Some(regCallback)
 
-            val interfaceName = Util.brand(s"${methodName}_get_events")
+            val interfaceName = Util.brand(s"${featureName}_get_events")
 
             var r = Some(st"""/************************************************************************
                              | *
                              | * Static variables and queue management functions for event port:
-                             | *     ${methodName}
+                             | *     ${featureName}
                              | *
                              | ************************************************************************/
                              |static int32_t ${varName} = 0;
                              |
                              |/************************************************************************
                              | * ${callback}:
-                             | * Invoked by: remote RPC
+                             | * Invoked by: seL4 notification callback
                              | *
-                             | * This is the function invoked by a remote RPC to write to an active-thread
-                             | * input event port.  It increments a count of received messages.
+                             | * This is the function invoked by an seL4 notification callback that  
+                             | * dispatches the active-thread due to the arrival of an event on 
+                             | * its ${featureName} event port
                              | *
                              | ************************************************************************/
                              |static void ${callback}(void *_ UNUSED){
@@ -1851,23 +1862,25 @@ import org.sireum.message.Reporter
               case _ => ""
             }
 
-            Some(st"""${r.get}
-                     |/************************************************************************
-                     | *  ${entrypointMethodName}
-                     | *
-                     | * This is the function invoked by an active thread dispatcher to
-                     | * call to a user-defined entrypoint function.  It sets up the dispatch
-                     | * context for the user-defined entrypoint, then calls it.
-                     | *
-                     | ************************************************************************/
-                     |void ${entrypointMethodName}(void){
-                     |  ${invokeHandler}
-                     |}""")
-
-
+            if(Util.getComputeEntrypointSourceText(feature.properties).nonEmpty) {
+              Some(st"""${r.get}
+                       |/************************************************************************
+                       | *  ${entrypointMethodName}
+                       | *
+                       | * This is the function invoked by an active thread dispatcher to
+                       | * call to a user-defined entrypoint function.  It sets up the dispatch
+                       | * context for the user-defined entrypoint, then calls it.
+                       | *
+                       | ************************************************************************/
+                       |void ${entrypointMethodName}(void){
+                       |  ${invokeHandler}
+                       |}""")              
+            } else {
+              r
+            }
           } else {
             var accum = ISZ[ST]()
-            val emit = Util.brand(s"${methodName}")
+            val emit = Util.brand(s"${featureName}")
 
             outConnections.get(Util.getName(feature.identifier)) match {
               case Some(conns) =>
@@ -1905,8 +1918,8 @@ import org.sireum.message.Reporter
           }
           val compName = Util.getClassifier(component.classifier.get)
           val methodName = Util.getLastName(feature.identifier)
-          val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_${dir}_${methodName}"
-
+          val checkMethodName = Util.getEventPortSendReceiveMethodName(feature)
+          
           var inter = Some(st"""bool ${checkMethodName}(void);""")
           val preInit: Option[ST] = None[ST]()
           var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
@@ -1928,9 +1941,9 @@ import org.sireum.message.Reporter
                              | * ${callback}:
                              | * Invoked by: seL4 notification callback
                              | *
-                             | * This is the function invoked by a seL4 notification callback to 
+                             | * This is the function invoked by an seL4 notification callback to 
                              | * write to an active-thread input event port.  It increments a count 
-                             | * of received messages.
+                             | * of received events.
                              | *
                              | ************************************************************************/
                              |static void ${callback}(void *_ UNUSED){
@@ -1977,19 +1990,22 @@ import org.sireum.message.Reporter
               case _ => ""
             }
 
-            Some(st"""${r.get}
-                     |/************************************************************************
-                     | *  ${entrypointMethodName}
-                     | *
-                     | * This is the function invoked by an active thread dispatcher to
-                     | * call to a user-defined entrypoint function.  It sets up the dispatch
-                     | * context for the user-defined entrypoint, then calls it.
-                     | *
-                     | ************************************************************************/
-                     |void ${entrypointMethodName}(void){
-                     |  ${invokeHandler}
-                     |}""")
-
+            if(Util.getComputeEntrypointSourceText(feature.properties).nonEmpty) {
+              Some(st"""${r.get}
+                       |/************************************************************************
+                       | *  ${entrypointMethodName}
+                       | *
+                       | * This is the function invoked by an active thread dispatcher to
+                       | * call to a user-defined entrypoint function.  It sets up the dispatch
+                       | * context for the user-defined entrypoint, then calls it.
+                       | *
+                       | ************************************************************************/
+                       |void ${entrypointMethodName}(void){
+                       |  ${invokeHandler}
+                       |}""")  
+            } else {
+              r
+            }
 
           } else {
             val emit = Util.brand(s"${methodName}_emit()")
@@ -1999,7 +2015,7 @@ import org.sireum.message.Reporter
                      | * Invoked from user code in the local thread.
                      | *
                      | * This is the function invoked by the local thread to make a
-                     | * call to write to a remote data port.
+                     | * call to write to a remote event port.
                      | *
                      | ************************************************************************/
                      |bool ${checkMethodName}(void) {
@@ -2048,7 +2064,7 @@ import org.sireum.message.Reporter
                                 | * ${callback}:
                                 | * Invoked by: seL4 notification callback
                                 | *
-                                | * This is the function invoked by a seL4 notification callback to 
+                                | * This is the function invoked by an seL4 notification callback to 
                                 | * dispatch the component due to the arrival of an event on port
                                 | * ${featureName}
                                 | *
@@ -2114,24 +2130,29 @@ import org.sireum.message.Reporter
               case _ => ""
             }
 
-            val entryPointMethod = Some(st"""/************************************************************************
-                     | *  ${entrypointMethodName}
-                     | *
-                     | * This is the function invoked by an active thread dispatcher to
-                     | * call to a user-defined entrypoint function.  It sets up the dispatch
-                     | * context for the user-defined entrypoint, then calls it.
-                     | *
-                     | ************************************************************************/
-                     |void ${entrypointMethodName}(void){
-                     |  ${invokeHandler}
-                     |}""")
-
+            val entryPointMethod: ST =
+              if(Util.getComputeEntrypointSourceText(feature.properties).nonEmpty) {
+                st"""
+                    |/************************************************************************
+                    | *  ${entrypointMethodName}
+                    | *
+                    | * This is the function invoked by an active thread dispatcher to
+                    | * call to a user-defined entrypoint function.  It sets up the dispatch
+                    | * context for the user-defined entrypoint, then calls it.
+                    | *
+                    | ************************************************************************/
+                    |void ${entrypointMethodName}(void){
+                    |  ${invokeHandler}
+                    |}"""                
+              } else {
+                st""
+              }
+            
             val cImplementationEntries = Some(st"""${globalVars}
                                              |
                                              |${callbackMethod}
                                              |
                                              |${readMethod}
-                                             |
                                              |${entryPointMethod}
                                              |""")
             

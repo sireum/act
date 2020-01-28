@@ -605,46 +605,90 @@ object StringTemplate {
 
   def hamrSendViaCAmkES(srcPort: ir.FeatureEnd, dstComponent: ir.Component, dstFeature: ir.FeatureEnd, connectionIndex: Z,
                         basePackageName: String, typeMap: HashSMap[String, ir.Component]) : ST = {
-    val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "write" else "enqueue"
-    val srcEnqueue = Util.brand(s"${Util.getLastName(srcPort.identifier)}${connectionIndex}_${suffix}")
     val dstComponentName = Util.getLastName(dstComponent.identifier)
     val dstFeatureName = Util.getLastName(dstFeature.identifier)
-    val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
-    val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
+    
+    def handleDataPort(): ST = {
+      val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "write" else "enqueue"
+      val srcEnqueue = Util.brand(s"${Util.getLastName(srcPort.identifier)}${connectionIndex}_${suffix}")
+      val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
+      val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
 
-    val slangPayloadType = hamrSlangPayloadType(srcPort.classifier.get, basePackageName)
-    return st"""${slangPayloadType} payload = (${slangPayloadType}) d;
-               |
-               |// convert Slang type to CAmkES type
-               |${ct} val;
-               |convertTo_${ct}(payload, &val);
-               |
-               |// deliver payload to ${dstComponentName}'s ${dstFeatureName} port via CAmkES
-               |${srcEnqueue}(&val);"""
+      val slangPayloadType = hamrSlangPayloadType(srcPort.classifier.get, basePackageName)
+      return st"""${slangPayloadType} payload = (${slangPayloadType}) d;
+                 |
+                 |// convert Slang type to CAmkES type
+                 |${ct} val;
+                 |convertTo_${ct}(payload, &val);
+                 |
+                 |// deliver payload to ${dstComponentName}'s ${dstFeatureName} port via CAmkES
+                 |${srcEnqueue}(&val);"""
+    }
+    
+    def handleEventPort(): ST = {
+      val srcWrite = Util.getEventPortSendReceiveMethodName(srcPort)
+      return st"""// event port - can ignore the Slang Empty payload
+                 |art_Empty payload = (art_Empty) d;
+                 |
+                 |// send event to ${dstComponentName}'s ${dstFeatureName} port via CAmkES
+                 |${srcWrite}();"""
+    }
+    
+    val ret: ST = srcPort.category match {
+      case ir.FeatureCategory.DataPort => handleDataPort()
+      case ir.FeatureCategory.EventDataPort => handleDataPort()
+      case ir.FeatureCategory.EventPort => handleEventPort()
+      case x => halt(s"Not handling ${x}")
+    }
+    
+    return ret
   }
 
   def hamrDrainQueue(f: ir.FeatureEnd, basePackageName: String, typeMap: HashSMap[String, ir.Component]): ST = {
     val portName = Util.getLastName(f.identifier)
     val camkesId = s"${portName}_id"
-    val suffix: String = if(f.category == ir.FeatureCategory.DataPort) "read" else "dequeue" 
-    val dequeue = Util.brand(s"${portName}_${suffix}")
-    val camkesType = Util.getClassifierFullyQualified(f.classifier.get)
-    val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
-    val condType: String = if(Util.isEventPort(f)) "while" else "if"
-    val slangPayloadType = hamrSlangPayloadType(f.classifier.get, basePackageName)
 
-    return st"""{
-               |  ${ct} val;
-               |  ${condType}(${dequeue}((${ct} *) &val)){
-               |    // convert to slang payload
-               |    DeclNew${slangPayloadType}(payload);
-               |    convertTo_${slangPayloadType}(val, &payload);
-               |
-               |    // deliver payload via ART
-               |    camkes_In_Port_Data_Transfer(${camkesId}, (art_DataContent) &payload);
-               |  }
-               |}
-               |"""
+    def handleEventPort(): ST = {
+      val srcRead = Util.getEventPortSendReceiveMethodName(f)
+      return st"""{
+                 |  while(${srcRead}()){
+                 |    // event port - ART requires an Empty payload be sent
+                 |    DeclNewart_Empty(payload);
+                 | 
+                 |    // deliver payload via ART
+                 |    camkes_In_Port_Data_Transfer(${camkesId}, (art_DataContent) &payload);
+                 |  }
+                 |}"""
+    }
+    def handleDataPort(): ST = {
+      val suffix: String = if(f.category == ir.FeatureCategory.DataPort) "read" else "dequeue"
+      val dequeue = Util.brand(s"${portName}_${suffix}")
+      val camkesType = Util.getClassifierFullyQualified(f.classifier.get)
+      val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
+      val condType: String = if(Util.isEventPort(f)) "while" else "if"
+      val slangPayloadType = hamrSlangPayloadType(f.classifier.get, basePackageName)
+
+      return st"""{
+                 |  ${ct} val;
+                 |  ${condType}(${dequeue}((${ct} *) &val)){
+                 |    // convert to slang payload
+                 |    DeclNew${slangPayloadType}(payload);
+                 |    convertTo_${slangPayloadType}(val, &payload);
+                 |
+                 |    // deliver payload via ART
+                 |    camkes_In_Port_Data_Transfer(${camkesId}, (art_DataContent) &payload);
+                 |  }
+                 |}
+                 |"""  
+    }
+    
+    val ret: ST = f.category match {
+      case ir.FeatureCategory.EventPort => handleEventPort()
+      case ir.FeatureCategory.DataPort => handleDataPort()
+      case ir.FeatureCategory.EventDataPort => handleDataPort()
+      case x => halt(s"Not handling ${x}")
+    }
+    return ret
   }
 
   def hamrIPC(numPorts: Z, basePackageName: String): (ST, ST) = {
@@ -683,6 +727,8 @@ object StringTemplate {
                    |}
                    |
                    |B ${basePackageName}_SharedMemory_sendAsync(STACK_FRAME Z destAppId, Z destPortId, art_DataContent d) {
+                   |  // printf("${basePackageName}_SharedMemory_sendAsync called with destPortId %i\n", destPortId);
+                   |  
                    |  camkes_sendAsync(destPortId, d);
                    |
                    |  return T;
