@@ -406,6 +406,8 @@ object StringTemplate {
                |
                |project (${rootServer} C)
                |
+               |add_definitions(-DCAMKES)
+               |
                |${(entries, "\n\n")}
                |
                |DeclareCAmkESRootserver(${rootServer}.camkes)

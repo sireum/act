@@ -43,7 +43,6 @@ import org.sireum.message.Reporter
   var auxCSources: ISZ[ST] = ISZ()
 
   var hasPeriodicComponents: B = F
-  var hasErrors: B = F
   val preventBadging: B = T
 
   var performHamrIntegration: B = Util.hamrIntegration(platform)
@@ -60,7 +59,11 @@ import org.sireum.message.Reporter
     return s"<${typeHeaderFileName}.h>"
   }
 
-  def process(cSources: ISZ[String]) : Option[ActContainer] = {
+  def hasErrors(): B = {
+    return reporter.hasError
+  }
+  
+  def process(cSources: ISZ[String]) : (Option[ActContainer], Reporter) = {
 
     val components = model.components.filter(f => f.category != ir.ComponentCategory.Data)
     if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
@@ -81,18 +84,18 @@ import org.sireum.message.Reporter
 
     resolve(system)
 
-    if(!hasErrors) {
+    if(!hasErrors()) {
       auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData), T)
     }
 
-    if(!hasErrors) {
+    if(!hasErrors()) {
       if(preventBadging) {
         reporter.warn(None(), Util.toolName, "Branding disabled")
       }
       gen(system)
     }
 
-    if(!hasErrors && performHamrIntegration) {
+    if(!hasErrors() && performHamrIntegration) {
       val bufferSize = 
         featureMap.values.filter(f => Util.isEventPort(f) || Util.isDataPort(f)).size +  
         componentMap.values.filter(c => Util.isThread(c)).size
@@ -102,7 +105,7 @@ import org.sireum.message.Reporter
       auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2, T)
     }
 
-    if(!hasErrors) {
+    if(!hasErrors()) {
       // merge assemblies
       val assemblies: ISZ[Assembly] = astObjects.filter(f => f.isInstanceOf[Assembly]).map(m => m.asInstanceOf[Assembly])
       val otherAstObjects: ISZ[ASTObject] =  astObjects.filter(f => !f.isInstanceOf[Assembly])
@@ -162,7 +165,7 @@ import org.sireum.message.Reporter
       
       astObjects = astObjects ++ otherAstObjects
       
-      return Some(ActContainer(
+      return (Some(ActContainer(
         rootServer = Util.getLastName(topLevelProcess.get.identifier),
         connectors = connectors,
         models = astObjects,
@@ -171,10 +174,10 @@ import org.sireum.message.Reporter
         cContainers = containers,
         auxFiles = auxFiles,
         globalImports = globalImports.elements,
-        requiresTimeServer = hasPeriodicComponents))
+        requiresTimeServer = hasPeriodicComponents)), reporter)
 
     } else {
-      return None[ActContainer]()
+      return ((None[ActContainer](), reporter))
     }
   }
 
@@ -1043,7 +1046,7 @@ import org.sireum.message.Reporter
 
             cImpls = cImpls :+ drains._1
             stRunLoopEntries = stRunLoopEntries :+ drains._2
-          case _ => reporter.error(None(), Util.toolName, s"Periodic thread ${cid} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
+          case _ => reporter.warn(None(), Util.toolName, s"Periodic thread ${cid} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
         }
       case Some(Dispatch_Protocol.Sporadic) =>
 
@@ -2326,18 +2329,18 @@ import org.sireum.message.Reporter
         topLevelProcess = Some(p)
         typeHeaderFileName = Util.getTypeHeaderFileName(p).get
       case _ =>
-        reporter.error(None(), Util.toolName, "No processor bound process defined")
+        reporter.error(None(), Util.toolName, "No processor bound process defined in the AADL model")
     }
 
-    if(!hasErrors) {
+    if(!hasErrors()) {
       buildMonitors()
     }
 
-    if(!hasErrors) {
+    if(!hasErrors()) {
       buildSamplingPortInterfaces()
     }
     
-    return !hasErrors
+    return !hasErrors()
   }
 
 

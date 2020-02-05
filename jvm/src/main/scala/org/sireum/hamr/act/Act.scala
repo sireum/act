@@ -49,7 +49,10 @@ object Act {
       val auxHFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"h").map(m => m._1)
       val auxHeaderDirectories = (Set.empty ++ auxHFiles.map(m => Os.path(m).up.value)).elements
       
-      Gen(m2, options.platform, options.hamrBasePackageName, reporter).process(auxHFiles) match {
+      val (container, r) = Gen(m2, options.platform, options.hamrBasePackageName, reporter).process(auxHFiles)
+      reporter.reports(r.messages)
+      
+      container match {
         case Some(container) =>
           val rootDir: String = options.aadlRootDirectory match {
             case Some(f) => Os.path(f).abs.value
