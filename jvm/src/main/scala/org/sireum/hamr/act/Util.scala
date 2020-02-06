@@ -95,8 +95,6 @@ object Util {
   val camkesStdConnectors: String = "<std_connector.camkes>"
   val camkesGlobalConnectors: String = "<global-connectors.camkes>"
   
-  val SB_EVENT_COUNTER_TYPE: String = "int32_t"
-  
   def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
   }
@@ -190,11 +188,16 @@ object Util {
     return brand(s"${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}")
   }
 
-  def genSeL4CallbackMethodName(f: ir.Feature, isDataPort: B): String = {
+  def genSeL4NotificationName(f: ir.Feature, isDataPort: B): String = {
     val name = s"${Util.getLastName(f.identifier)}${if(isDataPort) "_notification" else "" }"
     return brand(name)
   }
 
+  def genSeL4NotificationQueueName(f: ir.Feature, queueSize: Z): String = {
+    val name = s"${Util.getLastName(f.identifier)}_${queueSize}_notification"
+    return brand(name)
+  }
+  
   def getMonitorWriterName(f: ir.FeatureEnd): String = {
     return s"${getClassifierFullyQualified(f.classifier.get)}_writer"
   }
@@ -210,14 +213,10 @@ object Util {
   def getEventSBNotificationName(featureId: String): String = {
     return brand(s"${featureId}")
   }
-  
-  def getEventSBCounterName(featureId: String): String = {
-    return brand(s"${featureId}_counter")
-  }
 
-  def getMonitorWriterParamName(c: ir.Component): String = {
-    val name = Util.getClassifierFullyQualified(c.classifier.get)
-    if (TypeUtil.isArrayDef(c)) {
+  def getSel4TypeName(aadlType: ir.Component): String = {
+    val name = Util.getClassifierFullyQualified(aadlType.classifier.get)
+    if (TypeUtil.isArrayDef(aadlType)) {
       return getContainerName(name)
     } else {
       return name
@@ -544,6 +543,70 @@ object Util {
   def createResource(path: String, contents: ST, overwrite: B): Resource = {
     return Resource(path, contents, overwrite, F)
   }
+
+
+  def getUserEventEntrypointMethodName(component: ir.Component, feature: ir.FeatureEnd): String = {
+    val fid = Util.getLastName(feature.identifier)
+    val cid = Util.getClassifier(component.classifier.get)
+    return Util.brand(s"entrypoint_${cid}_${fid}")
+  }
+  
+  def getEventDataSBQueueName(typeName: String, queueSize: Z): String = {
+    return brand(s"queue_${typeName}_${queueSize}")
+  }
+
+  def getEventData_SB_QueueHeaderFileName(typeName: String, queueSize: Z): String = {
+    return s"${getEventDataSBQueueName(typeName, queueSize)}.h"
+  }
+
+  def getEventData_SB_QueueImplFileName(typeName: String, queueSize: Z): String = {
+    return s"${getEventDataSBQueueName(typeName, queueSize)}.c"
+  }
+
+  def getEventDataSBQueueTypeName(typeName: String, queueSize: Z): String = {
+    return s"${getEventDataSBQueueName(typeName, queueSize)}_t"
+  }
+
+  def getEventData_SB_RecvQueueName(typeName: String, queueSize: Z): String = {
+    return s"${getEventDataSBQueueName(typeName, queueSize)}_Recv"
+  }
+  def getEventData_SB_RecvQueueTypeName(typeName: String, queueSize: Z): String = {
+    return s"${getEventData_SB_RecvQueueName(typeName, queueSize)}_t"
+  }
+  def getEventData_SB_RecvQueueFeatureName(featureId: String): String = {
+    return brand(s"${featureId}_recv_queue")
+  }
+
+  def getEventDataSBQueueSrcFeatureName(featureId: String, queueSize: Z): String = {
+    return brand(s"${featureId}_queue_${queueSize}")
+  }
+
+  def getEventDataSBQueueDestFeatureName(featureId: String): String = {
+    return brand(s"${featureId}_queue")
+  }
+  
+  
+  def getEventSBCounterName(featureId: String): String = {
+    return brand(s"${featureId}_counter")
+  }
+
+
+  val SB_EVENT_COUNTER_TYPE: String = Util.brand("event_counter_t")
+  val SB_COUNTER_FILENAME: String = Util.brand("event_counter.h")
+
+  def sbCounterTypeDeclResource(): Resource = {
+    val counter: ST =st"""#pragma once
+                         |
+                         |#include <stdint.h>
+                         |
+                         |typedef _Atomic uintmax_t ${SB_EVENT_COUNTER_TYPE}; 
+                         |"""
+    Util.createResource(s"${Util.DIR_INCLUDES}/${Util.SB_COUNTER_FILENAME}", counter, T)
+  }
+  
+  def sbCounterInclude(): ST = {
+    return st"#include <${Util.SB_COUNTER_FILENAME}>"
+  }
 }
 
 object TypeUtil {
@@ -649,6 +712,11 @@ object StringUtil {
   def toLowerCase(s: String):String = {
     val cms = conversions.String.toCms(s)
     return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
+  }
+
+  def toUpperCase(s: String):String = {
+    val cms = conversions.String.toCms(s)
+    return conversions.String.fromCms(cms.map((c: C) => COps(c).toUpper))
   }
 }
 
@@ -807,7 +875,6 @@ object TimerUtil {
 
   def configurationTimerGlobalEndpoint(instanceName: String, interfaceName: String, classifier: String, id: String): ST = {
     return st"""${instanceName}.${interfaceName}_global_endpoint = "${classifier}_${id}";"""
-    //return st"""${instanceName}.${id}_global_endpoint = "HAMR_TODO"; // attribute required by connector"""
   }
 }
 
@@ -850,16 +917,18 @@ object TimerUtil {
                               ci: ir.ConnectionInstance // aadl connection 
                              ) extends Monitor
 
-@datatype class C_Container(component: String,
+@datatype class C_Container(componentId: String,
                             cSources: ISZ[Resource],
                             cIncludes: ISZ[Resource],
                             sourceText: ISZ[String],
                             externalCSources: ISZ[String],
                             externalCIncludeDirs: ISZ[String])
 
-@datatype class C_SimpleContainer(cInterface: Option[ST],
+@datatype class C_SimpleContainer(cIncludes: ISZ[ST],
+                                  cInterface: Option[ST],
                                   cImplementation: Option[ST],
                                   preInits: Option[ST],
+                                  postInits: Option[ST],
                                   drainQueues: Option[(ST, ST)])
 
 @enum object Dispatch_Protocol {
@@ -869,19 +938,17 @@ object TimerUtil {
 
 @datatype class SamplingPortInterface(name: String,
                                       structName: String,
-                                      typ: ir.Classifier,
+                                      sel4TypeName: String,
                                       headerPath: String,
-                                      implPath: String) {
-
-  def portType(): String = {
-    return Util.getClassifierFullyQualified(typ)
-  }
-}
+                                      implPath: String) 
 
 @datatype class SharedData(owner: ir.Component,
                            ownerFeature: Option[ir.FeatureAccess],
                            typ: ir.Classifier,
                            subcomponentId: String)
+
+@datatype class QueueObject(queueName: String,
+                            queueSize: Z)
 
 @enum object Sel4ConnectorTypes {
   'seL4GlobalAsynchCallback

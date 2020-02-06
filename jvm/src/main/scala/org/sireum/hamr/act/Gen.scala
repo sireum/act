@@ -6,8 +6,9 @@ import org.sireum._
 import org.sireum.ops.ISZOps
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
+import org.sireum.hamr.act.templates.EventDataQueueTemplate
 import org.sireum.hamr.ir
-import org.sireum.hamr.ir.Aadl
+import org.sireum.hamr.ir.{Aadl, FeatureEnd}
 import org.sireum.message.Reporter
 
 @record class Gen(model: Aadl, platform: ActPlatform.Type, hamrBasePackageName: Option[String], reporter: Reporter) {
@@ -21,8 +22,9 @@ import org.sireum.message.Reporter
 
   var featureMap: HashMap[String, ir.Feature] = HashMap.empty
   var sharedData: HashMap[String, SharedData] = HashMap.empty
-  var samplingPorts: HashMap[ir.Classifier, SamplingPortInterface] = HashMap.empty
-  
+  var samplingPorts: HashMap[String, SamplingPortInterface] = HashMap.empty
+  var srcQueues: Map[String, Map[String, QueueObject]] = Map.empty // {dstFeatureId -> {srcFeatureId -> queueobj}}
+
   // port-paths -> connInstances
   var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
   var outConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
@@ -31,7 +33,7 @@ import org.sireum.message.Reporter
   var astObjects: ISZ[ASTObject] = ISZ()
   var monitors: HashSMap[String, Monitor] = HashSMap.empty // conn instname -> monitor
   var containers: ISZ[C_Container] = ISZ()
-  var auxFiles: ISZ[Resource] = ISZ()
+  var auxResourceFiles: ISZ[Resource] = ISZ()
   
   var periodicDispatcherNotifications: ISZ[ast.Emits] = ISZ()
   var periodicDispatcherCalendars: ISZ[ST] = ISZ()
@@ -40,7 +42,7 @@ import org.sireum.message.Reporter
   var camkesConnections: ISZ[ast.Connection] = ISZ()
   var camkesConfiguration: ISZ[ST] = ISZ()
   
-  var auxCSources: ISZ[ST] = ISZ()
+  var auxCImplIncludes: ISZ[ST] = ISZ()
 
   var hasPeriodicComponents: B = F
   val preventBadging: B = T
@@ -49,14 +51,20 @@ import org.sireum.message.Reporter
   
   var globalImports: Set[String] = Set.empty[String] + Util.camkesStdConnectors
   
+  val hookupPeriodicComponentsToTimeServer: B = F
+  
   var count: Z = 1 // 0 causes capability conflict issues
   def getCounter(): Z = {
     count = count + 1
     return count - 1
   }
 
+  def getTypeHeaderFileName(): String = {
+    return s"${typeHeaderFileName}.h"
+  }
+  
   def getTypeHeaderFileForInclude(): String = {
-    return s"<${typeHeaderFileName}.h>"
+    return s"<${getTypeHeaderFileName()}>"
   }
 
   def hasErrors(): B = {
@@ -73,11 +81,7 @@ import org.sireum.message.Reporter
 
     buildComponentMap(system)
 
-    auxCSources = cSources.map(c => st"""#include "../../../${c}"""")
-
-    if(performHamrIntegration) {
-      auxCSources = auxCSources :+ st"#include <all.h>" :+ st"#include <ipc.h>"
-    }
+    auxCImplIncludes = cSources.map(c => st"""#include "../../../${c}"""")
 
     for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
     val sortedData = sortData(typeMap.values)
@@ -85,7 +89,7 @@ import org.sireum.message.Reporter
     resolve(system)
 
     if(!hasErrors()) {
-      auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData), T)
+      auxResourceFiles = auxResourceFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData), T)
     }
 
     if(!hasErrors()) {
@@ -101,8 +105,8 @@ import org.sireum.message.Reporter
         componentMap.values.filter(c => Util.isThread(c)).size
       val pair = StringTemplate.hamrIPC(bufferSize, hamrBasePackageName.get)
 
-      auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1, T)
-      auxFiles = auxFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2, T)
+      auxResourceFiles = auxResourceFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1, T)
+      auxResourceFiles = auxResourceFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2, T)
     }
 
     if(!hasErrors()) {
@@ -141,14 +145,6 @@ import org.sireum.message.Reporter
 
         camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerAttribute(dispatchComponent.name, getCounter(), T)
 
-        camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerGlobalEndpoint(
-          dispatchComponent.name, TimerUtil.TIMER_ID_DISPATCHER,
-          dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
-        
-        camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerGlobalEndpoint(
-          dispatchComponent.name, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID,
-          dispatchComponent.component.name, TimerUtil.TIMER_ID_DISPATCHER)
-
         camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationPriority(dispatchComponent.name, Util.DEFAULT_PRIORITY)
       }
 
@@ -160,7 +156,7 @@ import org.sireum.message.Reporter
       )
       
       astObjects = ISZ(Assembly(
-        configuration = camkesConfiguration.map(m => m.render),
+        configuration = (Set.empty[String] ++ camkesConfiguration.map((m : ST) => m.render)).elements,
         composition = composition))
       
       astObjects = astObjects ++ otherAstObjects
@@ -172,7 +168,7 @@ import org.sireum.message.Reporter
         monitors = monitors.values,
         samplingPorts = samplingPorts.values,
         cContainers = containers,
-        auxFiles = auxFiles,
+        auxFiles = auxResourceFiles,
         globalImports = globalImports.elements,
         requiresTimeServer = hasPeriodicComponents)), reporter)
 
@@ -267,6 +263,28 @@ import org.sireum.message.Reporter
       )
     }
 
+    def createSharedData_SB_Queue_Connection(conn: ir.ConnectionInstance) : ast.Connection = {
+      val srcComponent = Util.getLastName(conn.src.component)
+      val srcId = Util.getName(conn.src.feature.get)
+      val srcFeature = featureMap.get(srcId).get
+
+      val dstComponent = Util.getLastName(conn.dst.component)
+      val dstId = Util.getName(conn.dst.feature.get)
+      val dstFeature = featureMap.get(dstId).get
+
+      val queueObject: QueueObject = srcQueues.get(srcId).get.get(dstId).get
+      
+      val srcFeatureName = Util.getEventDataSBQueueSrcFeatureName(Util.getLastName(srcFeature.identifier), queueObject.queueSize)
+      val dstFeatureName = Util.getEventDataSBQueueDestFeatureName(Util.getLastName(dstFeature.identifier))
+
+      camkesConfiguration = camkesConfiguration :+ st"""${srcComponent}.${srcFeatureName}_access = "W";"""
+      camkesConfiguration = camkesConfiguration :+ st"""${dstComponent}.${dstFeatureName}_access = "R";"""
+
+      return createConnection(Sel4ConnectorTypes.seL4SharedData,
+        srcComponent, srcFeatureName,
+        dstComponent, dstFeatureName
+      )
+    }
     def createSharedDataConnection(conn: ir.ConnectionInstance) : ast.Connection = {
       val srcComponent = Util.getLastName(conn.src.component)
       val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
@@ -274,8 +292,8 @@ import org.sireum.message.Reporter
       val dstComponent = Util.getLastName(conn.dst.component)
       val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
 
-      val srcFeatureName = Util.getLastName(srcFeature.identifier)
-      val dstFeatureName = Util.getLastName(dstFeature.identifier)
+      val srcFeatureName = Util.brand(Util.getLastName(srcFeature.identifier))
+      val dstFeatureName = Util.brand(Util.getLastName(dstFeature.identifier))
 
       return createConnection(Sel4ConnectorTypes.seL4SharedData,
         srcComponent, srcFeatureName,
@@ -306,7 +324,7 @@ import org.sireum.message.Reporter
       // notification monsig to dst
       return ret :+ createNotificationConnection(
         monitor.i.name, "monsig",
-        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
+        dstComponent, Util.genSeL4NotificationName(dstFeature, T)
       )
     }
 
@@ -333,7 +351,7 @@ import org.sireum.message.Reporter
       // notification monsig to dst
       return ret :+ createNotificationConnection(
         monitor.i.name, "monsig",
-        dstComponent, Util.genSeL4CallbackMethodName(dstFeature, T)
+        dstComponent, Util.genSeL4NotificationName(dstFeature, T)
       )
     }
 
@@ -349,12 +367,13 @@ import org.sireum.message.Reporter
     }
     
     for(conn <- handledConns) {
-      val fdst = featureMap.get(Util.getName(conn.dst.feature.get)).get
+      val dstPath = Util.getName(conn.dst.feature.get)
+      val fdst: ir.Feature = featureMap.get(dstPath).get
 
       val srcComponent = Util.getLastName(conn.src.component)
       
-      val dstComponent = Util.getLastName(conn.dst.component)
-      val dstFeature = Util.getLastName(conn.dst.feature.get)
+      val dstComponentName = Util.getLastName(conn.dst.component)
+      val dstFeatureName = Util.getLastName(conn.dst.feature.get)
 
       conn.kind match {
         case ir.ConnectionKind.Port =>
@@ -367,33 +386,61 @@ import org.sireum.message.Reporter
               }
 
             case ir.FeatureCategory.EventDataPort =>
+              
+              def eventDataPort_SB_Connection_Profile(): Unit = {
+                // sel4 notification plus shared queue
+
+                val srcPath: String = Util.getName(conn.src.feature.get)
+                
+                val srcFeature: ir.Feature = featureMap.get(srcPath).get
+                
+                val queueSize: Z = srcQueues.get(srcPath).get.get(dstPath).get.queueSize
+                
+                connections = connections :+ createNotificationConnection(
+                  srcComponent, Util.genSeL4NotificationQueueName(srcFeature, queueSize), 
+                  dstComponentName, Util.genSeL4NotificationName(fdst, T))
+                
+                connections = connections :+ createSharedData_SB_Queue_Connection(conn)                
+              }
+              
               platform match {
                 case ActPlatform.SeL4 => connections = connections ++ createDataConnection(conn)
                 case ActPlatform.SeL4_TB => connections = connections ++ createDataConnection(conn)
-                case ActPlatform.SeL4_Only => connections = connections ++ createDataConnection_Ihor(conn) // ihor eventdata port profile
+                case ActPlatform.SeL4_Only => eventDataPort_SB_Connection_Profile()
               }
 
             case ir.FeatureCategory.EventPort =>
-              def eventPortSel4Profile(): Unit = {
+              
+              def eventPort_TB_Connection_Profile(): Unit = {
                 if(shouldUseMonitorForEventPort(fdst)) {
-                  connections = connections ++ createDataConnection_Ihor(conn) // ihor aadl-event-monitor port profile
+                  // monitor
+                  connections = connections ++ createDataConnection_Ihor(conn)
                 } else {
+                  // just a sel4 notification
                   val srcFeature = Util.getLastName(conn.src.feature.get)
-                  connections = connections :+ createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
+                  
+                  connections = connections :+ createNotificationConnection(
+                    srcComponent, Util.brand(srcFeature), 
+                    dstComponentName, Util.brand(dstFeatureName))
                 }
               }
 
-              def eventPort_SB_Profile(): Unit = {
-                // notification plus shared counter
+              def eventPort_SB_Connection_Profile(): Unit = {
+                // sel4 notification plus shared counter
                 val srcFeature = Util.getLastName(conn.src.feature.get)
-                connections = connections :+ createNotificationConnection(srcComponent, Util.brand(srcFeature), dstComponent, Util.brand(dstFeature))
+                
+                
+                connections = connections :+ createNotificationConnection(
+                  srcComponent, Util.brand(srcFeature), 
+                  dstComponentName, Util.brand(dstFeatureName))
+                
                 connections = connections :+ createSharedDataCounterConnection(conn)
               }
 
               platform match {
-                case ActPlatform.SeL4 => eventPortSel4Profile()
-                case ActPlatform.SeL4_TB => eventPortSel4Profile()
-                case ActPlatform.SeL4_Only => eventPort_SB_Profile() // ihor aadl-event-direct profile
+                case ActPlatform.SeL4 => eventPort_TB_Connection_Profile()
+                case ActPlatform.SeL4_TB => eventPort_TB_Connection_Profile()
+                case ActPlatform.SeL4_Only => eventPort_SB_Connection_Profile() // ihor aadl-event-direct profile
               }
 
             case _ => halt (s"not expecting ${fdst.category}")
@@ -402,10 +449,10 @@ import org.sireum.message.Reporter
           fdst.category match {
             case ir.FeatureCategory.SubprogramAccess =>
               val srcFeature = Util.getLastName(conn.src.feature.get)
-              connections = connections :+ createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
+              connections = connections :+ createRPCConnection(srcComponent, srcFeature, dstComponentName, dstFeatureName)
             case ir.FeatureCategory.SubprogramAccessGroup =>
               val srcFeature = Util.getLastName(conn.src.feature.get)
-              connections = connections :+ createRPCConnection(srcComponent, srcFeature, dstComponent, dstFeature)
+              connections = connections :+ createRPCConnection(srcComponent, srcFeature, dstComponentName, dstFeatureName)
 
             case ir.FeatureCategory.DataAccess =>
               val sd = sharedData.get(Util.getName(conn.src.component)).get
@@ -415,7 +462,7 @@ import org.sireum.message.Reporter
 
               if(ownerId != dstId) {
                 connections = connections :+ createConnection(Sel4ConnectorTypes.seL4SharedData,
-                  dstComponent, dstFeature,
+                  dstComponentName, dstFeatureName,
                   Util.getLastName(sd.owner.identifier), Util.getLastName(sd.ownerFeature.get.identifier)
                 )
               } else {
@@ -451,23 +498,29 @@ import org.sireum.message.Reporter
           
           if(Util.getDispatchProtocol(sc) == Some(Dispatch_Protocol.Periodic)) {
             
-            // connect component to time server
-            connections = connections :+ createConnection(Sel4ConnectorTypes.seL4TimeServer,
-              componentId, TimerUtil.TIMER_ID,
-              TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
-            
-            val dispatcherNotificationName = TimerUtil.componentNotificationName(Some(sc))
+            if(hookupPeriodicComponentsToTimeServer) {
+              // connect component to time server
+              connections = connections :+ createConnection(Sel4ConnectorTypes.seL4TimeServer,
+                componentId, TimerUtil.TIMER_ID,
+                TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
+
+              // timer attribute
+              camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerAttribute(
+                componentId, getCounter(), F)
+            }
+
             val componentNotificationName = TimerUtil.componentNotificationName(None())
+            val dispatcherNotificationName = TimerUtil.componentNotificationName(Some(sc))
+
+            // emit notification when component's period occurs
+            dispatchNotifications = dispatchNotifications :+ Emits(
+              name = dispatcherNotificationName,
+              typ = Util.NOTIFICATION_TYPE)
             
             // connect dispatcher to component
             connections = connections :+ createConnection(Sel4ConnectorTypes.seL4Notification,
               TimerUtil.DISPATCH_PERIODIC_INSTANCE, dispatcherNotificationName,
               componentId, componentNotificationName)
-              
-            // emit notification when component's period occurs
-            dispatchNotifications = dispatchNotifications :+ Emits(
-              name = dispatcherNotificationName,
-              typ = Util.NOTIFICATION_TYPE)
 
             val period: Z = if(Util.getPeriod(sc).isEmpty) {
               reporter.warn(None(), Util.toolName, s"Period not provided for periodic component ${classifier}, using ${Util.DEFAULT_PERIOD}")
@@ -476,15 +529,6 @@ import org.sireum.message.Reporter
               Util.getPeriod(sc).get
             }
             calendars = calendars :+ TimerUtil.calendar(sc, period)
-
-            // timer attribute
-            camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerAttribute(
-              componentId, getCounter(), F)
-            
-            // global endpoint
-            camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerGlobalEndpoint(
-              componentId, TimerUtil.TIMER_ID,
-              classifier, TimerUtil.TIMER_ID)
           }
           
           Util.getStackSizeInBytes(sc) match {
@@ -625,6 +669,12 @@ import org.sireum.message.Reporter
     )
   }
 
+  def getSamplingPort(fend: FeatureEnd): SamplingPortInterface = {
+    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(fend.classifier.get)).get
+    val sel4PortType: String = Util.getSel4TypeName(aadlPortType)
+    return samplingPorts.get(sel4PortType).get
+  }
+
   def genThread(c : ir.Component) : Component = {
     assert(c.category == ir.ComponentCategory.Thread)
     assert(c.subComponents.isEmpty)
@@ -637,8 +687,9 @@ import org.sireum.message.Reporter
     var emits: ISZ[Emits] = ISZ()
     var consumes: ISZ[Consumes] = ISZ()
     var dataports: ISZ[Dataport] = ISZ()
-    
 
+    var cSources: ISZ[Resource] = ISZ()
+    
     var camkesIncludes: Set[String] = Set.empty
     camkesIncludes = camkesIncludes + getTypeHeaderFileForInclude()
 
@@ -647,9 +698,11 @@ import org.sireum.message.Reporter
     
     var imports : Set[String] = Set.empty
 
-    var cIncludes: ISZ[ST] = ISZ()
+    var cInterfaceStatements: ISZ[ST] = ISZ()
+    var cImplIncludes: ISZ[ST] = ISZ()
     var cImpls: ISZ[ST] = ISZ()
     var cPreInits: ISZ[ST] = ISZ()
+    var cPostInits: ISZ[ST] = ISZ()
     var cDrainQueues: ISZ[(ST, ST)] = ISZ()
 
     for(f <- c.features.filter(_f => _f.isInstanceOf[ir.FeatureAccess])) {
@@ -716,11 +769,11 @@ import org.sireum.message.Reporter
       val fpath = Util.getName(fend.identifier)
       val fid = Util.getLastName(f.identifier)
       
-      def handleDataPort_New(): Unit = {
+      def handleDataPort_SB_Profile(): Unit = {
         assert(fend.direction == ir.Direction.In || fend.direction == ir.Direction.Out)
-        val classifier = fend.classifier.get
-        val samplingPort: SamplingPortInterface = samplingPorts.get(classifier).get
 
+        val samplingPort: SamplingPortInterface = getSamplingPort(fend)
+        
         camkesIncludes = camkesIncludes + s"<${Os.path(samplingPort.headerPath).name}>"
 
         externalCSources = externalCSources :+ samplingPort.implPath
@@ -733,13 +786,13 @@ import org.sireum.message.Reporter
             Util.getLastName(c.identifier), samplingPort, fend)
         
         dataports = dataports :+ Dataport(
-          name = fid,
+          name = Util.brand(fid),
           optional = F,
           typ = samplingPort.structName
         )
       }
       
-      def handleDataPort(): Unit = {
+      def handleDataPort_TB_Profile(): Unit = {
         fend.direction match {
           case ir.Direction.In =>
             // uses monitor
@@ -754,7 +807,7 @@ import org.sireum.message.Reporter
                 optional = F)
 
               consumes = consumes :+ Consumes(
-                name = Util.genSeL4CallbackMethodName(fend, T),
+                name = Util.genSeL4NotificationName(fend, T),
                 typ = Util.getMonitorNotificationType(fend.category),
                 optional = F)
             }
@@ -788,7 +841,7 @@ import org.sireum.message.Reporter
             val isConnected = inConnections.contains(Util.getName(fend.identifier))
             
             if(isConnected && (Util.getComputeEntrypointSourceText(fend.properties).nonEmpty || performHamrIntegration)) {
-              val name = Util.genSeL4CallbackMethodName(fend, isEventData)
+              val name = Util.genSeL4NotificationName(fend, isEventData)
               val handlerName = s"${name}_handler"
               val regCallback = s"${name}_reg_callback"
 
@@ -804,6 +857,64 @@ import org.sireum.message.Reporter
         }
       }
 
+      def eventDataPort_SB_Component_Profile(): Unit = {
+        // notification plus a shared counter
+
+        // correct for fan out connections?
+
+        val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(fend.classifier.get)).get
+        //val portComponentTypeName = Util.getClassifierFullyQualified(portComponentType.classifier.get)
+        val sel4TypeName = Util.getSel4TypeName(aadlPortType)
+        
+        auxResourceFiles = auxResourceFiles :+ Util.sbCounterTypeDeclResource()
+        
+        fend.direction match {
+          case ir.Direction.In =>
+            val queueSize = Util.getQueueSize(fend)
+            val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
+
+            val queueHeaderImplName = Util.getEventData_SB_QueueImplFileName(sel4TypeName, queueSize)
+            val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
+
+            externalCSources = externalCSources :+ s"${Util.DIR_INCLUDES}/${queueHeaderImplName}"
+            camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
+            
+            consumes = consumes :+ Consumes(
+              name = Util.genSeL4NotificationName(fend, T),
+              typ = Util.EVENT_NOTIFICATION_TYPE,
+              optional = F)
+
+            dataports = dataports :+ Dataport(
+              name = Util.getEventDataSBQueueDestFeatureName(fid),
+              typ = queueType,
+              optional = F)
+
+          case ir.Direction.Out =>
+
+            val dsts: Map[String, QueueObject] = srcQueues.get(fpath).get // dstId -> queueObject
+
+            for(qo <- dsts.valueSet.elements) {
+              val queueSize = qo.queueSize
+              val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
+              val queueHeaderImplName = Util.getEventData_SB_QueueImplFileName(sel4TypeName, queueSize)
+              val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
+
+              externalCSources = externalCSources :+ s"${Util.DIR_INCLUDES}/${queueHeaderImplName}"
+              camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
+
+              emits = emits :+ Emits(
+                name = Util.genSeL4NotificationQueueName(fend, queueSize),
+                typ = Util.EVENT_NOTIFICATION_TYPE)
+
+              dataports = dataports :+ Dataport(
+                name = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize),
+                typ = queueType,
+                optional = F)
+            }
+          case _ => halt(s"Unexpected port direction: ${fend.direction}")
+        }
+      }
+      
       def handleEventDataPort_Ihor(): Unit = {
         fend.direction match {
           case ir.Direction.In =>
@@ -819,14 +930,14 @@ import org.sireum.message.Reporter
                 optional = F)
 
               consumes = consumes :+ Consumes(
-                name = Util.genSeL4CallbackMethodName(fend, T),
+                name = Util.genSeL4NotificationName(fend, T),
                 typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                 optional = F)
 
               val isConnected = inConnections.contains(Util.getName(fend.identifier))
               
               if(isConnected && (Util.getComputeEntrypointSourceText(fend.properties).nonEmpty || performHamrIntegration)) {
-                val name = Util.genSeL4CallbackMethodName(fend, T)
+                val name = Util.genSeL4NotificationName(fend, T)
                 val handlerName = s"${name}_handler"
                 val regCallback = s"${name}_reg_callback"
 
@@ -862,27 +973,31 @@ import org.sireum.message.Reporter
       f.category match {
         case ir.FeatureCategory.DataPort =>
           platform match {
-            case ActPlatform.SeL4_Only => handleDataPort_New()
-            case ActPlatform.SeL4 => handleDataPort()              
-            case ActPlatform.SeL4_TB => handleDataPort()
+            case ActPlatform.SeL4_Only => handleDataPort_SB_Profile()
+            case ActPlatform.SeL4 => handleDataPort_TB_Profile()              
+            case ActPlatform.SeL4_TB => handleDataPort_TB_Profile()
           }
           
         case ir.FeatureCategory.EventDataPort =>
           platform match {
             case ActPlatform.SeL4_Only =>
-              handleEventDataPort_Ihor()
+              //handleEventDataPort_Ihor()
+              eventDataPort_SB_Component_Profile()
 
             case ActPlatform.SeL4 =>
-              handleDataPort()
+              handleDataPort_TB_Profile()
               handleEventPort(T)
 
             case ActPlatform.SeL4_TB =>
-              handleDataPort()
+              handleDataPort_TB_Profile()
               handleEventPort(T)
           }
 
         case ir.FeatureCategory.EventPort =>
-          def eventPort_Sel4_TB_Profile(): Unit = {
+          
+          def handleEventPort_TB_Component_Profile(): Unit = {
+            
+            
             if(shouldUseMonitorForEventPort(fend)) {
               // monitor 
               
@@ -900,7 +1015,7 @@ import org.sireum.message.Reporter
 
                   // consumes notification
                   consumes = consumes :+ Consumes(
-                    name = Util.genSeL4CallbackMethodName(fend, T),
+                    name = Util.genSeL4NotificationName(fend, T),
                     typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                     optional = F)
 
@@ -946,12 +1061,16 @@ import org.sireum.message.Reporter
             }
           }
           
-          def eventPort_SB_Profile(): Unit = {
+          def handleEventPort_SB_Component_Profile(): Unit = {
             // notification plus a shared counter
             
             // correct for fan out connections?
             
-            val counterType = "int32_t"
+            val counterType = Util.SB_EVENT_COUNTER_TYPE
+
+            // add sb counter type decl resource
+            auxResourceFiles = auxResourceFiles :+ Util.sbCounterTypeDeclResource()
+            camkesIncludes = camkesIncludes + s"<${Util.SB_COUNTER_FILENAME}>"
             
             fend.direction match {
               case ir.Direction.In =>
@@ -980,9 +1099,9 @@ import org.sireum.message.Reporter
           }
           
           platform match {
-            case ActPlatform.SeL4 => eventPort_Sel4_TB_Profile()
-            case ActPlatform.SeL4_TB => eventPort_Sel4_TB_Profile()
-            case ActPlatform.SeL4_Only => eventPort_SB_Profile()
+            case ActPlatform.SeL4 => handleEventPort_TB_Component_Profile()
+            case ActPlatform.SeL4_TB => handleEventPort_TB_Component_Profile()
+            case ActPlatform.SeL4_Only => handleEventPort_SB_Component_Profile()
           }
 
         case _ =>
@@ -990,10 +1109,12 @@ import org.sireum.message.Reporter
       }
 
       generateC_InterfaceMethod(c, f.asInstanceOf[ir.FeatureEnd]) match {
-        case Some(C_SimpleContainer(inter, impl, preInit, drainQueues)) =>
-          if(inter.nonEmpty) { cIncludes = cIncludes :+ inter.get }
+        case Some(C_SimpleContainer(cIncludes, interface, impl, preInit, postInits, drainQueues)) =>
+          if(cIncludes.nonEmpty) { cImplIncludes = cImplIncludes ++ cIncludes}
+          if(interface.nonEmpty) { cInterfaceStatements = cInterfaceStatements :+ interface.get }
           if(impl.nonEmpty) { cImpls = cImpls :+ impl.get }
           if(preInit.nonEmpty) { cPreInits = cPreInits :+ preInit.get}
+          if(postInits.nonEmpty) { cPostInits = cPostInits :+ postInits.get }
           if(drainQueues.nonEmpty) { cDrainQueues = cDrainQueues :+ drainQueues.get}
         case _ =>
       }
@@ -1022,11 +1143,13 @@ import org.sireum.message.Reporter
         // import Timer.idl4
         imports = imports + Util.camkesStdConnectors;
         
-        // uses Timer tb_timer;
-        uses = uses :+ Uses(
-          name = TimerUtil.TIMER_ID,
-          typ = TimerUtil.TIMER_TYPE,
-          optional = F)
+        if(hookupPeriodicComponentsToTimeServer) {
+          // uses Timer tb_timer;
+          uses = uses :+ Uses(
+            name = TimerUtil.TIMER_ID,
+            typ = TimerUtil.TIMER_TYPE,
+            optional = F)
+        }
         
         // consumes Notification from periodic dispatcher
         consumes = consumes :+ Consumes(
@@ -1034,13 +1157,13 @@ import org.sireum.message.Reporter
           typ = Util.NOTIFICATION_TYPE,
           optional = F)
         
-        cImpls = StringTemplate.periodicDispatchElems(cid) +: cImpls
+        cImpls = StringTemplate.periodicDispatchElems(cid, hookupPeriodicComponentsToTimeServer) +: cImpls
 
         cRunPreEntries = cRunPreEntries :+ StringTemplate.registerPeriodicCallback()
 
         Util.getComputeEntrypointSourceText(c.properties) match {
           case Some(handler) =>
-            cIncludes = cIncludes :+ st"void ${handler}(const int64_t *);"
+            cInterfaceStatements = cInterfaceStatements :+ st"void ${handler}(const int64_t *);"
 
             val drains = StringTemplate.drainPeriodicQueue(cid, handler)
 
@@ -1061,7 +1184,7 @@ import org.sireum.message.Reporter
     if(!performHamrIntegration) {
       Util.getInitializeEntryPoint(c.properties) match {
         case Some(methodName) =>
-          cIncludes = cIncludes :+ st"""void ${methodName}(const int64_t *arg);"""
+          cInterfaceStatements = cInterfaceStatements :+ st"""void ${methodName}(const int64_t *arg);"""
           val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(cid, methodName)
           cImpls = cImpls :+ cimpl
           cRunPreEntries = cRunPreEntries :+ runEntry
@@ -1069,9 +1192,10 @@ import org.sireum.message.Reporter
       }
     }
 
-    var sources: ISZ[Resource] = ISZ()
-
     if(performHamrIntegration) {
+      
+      cImplIncludes = cImplIncludes :+ st"#include <all.h>" :+ st"#include <ipc.h>"
+
       cPreInits = cPreInits :+ st"" // blank line
 
       cPreInits = cPreInits :+ StringTemplate.hamrIntialise(hamrBasePackageName.get, cid)
@@ -1167,10 +1291,10 @@ import org.sireum.message.Reporter
     }
 
     containers = containers :+ C_Container(
-      component = cid,
-      cSources = ISZ(genComponentTypeImplementationFile(c, cImpls, cPreInits, cRunPreEntries, stRunLoopEntries)) ++ 
-        sources,
-      cIncludes = ISZ(genComponentTypeInterfaceFile(c, cIncludes)),
+      componentId = cid,
+      cSources = ISZ(genComponentTypeImplementationFile(c, auxCImplIncludes ++ cImplIncludes, cImpls, 
+        cPreInits, cPostInits, cRunPreEntries, stRunLoopEntries)) ++ cSources,
+      cIncludes = ISZ(genComponentTypeInterfaceFile(c, cInterfaceStatements)),
       sourceText = if(performHamrIntegration) ISZ() else Util.getSourceText(c.properties),
       externalCSources = externalCSources,
       externalCIncludeDirs = externalCIncludeDirs
@@ -1215,21 +1339,22 @@ import org.sireum.message.Reporter
             dstFeature.category match {
               case ir.FeatureCategory.DataPort =>
 
-                val f = dstFeature.asInstanceOf[ir.FeatureEnd]
-                val classifier = f.classifier.get
+                val dstFend = dstFeature.asInstanceOf[ir.FeatureEnd]
+                val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(dstFend.classifier.get)).get
+                val sel4PortType: String = Util.getSel4TypeName(aadlPortType)
 
-                val name = s"sp_${Util.getClassifierFullyQualified(classifier)}"
+                val name = s"sp_${sel4PortType}"
                 val structName = s"${name}_t"
                 
                 val spi = SamplingPortInterface(
                   name = name,
                   structName = structName,
-                  typ = classifier,
+                  sel4TypeName = sel4PortType,
                   headerPath = s"${Util.DIR_SAMPLING_PORTS}/${name}.h",
                   implPath = s"${Util.DIR_SAMPLING_PORTS}/${name}.c"
                 )
 
-                samplingPorts = samplingPorts + (classifier ~> spi)
+                samplingPorts = samplingPorts + (sel4PortType ~> spi)
               case _ =>
             }
           case ir.ConnectionKind.Access => // no monitor needed
@@ -1239,7 +1364,84 @@ import org.sireum.message.Reporter
     }
   }
   
+  def buildSBQueues(): Unit = {
+    platform match {
+      case ActPlatform.SeL4_TB => return
+      case ActPlatform.SeL4 => return
+      case ActPlatform.SeL4_Only => // use new mappings below
+    }
+
+    var seen: Set[String] = Set.empty[String]
+
+    for (in <- inConnections.entries.filter(p => p._2.size > 0)) {
+      for (connInst <- in._2) {
+        val src: ir.Component = componentMap.get(Util.getName(connInst.src.component)).get
+        val srcFeature: ir.Feature = featureMap.get(Util.getName(connInst.src.feature.get)).get
+        val srcId: String = Util.getName(srcFeature.identifier) 
+          
+        val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
+        val dstFeature: ir.Feature = featureMap.get(Util.getName(connInst.dst.feature.get)).get
+        val dstId: String = Util.getName(dstFeature.identifier)
+        
+        if (dstFeature.category == ir.FeatureCategory.EventDataPort) {
+          val dstFend = dstFeature.asInstanceOf[ir.FeatureEnd]
+
+          val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(dstFend.classifier.get)).get
+          val sel4PortType: String = Util.getSel4TypeName(aadlPortType)
+
+          val queueSize = Util.getQueueSize(dstFend)
+
+          val queueName = Util.getEventDataSBQueueName(sel4PortType, queueSize)
+          if (!seen.contains(queueName)) {
+            val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(sel4PortType, queueSize)
+            val queueImplFilename = Util.getEventData_SB_QueueImplFileName(sel4PortType, queueSize)
+
+            val interface = EventDataQueueTemplate.header(
+              sbCounterFileName = Util.SB_COUNTER_FILENAME,
+              counterTypeName = Util.SB_EVENT_COUNTER_TYPE,
+              typeHeaderFileName = getTypeHeaderFileName(),
+
+              queueElementTypeName = sel4PortType,
+              queueSize = queueSize)
+
+            val impl = EventDataQueueTemplate.implementation(
+              queueHeaderFilename = queueHeaderFilename,
+              queueElementTypeName = sel4PortType,
+              queueSize = queueSize,
+
+              counterTypeName = Util.SB_EVENT_COUNTER_TYPE)
+
+            auxResourceFiles = auxResourceFiles :+ Resource(
+              path = s"${Util.DIR_INCLUDES}/${queueHeaderFilename}",
+              content = interface,
+              overwrite = T,
+              makeExecutable = F)
+
+            auxResourceFiles = auxResourceFiles :+ Resource(
+              path = s"${Util.DIR_INCLUDES}/${queueImplFilename}",
+              content = impl,
+              overwrite = T,
+              makeExecutable = F)
+
+            seen = seen + queueName
+          }
+
+          var dstMap = srcQueues.getOrElse(srcId, Map.empty)
+          assert(!dstMap.contains(dstId))
+          dstMap = dstMap + (dstId ~> QueueObject(queueName, queueSize))
+          srcQueues = srcQueues + (srcId ~> dstMap)
+        }
+      }
+    }
+  }
+  
   def buildMonitors(): Unit = {
+    platform match {
+      case ActPlatform.SeL4_TB => // 
+      case ActPlatform.SeL4 => // 
+      case ActPlatform.SeL4_Only => return  
+    }
+    
     for (portPath <- outConnections.keys.filter(p => outConnections.get(p).get.size > 0)) {
       var i: Z = 0
       for (connInst <- outConnections.get(portPath).get()) {
@@ -1279,7 +1481,7 @@ import org.sireum.message.Reporter
             component = monitor)
 
           val paramType: ir.Component = typeMap.get(typeName).get
-          val paramTypeName: String = Util.getMonitorWriterParamName(paramType)
+          val paramTypeName: String = Util.getSel4TypeName(paramType)
 
           val methods: ISZ[Method] = f.category match {
             case ir.FeatureCategory.EventDataPort => createQueueMethods(paramTypeName)
@@ -1324,7 +1526,7 @@ import org.sireum.message.Reporter
           val providesSenderVarName = "mon_send"
 
           val paramType = typeMap.get(typeName).get
-          val paramTypeName = Util.getMonitorWriterParamName(paramType)
+          val paramTypeName = Util.getSel4TypeName(paramType)
 
           val monitor = Component(
             control = F,
@@ -1609,7 +1811,7 @@ import org.sireum.message.Reporter
   }
 
   def generateC_InterfaceMethod(component: ir.Component, feature: ir.FeatureEnd): Option[C_SimpleContainer] = {
-    
+
     def handleDataPort(): Option[C_SimpleContainer] = {
 
       def dataport_TB_Profile() : Option[C_SimpleContainer] = {
@@ -1619,7 +1821,7 @@ import org.sireum.message.Reporter
           case x => halt(s"Unexpected direction: ${x}")
         }
         val name = Util.genMonitorFeatureName(feature, None[Z]())
-        val paramType = Util.getMonitorWriterParamName(
+        val paramType = Util.getSel4TypeName(
           typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get)
 
         val inter = Some(st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});""")
@@ -1660,18 +1862,26 @@ import org.sireum.message.Reporter
           } else {
             None[ST]()
           }
-        return Some(C_SimpleContainer(inter, impl, None[ST](), None[(ST, ST)]()))        
+        val cIncludes: ISZ[ST] = ISZ()      
+        val preInits: Option[ST] = None()
+        val postInits: Option[ST] = None()
+        val drainQueues: Option[(ST, ST)] = None()
+
+        return Some(C_SimpleContainer(cIncludes, inter, impl, preInits, postInits, drainQueues))
       } 
       
       def dataport_SB_Profile() : Option[C_SimpleContainer] = {
-        val classifier = feature.classifier.get
-        val samplingPort: SamplingPortInterface = samplingPorts.get(classifier).get
+        val samplingPort: SamplingPortInterface = getSamplingPort(feature)
 
         val cImpl =  StringTemplate.sbSamplingPortImplementation(samplingPort, feature)
 
         val cInterface = StringTemplate.sbSamplingPortInterface(samplingPort, feature)
-
-        return Some(C_SimpleContainer(Some(cInterface), Some(cImpl), None(), None()))
+        
+        val cIncludes: ISZ[ST] = ISZ()
+        val preInits: Option[ST] = None()
+        val postInits: Option[ST] = None()
+        val drainQueues: Option[(ST, ST)] = None()
+        return Some(C_SimpleContainer(cIncludes, Some(cInterface), Some(cImpl), preInits, postInits, drainQueues))
       }
       
       val ret: Option[C_SimpleContainer] = platform match {
@@ -1682,13 +1892,162 @@ import org.sireum.message.Reporter
       
       return ret
     }
+
+    def handleEventData_SB_GlueCode_Profile(): Option[C_SimpleContainer] = {
+      val featurePath = Util.getName(feature.identifier)
+      val fid = Util.getLastName(feature.identifier)
+      val featureName = Util.brand(fid)
+
+      val aadlPortType = typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get
+      val sel4TypeName = Util.getSel4TypeName(aadlPortType)
+
+      
+      val ret: Option[C_SimpleContainer] = feature.direction match {
+        case ir.Direction.In =>
+
+          val queueSize = Util.getQueueSize(feature)
+          val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
+          val queueName = Util.getEventDataSBQueueName(sel4TypeName, queueSize)
+
+          val featureQueueName = Util.getEventDataSBQueueDestFeatureName(fid)
+          val featureNotificationName = Util.genSeL4NotificationName(feature, T)
+          
+          var drainQueue: Option[(ST,ST)] = None()
+          var preInits: Option[ST] = None()
+          var cInterface: Option[ST] = None()
+
+          val recvQueueFeatureName = Util.getEventData_SB_RecvQueueFeatureName(fid)
+          val recvQueueName = Util.getEventData_SB_RecvQueueName(sel4TypeName, queueSize)
+          val recvQueueType = Util.getEventData_SB_RecvQueueTypeName(sel4TypeName, queueSize)
+          
+          val cImplementation: Option[ST] = Util.getComputeEntrypointSourceText(feature.properties) match {
+            case Some(entryPointName) =>
+              val varName = featureName
+
+              val handlerName = s"${featureNotificationName}_handler"
+              val regCallback = s"${featureNotificationName}_reg_callback"
+              val counterVar = "numDropped"
+              val counterType = Util.SB_EVENT_COUNTER_TYPE
+              val dequeueMethodName = s"${featureName}_dequeue"
+              val dequeuePollMethodName = s"${featureName}_dequeue_poll"
+              val userEntrypointName = Util.getUserEventEntrypointMethodName(component, feature)
+              
+              drainQueue = Some((st"",
+                st"""{
+                    |  ${sel4TypeName} ${varName};
+                    |  while (${dequeueMethodName}((${sel4TypeName} *) &${varName})) {
+                    |    ${userEntrypointName}(&${varName});
+                    |  }
+                    |}"""))
+
+              cInterface = Some(st"""bool ${dequeueMethodName}(${sel4TypeName} *);
+                                    |
+                                    |void ${entryPointName}(const ${sel4TypeName} *);""")
+              
+              preInits = Some(StringTemplate.cRegCallback(handlerName, regCallback))
+
+              val invokeHandler = s"${entryPointName}((${sel4TypeName} *) in_arg);"              
+              Some(st"""${StringTemplate.cEventNotificiationHandler(handlerName, regCallback)}
+                       |
+                       |${recvQueueType} ${recvQueueFeatureName};
+                       |
+                       |/************************************************************************
+                       | * ${dequeuePollMethodName}:
+                       | ************************************************************************/
+                       |bool ${dequeuePollMethodName}(${counterType} *${counterVar}, ${sel4TypeName} *data) {
+                       |  return ${queueName}_dequeue(&${recvQueueFeatureName}, ${counterVar}, data);
+                       |}
+                       |                     
+                       |/************************************************************************
+                       | * ${dequeueMethodName}:
+                       | ************************************************************************/
+                       |bool ${dequeueMethodName}(${sel4TypeName} *data) {
+                       |  ${counterType} ${counterVar};
+                       |  return ${dequeuePollMethodName}(&${counterVar}, data);
+                       |}
+                       |
+                       |/************************************************************************
+                       | * ${userEntrypointName}:
+                       | *
+                       | * This is the function invoked by an active thread dispatcher to
+                       | * call to a user-defined entrypoint function.  It sets up the dispatch
+                       | * context for the user-defined entrypoint, then calls it.
+                       | *
+                       | ************************************************************************/
+                       |void ${userEntrypointName}(const ${sel4TypeName} * in_arg) {
+                       |  ${invokeHandler}
+                       |}
+                       |"""
+              )
+            case _ => None[ST]()
+          } 
+          
+          val cIncludes: ISZ[ST] = ISZ(st"""#include <${queueHeaderName}>
+                                           |#include <${Util.SB_COUNTER_FILENAME}>""")
+          val postInits: Option[ST]= Some( st"${recvQueueName}_init(&${recvQueueFeatureName}, ${featureQueueName});")
+          
+          Some(C_SimpleContainer(cIncludes, cInterface, cImplementation, preInits, postInits, drainQueue))
+          
+        case ir.Direction.Out =>
+          
+          val dsts: Map[String, QueueObject] = srcQueues.get(featurePath).get
+
+          //val cIncludes: ISZ[ST] = ISZ(st"#include <${queueHeaderName}>")
+          var cIncludes: ISZ[ST] = ISZ()
+          
+          //val postInit = st"${queueName}_init(${featureQueueName});"
+          var _postInits: ISZ[ST] = ISZ()
+          val enqueueEntries: ISZ[ST] = dsts.valueSet.elements.map(qo => {
+
+            val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, qo.queueSize)
+            val queueName = Util.getEventDataSBQueueName(sel4TypeName, qo.queueSize)
+
+            val featureQueueName = Util.getEventDataSBQueueSrcFeatureName(fid, qo.queueSize)
+            val featureNotificationName = Util.genSeL4NotificationQueueName(feature, qo.queueSize)
+            
+            cIncludes = cIncludes :+ st"#include <${queueHeaderName}>"
+            _postInits = _postInits :+ st"${queueName}_init(${featureQueueName});"
+            
+            st"""${queueName}_enqueue(${featureQueueName}, (${sel4TypeName}*) data);
+                |${featureNotificationName}_emit();
+                |"""
+          })
+          
+          val methodName = s"${featureName}_enqueue"
+
+          val interface = st"""bool ${methodName}(const ${sel4TypeName} *);"""
+          
+          /*
+          val st = st"""bool ${methodName}(const ${sel4TypeName} *data) {
+                       |  ${queueName}_enqueue(${featureQueueName}, (${sel4TypeName}*) data);
+                       |  ${featureNotificationName}_emit();
+                       |  return true;
+                       |}"""
+          */
+          val st = st"""bool ${methodName}(const ${sel4TypeName} *data) {
+                       |  ${(enqueueEntries, "\n")}
+                       |  return true;
+                       |}"""
+          
+          val cInterface: Option[ST] = Some(interface)
+          val cImplementation: Option[ST] = Some(st)
+          val preInits: Option[ST] = None()
+          val postInits: Option[ST]= Some(st"${(_postInits, "\n")}")
+          val drainQueues: Option[(ST,ST)] = None()
+
+          Some(C_SimpleContainer(cIncludes, cInterface, cImplementation, preInits, postInits, drainQueues))
+            
+        case x => halt(s"Unexpected direction: ${x}")
+      }
+      return ret
+    }
     
-    def handleEventDataPort(): Option[C_SimpleContainer] = {
+    def handleEventData_TB_GlueCode_Profile(): Option[C_SimpleContainer] = {
       val (suffix, mod, paramType): (String, String, String) = feature.direction match {
         case ir.Direction.In => ("dequeue", "",
-          Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
+          Util.getSel4TypeName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
         case ir.Direction.Out => ("enqueue", "const ",
-          Util.getMonitorWriterParamName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
+          Util.getSel4TypeName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get))
         case x => halt(s"Unexpected direction: ${x}")
       }
       val name = Util.genMonitorFeatureName(feature, None[Z]())
@@ -1732,15 +2091,15 @@ import org.sireum.message.Reporter
           case _ => None[ST]()
         }
       } else if(!performHamrIntegration) {
-        val simpleName = Util.getLastName(feature.identifier)
-        val methodName = s"${Util.brand("entrypoint")}${Util.brand("")}${Util.getClassifier(component.classifier.get)}_${simpleName}"
-
+        val userEntrypointName = Util.getUserEventEntrypointMethodName(component, feature)
+        
         val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
           case Some(v) =>
+            val simpleName = Util.getLastName(feature.identifier)
             val varName = Util.brand(simpleName)
             drainQueue = Some((st"""${paramType} ${varName};""",
               st"""while (${genMethodName}((${paramType} *) &${varName})) {
-                  |  ${methodName}(&${varName});
+                  |  ${userEntrypointName}(&${varName});
                   |}"""))
 
             inter = Some(st"""${inter.get}
@@ -1753,14 +2112,14 @@ import org.sireum.message.Reporter
 
         if(Util.getComputeEntrypointSourceText(feature.properties).nonEmpty){
           Some(st"""/************************************************************************
-                   | * ${methodName}:
+                   | * ${userEntrypointName}:
                    | *
                    | * This is the function invoked by an active thread dispatcher to
                    | * call to a user-defined entrypoint function.  It sets up the dispatch
                    | * context for the user-defined entrypoint, then calls it.
                    | *
                    | ************************************************************************/
-                   |void ${methodName}(const ${paramType} * in_arg) {
+                   |void ${userEntrypointName}(const ${paramType} * in_arg) {
                    |  ${invokeHandler}
                    |}""")          
         } else {
@@ -1770,7 +2129,9 @@ import org.sireum.message.Reporter
         None()
       }
 
-      return Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
+      val cIncludes: ISZ[ST] = ISZ()
+      val postInits: Option[ST] = None()
+      return Some(C_SimpleContainer(cIncludes, inter, impl, preInit, postInits, drainQueue))
     }
     
     def handleEventPort() : Option[C_SimpleContainer] = {
@@ -1794,7 +2155,7 @@ import org.sireum.message.Reporter
           val impl: Option[ST] = if(dir == "read") {
 
             val varName = Util.brand(s"${featureName}_index")
-            val callback = s"${Util.genSeL4CallbackMethodName(feature, F)}_handler"
+            val callback = s"${Util.genSeL4NotificationName(feature, F)}_handler"
             val callback_reg = Util.brand(s"${featureName}_notification_reg_callback")
 
             val regCallback = st"CALLBACKOP(${callback_reg}(${callback}, NULL));"
@@ -1910,7 +2271,9 @@ import org.sireum.message.Reporter
                      |""")
           }
           
-          return Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
+          val cIncludes: ISZ[ST] = ISZ() 
+          val postInits: Option[ST] = None()
+          return Some(C_SimpleContainer(cIncludes, inter, impl, preInit, postInits, drainQueue))
         }
 
         def useNotification(): Option[C_SimpleContainer] = {
@@ -1929,7 +2292,7 @@ import org.sireum.message.Reporter
 
           val impl: Option[ST] = if(dir == "read") {
             val varName = Util.brand(s"${methodName}_index")
-            val callback = s"${Util.genSeL4CallbackMethodName(feature, F)}_handler"
+            val callback = s"${Util.genSeL4NotificationName(feature, F)}_handler"
             val callback_reg = Util.brand(s"${methodName}_reg_callback")
 
             var r = Some(st"""/************************************************************************
@@ -2029,7 +2392,9 @@ import org.sireum.message.Reporter
                      |""")
           }
           
-          return Some(C_SimpleContainer(inter, impl, preInit, drainQueue))
+          val cIncludes: ISZ[ST] = ISZ() 
+          val postInits: Option[ST] = None()
+          return Some(C_SimpleContainer(cIncludes, inter, impl, preInit, postInits, drainQueue))
         }
         
         if(shouldUseMonitorForEventPort(feature)) {
@@ -2043,11 +2408,11 @@ import org.sireum.message.Reporter
         val featureName = Util.getLastName(feature.identifier)
         val compName = Util.getClassifier(component.classifier.get)
         val counterName = Util.getEventSBCounterName(featureName)
-        
+                
         feature.direction match {
           case ir.Direction.In =>
 
-            val currentEventsVarName = Util.brand(s"${featureName}_current_events")
+            val receivedEventsVarName = Util.brand(s"${featureName}_received_events")
             val lastCounterVarName = Util.brand(s"${featureName}_last_counter")
             
             val globalVars = st"""/************************************************************************
@@ -2056,11 +2421,11 @@ import org.sireum.message.Reporter
                              | *     ${featureName}
                              | *
                              | ************************************************************************/
-                             |static ${Util.SB_EVENT_COUNTER_TYPE} ${currentEventsVarName} = 0;
+                             |static ${Util.SB_EVENT_COUNTER_TYPE} ${receivedEventsVarName} = 0;
                              |static ${Util.SB_EVENT_COUNTER_TYPE} ${lastCounterVarName} = 0;
                              |"""
             
-            val callback = s"${Util.genSeL4CallbackMethodName(feature, F)}_handler"
+            val callback = s"${Util.genSeL4NotificationName(feature, F)}_handler"
             val callback_reg = Util.brand(s"${featureName}_reg_callback")
 
             val callbackMethod = st"""/************************************************************************
@@ -2079,7 +2444,7 @@ import org.sireum.message.Reporter
             
             val preInit = Some(st"CALLBACKOP(${callback_reg}(${callback}, NULL));")
 
-            val checkMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_read_${featureName}"
+            val checkMethodName = Util.getEventPortSendReceiveMethodName(feature)
 
             var cHeaderEntries = Some(st"""bool ${checkMethodName}(void);""")
             
@@ -2092,8 +2457,8 @@ import org.sireum.message.Reporter
                                       | *
                                       | ************************************************************************/
                                       |bool ${checkMethodName}() {
-                                      |  if(${currentEventsVarName} > 0) {
-                                      |    ${currentEventsVarName}--;
+                                      |  if(${receivedEventsVarName} > 0) {
+                                      |    ${receivedEventsVarName}--;
                                       |    return true;
                                       |  } else {
                                       |    return false;
@@ -2106,21 +2471,42 @@ import org.sireum.message.Reporter
             val invokeHandler: String = Util.getComputeEntrypointSourceText(feature.properties) match {
               case Some(v) =>
 
-                val currentCounter = Util.brand(s"${featureName}_current_counter")
+                val currentCounter = s"current_${counterName}"
                 
                 val queueSize = Util.getQueueSize(feature)
-                
+
                 drainQueue = Some(
-                  (st"${Util.SB_EVENT_COUNTER_TYPE} ${currentCounter};",
-                    st"""${currentCounter} = *${counterName};
-                        |if(${lastCounterVarName} < ${currentCounter}) {
-                        |  ${currentEventsVarName} = ${currentCounter} - ${lastCounterVarName};
-                        |  if(${currentEventsVarName} > ${queueSize}) {
-                        |    // drop events
-                        |    ${currentEventsVarName} = ${queueSize};
+                  (st"",
+                    st"""{ // drain queue for incoming event port '${featureName}'
+                        |
+                        |  ${Util.SB_EVENT_COUNTER_TYPE} ${currentCounter};
+                        |
+                        |  ${receivedEventsVarName} = 0; // drop any events not handled during last dispatch
+                        |
+                        |  // get current shared counter value
+                        |  ${currentCounter} = *${counterName};
+                        |
+                        |  // Acquire memory fence - ensure preceding read occurs before any subsequent read or write
+                        |  ${counterName}_acquire();
+                        |
+                        |  // NOTE: Counters can wrap, so we must use != below instead of >
+                        |  while(${currentCounter} != ${lastCounterVarName}){
+                        |    ${lastCounterVarName}++;
+                        |    ${receivedEventsVarName}++;
                         |  }
-                        |  ${lastCounterVarName} = ${currentCounter};
-                        |  ${entrypointMethodName}();
+                        |
+                        |  if(${receivedEventsVarName} > 0) {
+                        |  
+                        |    // ${featureName}'s queue size is ${queueSize}
+                        |    if(${receivedEventsVarName} > ${queueSize}) {
+                        |      //printf("${compName}: dropping %i event(s) from incoming event port ${featureName}\n", (${receivedEventsVarName} - ${queueSize}));
+                        |    
+                        |      // drop events
+                        |      ${receivedEventsVarName} = ${queueSize};
+                        |    }
+                        |
+                        |    ${entrypointMethodName}();
+                        |  }
                         |}""")
                 )
 
@@ -2158,12 +2544,14 @@ import org.sireum.message.Reporter
                                              |${readMethod}
                                              |${entryPointMethod}
                                              |""")
-            
-            return Some(C_SimpleContainer(cHeaderEntries, cImplementationEntries, preInit, drainQueue))
+
+            val cIncludes: ISZ[ST] = ISZ(Util.sbCounterInclude())
+            val postInits: Option[ST] = None()
+            return Some(C_SimpleContainer(cIncludes, cHeaderEntries, cImplementationEntries, preInit, postInits, drainQueue))
             
           case ir.Direction.Out =>
 
-            val sendMethodName = s"${Util.GEN_ARTIFACT_PREFIX}_${compName}_write_${featureName}"
+            val sendMethodName = Util.getEventPortSendReceiveMethodName(feature)
             val emit = Util.brand(s"${featureName}_emit()")
 
             var cHeaderEntries = st"bool ${sendMethodName}(void);"
@@ -2177,13 +2565,28 @@ import org.sireum.message.Reporter
                      | *
                      | ************************************************************************/
                      |bool ${sendMethodName}(void) {
+                     |  // ${counterName} is a dataport (shared memory) that is written by the sender 
+                     |  // and read by the receiver(s). This counter is monotonicly increasing, 
+                     |  // but can wrap.
                      |  (*${counterName})++;
+                     |  
+                     |  // Release memory fence - ensure subsequent write occurs after any preceeding read or write
+                     |  ${counterName}_release();
+                     |  
                      |  ${emit};
+                     |  
                      |  return true;
                      |}
                      |"""
             
-            return Some(C_SimpleContainer(Some(cHeaderEntries), Some(sendMethod), None(), None()))
+            val cIncludes: ISZ[ST] = ISZ(Util.sbCounterInclude())
+            return Some(C_SimpleContainer(
+              cIncludes = cIncludes, 
+              cInterface = Some(cHeaderEntries), 
+              cImplementation = Some(sendMethod), 
+              preInits = None(), 
+              postInits = None(),
+              drainQueues = None()))
             
           case _ => halt(s"Unexpected direction ${feature.direction}")
         }
@@ -2199,8 +2602,14 @@ import org.sireum.message.Reporter
     
     val ret: Option[C_SimpleContainer] = feature.category match {
       case ir.FeatureCategory.DataPort => handleDataPort()
-      case ir.FeatureCategory.EventDataPort => handleEventDataPort()
-      case ir.FeatureCategory.EventPort => handleEventPort() 
+      case ir.FeatureCategory.EventPort => handleEventPort()
+      case ir.FeatureCategory.EventDataPort =>
+        platform match {
+          case ActPlatform.SeL4_TB => handleEventData_TB_GlueCode_Profile()  
+          case ActPlatform.SeL4 => handleEventData_TB_GlueCode_Profile()
+          case ActPlatform.SeL4_Only => handleEventData_SB_GlueCode_Profile()
+        }
+        
       case _ => None[C_SimpleContainer]()
     }
     return ret
@@ -2224,11 +2633,12 @@ import org.sireum.message.Reporter
     return Util.createResource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_INCLUDES}/${compTypeHeaderFileName}.h", ret, T)
   }
 
-  def genComponentTypeImplementationFile(component:ir.Component, blocks: ISZ[ST], preInitComments: ISZ[ST],
+  def genComponentTypeImplementationFile(component:ir.Component, 
+                                         localCIncludes: ISZ[ST], blocks: ISZ[ST], preInits: ISZ[ST], postInits: ISZ[ST],
                                          cRunPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): Resource = {
     val name = Util.getClassifier(component.classifier.get)
-    val compTypeFileName = s"${Util.GEN_ARTIFACT_PREFIX}_${name}"
-    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, auxCSources, blocks, preInitComments,
+    val compTypeFileName = Util.brand(name)
+    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, localCIncludes, blocks, preInits, postInits,
       cRunPreEntries, cDrainQueues, Util.isSporadic(component))
 
     return Util.createResource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret, T)
@@ -2335,7 +2745,11 @@ import org.sireum.message.Reporter
     if(!hasErrors()) {
       buildMonitors()
     }
-
+    
+    if(!hasErrors()){
+      buildSBQueues()  
+    }
+    
     if(!hasErrors()) {
       buildSamplingPortInterfaces()
     }
@@ -2380,6 +2794,8 @@ import org.sireum.message.Reporter
   }
   
   def shouldUseMonitorForEventPort(f: ir.Feature): B = {
+    return T
+    /*
     val ret: B = if(!f.isInstanceOf[ir.FeatureEnd]) {
       F
     }
@@ -2415,6 +2831,7 @@ import org.sireum.message.Reporter
       }
     }
     return ret
+   */
   }
 
   def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {

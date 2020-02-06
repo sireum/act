@@ -330,8 +330,8 @@ object StringTemplate {
     val methodNamePrefix = Util.brand(portName)
     
     val ret: ST = f.direction match {
-      case ir.Direction.In => st"bool ${methodNamePrefix}_read(${spi.portType()} * value);"
-      case ir.Direction.Out => st"bool ${methodNamePrefix}_write(const ${spi.portType()} * value);"
+      case ir.Direction.In => st"bool ${methodNamePrefix}_read(${spi.sel4TypeName} * value);"
+      case ir.Direction.Out => st"bool ${methodNamePrefix}_write(const ${spi.sel4TypeName} * value);"
       case _ => halt(s"Unexpected direction ${f.direction}")
     }
     return ret
@@ -340,14 +340,13 @@ object StringTemplate {
   def sbSamplingPortImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
-    val portName = Util.getLastName(f.identifier)
-    val methodNamePrefix = Util.brand(portName)
+    val sharedDataVarName = Util.brand(Util.getLastName(f.identifier))
     val globalVarName = sbSamplingPortGlobalVar(spi, f)
 
     val ret: ST = f.direction match {
-      case ir.Direction.In => st"""bool ${methodNamePrefix}_read(${spi.portType()} * value) {
+      case ir.Direction.In => st"""bool ${sharedDataVarName}_read(${spi.sel4TypeName} * value) {
                                   |  ${StringTemplate.SeqNumType} new_seqNum;
-                                  |  if ( read_${spi.name}(${portName}, value, &new_seqNum) ) {
+                                  |  if ( read_${spi.name}(${sharedDataVarName}, value, &new_seqNum) ) {
                                   |    ${globalVarName} = new_seqNum;
                                   |    return true;
                                   |  } else {
@@ -355,8 +354,8 @@ object StringTemplate {
                                   |  } 
                                   |}"""
         
-      case ir.Direction.Out => st"""bool ${methodNamePrefix}_write(const ${spi.portType()} * value) {
-                                   |  return write_${spi.name}(${portName}, value, &${globalVarName});
+      case ir.Direction.Out => st"""bool ${sharedDataVarName}_write(const ${spi.sel4TypeName} * value) {
+                                   |  return write_${spi.name}(${sharedDataVarName}, value, &${globalVarName});
                                    |}"""
         
       case _ => halt(s"Unexpected direction ${f.direction}")
@@ -452,21 +451,39 @@ object StringTemplate {
   val SEM_WAIT: String = Util.brand("dispatch_sem_wait")
   val SEM_POST: String = Util.brand("dispatch_sem_post")
 
-  def componentTypeImpl(filename: String, includes: ISZ[ST], blocks: ISZ[ST],
-                        preInitComments: ISZ[ST], runPreEntries: ISZ[ST], runLoopEntries: ISZ[ST],
+  def componentTypeImpl(filename: String, 
+                        includes: ISZ[ST], 
+                        blocks: ISZ[ST],
+                        preInits: ISZ[ST],
+                        postInits: ISZ[ST],
+                        runPreEntries: ISZ[ST], 
+                        runLoopEntries: ISZ[ST],
                         isSporadic: B): ST = {
     val initialLock: ST = if(isSporadic) { st"" } else { st"""// Initial lock to await dispatch input.
                                                              |MUTEXOP(${SEM_WAIT}())"""}
+    
+    val preInit: ST = if(preInits.nonEmpty) {
+      st"""
+          |void pre_init(void) {
+          |  ${(preInits, "\n")}
+          |}"""
+    } else { st"" }
+    
+    val postInit: ST = if(postInits.nonEmpty) {
+      st"""
+          |void post_init(void){
+          |  ${(postInits, "\n")}
+          |}"""
+    } else { st"" }
+    
     val ret:ST = st"""#include "../${Util.DIR_INCLUDES}/${filename}.h"
                      |${(includes, "\n")}
                      |#include <string.h>
                      |#include <camkes.h>
                      |
                      |${(blocks, "\n\n")}
-                     |
-                     |void pre_init(void) {
-                     |  ${(preInitComments, "\n")}
-                     |}
+                     |${preInit}
+                     |${postInit}
                      |
                      |/************************************************************************
                      | * int run(void)
@@ -526,7 +543,12 @@ object StringTemplate {
   val VAR_PERIODIC_TIME : String = Util.brand("time_periodic_dispatcher")
   val METHOD_PERIODIC_CALLBACK : String = s"${TimerUtil.componentNotificationName(None())}_callback"
   
-  def periodicDispatchElems(componentId: String) : ST = {
+  def periodicDispatchElems(componentId: String, timerHookedUp: B) : ST = {
+    var h: String = s"${Util.brand("timer_time()")} / 1000LL"
+    if(!timerHookedUp) {
+      h = s"0; // ${h} -- timer connection disabled"
+    }
+    
     val ret = st"""static bool ${VAR_PERIODIC_OCCURRED};
                   |static int64_t ${VAR_PERIODIC_TIME};
                   |
@@ -550,7 +572,7 @@ object StringTemplate {
                   |
                   |void ${METHOD_PERIODIC_CALLBACK}(void *_ UNUSED) {
                   |   // we want time in microseconds, not nanoseconds, so we divide by 1000.
-                  |   int64_t ${VAR_PERIODIC_TIME} = ${Util.brand("timer_time()")} / 1000LL;
+                  |   int64_t ${VAR_PERIODIC_TIME} = ${h};
                   |   (void)periodic_dispatcher_write_int64_t(&${VAR_PERIODIC_TIME});
                   |   ${registerPeriodicCallback()}
                   |}
@@ -614,7 +636,7 @@ object StringTemplate {
       val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "write" else "enqueue"
       val srcEnqueue = Util.brand(s"${Util.getLastName(srcPort.identifier)}${connectionIndex}_${suffix}")
       val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
-      val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
+      val ct = Util.getSel4TypeName(typeMap.get(camkesType).get)
 
       val slangPayloadType = hamrSlangPayloadType(srcPort.classifier.get, basePackageName)
       return st"""${slangPayloadType} payload = (${slangPayloadType}) d;
@@ -666,7 +688,7 @@ object StringTemplate {
       val suffix: String = if(f.category == ir.FeatureCategory.DataPort) "read" else "dequeue"
       val dequeue = Util.brand(s"${portName}_${suffix}")
       val camkesType = Util.getClassifierFullyQualified(f.classifier.get)
-      val ct = Util.getMonitorWriterParamName(typeMap.get(camkesType).get)
+      val ct = Util.getSel4TypeName(typeMap.get(camkesType).get)
       val condType: String = if(Util.isEventPort(f)) "while" else "if"
       val slangPayloadType = hamrSlangPayloadType(f.classifier.get, basePackageName)
 
@@ -767,8 +789,8 @@ object StringTemplate {
 
   def samplingPortHeader(s: SamplingPortInterface): ST = {
     val spName = s.name
-    val macroName = "MACRO_NAME"
-    val portType = Util.getClassifierFullyQualified(s.typ)
+    val macroName = StringUtil.toUpperCase(s"${spName}_h")
+    val portType = s.sel4TypeName
     
     val ret = st"""#ifndef ${macroName}
 #define ${macroName}
@@ -823,7 +845,7 @@ bool read_${spName}(${s.structName} *port, ${portType} *data, seqNum_t *seqNum);
   def samplingPortImpl(s: SamplingPortInterface): ST = {
     val spName = s.name
     val spType = s"${spName}_t"
-    val portType = Util.getClassifierFullyQualified(s.typ)
+    val portType = s.sel4TypeName
     
     val ret = st"""
 #include <camkes.h>

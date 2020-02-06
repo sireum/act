@@ -29,12 +29,21 @@ import org.sireum.hamr.act.Util.reporter
 
     prettyPrint(container.models)
 
+    if(Os.env("DOTTY").nonEmpty){
+      val assembly = container.models(0).asInstanceOf[Assembly]
+      val dot = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, F)
+      add(s"graph.dot", dot)
+      
+      val dotSimple = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, T)
+      add(s"graph_simple.dot", dotSimple)
+    }
+
     var cmakeComponents: ISZ[ST] = container.cContainers.map((c: C_Container) => {
       var sourcePaths: ISZ[String] = ISZ()
       var includePaths: ISZ[String] = ISZ()
 
       if(c.sourceText.nonEmpty) {
-        val dir = s"components/${c.component}/"
+        val dir = s"components/${c.componentId}/"
         val rootDestDir = dir
 
         for(st <- c.sourceText) {
@@ -65,7 +74,7 @@ import org.sireum.hamr.act.Util.reporter
       sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.externalCSources
       includePaths = includePaths ++ c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) ++ c.externalCIncludeDirs :+ Util.DIR_INCLUDES
       
-      StringTemplate.cmakeComponent(c.component, sourcePaths, includePaths, cFiles.nonEmpty,
+      StringTemplate.cmakeComponent(c.componentId, sourcePaths, includePaths, cFiles.nonEmpty,
         Util.hamrIntegration(platform) && hamrIncludeDirs.nonEmpty,
         Util.hamrIntegration(platform) && hamrStaticLib.nonEmpty)
     })
