@@ -1198,7 +1198,7 @@ import org.sireum.message.Reporter
 
       cPreInits = cPreInits :+ st"" // blank line
 
-      cPreInits = cPreInits :+ StringTemplate.hamrIntialise(hamrBasePackageName.get, cid)
+      cPreInits = cPreInits :+ StringTemplate.hamrIntialise(hamrBasePackageName.get, c)
 
       cPreInits = cPreInits :+ st"// fetch assigned port ids"
 
@@ -1269,7 +1269,7 @@ import org.sireum.message.Reporter
 
       cPreInits = cPreInits :+ st"" // blank line
       
-      cRunPreEntries = cRunPreEntries :+ StringTemplate.hamrInitialiseEntrypoint(hamrBasePackageName.get, cid)
+      cRunPreEntries = cRunPreEntries :+ StringTemplate.hamrInitialiseEntrypoint(hamrBasePackageName.get, c)
       
       stRunLoopEntries = StringTemplate.hamrRunLoopEntries(hamrBasePackageName.get, c)
 

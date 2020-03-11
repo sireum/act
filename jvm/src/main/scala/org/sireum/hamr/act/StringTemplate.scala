@@ -599,15 +599,21 @@ object StringTemplate {
     return (impl, drain)
   }
 
-  def hamrIntialise(basePackageName: String, componentName: String): ST = {
+  def hamrGetInstanceName(basePackageName: String, c: Component): ST = {
+    return st"${basePackageName}_${Util.getName(c.identifier)}"
+  }
+  
+  def hamrIntialise(basePackageName: String, c: Component): ST = {
+    val instanceName = hamrGetInstanceName(basePackageName, c)
     return st"""// initialise slang-embedded components/ports
-               |${basePackageName}_${componentName}_App_initialise(SF seed);
+               |${instanceName}_App_initialise(SF seed);
                |"""
   }
 
-  def hamrInitialiseEntrypoint(basePackageName: String, componentName: String): ST = {
+  def hamrInitialiseEntrypoint(basePackageName: String, c: Component): ST = {
+    val instanceName = hamrGetInstanceName(basePackageName, c)
     return st"""// call the component's initialise entrypoint
-               |art_Bridge_EntryPoints_initialise_(SF ${basePackageName}_${componentName}_App_entryPoints(SF));
+               |art_Bridge_EntryPoints_initialise_(SF ${instanceName}_App_entryPoints(SF));
                |"""
   }
 
@@ -617,9 +623,9 @@ object StringTemplate {
   }
 
   def hamrRunLoopEntries(basePackageName: String, c: Component): ISZ[ST] = {
-    //val cname = Util.nameToString(c.identifier)
-    val cname = Util.getClassifier(c.classifier.get)
-    return ISZ(st"transferIncomingDataToArt();", st"", st"${basePackageName}_${cname}_App_compute(SF);")
+    val instanceName = hamrGetInstanceName(basePackageName, c)
+    return ISZ(st"transferIncomingDataToArt();", st"", 
+      st"${instanceName}_App_compute(SF);")
   }
 
   def hamrSlangPayloadType(c : ir.Classifier, base: String) : String = {
