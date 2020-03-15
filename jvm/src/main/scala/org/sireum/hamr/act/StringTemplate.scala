@@ -606,14 +606,14 @@ object StringTemplate {
   def hamrIntialise(basePackageName: String, c: Component): ST = {
     val instanceName = hamrGetInstanceName(basePackageName, c)
     return st"""// initialise slang-embedded components/ports
-               |${instanceName}_App_initialise(SF seed);
+               |${instanceName}_App_initialiseArchitecture(SF seed);
                |"""
   }
 
   def hamrInitialiseEntrypoint(basePackageName: String, c: Component): ST = {
     val instanceName = hamrGetInstanceName(basePackageName, c)
     return st"""// call the component's initialise entrypoint
-               |art_Bridge_EntryPoints_initialise_(SF ${instanceName}_App_entryPoints(SF));
+               |${instanceName}_App_initialise(SF);
                |"""
   }
 
