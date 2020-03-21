@@ -917,7 +917,8 @@ object TimerUtil {
                               ci: ir.ConnectionInstance // aadl connection 
                              ) extends Monitor
 
-@datatype class C_Container(componentId: String,
+@datatype class C_Container(instanceName: String,
+                            componentId: String,
                             cSources: ISZ[Resource],
                             cIncludes: ISZ[Resource],
                             sourceText: ISZ[String],
@@ -1089,10 +1090,13 @@ object Transformers {
   'SeL4_TB
 }
 
+@datatype class HamrLib(instanceName: String,
+                        includeDirs: ISZ[String],
+                        staticLib: String)
+
 @datatype class ActOptions(outputDir: String,
                            auxFiles: Map[String, String],
                            aadlRootDirectory: Option[String],
                            platform: ActPlatform.Type,
-                           hamrIncludeDirs: ISZ[String],
-                           hamrStaticLib: Option[String],
+                           hamrLibs: Map[String, HamrLib],
                            hamrBasePackageName: Option[String])

@@ -19,8 +19,7 @@ import org.sireum.hamr.act.Util.reporter
                 cFiles: ISZ[String],
                 cHeaderDirectories: ISZ[String],
                 aadlRootDir: String,
-                hamrIncludeDirs: ISZ[String],
-                hamrStaticLib: Option[String],
+                hamrLibs: Map[String, HamrLib],
                 platform: ActPlatform.Type
                ): ISZ[Resource] = {
 
@@ -74,9 +73,11 @@ import org.sireum.hamr.act.Util.reporter
       sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.externalCSources
       includePaths = includePaths ++ c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) ++ c.externalCIncludeDirs :+ Util.DIR_INCLUDES
       
-      StringTemplate.cmakeComponent(c.componentId, sourcePaths, includePaths, cFiles.nonEmpty,
-        Util.hamrIntegration(platform) && hamrIncludeDirs.nonEmpty,
-        Util.hamrIntegration(platform) && hamrStaticLib.nonEmpty)
+      val hamrLib = hamrLibs.get(c.instanceName)
+      
+      StringTemplate.cmakeComponent(
+        c.componentId, sourcePaths, includePaths, cFiles.nonEmpty,
+        hamrLib)
     })
 
     for (m <- container.monitors) {
@@ -86,7 +87,7 @@ import org.sireum.hamr.act.Util.reporter
       }
 
       cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
-        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, F, F)
+        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, None())
 
       add(s"${m.cimplementation.path}", m.cimplementation.content)
       add(s"${m.cinclude.path}", m.cinclude.content)
@@ -114,15 +115,16 @@ import org.sireum.hamr.act.Util.reporter
       cmakeEntries = cmakeEntries :+ st"includeGlobalComponents()"
     }
     
-    if(Util.hamrIntegration(platform) && hamrStaticLib.nonEmpty) {
-      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess() :+
-        StringTemplate.cmakeHamrLib(hamrStaticLib.get)
-    }
+    if(Util.hamrIntegration(platform) && hamrLibs.nonEmpty) {
+      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess()
+      for(hamrLib <- hamrLibs.values){
+        
+        cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrLib(hamrLib.instanceName, hamrLib.staticLib)
 
-    if(Util.hamrIntegration(platform) && hamrIncludeDirs.nonEmpty) {
-      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(hamrIncludeDirs)
+        cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(hamrLib.instanceName, hamrLib.includeDirs)
+      }
     }
-
+    
     if(container.connectors.nonEmpty) {
       cmakeEntries = cmakeEntries :+
         st"""# add path to connector templates

@@ -60,7 +60,7 @@ object Act {
           }
           resources = resources ++ ActPrettyPrint().tempEntry(
             options.outputDir, container, auxCFiles, auxHeaderDirectories, rootDir,
-            options.hamrIncludeDirs, options.hamrStaticLib, options.platform)
+            options.hamrLibs, options.platform)
         case _ =>
       }
     }

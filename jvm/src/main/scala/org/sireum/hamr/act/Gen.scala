@@ -99,16 +99,6 @@ import org.sireum.message.Reporter
       gen(system)
     }
 
-    if(!hasErrors() && performHamrIntegration) {
-      val bufferSize = 
-        featureMap.values.filter(f => Util.isEventPort(f) || Util.isDataPort(f)).size +  
-        componentMap.values.filter(c => Util.isThread(c)).size
-      val pair = StringTemplate.hamrIPC(bufferSize, hamrBasePackageName.get)
-
-      auxResourceFiles = auxResourceFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.h", pair._1, T)
-      auxResourceFiles = auxResourceFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/ipc.c", pair._2, T)
-    }
-
     if(!hasErrors()) {
       // merge assemblies
       val assemblies: ISZ[Assembly] = astObjects.filter(f => f.isInstanceOf[Assembly]).map(m => m.asInstanceOf[Assembly])
@@ -129,7 +119,7 @@ import org.sireum.message.Reporter
 
         val dispatchComponent = TimerUtil.dispatchComponent(periodicDispatcherNotifications)
         instances = instances + dispatchComponent
-        containers = containers :+ C_Container(dispatchComponent.component.name,
+        containers = containers :+ C_Container(dispatchComponent.component.name, dispatchComponent.component.name,
           ISZ(TimerUtil.dispatchComponentCSource(getTypeHeaderFileForInclude(), periodicDispatcherCalendars)), ISZ(), ISZ(), ISZ(), ISZ())
 
         // connect dispatch timer to time server
@@ -1193,104 +1183,35 @@ import org.sireum.message.Reporter
     }
 
     if(performHamrIntegration) {
+
+      val instanceName = Util.getName(c.identifier)
+      val identifier = Util.getLastName(c.identifier)
+      val appPackageName = s"${hamrBasePackageName.get}_${instanceName}"
+      val appName = s"${appPackageName}_${identifier}"
       
-      cImplIncludes = cImplIncludes :+ st"#include <all.h>" :+ st"#include <ipc.h>"
-
-      cPreInits = cPreInits :+ st"" // blank line
-
-      cPreInits = cPreInits :+ StringTemplate.hamrIntialise(hamrBasePackageName.get, c)
-
-      cPreInits = cPreInits :+ st"// fetch assigned port ids"
-
-      var sends: ISZ[(ST, ST)] = ISZ()
-
-      val destPortId = "destPortId"
-      
-      val outgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c)
-      for(f <- outgoingPorts) {
-        val srcFeatureName = Util.getName(f.identifier)
-        if(outConnections.contains(srcFeatureName)) {
-          
-          {
-            val outgoingConnections: ISZ[ir.ConnectionInstance] = outConnections.get(srcFeatureName).get
-
-            val connectedPorts: ISZ[(ir.Component, ir.FeatureEnd)] = outgoingConnections.map(ci => {
-              val dstComponent = componentMap.get(Util.getName(ci.dst.component)).get
-              val dstFeature = featureMap.get(Util.getName(ci.dst.feature.get)).get.asInstanceOf[ir.FeatureEnd]
-              (dstComponent, dstFeature)
-            })
-
-            var counter: Z = 0
-            val assignOutgoingPortIds: ISZ[ST] = connectedPorts.map((pair: (ir.Component, ir.FeatureEnd)) => {
-              val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, pair._1)
-              val dstPortName = Util.getLastName(pair._2.identifier)
-              val dstGlobalVarId = s"${Util.nameToString(pair._2.identifier)}_id"
-
-              // create a global var for the destination's port id
-              cImpls = st"Z ${dstGlobalVarId};" +: cImpls
-
-              // add entry to if else block
-              val stpair = (st"${destPortId} == ${dstGlobalVarId}",
-                st"${StringTemplate.hamrSendViaCAmkES(f, pair._1, pair._2, counter, hamrBasePackageName.get, typeMap)}")
-
-              sends = sends :+ stpair
-              
-              counter = counter + 1
-              
-              // add preInit entry that fetches the id of the destination port
-              st"${dstGlobalVarId} = ${archId}(SF)->${dstPortName}.id + seed;"
-
-            })
-
-            cPreInits = cPreInits ++ assignOutgoingPortIds
-          }
-        }
-      }
-
-      var receives: ISZ[ST] = ISZ()
-      
-      val inPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c).filter(inPort => {
-        val portId = Util.getName(inPort.identifier)
-        inConnections.contains(portId)
-      })
-
-      val archId = StringTemplate.hamrGetArchId(hamrBasePackageName.get, c)
-      val tinPorts: ISZ[ST] = inPorts.map((m: ir.FeatureEnd) => {
-        val portName = Util.getLastName(m.identifier)
-        val camkesId = s"${portName}_id"
-
-        cImpls = st"Z ${camkesId};" +: cImpls
-
-        receives = receives :+ StringTemplate.hamrDrainQueue(m, hamrBasePackageName.get, typeMap)
-
-        st"${camkesId} = ${archId}(SF)->${portName}.id + seed;"
-      })
-      cPreInits = cPreInits ++ tinPorts
+      cImplIncludes = cImplIncludes :+ st"#include <all.h>"
 
       cPreInits = cPreInits :+ st"" // blank line
       
-      cRunPreEntries = cRunPreEntries :+ StringTemplate.hamrInitialiseEntrypoint(hamrBasePackageName.get, c)
+      cPreInits = cPreInits :+ StringTemplate.hamrIntialiseArchitecture(appName)
+
+      cPreInits = cPreInits :+ StringTemplate.hamrInitialiseEntrypoint(appName)
+
+      stRunLoopEntries = StringTemplate.hamrRunLoopEntries(appName)
       
-      stRunLoopEntries = StringTemplate.hamrRunLoopEntries(hamrBasePackageName.get, c)
-
-      val id = st"${cid} camkes_sendAsync"
-      val ifElses = StringTemplate.ifEsleHelper(sends,
-        Some(st"""printf("${id}: not expecting port id %i\n", ${destPortId});"""))
-
-      cImpls = cImpls :+ st"""void camkes_sendAsync(Z ${destPortId}, art_DataContent d) {
-                             |  ${ifElses}
-                             |}
-                             |"""
-
-      cImpls = cImpls :+ st"""void transferIncomingDataToArt() {
-                             |  ${(receives, "\n")}
-                             |}
-                             |"""
-
-      externalCSources = externalCSources :+ s"${Util.DIR_INCLUDES}/ipc.c"
+      val outgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c).filter(f =>
+        outConnections.contains(Util.getName(f.identifier)))
+      
+      cImpls = cImpls ++ outgoingPorts.map((f: ir.FeatureEnd) => hamrSendOutgoingPort(c, f, typeMap))
+      
+      val inPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c).filter(f => 
+        inConnections.contains(Util.getName(f.identifier)))
+      
+      cImpls = cImpls ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(c, f, typeMap))
     }
 
     containers = containers :+ C_Container(
+      instanceName = Util.getName(c.identifier),
       componentId = cid,
       cSources = ISZ(genComponentTypeImplementationFile(c, auxCImplIncludes ++ cImplIncludes, cImpls, 
         cPreInits, cPostInits, cRunPreEntries, stRunLoopEntries)) ++ cSources,
@@ -1319,6 +1240,87 @@ import org.sireum.message.Reporter
 
       imports = imports.elements
     )
+  }
+
+  def getSeL4SlangExtName(instanceName: String, identifier: String) : String = {
+    return s"${hamrBasePackageName.get}_${instanceName}_${identifier}_seL4"
+  }
+
+  def hamrSendOutgoingPort(c: ir.Component, srcPort: ir.FeatureEnd, typeMap: HashSMap[String, ir.Component]): ST = {
+    val instanceName = Util.getName(c.identifier)
+    val identifier = Util.getLastName(c.identifier)
+    val portName = Util.getLastName(srcPort.identifier)
+    val sel4ExtName = getSeL4SlangExtName(instanceName, identifier)
+    
+    val methodName = s"${sel4ExtName}_${portName}_Send"
+    
+    def handleOutDataPort(): ST = {
+      val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "write" else "enqueue"
+      val srcEnqueue = Util.brand(s"${Util.getLastName(srcPort.identifier)}_${suffix}")
+      val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
+      val sel4Type = Util.getSel4TypeName(typeMap.get(camkesType).get)
+      val slangPayloadType = StringTemplate.hamrSlangPayloadType(srcPort.classifier.get, hamrBasePackageName.get)
+
+      val comment = st"// send ${portName}: ${srcPort.direction.name} ${srcPort.category.name} ${camkesType}"
+      return StringTemplate.hamrSendOutgoingDataPort(comment, methodName, sel4Type, slangPayloadType, srcEnqueue)
+    }
+    
+    def handleOutEventPort(): ST = {
+      val srcEnqueue = Util.getEventPortSendReceiveMethodName(srcPort)
+      val comment = st"// send ${portName}: ${srcPort.direction.name} ${srcPort.category.name}"
+      return StringTemplate.hamrSendOutgoingEventPort(comment, methodName, srcEnqueue)
+    }
+    
+    val ret: ST = srcPort.category match {
+      case ir.FeatureCategory.DataPort => handleOutDataPort()
+      case ir.FeatureCategory.EventDataPort => handleOutDataPort()
+      case ir.FeatureCategory.EventPort => handleOutEventPort()
+      case x => halt(s"Not handling ${x}")
+    }
+    
+    return ret
+  }
+
+  def hamrReceiveIncomingPort(c: ir.Component, srcPort: ir.FeatureEnd, typeMap: HashSMap[String, ir.Component]): ST = {
+    val instanceName = Util.getName(c.identifier)
+    val identifier = Util.getLastName(c.identifier)
+    val portName = Util.getLastName(srcPort.identifier)
+    val sel4ExtName = getSeL4SlangExtName(instanceName, identifier)
+    
+    val methodName = s"${sel4ExtName}_${portName}_Receive"
+    val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "read" else "dequeue"
+    val sel4ReadMethod = Util.brand(s"${portName}_${suffix}")
+    
+    def handleInDataPort(): ST = {
+      val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
+      val sel4Type = Util.getSel4TypeName(typeMap.get(camkesType).get)
+      val slangPayloadType = StringTemplate.hamrSlangPayloadType(srcPort.classifier.get, hamrBasePackageName.get)
+      
+      val isEmptyMethodName = s"${sel4ExtName}_${portName}_IsEmpty"
+      val sel4IsEmptyMethodName = Util.brand(s"${portName}_is_empty")
+      val isEmptyMethod = StringTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName)
+      
+      val comment = st"// receive ${portName}: ${srcPort.direction.name} ${srcPort.category.name} ${sel4Type}"
+      val receiveMethod = StringTemplate.hamrReceiveIncomingDataPort(
+        comment, methodName, sel4Type, slangPayloadType, sel4ReadMethod)
+      
+      return st"""${isEmptyMethod}
+                 |
+                 |${receiveMethod}""" 
+    }
+    
+    def handleInEventPort(): ST = {
+      return st"// TODO - ${methodName}"
+    }
+    
+    val ret: ST = srcPort.category match {
+      case ir.FeatureCategory.DataPort => handleInDataPort()
+      case ir.FeatureCategory.EventDataPort => handleInDataPort()
+      case ir.FeatureCategory.EventPort => handleInEventPort()
+      case x => halt(s"Not handling ${x}")
+    }
+    
+    return ret
   }
 
   def buildSamplingPortInterfaces(): Unit = {
@@ -1501,9 +1503,11 @@ import org.sireum.message.Reporter
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_SRC}/${monitorName}.c"
           val cimplementation: Resource =
             if(f.category == ir.FeatureCategory.DataPort) {
-              Util.createResource(implName, StringTemplate.tbMonReadWrite(paramTypeName, Util.getQueueSize(f), monitorName, getTypeHeaderFileForInclude(), preventBadging), T)
+              Util.createResource(implName, StringTemplate.tbMonReadWrite(
+                paramTypeName, Util.getQueueSize(f), monitorName, getTypeHeaderFileForInclude(), preventBadging), T)
             } else {
-              Util.createResource(implName, StringTemplate.tbEnqueueDequeue(paramTypeName, Util.getQueueSize(f), monitorName, getTypeHeaderFileForInclude(), preventBadging), T)
+              Util.createResource(implName, StringTemplate.tbEnqueueDequeue(
+                paramTypeName, Util.getQueueSize(f), monitorName, getTypeHeaderFileForInclude(), preventBadging), T)
             }
 
           val interName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/${Util.DIR_INCLUDES}/${monitorName}.h"
@@ -1720,10 +1724,10 @@ import org.sireum.message.Reporter
 
   def createQueueMethods(typeName: String): ISZ[Method] = {
     return ISZ(
+      Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool")),
       Method(name = "enqueue", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")),
       Method(name = "dequeue", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")))
   }
-
 
   def getMonitorForConnectionInstance(instance: ir.ConnectionInstance): Option[Monitor] = {
     for(m <- monitors.values if m.ci == instance){

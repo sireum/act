@@ -163,12 +163,12 @@ object StringTemplate {
           |  return length == ${dim};
           |}
           |
-          |static bool is_empty(void) {
+          |bool mon_is_empty(void) {
           |  return length == 0;
           |}
           |
           |bool mon_dequeue(${typeName} * m) {
-          |  ${mon_dequeue}if (is_empty()) {
+          |  ${mon_dequeue}if (mon_is_empty()) {
           |    return false;
           |  } else {
           |    *m = contents[front];
@@ -262,12 +262,12 @@ object StringTemplate {
           |  return q.len == ${dim};
           |}
           |
-          |static bool is_empty(void) {
+          |bool mon_is_empty(void) {
           |  return q.len == 0;
           |}
           |
           |bool mon_receive_dequeue(${typeName} * m) {
-          |  ${mon_dequeue}if (is_empty()) {
+          |  ${mon_dequeue}if (mon_is_empty()) {
           |    return false;
           |  } else {
           |    m_lock();
@@ -381,8 +381,13 @@ object StringTemplate {
   val AUX_C_SOURCES: String = "AUX_C_SOURCES"
   val AUX_C_INCLUDES: String = "AUX_C_INCLUDES"
 
-  def cmakeHamrIncludes(hamrIncludeDirs: ISZ[String]): ST = {
-    return st"""set(${Util.HAMR_INCLUDES_NAME}
+  def cmakeHamrIncludesName(instanceName: String): String = {
+    return s"${Util.HAMR_INCLUDES_NAME}_${instanceName}"
+  }
+
+  def cmakeHamrIncludes(instanceName: String, hamrIncludeDirs: ISZ[String]): ST = {
+    val includesName = cmakeHamrIncludesName(instanceName)
+    return st"""set(${includesName}
                |  ${(hamrIncludeDirs, "\n")}
                |)"""
   }
@@ -392,8 +397,14 @@ object StringTemplate {
                |set(${AUX_C_INCLUDES} ${(auxHDirectories, " ")})"""
   }
 
-  def cmakeHamrLib(hamrStaticLib: String): ST = {
-    return st"set(${Util.HAMR_LIB_NAME} ${hamrStaticLib})"
+  def cmakeHamrLibName(instanceName: String): String = {
+    return s"${Util.HAMR_LIB_NAME}_${instanceName}"
+  }
+  
+  def cmakeHamrLib(instanceName: String,
+                   hamrStaticLib: String): ST = {
+    val libName = cmakeHamrLibName(instanceName)
+    return st"set(${libName} ${hamrStaticLib})"
   }
 
   def cmakeHamrExecuteProcess(): ST = {
@@ -413,18 +424,24 @@ object StringTemplate {
                |"""
   }
 
-  def cmakeComponent(componentName: String, sources: ISZ[String], includes: ISZ[String], hasAux: B,
-                     hasHamrIncl: B, hasHamrLib: B): ST = {
+  def cmakeComponent(componentName: String, 
+                     sources: ISZ[String], 
+                     includes: ISZ[String], 
+                     hasAux: B,
+                     hamrLib: Option[HamrLib]): ST = {
     var srcs: ISZ[ST] = ISZ()
     if(hasAux) { srcs = srcs :+ st"$${${AUX_C_SOURCES}} " }
     if(sources.nonEmpty) { srcs = srcs :+ st"""${(sources, " ")}""" }
 
     var incls: ISZ[ST] = ISZ()
     if(hasAux) { incls = incls :+ st"$${${AUX_C_INCLUDES}} " }
-    if(hasHamrIncl){ incls = incls :+ st"$${${Util.HAMR_INCLUDES_NAME}} "}
+    if(hamrLib.nonEmpty){
+      val hamrIncludeName = StringTemplate.cmakeHamrIncludesName(hamrLib.get.instanceName)  
+      incls = incls :+ st"$${${hamrIncludeName}} "
+    }
     if(includes.nonEmpty) { incls = incls :+ st"""${(includes, " ")}""" }
 
-    val libs: ST = if(hasHamrLib) { st"LIBS $${${Util.HAMR_LIB_NAME}}"}
+    val libs: ST = if(hamrLib.nonEmpty) { st"LIBS $${${StringTemplate.cmakeHamrLibName(hamrLib.get.instanceName)}}"}
     else { st"" }
 
     val r: ST =
@@ -603,36 +620,107 @@ object StringTemplate {
     return st"${basePackageName}_${Util.getName(c.identifier)}"
   }
   
-  def hamrIntialise(basePackageName: String, c: Component): ST = {
-    val instanceName = hamrGetInstanceName(basePackageName, c)
+  def hamrIntialiseArchitecture(appName: String): ST = {
     return st"""// initialise slang-embedded components/ports
-               |${instanceName}_App_initialiseArchitecture(SF seed);
+               |${appName}_initialiseArchitecture(SF_LAST);
                |"""
   }
 
-  def hamrInitialiseEntrypoint(basePackageName: String, c: Component): ST = {
-    val instanceName = hamrGetInstanceName(basePackageName, c)
+  def hamrInitialiseEntrypoint(appName: String): ST = {
     return st"""// call the component's initialise entrypoint
-               |${instanceName}_App_initialise(SF);
+               |${appName}_initialiseEntryPoint(SF_LAST);
                |"""
   }
 
-  def hamrGetArchId(basePackageName: String, c: ir.Component): String = {
-    val n =  org.sireum.ops.ISZOps(c.identifier.name).foldLeft((r: String, s : String) => s"${r}_${s}", "")
-    return s"${basePackageName}_Arch${n}"
+  def hamrRunLoopEntries(appName: String): ISZ[ST] = {
+    return ISZ(st"""// call the component's compute entrypoint
+                   |${appName}_computeEntryPoint(SF_LAST);""")
   }
 
-  def hamrRunLoopEntries(basePackageName: String, c: Component): ISZ[ST] = {
-    val instanceName = hamrGetInstanceName(basePackageName, c)
-    return ISZ(st"transferIncomingDataToArt();", st"", 
-      st"${instanceName}_App_compute(SF);")
+  def hamrSlangType(c : ir.Classifier, base: String) : String = {
+    val r = StringUtil.replaceAll(StringUtil.replaceAll(c.name, "::", "_"), ".", "_")
+    return s"${base}_${r}"
   }
-
+  
   def hamrSlangPayloadType(c : ir.Classifier, base: String) : String = {
     val r = StringUtil.replaceAll(StringUtil.replaceAll(c.name, "::", "_"), ".", "_")
     return s"${base}_${r}_Payload"
   }
+  
+  def hamrIsEmpty(methodName: String,
+                  sel4IsEmptyMethodName: String): ST = {
+    val ret: ST = st"""B ${methodName}(STACK_FRAME_ONLY) {
+                      |  return ${sel4IsEmptyMethodName}();
+                      |}"""
+    return ret
+  }
+  
+  def hamrReceiveIncomingDataPort(comment: ST,
+                                  methodName: String,
+                                  sel4Type: String,
+                                  slangPayloadType: String,
+                                  sel4ReadMethod: String): ST = {
+    val ret: ST = st"""${comment}
+                      |Unit ${methodName}(STACK_FRAME
+                      |  Option_8E9F45 result) {
+                      |  ${sel4Type} val;
+                      |  if(${sel4ReadMethod}((${sel4Type} *) &val)) {
+                      |    // convert to Slang payload
+                      |    DeclNew${slangPayloadType}(payload);
+                      |    convertTo_${slangPayloadType}(val, &payload);
+                      |    
+                      |    // wrap it in Some and place in result
+                      |    DeclNewSome_D29615(some);
+                      |    Some_D29615_apply(STACK_FRAME &some, (art_DataContent) &payload);
+                      |    Type_assign(result, &some, sizeof(union Option_8E9F45));
+                      |  } else {
+                      |    // put None in result
+                      |    DeclNewNone_964667(none);
+                      |    Type_assign(result, &none, sizeof(union Option_8E9F45));
+                      |  }
+                      |}
+                      |"""
+    return ret
+  }
+  
+  def hamrSendOutgoingDataPort(comment: ST,
+                               methodName: String,
+                               sel4Type: String,
+                               slangPayloadType: String,
+                               srcEnqueue: String
+                        ): ST = {
+    val ret: ST = st"""${comment}
+                      |Unit ${methodName}(STACK_FRAME 
+                      |  art_DataContent d) {
+                      |  ${slangPayloadType} payload = (${slangPayloadType}) d;
+                      |  
+                      |  // convert Slang type to CAmkES type
+                      |  ${sel4Type} val;
+                      |  convertTo_${sel4Type}(payload, &val);
+                      |
+                      |  // deliver payload via CAmkES
+                      |  ${srcEnqueue}(&val);
+                      |}"""
+    return ret
+  }
 
+  def hamrSendOutgoingEventPort(comment: ST,
+                                methodName: String,
+                                srcEnqueue: String
+                              ): ST = {
+    val ret: ST = st"""${comment}
+                      |Unit ${methodName}(STACK_FRAME 
+                      |  art_DataContent d) {
+                      |
+                      |  // event port - can ignore the Slang Empty payload
+                      |  art_Empty payload = (art_Empty) d;
+                      |
+                      |  // send event via CAmkES
+                      |  ${srcEnqueue}();
+                      |}"""
+    return ret
+  }
+  
   def hamrSendViaCAmkES(srcPort: ir.FeatureEnd, dstComponent: ir.Component, dstFeature: ir.FeatureEnd, connectionIndex: Z,
                         basePackageName: String, typeMap: HashSMap[String, ir.Component]) : ST = {
     val dstComponentName = Util.getLastName(dstComponent.identifier)
