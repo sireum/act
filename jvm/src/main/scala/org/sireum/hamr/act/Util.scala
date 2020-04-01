@@ -78,6 +78,8 @@ object Util {
   val DIR_MONITORS: String = brand("Monitors")
   val DIR_SAMPLING_PORTS: String = "sampling_ports"
 
+  val SlangTypeLibrary: String = "SlangTypeLibrary"
+  
   val CMAKE_VERSION: String = "3.8.2"
 
   val cKeywords: ISZ[String] = ISZ("auto", "break", "case", "char", "const", "continue", "default", "do", "double",
@@ -156,8 +158,8 @@ object Util {
   def getEventPortSendReceiveMethodName(feature: FeatureEnd): String = {
     val featureName = Util.getLastName(feature.identifier)
     val direction: String = feature.direction match {
-      case ir.Direction.In => "read"
-      case ir.Direction.Out => "write"
+      case ir.Direction.In => "dequeue"
+      case ir.Direction.Out => "enqueue"
       case x => halt(s"Unexpected direction ${x}")
     } 
     return Util.brand(s"${featureName}_${direction}")
@@ -214,12 +216,16 @@ object Util {
     return brand(s"${featureId}")
   }
 
-  def getSel4TypeName(aadlType: ir.Component): String = {
-    val name = Util.getClassifierFullyQualified(aadlType.classifier.get)
-    if (TypeUtil.isArrayDef(aadlType)) {
-      return getContainerName(name)
+  def getSel4TypeName(aadlType: ir.Component, hamrIntegration: B): String = {
+    if(hamrIntegration) {
+      return "union_art_DataContent"
     } else {
-      return name
+      val name = Util.getClassifierFullyQualified(aadlType.classifier.get)
+      if (TypeUtil.isArrayDef(aadlType)) {
+        return getContainerName(name)
+      } else {
+        return name
+      }
     }
   }
 
@@ -718,6 +724,10 @@ object StringUtil {
     val cms = conversions.String.toCms(s)
     return conversions.String.fromCms(cms.map((c: C) => COps(c).toUpper))
   }
+  
+  def sanitizeName(s: String): String = {
+    return replaceAll(replaceAll(s, "-", "_"), ".", "_")
+  }
 }
 
 object TimerUtil {
@@ -1100,3 +1110,41 @@ object Transformers {
                            platform: ActPlatform.Type,
                            hamrLibs: Map[String, HamrLib],
                            hamrBasePackageName: Option[String])
+
+@datatype class Names(c: ir.Component,
+                      basePackage: String) {
+  val split: ISZ[String] = {
+    val san = StringUtil.replaceAll(c.classifier.get.name, "::", ":")
+    ops.StringOps(san).split(char => char == ':')
+  }
+    
+  def component: String = { return StringUtil.sanitizeName(split(1)) }
+  
+  def componentImpl: String = { return s"${component}_Impl"  }
+
+  def bridge: String = { return s"${component}_Bridge" }
+  
+  def aadlPackage: String = { return split(0) }
+
+  def packageName: String = { return s"${basePackage}.${aadlPackage}" }
+
+  def packagePath: String = { return s"${basePackage}/${aadlPackage}" }
+
+  def path: ISZ[String] = { return ISZ(basePackage, aadlPackage) }
+  
+  def identifier: String = { return Util.getLastName(c.identifier) }
+  
+  def instanceName: String = { return Util.getName(c.identifier) }  
+  
+  
+  def cPackageName: String = { return st"${(path, "_")}".render }
+  
+  def cEntryPointAdapterName: String = { return s"${component}_adapter" }
+  
+  def cEntryPointAdapterQualifiedName: String = { return s"${cPackageName}_${cEntryPointAdapterName}" }
+
+
+  def sel4SlangExtensionName: String = { return s"${component}_seL4Nix" }
+  
+  def sel4SlangExtensionQualifiedNameC: String = { return s"${cPackageName}_${sel4SlangExtensionName}" }
+}

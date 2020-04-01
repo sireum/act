@@ -25,7 +25,11 @@ object StringTemplate {
     return r
   }
 
-  def tbTypeHeaderFile(macroName: String, typeHeaderFileName: String, defs: ISZ[ST], preventBadging: B): ST = {
+  def tbTypeHeaderFile(macroName: String, 
+                       typeHeaderFileName: String,
+                       includes: Option[ST],
+                       defs: ISZ[ST], 
+                       preventBadging: B): ST = {
     val badges: ST = if(preventBadging) {st""} else {st"""
                                                          |#define $MON_READ_ACCESS 111
                                                          |#define $MON_WRITE_ACCESS 222"""}
@@ -36,6 +40,7 @@ object StringTemplate {
                    |
                    |#include <stdbool.h>
                    |#include <stdint.h>
+                   |${includes}
                    |
                    |#ifndef ${SB_VERIFY}
                    |#include <stddef.h>
@@ -117,6 +122,10 @@ object StringTemplate {
           |
           |static $typeName contents;
           |bool ${receivedDataVar} = false;
+          |
+          |bool mon_is_empty() {
+          |  return !${receivedDataVar};
+          |}
           |
           |bool mon_read($typeName * m) {
           |  ${mon_read}
@@ -203,7 +212,8 @@ object StringTemplate {
         |
         |static inline void ignore_result(long long int unused_result) { (void) unused_result; }
         |
-        |void mon_send_raise(void) {
+        |// Send interfaces
+        |bool mon_send_enqueue(void) {
         |  int do_emit = 0;
         |  ignore_result(m_lock());
         |  if (num_events < ${queueSize}) {
@@ -214,14 +224,23 @@ object StringTemplate {
         |  if (do_emit) {
         |    monsig_emit();
         |  }
+        |  return true;
         |}
         |
-        |int32_t mon_receive_get_events(void) {
+        |// Receive interfaces 
+        |bool mon_receive_is_empty(void) {
+        |  return num_events == 0;
+        |}
+        |
+        |bool mon_receive_dequeue(void) {
         |  ignore_result(m_lock());
-        |  int ne = num_events;
-        |  num_events = 0;
+        |  bool ret = false;
+        |  if(num_events > 0){
+        |    num_events--;
+        |    ret = true;
+        |  }
         |  ignore_result(m_unlock());
-        |  return ne;
+        |  return ret;
         |}
         |"""
     
@@ -646,7 +665,16 @@ object StringTemplate {
     val r = StringUtil.replaceAll(StringUtil.replaceAll(c.name, "::", "_"), ".", "_")
     return s"${base}_${r}_Payload"
   }
-  
+
+  def hamrIsEmptyUnconnected(methodName: String,
+                             sel4IsEmptyMethodName: String): ST = {
+    val ret: ST = st"""// FIXME: dummy implementation for unconnected incoming port
+                      |B ${methodName}(STACK_FRAME_ONLY) {
+                      |  return T;
+                      |}"""
+    return ret
+  }
+
   def hamrIsEmpty(methodName: String,
                   sel4IsEmptyMethodName: String): ST = {
     val ret: ST = st"""B ${methodName}(STACK_FRAME_ONLY) {
@@ -655,6 +683,42 @@ object StringTemplate {
     return ret
   }
   
+  def hamrReceiveUnconnectedIncomingEventPort(methodName: String): ST = {
+    val ret: ST = st"""// FIXME: dummy implementation for unconnected incoming port
+                      |Unit ${methodName}(STACK_FRAME
+                      |  Option_8E9F45 result) {
+                      |  // FIXME: dummy implementation
+                      | 
+                      |  // put None in result
+                      |  DeclNewNone_964667(none);
+                      |  Type_assign(result, &none, sizeof(union Option_8E9F45));
+                      |}"""
+    return ret
+  }
+
+  def hamrReceiveIncomingEventPort(comment: ST,
+                                   methodName: String,
+                                   sel4ReadMethod: String): ST = {
+    val ret: ST = st"""${comment}
+                      |Unit ${methodName}(STACK_FRAME
+                      |  Option_8E9F45 result) {
+                      |  if(${sel4ReadMethod}()) {
+                      |    // event port - ART requires an Empty payload be sent
+                      |    DeclNewart_Empty(payload);
+                      | 
+                      |    // wrap it in Some and place in result
+                      |    DeclNewSome_D29615(some);
+                      |    Some_D29615_apply(STACK_FRAME &some, (art_DataContent) &payload);
+                      |    Type_assign(result, &some, sizeof(union Option_8E9F45));
+                      |  } else {
+                      |    // put None in result
+                      |    DeclNewNone_964667(none);
+                      |    Type_assign(result, &none, sizeof(union Option_8E9F45));
+                      |  }
+                      |} """
+    return ret
+  }
+
   def hamrReceiveIncomingDataPort(comment: ST,
                                   methodName: String,
                                   sel4Type: String,
@@ -665,13 +729,9 @@ object StringTemplate {
                       |  Option_8E9F45 result) {
                       |  ${sel4Type} val;
                       |  if(${sel4ReadMethod}((${sel4Type} *) &val)) {
-                      |    // convert to Slang payload
-                      |    DeclNew${slangPayloadType}(payload);
-                      |    convertTo_${slangPayloadType}(val, &payload);
-                      |    
-                      |    // wrap it in Some and place in result
+                      |    // wrap payload in Some and place in result
                       |    DeclNewSome_D29615(some);
-                      |    Some_D29615_apply(STACK_FRAME &some, (art_DataContent) &payload);
+                      |    Some_D29615_apply(STACK_FRAME &some, (art_DataContent) &val);
                       |    Type_assign(result, &some, sizeof(union Option_8E9F45));
                       |  } else {
                       |    // put None in result
@@ -682,24 +742,26 @@ object StringTemplate {
                       |"""
     return ret
   }
-  
+
+  def hamrSendUnconnectedOutgoingDataPort(methodName: String): ST = {
+    val ret: ST = st"""// FIXME: dummy implementation for unconnected outgoing port
+                      |Unit ${methodName}(STACK_FRAME 
+                      |  art_DataContent d) {
+                      |  // FIXME: dummy implementation
+                      |}"""
+    return ret
+  }
+
   def hamrSendOutgoingDataPort(comment: ST,
                                methodName: String,
                                sel4Type: String,
                                slangPayloadType: String,
                                srcEnqueue: String
-                        ): ST = {
+                              ): ST = {
     val ret: ST = st"""${comment}
                       |Unit ${methodName}(STACK_FRAME 
                       |  art_DataContent d) {
-                      |  ${slangPayloadType} payload = (${slangPayloadType}) d;
-                      |  
-                      |  // convert Slang type to CAmkES type
-                      |  ${sel4Type} val;
-                      |  convertTo_${sel4Type}(payload, &val);
-                      |
-                      |  // deliver payload via CAmkES
-                      |  ${srcEnqueue}(&val);
+                      |  ${srcEnqueue}(d);
                       |}"""
     return ret
   }
@@ -721,166 +783,6 @@ object StringTemplate {
     return ret
   }
   
-  def hamrSendViaCAmkES(srcPort: ir.FeatureEnd, dstComponent: ir.Component, dstFeature: ir.FeatureEnd, connectionIndex: Z,
-                        basePackageName: String, typeMap: HashSMap[String, ir.Component]) : ST = {
-    val dstComponentName = Util.getLastName(dstComponent.identifier)
-    val dstFeatureName = Util.getLastName(dstFeature.identifier)
-    
-    def handleDataPort(): ST = {
-      val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "write" else "enqueue"
-      val srcEnqueue = Util.brand(s"${Util.getLastName(srcPort.identifier)}${connectionIndex}_${suffix}")
-      val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
-      val ct = Util.getSel4TypeName(typeMap.get(camkesType).get)
-
-      val slangPayloadType = hamrSlangPayloadType(srcPort.classifier.get, basePackageName)
-      return st"""${slangPayloadType} payload = (${slangPayloadType}) d;
-                 |
-                 |// convert Slang type to CAmkES type
-                 |${ct} val;
-                 |convertTo_${ct}(payload, &val);
-                 |
-                 |// deliver payload to ${dstComponentName}'s ${dstFeatureName} port via CAmkES
-                 |${srcEnqueue}(&val);"""
-    }
-    
-    def handleEventPort(): ST = {
-      val srcWrite = Util.getEventPortSendReceiveMethodName(srcPort)
-      return st"""// event port - can ignore the Slang Empty payload
-                 |art_Empty payload = (art_Empty) d;
-                 |
-                 |// send event to ${dstComponentName}'s ${dstFeatureName} port via CAmkES
-                 |${srcWrite}();"""
-    }
-    
-    val ret: ST = srcPort.category match {
-      case ir.FeatureCategory.DataPort => handleDataPort()
-      case ir.FeatureCategory.EventDataPort => handleDataPort()
-      case ir.FeatureCategory.EventPort => handleEventPort()
-      case x => halt(s"Not handling ${x}")
-    }
-    
-    return ret
-  }
-
-  def hamrDrainQueue(f: ir.FeatureEnd, basePackageName: String, typeMap: HashSMap[String, ir.Component]): ST = {
-    val portName = Util.getLastName(f.identifier)
-    val camkesId = s"${portName}_id"
-
-    def handleEventPort(): ST = {
-      val srcRead = Util.getEventPortSendReceiveMethodName(f)
-      return st"""{
-                 |  while(${srcRead}()){
-                 |    // event port - ART requires an Empty payload be sent
-                 |    DeclNewart_Empty(payload);
-                 | 
-                 |    // deliver payload via ART
-                 |    camkes_In_Port_Data_Transfer(${camkesId}, (art_DataContent) &payload);
-                 |  }
-                 |}"""
-    }
-    def handleDataPort(): ST = {
-      val suffix: String = if(f.category == ir.FeatureCategory.DataPort) "read" else "dequeue"
-      val dequeue = Util.brand(s"${portName}_${suffix}")
-      val camkesType = Util.getClassifierFullyQualified(f.classifier.get)
-      val ct = Util.getSel4TypeName(typeMap.get(camkesType).get)
-      val condType: String = if(Util.isEventPort(f)) "while" else "if"
-      val slangPayloadType = hamrSlangPayloadType(f.classifier.get, basePackageName)
-
-      return st"""{
-                 |  ${ct} val;
-                 |  ${condType}(${dequeue}((${ct} *) &val)){
-                 |    // convert to slang payload
-                 |    DeclNew${slangPayloadType}(payload);
-                 |    convertTo_${slangPayloadType}(val, &payload);
-                 |
-                 |    // deliver payload via ART
-                 |    camkes_In_Port_Data_Transfer(${camkesId}, (art_DataContent) &payload);
-                 |  }
-                 |}
-                 |"""  
-    }
-    
-    val ret: ST = f.category match {
-      case ir.FeatureCategory.EventPort => handleEventPort()
-      case ir.FeatureCategory.DataPort => handleDataPort()
-      case ir.FeatureCategory.EventDataPort => handleDataPort()
-      case x => halt(s"Not handling ${x}")
-    }
-    return ret
-  }
-
-  def hamrIPC(numPorts: Z, basePackageName: String): (ST, ST) = {
-    val impl = st"""#include <all.h>
-                   |#include <ipc.h>
-                   |
-                   |static union Option_8E9F45 camkes_buffer[${numPorts}] = { 0 };
-                   |
-                   |Z ${basePackageName}_SharedMemory_create(STACK_FRAME Z id) {
-                   |  //printf("${basePackageName}_Shared_Memory_create called with id %i\n", id);
-                   |  
-                   |  DeclNewNone_964667(t_0);
-                   |  None_964667_apply(CALLER &t_0);
-                   |  Type_assign((camkes_buffer + id), (&t_0), sizeof(union Option_8E9F45));
-                   |
-                   |  return -1;
-                   |}
-                   |
-                   |void ${basePackageName}_SharedMemory_receive(STACK_FRAME art_DataContent result, Z port) {
-                   |  printf("${basePackageName}_SharedMemory_receive called with port %i -- NOT IMPLEMENTED\n", port);
-                   |}
-                   |
-                   |void ${basePackageName}_SharedMemory_receiveAsync(STACK_FRAME Option_8E9F45 result, Z port) {
-                   |  union Option_8E9F45 p = camkes_buffer[port];
-                   |
-                   |  if (p.type == TSome_D29615) {
-                   |      Type_assign(result, &p, sizeOf((Type) &p));
-                   |      memset(camkes_buffer + port, 0, sizeof(union Option_8E9F45));
-                   |  } else {
-                   |      result->type = TNone_964667;
-                   |  }
-                   |}
-                   |
-                   |Unit ${basePackageName}_SharedMemory_send(STACK_FRAME Z destAppid, Z destPortId, art_DataContent d) {
-                   |  printf("${basePackageName}_SharedMemory_send called with port %i -- NOT IMPLEMENTED\n", destPortId);
-                   |}
-                   |
-                   |B ${basePackageName}_SharedMemory_sendAsync(STACK_FRAME Z destAppId, Z destPortId, art_DataContent d) {
-                   |  // printf("${basePackageName}_SharedMemory_sendAsync called with destPortId %i\n", destPortId);
-                   |  
-                   |  camkes_sendAsync(destPortId, d);
-                   |
-                   |  return T;
-                   |}
-                   |
-                   |Unit ${basePackageName}_SharedMemory_remove(STACK_FRAME Z id) {
-                   |  printf("${basePackageName}_SharedMemory_remove called with %i -- NOT IMPLEMENTED\n", id);
-                   |}
-                   |
-                   |Unit ${basePackageName}_Process_sleep(STACK_FRAME Z n) {}
-                   |
-                   |void camkes_In_Port_Data_Transfer (Z port, art_DataContent d) {
-                   |  union Option_8E9F45 p = camkes_buffer[port];
-                   |  camkes_buffer[port].type = TSome_D29615;
-                   |  Type_assign(&(camkes_buffer[port].Some_D29615.value), d, sizeOf((Type) d));
-                   |}
-                   |"""
-
-    val header = st"""#ifndef IPC_H
-                     |#define IPC_H
-                     |#include <all.h>
-                     |
-                     |static const int seed = 1;
-                     |
-                     |// transfer data from CAmkES to ART
-                     |void camkes_In_Port_Data_Transfer (Z destPortId, art_DataContent payload);
-                     |
-                     |// transfer data from ART to CAmkES
-                     |void camkes_sendAsync(Z destPortId, art_DataContent payload);
-                     |
-                     |#endif"""
-    return (header, impl)
-  }
-
   def samplingPortHeader(s: SamplingPortInterface): ST = {
     val spName = s.name
     val macroName = StringUtil.toUpperCase(s"${spName}_h")

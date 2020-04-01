@@ -71,13 +71,14 @@ import org.sireum.hamr.act.Util.reporter
       }
 
       sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.externalCSources
-      includePaths = includePaths ++ c.cIncludes.map((r: Resource) => StringUtil.getDirectory(r.path)) ++ c.externalCIncludeDirs :+ Util.DIR_INCLUDES
+      includePaths = includePaths ++ c.cIncludes.map((r: Resource) => 
+        StringUtil.getDirectory(r.path)) ++ c.externalCIncludeDirs :+ Util.DIR_INCLUDES
+
+      val hamrLib = getHamrLib(c.instanceName, hamrLibs)
       
-      val hamrLib = hamrLibs.get(c.instanceName)
+      val hasAux = cFiles.nonEmpty && c.componentId != TimerUtil.DISPATCH_CLASSIFIER
       
-      StringTemplate.cmakeComponent(
-        c.componentId, sourcePaths, includePaths, cFiles.nonEmpty,
-        hamrLib)
+      StringTemplate.cmakeComponent(c.componentId, sourcePaths, includePaths, hasAux, hamrLib)
     })
 
     for (m <- container.monitors) {
@@ -86,8 +87,10 @@ import org.sireum.hamr.act.Util.reporter
         case i: Ihor_Monitor => prettyPrint(ISZ(i.interfaceReceiver, i.interfaceSender))
       }
 
+      val hamrLib = getHamrLib(Util.SlangTypeLibrary, hamrLibs)
+      
       cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
-        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, None())
+        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, hamrLib)
 
       add(s"${m.cimplementation.path}", m.cimplementation.content)
       add(s"${m.cinclude.path}", m.cinclude.content)
@@ -313,5 +316,11 @@ import org.sireum.hamr.act.Util.reporter
 
   def add(path: String, content: ST) : Unit = {
     resources = resources :+ Util.createResource(path, content, T)
+  }
+
+  def getHamrLib(instanceName: String, hamrLibs: Map[String, HamrLib]): Option[HamrLib] = {
+    return if(hamrLibs.contains(instanceName)) hamrLibs.get(instanceName)
+    else if(hamrLibs.contains(Util.SlangTypeLibrary)) hamrLibs.get(Util.SlangTypeLibrary)
+    else None()
   }
 }
