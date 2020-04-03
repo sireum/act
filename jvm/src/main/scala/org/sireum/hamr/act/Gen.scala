@@ -1749,7 +1749,8 @@ import org.sireum.message.Reporter
       val defs = ISZ(st"typedef union art_DataContent union_art_DataContent;")
       return StringTemplate.tbTypeHeaderFile(macroname, typeHeaderFileName, Some(st"#include <all.h>"), defs, preventBadging)
     } else {
-      val defs = values.filter(v => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).map(v => processDataType(v, F))
+      val defs = values.filter((v : ir.Component) => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).
+        map((v : ir.Component) => processDataType(v, F))
       return StringTemplate.tbTypeHeaderFile(macroname, typeHeaderFileName, None(), defs, preventBadging)
     }
   }
