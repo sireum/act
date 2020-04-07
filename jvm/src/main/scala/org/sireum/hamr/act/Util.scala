@@ -550,6 +550,10 @@ object Util {
     return Resource(path, contents, overwrite, F)
   }
 
+  def createExeResource(path: String, contents: ST, overwrite: B): Resource = {
+    return Resource(path, contents, overwrite, T)
+  }
+
 
   def getUserEventEntrypointMethodName(component: ir.Component, feature: ir.FeatureEnd): String = {
     val fid = Util.getLastName(feature.identifier)

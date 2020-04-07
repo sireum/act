@@ -143,14 +143,23 @@ import org.sireum.hamr.act.Util.reporter
 
     val cmakelist = StringTemplate.cmakeLists(Util.CMAKE_VERSION, container.rootServer, cmakeEntries)
 
-    add(s"CMakeLists.txt", cmakelist)
+    add("CMakeLists.txt", cmakelist)
 
     
     val c: ISZ[Resource] = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)
     val auxResources: ISZ[Resource] = container.auxFiles
 
-    val ret = (resources ++ c ++ auxResources).map((o: Resource) => Util.createResource(s"${destDir}/${o.path}", o.content, T))
-
+    
+    addExeResource("bin/run-camkes.sh", StringTemplate.runCamkesScript()) 
+    
+    // add dest dir to path
+    val ret = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
+      path = s"${destDir}/${o.path}", 
+      content = o.content,
+      overwrite = o.overwrite,
+      makeExecutable = o.makeExecutable
+    ))
+    
     return ret
   }
 
@@ -316,6 +325,10 @@ import org.sireum.hamr.act.Util.reporter
 
   def add(path: String, content: ST) : Unit = {
     resources = resources :+ Util.createResource(path, content, T)
+  }
+
+  def addExeResource(path: String, content: ST) : Unit = {
+    resources = resources :+ Util.createExeResource(path, content, T)
   }
 
   def getHamrLib(instanceName: String, hamrLibs: Map[String, HamrLib]): Option[HamrLib] = {
