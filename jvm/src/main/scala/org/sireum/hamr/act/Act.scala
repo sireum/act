@@ -37,6 +37,8 @@ object Act {
 
     if(!result.ctx.hasErrors) {
       
+      val symbolTable = util.SymbolResolver.resolve(m2, options.hamrBasePackageName, reporter)
+      
       val auxFiles: ISZ[(String, String)] = options.auxFiles.entries.map(m => {
         val resourceName = s"${options.outputDir}/${Util.AUX_CODE_DIRECTORY_NAME}/${m._1}"
         resources = resources :+ Util.createResource(resourceName, st"${m._2}", T)
@@ -49,7 +51,7 @@ object Act {
       val auxHFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"h").map(m => m._1)
       val auxHeaderDirectories = (Set.empty ++ auxHFiles.map(m => Os.path(m).up.value)).elements
       
-      val (container, r) = Gen(m2, options.platform, options.hamrBasePackageName, reporter).process(auxHFiles)
+      val (container, r) = Gen(m2, symbolTable, options, reporter).process(auxHFiles)
       reporter.reports(r.messages)
       
       container match {

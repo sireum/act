@@ -49,7 +49,6 @@ object Util {
 
   val PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL: String = "Thread_Properties::Dispatch_Protocol"
   val PROP_THREAD_PROPERTIES__PRIORITY: String =  "Thread_Properties::Priority"
-  val PROP_THREAD_PROPERTIES__PERIOD: String = "Timing_Properties::Period"
 
   val PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING: String = "Deployment_Properties::Actual_Processor_Binding"
   val PROP_COMMUNICATION_PROPERTIES__QUEUE_SIZE: String = "Communication_Properties::Queue_Size"
@@ -58,14 +57,22 @@ object Util {
 
   val PROP_PROGRAMMING_PROPERTIES__INITIALIZE_ENTRYPOINT_SOURCE_TEXT: String = "Programming_Properties::Initialize_Entrypoint_Source_Text"
   val PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT: String = "Programming_Properties::Source_Text"
-
-  val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
-  val PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "SB_SYS::Compute_Entrypoint_Source_Text"
   val PROP_PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "Programming_Properties::Compute_Entrypoint_Source_Text"
   
+  val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
+  val PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "SB_SYS::Compute_Entrypoint_Source_Text"
+    
   val PROP_SB_SYS__CAmkES_Owner_Thread: String = "SB_SYS::CAmkES_Owner_Thread"
   val PROP_TB_SYS__CAmkES_Owner_Thread: String = "TB_SYS::CAmkES_Owner_Thread"
 
+  val PROP_Timing_Properties__Compute_Execution_Time: String = "Timing_Properties::Compute_Execution_Time"
+  val PROP_Timing_Properties__Clock_Period: String = "Timing_Properties::Clock_Period"
+  val PROP_Timing_Properties__Frame_Period: String = "Timing_Properties::Frame_Period"
+  val PROP_Timing_Properties__Period: String = "Timing_Properties::Period"
+  
+  val PROP_CASE_Scheduling__Domain: String = "CASE_Scheduling::Domain"
+  val PROP_CASE_Scheduling__Schedule_Source_Text: String = "CASE_Scheduling::Schedule_Source_Text"
+  
   val DEFAULT_QUEUE_SIZE: Z = z"1"
   val DEFAULT_PRIORITY: Z = z"201"
   val DEFAULT_STACK_SIZE: Z = z"1024"
@@ -261,14 +268,19 @@ object Util {
     return ret
   }
 
-  def getTypeHeaderFileName(c: ir.Component) : Option[String] = {
+  def getTypeHeaderFileName(c: ir.Component) : String = {
+    /*
     assert(c.category == ir.ComponentCategory.Process)
-    val processor: Option[ir.PropertyValue] = getDiscreetPropertyValue(c.properties, PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING)
+    val processor: Option[ir.PropertyValue] = 
+      getDiscreetPropertyValue(c.properties, PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING)
+    
     val procName: String = processor match {
       case Some(v : ir.ReferenceProp) => getLastName(v.value)
       case _ => return None[String]()
     }
-    return Some(brand(s"${procName}_types"))
+   */
+    val name = Util.getLastName(c.identifier)
+    return brand(s"${name}_types")
   }
 
   def getContainerName(s: String) : String = {
@@ -342,30 +354,45 @@ object Util {
 
   }
 
-  def getPeriod(c: ir.Component): Option[Z] = {
-    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__PERIOD) match {
-      case Some(ir.UnitProp(z, u)) =>
-        R(z) match {
-          case Some(v) =>
-            val _v = conversions.R.toZ(v)
-            val _ret: Option[Z] = u match {
-              case Some("ps")  => Some(_v / (z"1000" * z"1000" * z"1000"))
-              case Some("ns")  => Some(_v / (z"1000" * z"1000"))
-              case Some("us")  => Some(_v / (z"1000"))
-              case Some("ms")  => Some(_v)
-              case Some("sec") => Some(_v * z"1000")
-              case Some("min") => Some(_v * z"1000" * z"60")
-              case Some("hr")  => Some(_v * z"1000" * z"60" * z"60")
-              case _ => None[Z]()
-            }
-            _ret
+  def convertToMS(value: String, unit: Option[String]): Option[Z] = {
+    val ret: Option[Z] = R(value) match {
+      case Some(v) =>
+        val _v = conversions.R.toZ(v)
+        val ret: Option[Z] = unit match {
+          case Some("ps")  => Some(_v / (z"1000" * z"1000" * z"1000"))
+          case Some("ns")  => Some(_v / (z"1000" * z"1000"))
+          case Some("us")  => Some(_v / (z"1000"))
+          case Some("ms")  => Some(_v)
+          case Some("sec") => Some(_v * z"1000")
+          case Some("min") => Some(_v * z"1000" * z"60")
+          case Some("hr")  => Some(_v * z"1000" * z"60" * z"60")
           case _ => None[Z]()
         }
+        ret
+      case _ => None()
+    }
+    return ret
+  }
+  
+  def getPeriod(c: ir.Component): Option[Z] = {
+    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_Timing_Properties__Period) match {
+      case Some(ir.UnitProp(z, u)) => convertToMS(z, u)
       case _ => None[Z]()
     }
     return ret
   }
 
+  def getActualProcessorBinding(c: Component): Option[String] = {
+
+    val ret: Option[String] =
+      getDiscreetPropertyValue(c.properties, PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING) match {
+        case Some(v : ir.ReferenceProp) => Some(getName(v.value))
+        case _ => return None[String]()
+      }
+
+    return ret
+  }
+  
   def getInitializeEntryPoint(properties: ISZ[ir.Property]): Option[String] = {
     val ret: Option[String] = getDiscreetPropertyValue(properties, PROP_PROGRAMMING_PROPERTIES__INITIALIZE_ENTRYPOINT_SOURCE_TEXT) match {
       case Some(ir.ValueProp(v)) => Some(v)
@@ -617,6 +644,33 @@ object Util {
   def sbCounterInclude(): ST = {
     return st"#include <${Util.SB_COUNTER_FILENAME}>"
   }
+
+  def getConnectionName(index: Z): String = { return s"conn${index}"}
+  
+  def createConnection(connectionName: String, 
+                       connectionType: Sel4ConnectorTypes.Type,
+                       srcComponent: String, srcFeature: String,
+                       dstComponent: String, dstFeature: String): ast.Connection = {
+    val from_ends: ISZ[ast.ConnectionEnd] = ISZ(ast.ConnectionEnd(
+      isFrom = T,
+      component = srcComponent,
+      end = srcFeature))
+
+    val to_ends: ISZ[ast.ConnectionEnd] = ISZ(ast.ConnectionEnd(
+      isFrom = F,
+      component = dstComponent,
+      end = dstFeature))
+
+    val con = ast.Connection(
+      name = connectionName,
+      connectionType = s"$connectionType",
+      from_ends = from_ends,
+      to_ends = to_ends
+    )
+
+    return con
+  }
+
 }
 
 object TypeUtil {
@@ -734,164 +788,6 @@ object StringUtil {
   }
 }
 
-object TimerUtil {
-
-  val SEM_DISPATCH: String = Util.brand("dispatch_sem")
-
-  val TIMER_ID: String = Util.brand("timer")
-  val TIMER_ID_DISPATCHER: String = "timer"
-
-  // Notification from time server to the periodic dispatcher
-  val TIMER_NOTIFICATION_DISPATCHER_ID: String = "timer_complete"
-
-  val TIMER_TYPE: String = "Timer"
-  val TIMER_INSTANCE: String = "time_server"
-
-  val TIMER_SERVER_CLASSIFIER: String = "TimeServer"
-  val TIMER_SERVER_TIMER_ID: String = "the_timer"
-  val TIMER_SERVER_NOTIFICATION_ID: String = "timer_notification"
-
-  val TIMER_SERVER_IMPORT: String = "<TimeServer/TimeServer.camkes>;"
-  
-  val DISPATCH_CLASSIFIER: String = "dispatch_periodic"
-  val DISPATCH_PERIODIC_INSTANCE: String = "dispatch_periodic_inst"
-  val DISPATCH_TIMER_ID: String = "timer"
-
-  def dispatchComponent(notifications: ISZ[ast.Emits]): ast.Instance = {
-    val i = ast.Instance(
-      address_space = "",
-      name = DISPATCH_PERIODIC_INSTANCE,
-      component = ast.Component(
-        control = T,
-        hardware = F,
-        name = DISPATCH_CLASSIFIER,
-        mutexes = ISZ(),
-        binarySemaphores = ISZ(),
-        semaphores = ISZ(),
-        dataports = ISZ(),
-        emits = notifications,
-        uses = ISZ(ast.Uses(
-          name = DISPATCH_TIMER_ID,
-          typ = TIMER_TYPE,
-          optional = F)),
-        consumes = ISZ(ast.Consumes(
-          name = TIMER_NOTIFICATION_DISPATCHER_ID,
-          typ = Util.NOTIFICATION_TYPE,
-          optional = F)),
-        provides = ISZ(),
-        includes = ISZ(),
-        attributes = ISZ(),
-        imports = ISZ(Util.camkesGlobalConnectors)
-      ))
-    return i
-  }
-
-  def calendar(c: ir.Component, period: Z): ST = {
-    val notifName = TimerUtil.componentNotificationName(Some(c))
-    val st = st"""if ((aadl_calendar_counter % (${period} / aadl_tick_interval)) == 0) {
-                 |  ${notifName}_emit();
-                 |}"""
-    return st
-  }
-
-  def dispatchComponentCSource(modelTypesHeader: String, calendars: ISZ[ST]): Resource = {
-    val THREAD_CALENDAR = Util.brand("thread_calendar")
-    val st: ST = st"""#include <string.h>
-                     |#include <camkes.h>
-                     |#include ${modelTypesHeader}
-                     |
-                     |// prototypes for clock functions
-                     |void clock_init();
-                     |void clock_set_interval_in_ms(uint32_t interval);
-                     |void clock_start_timer(void);
-                     |void clock_irq_callback(void);
-                     |uint64_t clock_get_time();
-                     |
-                     |// Declarations for managing periodic thread dispatch
-                     |const uint32_t aadl_tick_interval = 1;
-                     |uint32_t aadl_calendar_counter = 0;
-                     |
-                     |void ${THREAD_CALENDAR}() {
-                     |  ${(calendars, "\n")}
-                     |
-                     |  aadl_calendar_counter++;
-                     |}
-                     |
-                     |void ${TIMER_NOTIFICATION_DISPATCHER_ID}_callback() {
-                     |  ${THREAD_CALENDAR}();
-                     |}
-                     |
-                     |// no op under the new time server scheme.
-                     |void clock_init() { }
-                     |
-                     |// Set interrupt interval, in milliseconds.
-                     |void clock_set_interval_in_ms(uint32_t interval) {
-                     |  timer_periodic(0, ((uint64_t)interval) * NS_IN_MS);
-                     |}
-                     |
-                     |// no op under the new time server scheme
-                     |void clock_start_timer(void) { }
-                     |
-                     |// defer to time server
-                     |uint64_t clock_get_time() {
-                     |  return (timer_time() / NS_IN_MS);
-                     |}
-                     |
-                     |int run(void) {
-                     |  clock_init();
-                     |  clock_set_interval_in_ms(1);
-                     |  clock_start_timer();
-                     |  return 0;
-                     |}
-                     |"""
-
-    val compTypeFileName:String = Util.brand(DISPATCH_CLASSIFIER)
-    return Util.createResource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
-  }
-
-  def timerComponent(): ast.Instance = {
-    val i = ast.Instance(
-      address_space = "",
-      name = TIMER_INSTANCE,
-      component = ast.Component(
-        control = F,
-        hardware = F,
-        name = TIMER_SERVER_CLASSIFIER,
-        mutexes = ISZ(),
-        binarySemaphores = ISZ(),
-        semaphores = ISZ(),
-        dataports = ISZ(),
-        emits = ISZ(ast.Emits(
-          name = TIMER_SERVER_NOTIFICATION_ID,
-          typ = Util.NOTIFICATION_TYPE)),
-        uses = ISZ(),
-        consumes = ISZ(),
-        provides = ISZ(ast.Provides(
-          name = TIMER_SERVER_TIMER_ID,
-          typ = TIMER_TYPE)),
-        includes = ISZ(),
-        attributes = ISZ(),
-        imports = ISZ()
-      )
-    )
-    return i
-  }
-  
-  def componentNotificationName(c: Option[ir.Component]): String = {
-    val prefix: String = if(c.nonEmpty) s"${Util.getLastName(c.get.identifier)}_" else ""
-    return Util.brand(s"${prefix}periodic_dispatch_notification")
-  }
-  
-  def configurationTimerAttribute(instanceName: String, i: Z, isDispatcher: B): ST = {
-    val id: String = if(isDispatcher) {TIMER_ID_DISPATCHER} else {TIMER_ID}
-    return st"""${instanceName}.${id}_attributes = ${i};"""
-  }
-
-  def configurationTimerGlobalEndpoint(instanceName: String, interfaceName: String, classifier: String, id: String): ST = {
-    return st"""${instanceName}.${interfaceName}_global_endpoint = "${classifier}_${id}";"""
-  }
-}
-
 @datatype class ActContainer(rootServer: String,
                              connectors: ISZ[ast.Connector],
                              models: ISZ[ast.ASTObject],
@@ -945,6 +841,32 @@ object TimerUtil {
                                   preInits: Option[ST],
                                   postInits: Option[ST],
                                   drainQueues: Option[(ST, ST)])
+
+@datatype class CamkesAssemblyContribution(imports: ISZ[String],
+                                           instances: ISZ[ast.Instance],
+                                           connections: ISZ[ast.Connection],
+                                           configurations: ISZ[ST],
+                                           cContainers: ISZ[C_Container],
+                                           auxResourceFiles: ISZ[Resource])
+
+@datatype class CamkesComponentContributions(shell: ast.Component)
+
+@datatype class CamkesGlueCodeContributions(header: CamkesGlueCodeHeaderContributions,
+                                            impl: CamkesGlueCodeImplContributions)
+
+@datatype class CamkesGlueCodeHeaderContributions(includes: ISZ[String],
+                                                  methods: ISZ[ST])
+
+@datatype class CamkesGlueCodeImplContributions(includes: ISZ[String],
+                                                globals: ISZ[ST],
+                                                         
+                                                methods: ISZ[ST],
+                                                        
+                                                preInitStatements: ISZ[ST],
+                                                postInitStatements: ISZ[ST],
+                                                         
+                                                mainPreLoopStatements: ISZ[ST],
+                                                mainLoopStatements: ISZ[ST])
 
 @enum object Dispatch_Protocol {
   'Periodic
@@ -1151,4 +1073,13 @@ object Transformers {
   def sel4SlangExtensionName: String = { return s"${component}_seL4Nix" }
   
   def sel4SlangExtensionQualifiedNameC: String = { return s"${cPackageName}_${sel4SlangExtensionName}" }
+}
+
+@record class Counter() {
+  var count: Z = 0 // start at 0 so first is 1 which prevents capability conflict issues
+
+  def increment(): Z = {
+    count = count + 1
+    return count
+  }
 }

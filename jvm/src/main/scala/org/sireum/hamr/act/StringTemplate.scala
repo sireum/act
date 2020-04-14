@@ -3,11 +3,13 @@
 package org.sireum.hamr.act
 
 import org.sireum._
+import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Component
 
 object StringTemplate {
-
+  val SEM_DISPATCH: String = Util.brand("dispatch_sem")
+  
   val SB_VERIFY: String = Util.cbrand("VERIFY")
 
   val MON_READ_ACCESS: String = Util.cbrand("MONITOR_READ_ACCESS")
@@ -549,28 +551,25 @@ cd $$BUILD_DIR
 
   def componentTypeImpl(filename: String, 
                         includes: ISZ[ST], 
+                       
                         blocks: ISZ[ST],
                         preInits: ISZ[ST],
                         postInits: ISZ[ST],
-                        runPreEntries: ISZ[ST], 
-                        runLoopEntries: ISZ[ST],
-                        isSporadic: B): ST = {
-    val initialLock: ST = if(isSporadic) { st"" } else { st"""// Initial lock to await dispatch input.
-                                                             |MUTEXOP(${SEM_WAIT}())"""}
+
+                        runMethod: ST): ST = {
+    val preInit: Option[ST] = if(preInits.nonEmpty) {
+      Some(st"""
+               |void pre_init(void) {
+               |  ${(preInits, "\n")}
+               |}""")
+    } else { None() }
     
-    val preInit: ST = if(preInits.nonEmpty) {
-      st"""
-          |void pre_init(void) {
-          |  ${(preInits, "\n")}
-          |}"""
-    } else { st"" }
-    
-    val postInit: ST = if(postInits.nonEmpty) {
-      st"""
-          |void post_init(void){
-          |  ${(postInits, "\n")}
-          |}"""
-    } else { st"" }
+    val postInit: Option[ST] = if(postInits.nonEmpty) {
+      Some(st"""
+               |void post_init(void){
+               |  ${(postInits, "\n")}
+               |}""")
+    } else { None() }
     
     val ret:ST = st"""#include "../${Util.DIR_INCLUDES}/${filename}.h"
                      |${(includes, "\n")}
@@ -581,21 +580,38 @@ cd $$BUILD_DIR
                      |${preInit}
                      |${postInit}
                      |
-                     |/************************************************************************
-                     | * int run(void)
-                     | * Main active thread function.
-                     | ************************************************************************/
-                     |int run(void) {
-                     |  ${(runPreEntries, "\n")}
-                     |  ${initialLock}
-                     |  for(;;) {
-                     |    MUTEXOP(${SEM_WAIT}())
-                     |    
-                     |    ${(runLoopEntries, "\n")}
-                     |  }
-                     |  return 0;
-                     |}
+                     |${runMethod}
                      |"""
+    return ret
+  }
+  
+  def runMethod(locals: ISZ[ST],
+                initStmts: ISZ[ST],
+                preLoopStmts: ISZ[ST],
+                loopStartStmts: ISZ[ST],
+                loopBodyStmts: ISZ[ST],
+                loopEndStmts: ISZ[ST],
+                postLoopStmts: ISZ[ST]): ST = {
+    
+    def flatten(i: ISZ[ST]): Option[ST] = { return if(i.nonEmpty) Some(st"""${(i, "\n")}""") else None() }
+
+    val ret: ST = st"""
+          |/************************************************************************
+          | * int run(void)
+          | * Main active thread function.
+          | ************************************************************************/
+          |int run(void) {
+          |  ${flatten(locals)}
+          |  ${flatten(initStmts)}
+          |  ${flatten(preLoopStmts)}
+          |  for(;;) {
+          |    ${flatten(loopStartStmts)}
+          |    ${flatten(loopBodyStmts)}
+          |    ${flatten(loopEndStmts)}
+          |  }
+          |  ${flatten(postLoopStmts)}
+          |  return 0;
+          |}"""
     return ret
   }
 
@@ -633,66 +649,6 @@ cd $$BUILD_DIR
   def cRegCallback(handlerName: String, regCallback: String): ST = {
     val ret: ST = st"CALLBACKOP(${regCallback}(${handlerName}, NULL));"
     return ret
-  }
-
-  val VAR_PERIODIC_OCCURRED : String = Util.brand("occurred_periodic_dispatcher")
-  val VAR_PERIODIC_TIME : String = Util.brand("time_periodic_dispatcher")
-  val METHOD_PERIODIC_CALLBACK : String = s"${TimerUtil.componentNotificationName(None())}_callback"
-  
-  def periodicDispatchElems(componentId: String, timerHookedUp: B) : ST = {
-    var h: String = s"${Util.brand("timer_time()")} / 1000LL"
-    if(!timerHookedUp) {
-      h = s"0; // ${h} -- timer connection disabled"
-    }
-    
-    val ret = st"""static bool ${VAR_PERIODIC_OCCURRED};
-                  |static int64_t ${VAR_PERIODIC_TIME};
-                  |
-                  |/************************************************************************
-                  | * periodic_dispatcher_write_int64_t
-                  | * Invoked from remote periodic dispatch thread.
-                  | *
-                  | * This function records the current time and triggers the active thread
-                  | * dispatch from a periodic event.  Note that the periodic dispatch
-                  | * thread is the *only* thread that triggers a dispatch, so we do not
-                  | * mutex lock the function.
-                  | *
-                  | ************************************************************************/
-                  |
-                  |bool periodic_dispatcher_write_int64_t(const int64_t * arg) {
-                  |    ${VAR_PERIODIC_OCCURRED} = true;
-                  |    ${VAR_PERIODIC_TIME} = *arg;
-                  |    MUTEXOP(${SEM_POST}());
-                  |    return true;
-                  |}
-                  |
-                  |void ${METHOD_PERIODIC_CALLBACK}(void *_ UNUSED) {
-                  |   // we want time in microseconds, not nanoseconds, so we divide by 1000.
-                  |   int64_t ${VAR_PERIODIC_TIME} = ${h};
-                  |   (void)periodic_dispatcher_write_int64_t(&${VAR_PERIODIC_TIME});
-                  |   ${registerPeriodicCallback()}
-                  |}
-                  |"""
-    return ret
-  }
-
-  def registerPeriodicCallback(): ST = {
-    val notificationName = TimerUtil.componentNotificationName(None())
-    return st"CALLBACKOP(${notificationName}_reg_callback(${METHOD_PERIODIC_CALLBACK}, NULL));"
-  }
-
-  def drainPeriodicQueue(componentName: String, userEntrypoint: String): (ST, ST) = {
-    val methodName = Util.brand(s"entrypoint_${componentName}_periodic_dispatcher")
-
-    val impl = st"""void ${methodName}(const int64_t * in_arg) {
-                   |  ${userEntrypoint}((int64_t *) in_arg);
-                   |}"""
-
-    val drain = st"""if(${VAR_PERIODIC_OCCURRED}){
-                    |  ${VAR_PERIODIC_OCCURRED} = false;
-                    |  ${methodName}(&${VAR_PERIODIC_TIME});
-                    |}"""
-    return (impl, drain)
   }
 
   def hamrGetInstanceName(basePackageName: String, c: Component): ST = {

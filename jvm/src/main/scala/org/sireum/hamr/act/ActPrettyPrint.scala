@@ -4,9 +4,9 @@ package org.sireum.hamr.act
 
 import org.sireum._
 import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Composition, Consumes, Dataport, Direction, Emits, Instance, Method, Mutex, Procedure, Provides, Semaphore, Uses}
-import org.sireum.message.Reporter
 import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
+import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
 
 @record class ActPrettyPrint {
 
@@ -76,7 +76,7 @@ import org.sireum.hamr.act.Util.reporter
 
       val hamrLib = getHamrLib(c.instanceName, hamrLibs)
       
-      val hasAux = cFiles.nonEmpty && c.componentId != TimerUtil.DISPATCH_CLASSIFIER
+      val hasAux = cFiles.nonEmpty && c.componentId != PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER
       
       StringTemplate.cmakeComponent(c.componentId, sourcePaths, includePaths, hasAux, hamrLib)
     })
@@ -230,7 +230,7 @@ import org.sireum.hamr.act.Util.reporter
     }
 
     if(actContainer.get.requiresTimeServer) {
-      instances = instances :+ st"component ${TimerUtil.TIMER_SERVER_CLASSIFIER} ${TimerUtil.TIMER_INSTANCE};"
+      instances = instances :+ st"component ${PeriodicDispatcherTemplate.TIMER_SERVER_CLASSIFIER} ${PeriodicDispatcherTemplate.TIMER_INSTANCE};"
     }
 
     for(c <- o.connections) {

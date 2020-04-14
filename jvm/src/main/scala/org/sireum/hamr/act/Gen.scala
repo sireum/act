@@ -6,59 +6,48 @@ import org.sireum._
 import org.sireum.ops.ISZOps
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
+import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUtil}
 import org.sireum.hamr.act.templates.EventDataQueueTemplate
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
 import org.sireum.message.Reporter
 
-@record class Gen(model: Aadl, platform: ActPlatform.Type, hamrBasePackageName: Option[String], reporter: Reporter) {
+@record class Gen(model: Aadl,
+                  symbolTable: util.SymbolTable,
+                  actOptions: ActOptions,
+                  reporter: Reporter) {
 
-  var topLevelProcess: Option[ir.Component] = None[ir.Component]()
-  var typeHeaderFileName: String = ""
-
-  var componentMap: HashMap[String, ir.Component] = HashMap.empty
+  val platform: ActPlatform.Type = actOptions.platform
+  val hamrBasePackageName: Option[String] = actOptions.hamrBasePackageName
+  
+  val typeHeaderFileName: String = Util.getTypeHeaderFileName(symbolTable.rootSystem.component)
   var typeMap: HashSMap[String, ir.Component] = HashSMap.empty
-  var classifierMap: HashMap[String, ir.Component] = HashMap.empty
-
-  var featureMap: HashMap[String, ir.Feature] = HashMap.empty
+  
   var sharedData: HashMap[String, SharedData] = HashMap.empty
   var samplingPorts: HashMap[String, SamplingPortInterface] = HashMap.empty
   var srcQueues: Map[String, Map[String, QueueObject]] = Map.empty // {dstFeatureId -> {srcFeatureId -> queueobj}}
-
-  // port-paths -> connInstances
-  var inConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
-  var outConnections: HashMap[String, ISZ[ir.ConnectionInstance]] = HashMap.empty
-
+  
   var connectors: ISZ[ast.Connector] = ISZ()
   var astObjects: ISZ[ASTObject] = ISZ()
   var monitors: HashSMap[String, Monitor] = HashSMap.empty // conn instname -> monitor
   var containers: ISZ[C_Container] = ISZ()
   var auxResourceFiles: ISZ[Resource] = ISZ()
-  
-  var periodicDispatcherNotifications: ISZ[ast.Emits] = ISZ()
-  var periodicDispatcherCalendars: ISZ[ST] = ISZ()
-  
+
   var camkesComponents: ISZ[ast.Component] = ISZ()
   var camkesConnections: ISZ[ast.Connection] = ISZ()
   var camkesConfiguration: ISZ[ST] = ISZ()
   
   var auxCImplIncludes: ISZ[ST] = ISZ()
-
-  var hasPeriodicComponents: B = F
-  val preventBadging: B = T
-
-  var performHamrIntegration: B = Util.hamrIntegration(platform)
   
   var globalImports: Set[String] = Set.empty[String] + Util.camkesStdConnectors
   
+  val preventBadging: B = T
+  val performHamrIntegration: B = Util.hamrIntegration(platform)
   val hookupPeriodicComponentsToTimeServer: B = F
   
-  var count: Z = 1 // 0 causes capability conflict issues
-  def getCounter(): Z = {
-    count = count + 1
-    return count - 1
-  }
-
+  val connectionCounter: Counter = Counter()
+  val timerAttributeCounter: Counter = Counter()
+  
   def getTypeHeaderFileName(): String = {
     return s"${typeHeaderFileName}.h"
   }
@@ -70,23 +59,18 @@ import org.sireum.message.Reporter
   def hasErrors(): B = {
     return reporter.hasError
   }
-  
+
+
   def process(cSources: ISZ[String]) : (Option[ActContainer], Reporter) = {
 
-    val components = model.components.filter(f => f.category != ir.ComponentCategory.Data)
-    if(components.size != z"1" || components(0).category != ir.ComponentCategory.System) {
-      halt(s"Model contains ${components.size} components.  Should only contain a single top-level system")
-    }
-    val system = components(0)
-
-    buildComponentMap(system)
+    val system = symbolTable.rootSystem.component
 
     auxCImplIncludes = cSources.map(c => st"""#include "../../../${c}"""")
 
     for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
     val sortedData = sortData(typeMap.values)
 
-    resolve(system)
+    buildTransportMechanisms(system)
 
     if(!hasErrors()) {
       auxResourceFiles = auxResourceFiles :+ Util.createResource(s"${Util.DIR_INCLUDES}/$typeHeaderFileName.h", processDataTypes(sortedData), T)
@@ -114,30 +98,17 @@ import org.sireum.message.Reporter
 
       connections = connections ++ camkesConnections
       
-      if(hasPeriodicComponents) {
-        // add the dispatcher component
-
-        val dispatchComponent = TimerUtil.dispatchComponent(periodicDispatcherNotifications)
-        instances = instances + dispatchComponent
-        containers = containers :+ C_Container(dispatchComponent.component.name, dispatchComponent.component.name,
-          ISZ(TimerUtil.dispatchComponentCSource(getTypeHeaderFileForInclude(), periodicDispatcherCalendars)), ISZ(), ISZ(), ISZ(), ISZ())
-
-        // connect dispatch timer to time server
-        connections = connections + createConnection(Sel4ConnectorTypes.seL4TimeServer,
-          TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_ID_DISPATCHER,
-          TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
-
-        connections = connections + createConnection(Sel4ConnectorTypes.seL4GlobalAsynchCallback,
-          TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_NOTIFICATION_ID,
-          TimerUtil.DISPATCH_PERIODIC_INSTANCE, TimerUtil.TIMER_NOTIFICATION_DISPATCHER_ID)
-
-        camkesConfiguration = camkesConfiguration :+ st"${TimerUtil.TIMER_INSTANCE}.timers_per_client = 1;"
-
-        camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerAttribute(dispatchComponent.name, getCounter(), T)
-
-        camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationPriority(dispatchComponent.name, Util.DEFAULT_PRIORITY)
-      }
-
+      val assemblyContributions: CamkesAssemblyContribution = 
+        Dispatcher.handlePeriodicComponents(
+          symbolTable, actOptions, connectionCounter, timerAttributeCounter, getTypeHeaderFileForInclude(), reporter)
+      
+      globalImports = globalImports ++ assemblyContributions.imports
+      instances = instances ++ assemblyContributions.instances
+      connections = connections ++ assemblyContributions.connections
+      camkesConfiguration = camkesConfiguration ++ assemblyContributions.configurations
+      containers = containers ++ assemblyContributions.cContainers
+      auxResourceFiles = auxResourceFiles ++ assemblyContributions.auxResourceFiles
+      
       val composition = Composition(
         groups = ISZ(),
         exports = ISZ(),
@@ -152,7 +123,7 @@ import org.sireum.message.Reporter
       astObjects = astObjects ++ otherAstObjects
       
       return (Some(ActContainer(
-        rootServer = Util.getLastName(topLevelProcess.get.identifier),
+        rootServer = Util.getLastName(symbolTable.rootSystem.component.identifier),
         connectors = connectors,
         models = astObjects,
         monitors = monitors.values,
@@ -160,7 +131,7 @@ import org.sireum.message.Reporter
         cContainers = containers,
         auxFiles = auxResourceFiles,
         globalImports = globalImports.elements,
-        requiresTimeServer = hasPeriodicComponents)), reporter)
+        requiresTimeServer = PeriodicUtil.requiresTimeServer(symbolTable, actOptions.platform))), reporter)
 
     } else {
       return ((None[ActContainer](), reporter))
@@ -189,37 +160,12 @@ import org.sireum.message.Reporter
         }
     }
   }
-
-
-  var i: Z = 1
-
-  def newConn(): String = {
-    val ret = s"conn${i}"
-    i = i + 1
-    return ret
-  }
   
   def createConnection(connectionType: Sel4ConnectorTypes.Type,
                        srcComponent: String, srcFeature: String,
                        dstComponent: String, dstFeature: String): ast.Connection = {
-    val from_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
-      isFrom = T,
-      component = srcComponent,
-      end = srcFeature))
-
-    val to_ends: ISZ[ConnectionEnd] = ISZ(ConnectionEnd(
-      isFrom = F,
-      component = dstComponent,
-      end = dstFeature))
-
-    val con = Connection(
-      name = newConn(),
-      connectionType = s"$connectionType",
-      from_ends = from_ends,
-      to_ends = to_ends
-    )
-
-    return con
+    val name = Util.getConnectionName(connectionCounter.increment())
+    Util.createConnection(name, connectionType, srcComponent, srcFeature, dstComponent, dstFeature)
   }
   
   def processConnections(c: ir.Component): ISZ[ast.Connection] = {
@@ -236,10 +182,10 @@ import org.sireum.message.Reporter
 
     def createSharedDataCounterConnection(conn: ir.ConnectionInstance) : ast.Connection = {
       val srcComponent = Util.getLastName(conn.src.component)
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+      val srcFeature = symbolTable.airFeatureMap.get(Util.getName(conn.src.feature.get)).get
 
       val dstComponent = Util.getLastName(conn.dst.component)
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+      val dstFeature = symbolTable.airFeatureMap.get(Util.getName(conn.dst.feature.get)).get
 
       val srcFeatureName = Util.getEventSBCounterName(Util.getLastName(srcFeature.identifier))
       val dstFeatureName = Util.getEventSBCounterName(Util.getLastName(dstFeature.identifier))
@@ -256,11 +202,11 @@ import org.sireum.message.Reporter
     def createSharedData_SB_Queue_Connection(conn: ir.ConnectionInstance) : ast.Connection = {
       val srcComponent = Util.getLastName(conn.src.component)
       val srcId = Util.getName(conn.src.feature.get)
-      val srcFeature = featureMap.get(srcId).get
+      val srcFeature = symbolTable.airFeatureMap.get(srcId).get
 
       val dstComponent = Util.getLastName(conn.dst.component)
       val dstId = Util.getName(conn.dst.feature.get)
-      val dstFeature = featureMap.get(dstId).get
+      val dstFeature = symbolTable.airFeatureMap.get(dstId).get
 
       val queueObject: QueueObject = srcQueues.get(srcId).get.get(dstId).get
       
@@ -277,10 +223,10 @@ import org.sireum.message.Reporter
     }
     def createSharedDataConnection(conn: ir.ConnectionInstance) : ast.Connection = {
       val srcComponent = Util.getLastName(conn.src.component)
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
+      val srcFeature = symbolTable.airFeatureMap.get(Util.getName(conn.src.feature.get)).get
 
       val dstComponent = Util.getLastName(conn.dst.component)
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+      val dstFeature = symbolTable.airFeatureMap.get(Util.getName(conn.dst.feature.get)).get
 
       val srcFeatureName = Util.brand(Util.getLastName(srcFeature.identifier))
       val dstFeatureName = Util.brand(Util.getLastName(dstFeature.identifier))
@@ -297,8 +243,8 @@ import org.sireum.message.Reporter
       val srcComponent = Util.getLastName(conn.src.component)
       val dstComponent = Util.getLastName(conn.dst.component)
 
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+      val srcFeature = symbolTable.airFeatureMap.get(Util.getName(conn.src.feature.get)).get
+      val dstFeature = symbolTable.airFeatureMap.get(Util.getName(conn.dst.feature.get)).get
 
       val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
       val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
@@ -324,8 +270,8 @@ import org.sireum.message.Reporter
       val srcComponent = Util.getLastName(conn.src.component)
       val dstComponent = Util.getLastName(conn.dst.component)
 
-      val srcFeature = featureMap.get(Util.getName(conn.src.feature.get)).get
-      val dstFeature = featureMap.get(Util.getName(conn.dst.feature.get)).get
+      val srcFeature = symbolTable.airFeatureMap.get(Util.getName(conn.src.feature.get)).get
+      val dstFeature = symbolTable.airFeatureMap.get(Util.getName(conn.dst.feature.get)).get
 
       val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
       val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
@@ -358,7 +304,7 @@ import org.sireum.message.Reporter
     
     for(conn <- handledConns) {
       val dstPath = Util.getName(conn.dst.feature.get)
-      val fdst: ir.Feature = featureMap.get(dstPath).get
+      val fdst: ir.Feature = symbolTable.airFeatureMap.get(dstPath).get
 
       val srcComponent = Util.getLastName(conn.src.component)
       
@@ -382,7 +328,7 @@ import org.sireum.message.Reporter
 
                 val srcPath: String = Util.getName(conn.src.feature.get)
                 
-                val srcFeature: ir.Feature = featureMap.get(srcPath).get
+                val srcFeature: ir.Feature = symbolTable.airFeatureMap.get(srcPath).get
                 
                 val queueSize: Z = srcQueues.get(srcPath).get.get(dstPath).get.queueSize
                 
@@ -437,7 +383,7 @@ import org.sireum.message.Reporter
 
             case ir.FeatureCategory.DataAccess =>
               val sd = sharedData.get(Util.getName(conn.src.component)).get
-              val dstComp = componentMap.get(Util.getName(conn.dst.component)).get
+              val dstComp = symbolTable.airComponentMap.get(Util.getName(conn.dst.component)).get
               val ownerId = Util.getName(sd.owner.identifier)
               val dstId = Util.getName(dstComp.identifier)
 
@@ -462,61 +408,24 @@ import org.sireum.message.Reporter
     assert(c.category == ir.ComponentCategory.Process)
 
     var connections: ISZ[Connection] = ISZ()
-
     var instances: ISZ[Instance] = ISZ()
-    var dispatchNotifications: ISZ[Emits] = ISZ()
-    var calendars: ISZ[ST]= ISZ()
 
     for(sc <- c.subComponents) {
       sc.category match {
         case ir.ComponentCategory.Thread =>
           val componentId = Util.getLastName(sc.identifier)
-          val classifier = Util.getClassifier(sc.classifier.get)
+          
           instances = instances :+
             Instance(address_space =  "",
               name = componentId,
               component = genThread(sc))
-          
-          if(Util.getDispatchProtocol(sc) == Some(Dispatch_Protocol.Periodic)) {
-            
-            if(hookupPeriodicComponentsToTimeServer) {
-              // connect component to time server
-              connections = connections :+ createConnection(Sel4ConnectorTypes.seL4TimeServer,
-                componentId, TimerUtil.TIMER_ID,
-                TimerUtil.TIMER_INSTANCE, TimerUtil.TIMER_SERVER_TIMER_ID)
 
-              // timer attribute
-              camkesConfiguration = camkesConfiguration :+ TimerUtil.configurationTimerAttribute(
-                componentId, getCounter(), F)
-            }
-
-            val componentNotificationName = TimerUtil.componentNotificationName(None())
-            val dispatcherNotificationName = TimerUtil.componentNotificationName(Some(sc))
-
-            // emit notification when component's period occurs
-            dispatchNotifications = dispatchNotifications :+ Emits(
-              name = dispatcherNotificationName,
-              typ = Util.NOTIFICATION_TYPE)
-            
-            // connect dispatcher to component
-            connections = connections :+ createConnection(Sel4ConnectorTypes.seL4Notification,
-              TimerUtil.DISPATCH_PERIODIC_INSTANCE, dispatcherNotificationName,
-              componentId, componentNotificationName)
-
-            val period: Z = if(Util.getPeriod(sc).isEmpty) {
-              reporter.warn(None(), Util.toolName, s"Period not provided for periodic component ${classifier}, using ${Util.DEFAULT_PERIOD}")
-              Util.DEFAULT_PERIOD
-            } else {
-              Util.getPeriod(sc).get
-            }
-            calendars = calendars :+ TimerUtil.calendar(sc, period)
-          }
-          
           Util.getStackSizeInBytes(sc) match {
             case Some(bytes) =>
               camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(componentId, bytes)
             case _ =>
           }
+          
         case ir.ComponentCategory.Subprogram =>
           var params: ISZ[Parameter] = ISZ()
           for(f <- sc.features) {
@@ -542,7 +451,7 @@ import org.sireum.message.Reporter
             m match {
               case spa: ir.FeatureAccess =>
                 if(spa.classifier.nonEmpty) {
-                  val spComp = classifierMap.get(spa.classifier.get.name).get
+                  val spComp = symbolTable.airClassifierMap.get(spa.classifier.get.name).get
                   assert(spComp.category == ir.ComponentCategory.Subprogram)
 
                   val methodName = Util.getLastName(spa.identifier)
@@ -602,7 +511,7 @@ import org.sireum.message.Reporter
 
           Util.getCamkesOwnerThread(sc.properties) match {
             case Some(owner) =>
-              val threads = componentMap.values.filter(f => f.category == ir.ComponentCategory.Thread)
+              val threads = symbolTable.airComponentMap.values.filter(f => f.category == ir.ComponentCategory.Thread)
               val thread = threads.filter(f => f.classifier.get.name == owner || Util.getClassifier(f.classifier.get) == owner)
 
               if(thread.nonEmpty) {
@@ -629,16 +538,6 @@ import org.sireum.message.Reporter
         case _ =>
           halt(s"Not handling: subcomponent of type '${sc.category}'.  ${Util.getName(sc.identifier)}")
       }
-    }
-
-    if(hasPeriodicComponents) { // add the periodic dispatcher component
-      
-      globalImports = globalImports + Util.camkesStdConnectors
-      globalImports = globalImports + Util.camkesGlobalConnectors
-      globalImports = globalImports + TimerUtil.TIMER_SERVER_IMPORT
-
-      periodicDispatcherNotifications = periodicDispatcherNotifications ++ dispatchNotifications
-      periodicDispatcherCalendars = periodicDispatcherCalendars ++ calendars
     }
 
     val monInstances = monitors.values.map((m: Monitor) => m.i)
@@ -679,12 +578,12 @@ import org.sireum.message.Reporter
     
     var imports : Set[String] = Set.empty
 
-    var cInterfaceStatements: ISZ[ST] = ISZ()
-    var cImplIncludes: ISZ[ST] = ISZ()
-    var cImpls: ISZ[ST] = ISZ()
-    var cPreInits: ISZ[ST] = ISZ()
-    var cPostInits: ISZ[ST] = ISZ()
-    var cDrainQueues: ISZ[(ST, ST)] = ISZ()
+    var gcInterfaceStatements: ISZ[ST] = ISZ()
+    var gcImplIncludes: ISZ[ST] = ISZ()
+    var gcImplMethods: ISZ[ST] = ISZ()
+    var gcImplPreInits: ISZ[ST] = ISZ()
+    var gcImplPostInits: ISZ[ST] = ISZ()
+    var gcImplDrainQueues: ISZ[(ST, ST)] = ISZ()
 
     for(f <- c.features.filter(_f => _f.isInstanceOf[ir.FeatureAccess])) {
       def handleSubprogramAccess(): Unit = {
@@ -760,7 +659,7 @@ import org.sireum.message.Reporter
         externalCSources = externalCSources :+ samplingPort.implPath
         externalCIncludeDirs = externalCIncludeDirs :+ Os.path(samplingPort.headerPath).up.value
 
-        cImpls = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, fend) +: cImpls
+        gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, fend) +: gcImplMethods
 
         camkesConfiguration = camkesConfiguration :+ 
           StringTemplate.sbSamplingPortConfigurationEntry(
@@ -778,7 +677,7 @@ import org.sireum.message.Reporter
           case ir.Direction.In =>
             // uses monitor
             // consumes notification
-            if(inConnections.get(fpath).nonEmpty) {
+            if(symbolTable.inConnections.get(fpath).nonEmpty) {
               val monitor = getMonitorForInPort(fend).get.asInstanceOf[TB_Monitor]
               imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
@@ -794,7 +693,7 @@ import org.sireum.message.Reporter
             }
           case ir.Direction.Out =>
             // uses monitor
-            outConnections.get(fpath) match {
+            symbolTable.outConnections.get(fpath) match {
               case Some(outs) =>
                 var i: Z = 0
                 for(o <- outs) {
@@ -819,7 +718,7 @@ import org.sireum.message.Reporter
         fend.direction match {
           case ir.Direction.In =>
             
-            val isConnected = inConnections.contains(Util.getName(fend.identifier))
+            val isConnected = symbolTable.inConnections.contains(Util.getName(fend.identifier))
             
             if(isConnected && (Util.getComputeEntrypointSourceText(fend.properties).nonEmpty || performHamrIntegration)) {
               val name = Util.genSeL4NotificationName(fend, isEventData)
@@ -827,9 +726,9 @@ import org.sireum.message.Reporter
               val regCallback = s"${name}_reg_callback"
 
               if (isEventData) {
-                cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
+                gcImplMethods = gcImplMethods :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
               }
-              cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
+              gcImplPreInits = gcImplPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
             } else {
               reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
             }
@@ -901,7 +800,7 @@ import org.sireum.message.Reporter
           case ir.Direction.In =>
             // uses AADLEvent_Receiver event
             // consumes ReceiveEvent e
-            if (inConnections.get(fpath).nonEmpty) {
+            if (symbolTable.inConnections.get(fpath).nonEmpty) {
               val monitor = getMonitorForInPort(fend).get.asInstanceOf[Ihor_Monitor]
               imports = imports + Util.getInterfaceFilename(monitor.interfaceReceiver.name)
 
@@ -915,22 +814,22 @@ import org.sireum.message.Reporter
                 typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                 optional = F)
 
-              val isConnected = inConnections.contains(Util.getName(fend.identifier))
+              val isConnected = symbolTable.inConnections.contains(Util.getName(fend.identifier))
               
               if(isConnected && (Util.getComputeEntrypointSourceText(fend.properties).nonEmpty || performHamrIntegration)) {
                 val name = Util.genSeL4NotificationName(fend, T)
                 val handlerName = s"${name}_handler"
                 val regCallback = s"${name}_reg_callback"
 
-                cImpls = cImpls :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
-                cPreInits = cPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
+                gcImplMethods = gcImplMethods :+ StringTemplate.cEventNotificiationHandler(handlerName, regCallback)
+                gcImplPreInits = gcImplPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
               } else {
                 reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
               }              
             }
 
           case ir.Direction.Out =>
-            outConnections.get(fpath) match {
+            symbolTable.outConnections.get(fpath) match {
               case Some(outs) =>
                 var i: Z = 0
                 for (o <- outs) {
@@ -999,7 +898,7 @@ import org.sireum.message.Reporter
                 // import sender interface
                 imports = imports + s""""../../interfaces/${Util.MONITOR_INTERFACE_NAME_SENDER}.idl4""""
 
-                outConnections.get(fpath) match {
+                symbolTable.outConnections.get(fpath) match {
                   case Some(outs) =>
                     var i: Z = 0
                     for (o <- outs) {
@@ -1067,67 +966,66 @@ import org.sireum.message.Reporter
 
       generateC_InterfaceMethod(c, f.asInstanceOf[ir.FeatureEnd]) match {
         case Some(C_SimpleContainer(cIncludes, interface, impl, preInit, postInits, drainQueues)) =>
-          if(cIncludes.nonEmpty) { cImplIncludes = cImplIncludes ++ cIncludes}
-          if(interface.nonEmpty) { cInterfaceStatements = cInterfaceStatements :+ interface.get }
-          if(impl.nonEmpty) { cImpls = cImpls :+ impl.get }
-          if(preInit.nonEmpty) { cPreInits = cPreInits :+ preInit.get}
-          if(postInits.nonEmpty) { cPostInits = cPostInits :+ postInits.get }
-          if(drainQueues.nonEmpty) { cDrainQueues = cDrainQueues :+ drainQueues.get}
+          if(cIncludes.nonEmpty) { gcImplIncludes = gcImplIncludes ++ cIncludes}
+          if(interface.nonEmpty) { gcInterfaceStatements = gcInterfaceStatements :+ interface.get }
+          if(impl.nonEmpty) { gcImplMethods = gcImplMethods :+ impl.get }
+          if(preInit.nonEmpty) { gcImplPreInits = gcImplPreInits :+ preInit.get}
+          if(postInits.nonEmpty) { gcImplPostInits = gcImplPostInits :+ postInits.get }
+          if(drainQueues.nonEmpty) { gcImplDrainQueues = gcImplDrainQueues :+ drainQueues.get}
         case _ =>
       }
-    }
+    } // end processing thread's features
 
+    
+    // Build camkes component and glue code files
+    
     var binarySemaphores: ISZ[BinarySemaphore] = ISZ()
     var semaphores: ISZ[Semaphore] = ISZ()
-    val binSem = Util.getDiscreetPropertyValue(c.properties, "camkes::Binary_Semaphore")
-    binSem match {
+
+    Util.getDiscreetPropertyValue(c.properties, "camkes::Binary_Semaphore") match {
       case Some(v: ir.ValueProp) =>
         binarySemaphores = binarySemaphores :+ BinarySemaphore(v.value)
       case _ =>
     }
-
-    // FIXME: 2018.12.06 - changed binary semaphore to semaphore
-    // has semaphore tb_dispatch_sem
-    //binarySemaphores = binarySemaphores :+ BinarySemaphore(TimerUtil.SEM_DISPATCH)
-    semaphores = semaphores :+ Semaphore(TimerUtil.SEM_DISPATCH)
-
-    var cRunPreEntries: ISZ[ST] = cDrainQueues.map(x => x._1)
-
-    var stRunLoopEntries: ISZ[ST] = cDrainQueues.map(x => x._2)
-
+    
+    
+    var gcRunInitStmts: ISZ[ST] = gcImplDrainQueues.map(x => x._1)
+    var gcRunPreLoopStmts: ISZ[ST] = ISZ()
+    var gcRunLoopStartStmts: ISZ[ST] = ISZ()
+    var gcRunLoopMidStmts: ISZ[ST] = gcImplDrainQueues.map(x => x._2)
+    
+    if(!PeriodicUtil.requiresPacerArtifacts(c, symbolTable, actOptions.platform)) {
+      semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH)
+      
+      val semWait: ST = st"MUTEXOP(${StringTemplate.SEM_WAIT}())"
+      
+      gcRunLoopStartStmts = gcRunLoopStartStmts :+ semWait
+      
+      if(Util.isPeriodic(c)) {
+        val initialLock:ST = st"""// Initial lock to await dispatch input.
+                                 |${semWait}"""
+        gcRunPreLoopStmts = gcRunPreLoopStmts :+ initialLock 
+      }
+    }
+      
     Util.getDispatchProtocol(c) match {
       case Some(Dispatch_Protocol.Periodic) =>
-        // import Timer.idl4
-        imports = imports + Util.camkesStdConnectors;
+
+        val (componentContributions, glueCodeContributions) = 
+          Dispatcher.handlePeriodicComponent(symbolTable, actOptions, c, reporter)
         
-        if(hookupPeriodicComponentsToTimeServer) {
-          // uses Timer tb_timer;
-          uses = uses :+ Uses(
-            name = TimerUtil.TIMER_ID,
-            typ = TimerUtil.TIMER_TYPE,
-            optional = F)
-        }
+        binarySemaphores = binarySemaphores ++ componentContributions.shell.binarySemaphores
+        semaphores = semaphores ++ componentContributions.shell.semaphores
+        imports = imports ++ componentContributions.shell.imports
+        uses = uses ++ componentContributions.shell.uses
+        consumes = consumes ++ componentContributions.shell.consumes
+
+        gcImplMethods = glueCodeContributions.impl.methods ++ gcImplMethods
+        gcRunInitStmts = gcRunInitStmts ++ glueCodeContributions.impl.mainPreLoopStatements
+        gcRunLoopMidStmts = gcRunLoopMidStmts ++ glueCodeContributions.impl.mainLoopStatements
         
-        // consumes Notification from periodic dispatcher
-        consumes = consumes :+ Consumes(
-          name = TimerUtil.componentNotificationName(None()),
-          typ = Util.NOTIFICATION_TYPE,
-          optional = F)
-        
-        cImpls = StringTemplate.periodicDispatchElems(cid, hookupPeriodicComponentsToTimeServer) +: cImpls
-
-        cRunPreEntries = cRunPreEntries :+ StringTemplate.registerPeriodicCallback()
-
-        Util.getComputeEntrypointSourceText(c.properties) match {
-          case Some(handler) =>
-            cInterfaceStatements = cInterfaceStatements :+ st"void ${handler}(const int64_t *);"
-
-            val drains = StringTemplate.drainPeriodicQueue(cid, handler)
-
-            cImpls = cImpls :+ drains._1
-            stRunLoopEntries = stRunLoopEntries :+ drains._2
-          case _ => reporter.warn(None(), Util.toolName, s"Periodic thread ${cid} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
-        }
+        gcInterfaceStatements = gcInterfaceStatements ++ glueCodeContributions.header.methods
+       
       case Some(Dispatch_Protocol.Sporadic) =>
 
       case x =>
@@ -1138,58 +1036,61 @@ import org.sireum.message.Reporter
         }
     }
 
+    val names: Names = Names(c, hamrBasePackageName.get)
+    
     if(!performHamrIntegration) {
       Util.getInitializeEntryPoint(c.properties) match {
         case Some(methodName) =>
-          cInterfaceStatements = cInterfaceStatements :+ st"""void ${methodName}(const int64_t *arg);"""
+          gcInterfaceStatements = gcInterfaceStatements :+ st"""void ${methodName}(const int64_t *arg);"""
           val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(cid, methodName)
-          cImpls = cImpls :+ cimpl
-          cRunPreEntries = cRunPreEntries :+ runEntry
+          gcImplMethods = gcImplMethods :+ cimpl
+          gcRunInitStmts = gcRunInitStmts :+ runEntry
         case _ =>
       }
     }
-    
-    val names: Names = Names(c, hamrBasePackageName.get)
-    
+        
     if(performHamrIntegration) {
       
-      cImplIncludes = cImplIncludes :+ st"#include <${names.cEntryPointAdapterName}.h>"
+      gcImplIncludes = gcImplIncludes :+ st"#include <${names.cEntryPointAdapterName}.h>"
 
-      cPreInits = cPreInits :+ st"" // blank line
+      gcImplPreInits = gcImplPreInits :+ st"" // blank line
       
-      cPreInits = cPreInits :+ StringTemplate.hamrIntialiseArchitecture(names.cEntryPointAdapterQualifiedName)
+      gcImplPreInits = gcImplPreInits :+ StringTemplate.hamrIntialiseArchitecture(names.cEntryPointAdapterQualifiedName)
       
-      cPreInits = cPreInits :+ StringTemplate.hamrInitialiseEntrypoint(names.cEntryPointAdapterQualifiedName)
+      gcImplPreInits = gcImplPreInits :+ StringTemplate.hamrInitialiseEntrypoint(names.cEntryPointAdapterQualifiedName)
 
-      stRunLoopEntries = StringTemplate.hamrRunLoopEntries(names.cEntryPointAdapterQualifiedName)
+      gcRunLoopMidStmts = StringTemplate.hamrRunLoopEntries(names.cEntryPointAdapterQualifiedName)
 
       val outgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c).filter(f =>
-        outConnections.contains(Util.getName(f.identifier)))
+        symbolTable.outConnections.contains(Util.getName(f.identifier)))
 
-      cImpls = cImpls ++ outgoingPorts.map((f: ir.FeatureEnd) => hamrSendOutgoingPort(c, names, f, typeMap))
+      gcImplMethods = gcImplMethods ++ outgoingPorts.map((f: ir.FeatureEnd) => hamrSendOutgoingPort(c, names, f, typeMap))
 
       val unconnectedOutgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c).filter(f =>
-        !outConnections.contains(Util.getName(f.identifier)))
+        !symbolTable.outConnections.contains(Util.getName(f.identifier)))
 
-      cImpls = cImpls ++ unconnectedOutgoingPorts.map((f: ir.FeatureEnd) => hamrSendUnconnectedOutgoingPort(c, names, f, typeMap))
+      gcImplMethods = gcImplMethods ++ unconnectedOutgoingPorts.map((f: ir.FeatureEnd) => hamrSendUnconnectedOutgoingPort(c, names, f, typeMap))
       
       val inPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c).filter(f =>
-        inConnections.contains(Util.getName(f.identifier)))
+        symbolTable.inConnections.contains(Util.getName(f.identifier)))
 
-      cImpls = cImpls ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(c, names, f, typeMap))
+      gcImplMethods = gcImplMethods ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(c, names, f, typeMap))
 
       val unconnectedInPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c).filter(f =>
-        !inConnections.contains(Util.getName(f.identifier)))
+        !symbolTable.inConnections.contains(Util.getName(f.identifier)))
 
-      cImpls = cImpls ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(c, names, f, typeMap))
+      gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(c, names, f, typeMap))
     }
 
+    val gcImpl = genComponentTypeImplementationFile(c, auxCImplIncludes ++ gcImplIncludes,
+      gcImplMethods, gcImplPreInits, gcImplPostInits,
+      gcRunInitStmts, gcRunPreLoopStmts, gcRunLoopStartStmts, gcRunLoopMidStmts)
+    
     containers = containers :+ C_Container(
       instanceName = names.instanceName,
       componentId = cid,
-      cSources = ISZ(genComponentTypeImplementationFile(c, auxCImplIncludes ++ cImplIncludes, cImpls, 
-        cPreInits, cPostInits, cRunPreEntries, stRunLoopEntries)) ++ cSources,
-      cIncludes = ISZ(genComponentTypeInterfaceFile(c, cInterfaceStatements)),
+      cSources = gcImpl +: cSources,
+      cIncludes = ISZ(genComponentTypeInterfaceFile(c, gcInterfaceStatements)),
       sourceText = if(performHamrIntegration) ISZ() else Util.getSourceText(c.properties),
       externalCSources = externalCSources,
       externalCIncludeDirs = externalCIncludeDirs
@@ -1327,11 +1228,11 @@ import org.sireum.message.Reporter
       case ActPlatform.SeL4_Only => // use new mappings below
     }
 
-    for (portPath <- outConnections.keys.filter(p => outConnections.get(p).get.size > 0)) {
+    for (portPath <- symbolTable.outConnections.keys.filter(p => symbolTable.outConnections.get(p).get.size > 0)) {
 
-      for (connInst <- outConnections.get(portPath).get()) {
-        val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
-        val dstFeature: ir.Feature = featureMap.get(Util.getName(connInst.dst.feature.get)).get
+      for (connInst <- symbolTable.outConnections.get(portPath).get()) {
+        val dst: ir.Component = symbolTable.airComponentMap.get(Util.getName(connInst.dst.component)).get
+        val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(Util.getName(connInst.dst.feature.get)).get
 
         connInst.kind match {
           case ir.ConnectionKind.Port =>
@@ -1372,14 +1273,14 @@ import org.sireum.message.Reporter
 
     var seen: Set[String] = Set.empty[String]
 
-    for (in <- inConnections.entries.filter(p => p._2.size > 0)) {
+    for (in <- symbolTable.inConnections.entries.filter(p => p._2.size > 0)) {
       for (connInst <- in._2) {
-        val src: ir.Component = componentMap.get(Util.getName(connInst.src.component)).get
-        val srcFeature: ir.Feature = featureMap.get(Util.getName(connInst.src.feature.get)).get
+        val src: ir.Component = symbolTable.airComponentMap.get(Util.getName(connInst.src.component)).get
+        val srcFeature: ir.Feature = symbolTable.airFeatureMap.get(Util.getName(connInst.src.feature.get)).get
         val srcId: String = Util.getName(srcFeature.identifier) 
           
-        val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
-        val dstFeature: ir.Feature = featureMap.get(Util.getName(connInst.dst.feature.get)).get
+        val dst: ir.Component = symbolTable.airComponentMap.get(Util.getName(connInst.dst.component)).get
+        val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(Util.getName(connInst.dst.feature.get)).get
         val dstId: String = Util.getName(dstFeature.identifier)
         
         if (dstFeature.category == ir.FeatureCategory.EventDataPort) {
@@ -1441,12 +1342,12 @@ import org.sireum.message.Reporter
       case ActPlatform.SeL4_Only => return  
     }
     
-    for (portPath <- outConnections.keys.filter(p => outConnections.get(p).get.size > 0)) {
+    for (portPath <- symbolTable.outConnections.keys.filter(p => symbolTable.outConnections.get(p).get.size > 0)) {
       var i: Z = 0
-      for (connInst <- outConnections.get(portPath).get()) {
+      for (connInst <- symbolTable.outConnections.get(portPath).get()) {
 
-        val dst: ir.Component = componentMap.get(Util.getName(connInst.dst.component)).get
-        val dstFeature: ir.Feature = featureMap.get(Util.getName(connInst.dst.feature.get)).get
+        val dst: ir.Component = symbolTable.airComponentMap.get(Util.getName(connInst.dst.component)).get
+        val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(Util.getName(connInst.dst.feature.get)).get
         
         def handleDataPort(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, f)
@@ -1836,7 +1737,7 @@ import org.sireum.message.Reporter
         val inter = Some(st"""bool ${name}_${suffix}(${mod}${paramType} * ${name});""")
         val impl: Option[ST] =
           if(suffix == "write") {
-            outConnections.get(Util.getName(feature.identifier)) match {
+            symbolTable.outConnections.get(Util.getName(feature.identifier)) match {
               case Some(conns) =>
                 var accum: ISZ[ST] = ISZ()
                 var i = 0
@@ -2001,10 +1902,8 @@ import org.sireum.message.Reporter
           
           val dsts: Map[String, QueueObject] = srcQueues.get(featurePath).get
 
-          //val cIncludes: ISZ[ST] = ISZ(st"#include <${queueHeaderName}>")
           var cIncludes: ISZ[ST] = ISZ()
-          
-          //val postInit = st"${queueName}_init(${featureQueueName});"
+
           var _postInits: ISZ[ST] = ISZ()
           val enqueueEntries: ISZ[ST] = dsts.valueSet.elements.map(qo => {
 
@@ -2025,14 +1924,7 @@ import org.sireum.message.Reporter
           val methodName = s"${featureName}_enqueue"
 
           val interface = st"""bool ${methodName}(const ${sel4TypeName} *);"""
-          
-          /*
-          val st = st"""bool ${methodName}(const ${sel4TypeName} *data) {
-                       |  ${queueName}_enqueue(${featureQueueName}, (${sel4TypeName}*) data);
-                       |  ${featureNotificationName}_emit();
-                       |  return true;
-                       |}"""
-          */
+
           val st = st"""bool ${methodName}(const ${sel4TypeName} *data) {
                        |  ${(enqueueEntries, "\n")}
                        |  return true;
@@ -2068,7 +1960,7 @@ import org.sireum.message.Reporter
 
       val impl: Option[ST] = if(suffix == "enqueue") {
         // OUT
-        outConnections.get(Util.getName(feature.identifier)) match {
+        symbolTable.outConnections.get(Util.getName(feature.identifier)) match {
           case Some(conns) =>
             var accum: ISZ[ST] = ISZ()
             var i = 0
@@ -2223,7 +2115,7 @@ import org.sireum.message.Reporter
               var accum = ISZ[ST]()
               val emit = Util.brand(s"${featureName}")
 
-              outConnections.get(Util.getName(feature.identifier)) match {
+              symbolTable.outConnections.get(Util.getName(feature.identifier)) match {
                 case Some(conns) =>
                   var i = 0
                   while (i < conns.size) {
@@ -2490,114 +2382,27 @@ import org.sireum.message.Reporter
   }
 
   def genComponentTypeImplementationFile(component:ir.Component, 
+                                        
                                          localCIncludes: ISZ[ST], blocks: ISZ[ST], preInits: ISZ[ST], postInits: ISZ[ST],
-                                         cRunPreEntries: ISZ[ST], cDrainQueues: ISZ[ST]): Resource = {
+
+                                         gcRunInitStmts: ISZ[ST],
+                                         gcRunPreLoopStmts: ISZ[ST],
+                                         gcRunLoopStartStmts: ISZ[ST],
+                                         gcRunLoopMidStmts: ISZ[ST]
+                                         ): Resource = {
     val name = Util.getClassifier(component.classifier.get)
     val compTypeFileName = Util.brand(name)
-    val ret: ST =  StringTemplate.componentTypeImpl(compTypeFileName, localCIncludes, blocks, preInits, postInits,
-      cRunPreEntries, cDrainQueues, Util.isSporadic(component))
+    
+    val runMethod: ST = StringTemplate.runMethod(locals = ISZ(), initStmts = gcRunInitStmts, preLoopStmts = gcRunPreLoopStmts,
+      loopStartStmts = gcRunLoopStartStmts, loopBodyStmts = gcRunLoopMidStmts, loopEndStmts = ISZ(), postLoopStmts = ISZ())
+    
+    val glueCodeImpl: ST =  StringTemplate.componentTypeImpl(compTypeFileName, localCIncludes, blocks, preInits, postInits, runMethod)
 
-    return Util.createResource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", ret, T)
+    return Util.createResource(s"${Util.DIR_COMPONENTS}/${name}/${Util.DIR_SRC}/${compTypeFileName}.c", glueCodeImpl, T)
   }
 
-  def buildComponentMap(c: ir.Component): Unit = {
-    val name = Util.getName(c.identifier)
-    assert(!componentMap.contains(name))
-    componentMap = componentMap + (name ~> c)
-    if(c.classifier.nonEmpty) {
-      classifierMap = classifierMap + (c.classifier.get.name ~> c)
-    }
-    for(f <- c.features){
-      featureMap = featureMap + (Util.getName(f.identifier) ~> f)
-
-      f match {
-        case fe: ir.FeatureEnd =>
-          if (Util.isDataPort(fe) && fe.classifier.isEmpty) {
-            reporter.warn(None(), Util.toolName, s"Data type missing for feature ${fe.category} ${Util.getName(fe.identifier)}")
-          }
-        case _ =>
-      }
-    }
-    for (sc <- c.subComponents) {
-      buildComponentMap(sc)
-    }
-    hasPeriodicComponents = hasPeriodicComponents | Util.isPeriodic(c)
-  }
-
-  def resolve(sys : ir.Component): B = {
-
-    for(c <- componentMap.values){
-
-
-      for(ci <- c.connectionInstances){
-        if(isHandledConnection(ci)) {
-          def add(portPath: String, isIn: B): Unit = {
-            val map: HashMap[String, ISZ[ir.ConnectionInstance]] = isIn match {
-              case T => inConnections
-              case F => outConnections
-            }
-            var cis: ISZ[ir.ConnectionInstance] = map.get(portPath) match {
-              case Some(x) => x
-              case _ => ISZ()
-            }
-            cis = cis :+ ci
-            isIn match {
-              case T => inConnections = inConnections + (portPath ~> cis)
-              case F => outConnections = outConnections + (portPath ~> cis)
-            }
-          }
-          val portNames = getPortConnectionNames(ci)
-          add(portNames._1, F)
-          add(portNames._2, T)
-        } else {
-          val src = componentMap.get(Util.getName(ci.src.component)).get
-          val dst = componentMap.get(Util.getName(ci.dst.component)).get
-          
-          val srcName: String = if(ci.src.feature.nonEmpty) {
-            s"${Util.getLastName(src.identifier)}.${Util.getLastName(ci.src.feature.get)}"
-          } else {
-            Util.getLastName(src.identifier)
-          }
-          
-          val dstName: String = if(ci.dst.feature.nonEmpty) {
-            s"${Util.getLastName(dst.identifier)}.${Util.getLastName(ci.dst.feature.get)}"
-          } else {
-            Util.getLastName(dst.identifier)
-          }
-          reporter.info(None(), Util.toolName, s"Ignoring ${src.category} to ${dst.category} connection: ${srcName} -> ${dstName}")
-        }
-      }
-    }
-
-    def findProcessor(): Option[ir.Component] = {
-      var processes:ISZ[ir.Component] = ISZ()
-      for (c <- componentMap.values if (c.category == ir.ComponentCategory.Process) && Util.getTypeHeaderFileName(c).nonEmpty) {
-        processes = processes :+ c
-      }
-      if(processes.size > 0) {
-        val candidates = processes.filter(f => ISZOps(f.subComponents).exists(p => p.category == ir.ComponentCategory.Thread))
-        if(candidates.isEmpty) {
-          reporter.warn(None(), Util.toolName, "None of the bound processes contain subcomponents")
-          Some(processes(z"0"))
-        } else if (candidates.size > 1) {
-          reporter.error(None(), Util.toolName, s"${candidates.size} bound processes discovered, each containing thread subcomponents.")
-          None[ir.Component]()
-        } else {
-          Some(candidates(z"0"))
-        }
-      } else {
-        None[ir.Component]()
-      }
-    }
-
-    findProcessor() match {
-      case Some(p) =>
-        topLevelProcess = Some(p)
-        typeHeaderFileName = Util.getTypeHeaderFileName(p).get
-      case _ =>
-        reporter.error(None(), Util.toolName, "No processor bound process defined in the AADL model")
-    }
-
+  def buildTransportMechanisms(sys : ir.Component): B = {
+   
     if(!hasErrors()) {
       buildMonitors()
     }
@@ -2616,10 +2421,10 @@ import org.sireum.message.Reporter
 
   def resolveSharedDataFeatures(conns: ISZ[ir.ConnectionInstance]): Unit = {
     val dataConnections = conns.filter(f => f.kind == ir.ConnectionKind.Access).filter(
-      f => featureMap.get(Util.getName(f.dst.feature.get)).get.category == ir.FeatureCategory.DataAccess)
+      f => symbolTable.airFeatureMap.get(Util.getName(f.dst.feature.get)).get.category == ir.FeatureCategory.DataAccess)
 
     for(conn <- dataConnections) {
-      val srcComp = componentMap.get(Util.getName(conn.src.component)).get
+      val srcComp = symbolTable.airComponentMap.get(Util.getName(conn.src.component)).get
 
       if(srcComp.category != ir.ComponentCategory.Data) {
         reporter.error(None(), Util.toolName, s"${Util.getLastName(conn.src.component)} is not a data component")
@@ -2628,7 +2433,7 @@ import org.sireum.message.Reporter
       val (dataKey, dstFeatureName) = getPortConnectionNames(conn)
       sharedData.get(dataKey) match {
         case Some(sd) =>
-          val dstComp = componentMap.get(Util.getName(conn.dst.component)).get
+          val dstComp = symbolTable.airComponentMap.get(Util.getName(conn.dst.component)).get
           val ownerId = Util.getName(sd.owner.identifier)
           val dstId = Util.getName(dstComp.identifier)
 
@@ -2699,8 +2504,8 @@ import org.sireum.message.Reporter
   }
   
   def getPortConnectionNames(c: ir.ConnectionInstance): (String, String) = {
-    val src = componentMap.get(Util.getName(c.src.component)).get
-    val dst = componentMap.get(Util.getName(c.dst.component)).get
+    val src = symbolTable.airComponentMap.get(Util.getName(c.src.component)).get
+    val dst = symbolTable.airComponentMap.get(Util.getName(c.dst.component)).get
 
     val ret: (String, String) = (src.category, dst.category) match {
       case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
@@ -2741,19 +2546,19 @@ import org.sireum.message.Reporter
       }
       return ret
     }
-    val src = componentMap.get(Util.getName(c.src.component)).get
-    val dst = componentMap.get(Util.getName(c.dst.component)).get
+    val src = symbolTable.airComponentMap.get(Util.getName(c.src.component)).get
+    val dst = symbolTable.airComponentMap.get(Util.getName(c.dst.component)).get
 
     val ret : B = (src.category, dst.category) match {
       case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
 
-        val srcFeature = featureMap.get(Util.getName(c.src.feature.get)).get
-        val dstFeature = featureMap.get(Util.getName(c.dst.feature.get)).get
+        val srcFeature = symbolTable.airFeatureMap.get(Util.getName(c.src.feature.get)).get
+        val dstFeature = symbolTable.airFeatureMap.get(Util.getName(c.dst.feature.get)).get
 
         validFeature(srcFeature) && validFeature(dstFeature)
 
       case (ir.ComponentCategory.Data, ir.ComponentCategory.Thread) =>
-        val dstFeature = featureMap.get(Util.getName(c.dst.feature.get)).get
+        val dstFeature = symbolTable.airFeatureMap.get(Util.getName(c.dst.feature.get)).get
         validFeature(dstFeature)
 
       case _ =>
@@ -2762,6 +2567,5 @@ import org.sireum.message.Reporter
 
     return ret
   }
-
 }
 
