@@ -637,7 +637,7 @@ cd $$BUILD_DIR
     return (ret, runEntry)
   }
 
-  def cEventNotificiationHandler(handlerName: String, regCallback: String): ST = {
+  def cEventNotificationHandler(handlerName: String, regCallback: String): ST = {
     val ret: ST =
       st"""static void ${handlerName}(void * unused) {
           |  MUTEXOP(${SEM_POST}())

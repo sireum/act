@@ -864,9 +864,15 @@ object StringUtil {
                                                         
                                                 preInitStatements: ISZ[ST],
                                                 postInitStatements: ISZ[ST],
-                                                         
+                                               
                                                 mainPreLoopStatements: ISZ[ST],
-                                                mainLoopStatements: ISZ[ST])
+
+                                                mainLoopStartStatements: ISZ[ST],
+                                                mainLoopStatements: ISZ[ST],
+                                                mainLoopEndStatements: ISZ[ST],
+
+                                                mainPostLoopStatements: ISZ[ST]
+                                               )
 
 @enum object Dispatch_Protocol {
   'Periodic

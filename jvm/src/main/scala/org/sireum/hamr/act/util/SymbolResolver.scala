@@ -167,6 +167,11 @@ import org.sireum.message.Reporter
                            ports: ISZ[AadlFeature]
                           ) extends AadlComponent {
 
+
+  def isPeriodic(): B = { return dispatchProtocol == Dispatch_Protocol.Periodic }
+  
+  def isSporadic(): B = { return dispatchProtocol == Dispatch_Protocol.Sporadic }
+
   def getMaxComputeExecutionTime(): Z = {
     val ret: Z = Util.getDiscreetPropertyValue(component.properties, Util.PROP_Timing_Properties__Compute_Execution_Time) match {
       case Some(RangeProp(low, high)) => 
@@ -182,6 +187,10 @@ import org.sireum.message.Reporter
   def getDomain(symbolTable: SymbolTable): Option[Z] = {
     val p: AadlProcess = symbolTable.getProcess(parent.get)
     return p.getDomain()
+  }
+
+  def getComputeEntrypointSourceText(): Option[String] = {
+    return Util.getComputeEntrypointSourceText(component.properties)
   }
 }
 

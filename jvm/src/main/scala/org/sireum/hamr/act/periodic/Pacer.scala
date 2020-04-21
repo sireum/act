@@ -88,6 +88,7 @@ import org.sireum.message.Reporter
 
     var gcMethods: ISZ[ST] = ISZ()
     var gcMainPreLoopStms: ISZ[ST] = ISZ()
+    var gcMainLoopStartStms: ISZ[ST] = ISZ()
     var gcMainLoopStms: ISZ[ST]= ISZ()
 
     // get user defined time triggered method 
@@ -99,8 +100,8 @@ import org.sireum.message.Reporter
         // initial pacer/period wait
         gcMainPreLoopStms = gcMainPreLoopStms :+ PacerTemplate.pacerWait()
 
-        // pacer/period wait at start of for loop
-        gcMainLoopStms = gcMainLoopStms :+ PacerTemplate.pacerWait()
+        // pacer/period wait at start of loop
+        gcMainLoopStartStms = gcMainLoopStartStms :+ PacerTemplate.pacerWait()
                 
         gcMethods = gcMethods :+ PacerTemplate.wrapPeriodicComputeEntrypoint(classifier, handler) 
         
@@ -128,7 +129,11 @@ import org.sireum.message.Reporter
     val glueCodeContributions = CamkesGlueCodeContributions(
       CamkesGlueCodeHeaderContributions(includes = ISZ(), methods = gcHeaderMethods),
       CamkesGlueCodeImplContributions(includes = ISZ(), globals = ISZ(), methods = gcMethods, preInitStatements = ISZ(),
-        postInitStatements = ISZ(), mainPreLoopStatements = gcMainPreLoopStms, mainLoopStatements = gcMainLoopStms)
+        postInitStatements = ISZ(), 
+        mainPreLoopStatements = gcMainPreLoopStms, 
+        mainLoopStartStatements = gcMainLoopStartStms, mainLoopStatements = gcMainLoopStms, mainLoopEndStatements = ISZ(),
+        mainPostLoopStatements = ISZ()
+      )
     )
 
     return (componentContributions, glueCodeContributions)

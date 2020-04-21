@@ -132,6 +132,7 @@ import org.sireum.message.Reporter
 
     var gcMethods: ISZ[ST] = ISZ()
     var gcMainPreLoopStms: ISZ[ST] = ISZ()
+    
     var gcMainLoopStms: ISZ[ST]= ISZ()
 
     // import Timer.idl4
@@ -183,7 +184,10 @@ import org.sireum.message.Reporter
     val glueCodeContributions = CamkesGlueCodeContributions(
       CamkesGlueCodeHeaderContributions(includes = ISZ(), methods = gcHeaderMethods),
       CamkesGlueCodeImplContributions(includes = ISZ(), globals = ISZ(), methods = gcMethods, preInitStatements = ISZ(),
-        postInitStatements = ISZ(), mainPreLoopStatements = gcMainPreLoopStms, mainLoopStatements = gcMainLoopStms)
+        postInitStatements = ISZ(), 
+        mainPreLoopStatements = gcMainPreLoopStms, 
+        mainLoopStartStatements = ISZ(), mainLoopStatements = gcMainLoopStms, mainLoopEndStatements = ISZ(),
+        mainPostLoopStatements = ISZ())
     )
 
     return (componentContributions, glueCodeContributions)
