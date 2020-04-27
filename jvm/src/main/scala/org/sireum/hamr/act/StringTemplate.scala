@@ -3,6 +3,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
+import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits, Provides, Uses}
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Component
@@ -344,12 +345,34 @@ object StringTemplate {
     return st"${StringTemplate.SeqNumType} ${sbSamplingPortGlobalVar(spi, f)};"
   }
 
+  def sbSamplingPortGetterInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    assert(f.category == ir.FeatureCategory.DataPort)
+
+    val portName = Util.getLastName(f.identifier)
+    val methodNamePrefix = Util.brand(portName)
+
+    val ret: ST = st"bool ${methodNamePrefix}_read(${spi.sel4TypeName} * value);"
+
+    return ret
+  }
+  
+  def sbSamplingPortSetterInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    assert(f.category == ir.FeatureCategory.DataPort)
+
+    val portName = Util.getLastName(f.identifier)
+    val methodNamePrefix = Util.brand(portName)
+
+    val ret: ST = st"bool ${methodNamePrefix}_write(const ${spi.sel4TypeName} * value);"
+
+    return ret
+  }
+  
   def sbSamplingPortInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
     val portName = Util.getLastName(f.identifier)
     val methodNamePrefix = Util.brand(portName)
-    
+
     val ret: ST = f.direction match {
       case ir.Direction.In => st"bool ${methodNamePrefix}_read(${spi.sel4TypeName} * value);"
       case ir.Direction.Out => st"bool ${methodNamePrefix}_write(const ${spi.sel4TypeName} * value);"
@@ -357,30 +380,60 @@ object StringTemplate {
     }
     return ret
   }
-  
-  def sbSamplingPortImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+
+  def sbSamplingPortGetterImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
     val sharedDataVarName = Util.brand(Util.getLastName(f.identifier))
     val globalVarName = sbSamplingPortGlobalVar(spi, f)
 
-    val ret: ST = f.direction match {
-      case ir.Direction.In => st"""bool ${sharedDataVarName}_read(${spi.sel4TypeName} * value) {
-                                  |  ${StringTemplate.SeqNumType} new_seqNum;
-                                  |  if ( read_${spi.name}(${sharedDataVarName}, value, &new_seqNum) ) {
-                                  |    ${globalVarName} = new_seqNum;
-                                  |    return true;
-                                  |  } else {
-                                  |    return false;
-                                  |  } 
-                                  |}"""
-        
-      case ir.Direction.Out => st"""bool ${sharedDataVarName}_write(const ${spi.sel4TypeName} * value) {
-                                   |  return write_${spi.name}(${sharedDataVarName}, value, &${globalVarName});
-                                   |}"""
-        
-      case _ => halt(s"Unexpected direction ${f.direction}")
-    }
+    val isEmptyMethodName = s"${sharedDataVarName}_is_empty"
+
+    val ret: ST = st"""/*****************************************************************
+                          | * ${isEmptyMethodName}:
+                          | *
+                          | * Helper method to determine if the data infrastructure port has
+                          | * received data
+                          | *
+                          | ****************************************************************/
+                          |bool ${isEmptyMethodName}() {
+                          |  return is_empty_${spi.name}(${sharedDataVarName});
+                          |}
+                          |
+                          |bool ${sharedDataVarName}_read(${spi.sel4TypeName} * value) {
+                          |  ${StringTemplate.SeqNumType} new_seqNum;
+                          |  if ( read_${spi.name}(${sharedDataVarName}, value, &new_seqNum) ) {
+                          |    ${globalVarName} = new_seqNum;
+                          |    return true;
+                          |  } else {
+                          |    return false;
+                          |  } 
+                          |}"""
+    return ret
+  }
+
+  def sbSamplingPortInitialise(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    assert(f.category == ir.FeatureCategory.DataPort)
+    val featureName = Util.getLastName(f.identifier)
+    val sharedDataVarName = Util.brand(Util.getLastName(f.identifier))
+    val globalVarName = sbSamplingPortGlobalVar(spi, f)
+    
+    val initMethodName = s"init_${spi.name}"
+    
+    return st"""// initialise data structure for data port ${featureName}
+               |${initMethodName}(${sharedDataVarName}, &${globalVarName});"""
+  }
+  
+  def sbSamplingPortSetterImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
+    assert(f.category == ir.FeatureCategory.DataPort)
+
+    val sharedDataVarName = Util.brand(Util.getLastName(f.identifier))
+    val globalVarName = sbSamplingPortGlobalVar(spi, f)
+
+    val ret: ST = st"""bool ${sharedDataVarName}_write(const ${spi.sel4TypeName} * value) {
+                      |  return write_${spi.name}(${sharedDataVarName}, value, &${globalVarName});
+                      |}"""
+    
     return ret
   }
   
@@ -560,14 +613,14 @@ cd $$BUILD_DIR
     val preInit: Option[ST] = if(preInits.nonEmpty) {
       Some(st"""
                |void pre_init(void) {
-               |  ${(preInits, "\n")}
+               |  ${(preInits, "\n\n")}
                |}""")
     } else { None() }
     
     val postInit: Option[ST] = if(postInits.nonEmpty) {
       Some(st"""
                |void post_init(void){
-               |  ${(postInits, "\n")}
+               |  ${(postInits, "\n\n")}
                |}""")
     } else { None() }
     
@@ -637,17 +690,29 @@ cd $$BUILD_DIR
     return (ret, runEntry)
   }
 
-  def cEventNotificationHandler(handlerName: String, regCallback: String): ST = {
+  def cEventNotificationHandler(handlerName: String, regCallback: String, featureName: String): ST = {
     val ret: ST =
-      st"""static void ${handlerName}(void * unused) {
+      st"""/************************************************************************
+          | * ${handlerName}:
+          | * Invoked by: seL4 notification callback
+          | *
+          | * This is the function invoked by an seL4 notification callback to 
+          | * dispatch the component due to the arrival of an event on port
+          | * ${featureName}
+          | *
+          | ************************************************************************/
+          |static void ${handlerName}(void * unused) {
           |  MUTEXOP(${SEM_POST}())
           |  CALLBACKOP(${regCallback}(${handlerName}, NULL));
           |}"""
     return ret
   }
 
-  def cRegCallback(handlerName: String, regCallback: String): ST = {
-    val ret: ST = st"CALLBACKOP(${regCallback}(${handlerName}, NULL));"
+  def cRegCallback(handlerName: String, regCallback: String, feature: ir.FeatureEnd): ST = {
+    val portType = feature.category.string
+    val featureName = Util.getLastName(feature.identifier)
+    val ret: ST = st"""// register callback for ${portType} port ${featureName}
+                      |CALLBACKOP(${regCallback}(${handlerName}, NULL));"""
     return ret
   }
 
@@ -657,14 +722,12 @@ cd $$BUILD_DIR
   
   def hamrIntialiseArchitecture(appName: String): ST = {
     return st"""// initialise slang-embedded components/ports
-               |${appName}_initialiseArchitecture(SF_LAST);
-               |"""
+               |${appName}_initialiseArchitecture(SF_LAST);"""
   }
 
   def hamrInitialiseEntrypoint(appName: String): ST = {
     return st"""// call the component's initialise entrypoint
-               |${appName}_initialiseEntryPoint(SF_LAST);
-               |"""
+               |${appName}_initialiseEntryPoint(SF_LAST);"""
   }
 
   def hamrRunLoopEntries(appName: String): ISZ[ST] = {
@@ -692,8 +755,10 @@ cd $$BUILD_DIR
   }
 
   def hamrIsEmpty(methodName: String,
-                  sel4IsEmptyMethodName: String): ST = {
-    val ret: ST = st"""B ${methodName}(STACK_FRAME_ONLY) {
+                  sel4IsEmptyMethodName: String,
+                  srcPort: ir.FeatureEnd): ST = {
+    val ret: ST = st"""// is_empty ${Util.getLastName(srcPort.identifier)}: ${srcPort.direction.name} ${srcPort.category.name}
+                      |B ${methodName}(STACK_FRAME_ONLY) {
                       |  return ${sel4IsEmptyMethodName}();
                       |}"""
     return ret
@@ -799,41 +864,33 @@ cd $$BUILD_DIR
     return ret
   }
   
+  def samplingPortFreezeMethodName(feature: ir.FeatureEnd): String = {
+    return Util.brand(s"freeze_event_port_${Util.getLastName(feature.identifier)}")
+  }
+  
   def samplingPortHeader(s: SamplingPortInterface): ST = {
-    val spName = s.name
-    val macroName = StringUtil.toUpperCase(s"${spName}_h")
-    val portType = s.sel4TypeName
-    
+    val macroName = StringUtil.toUpperCase(s"${s.name}_h")
+        
     val ret = st"""#ifndef ${macroName}
 #define ${macroName}
 
 #include "seqNum.h"
 
 // Sampling port message with bool data
-typedef struct ${spName} {
+typedef struct ${s.name} {
 
   // The sampling port message data.
-  ///
-  // TODO: How do we handle differnet data types?  Possible options:
   //
-  //   - HAMR could generate a dedicated struct for each data port type. In
-  //     the long run this may be the best options since AADL can specify the
-  //     message type.
-  //
-  //   - Generalize this struct with some C wizardry. Would it help to split
-  //     this into two data parts, one for the data and one for the sequence
-  //     number?
-  //
-  ${portType} data;
+  ${s.sel4TypeName} data;
   
   // Sequence number incremented by the writer every time the sampling port is
-  // written. Read by the reciever to detect dropped messages and incoherant
-  // message reads.  An incoherant message is one that is formed of parts of
-  // more than one message.  An incoherent message can occure when writing
-  // happens durring read. If the component runs long enough, this counter
-  // will wrap back to zero.  This causes no problems unless the reciever is
-  // delayed for the wrap time. In that case the reciever may not detect
-  // dropped or incoherent messags. But if the reciver is delayed for that
+  // written. Read by the receiver to detect dropped messages and incoherent
+  // message reads.  An incoherent message is one that is formed of parts of
+  // more than one message.  An incoherent message can occur when writing
+  // happens during read. If the component runs long enough, this counter
+  // will wrap back to zero.  This causes no problems unless the receiver is
+  // delayed for the wrap time. In that case the receiver may not detect
+  // dropped or incoherent message. But if the receiver is delayed for that
   // long the system is probably in a very bad state. Also see DIRTY_SEQ_NUM
   // above.
   //
@@ -843,11 +900,13 @@ typedef struct ${spName} {
 
 } ${s.structName};
 
-void init_${spName}(${s.structName} *port, seqNum_t *seqNum);
+void init_${s.name}(${s.structName} *port, seqNum_t *seqNum);
 
-bool write_${spName}(${s.structName} *port, const ${portType} *data, seqNum_t *seqNum);
+bool write_${s.name}(${s.structName} *port, const ${s.sel4TypeName} *data, seqNum_t *seqNum);
 
-bool read_${spName}(${s.structName} *port, ${portType} *data, seqNum_t *seqNum);
+bool read_${s.name}(${s.structName} *port, ${s.sel4TypeName} *data, seqNum_t *seqNum);
+
+bool is_empty_${s.name}(${s.structName} *port);
 
 #endif
 """
@@ -855,9 +914,6 @@ bool read_${spName}(${s.structName} *port, ${portType} *data, seqNum_t *seqNum);
   }
   
   def samplingPortImpl(s: SamplingPortInterface): ST = {
-    val spName = s.name
-    val spType = s"${spName}_t"
-    val portType = s.sel4TypeName
     
     val ret = st"""
 #include <camkes.h>
@@ -867,21 +923,21 @@ bool read_${spName}(${s.structName} *port, ${portType} *data, seqNum_t *seqNum);
 #include <sel4utils/util.h>
 #include <sel4utils/helpers.h>
 
-#include "${spName}.h"
+#include "${s.name}.h"
 
-void init_${spName}(${spType} *port, seqNum_t *seqNum) {
+void init_${s.name}(${s.structName} *port, seqNum_t *seqNum) {
   *seqNum = 0; // First message sequence number will be 1.
   port->seqNum = DIRTY_SEQ_NUM;
 }
 
 // Write message to a sampling port (data type: int)
 //
-// Returns true when sucessful. Otherwise returns false. Currently there is no
-// way to fail and true is alwasy returned. But this may change in the
-// future. seqNum is incremented when a message is succefully sent. seqNum
+// Returns true when successful. Otherwise returns false. Currently there is no
+// way to fail and true is always returned. But this may change in the
+// future. seqNum is incremented when a message is successfully sent. seqNum
 // should not be modified otherwise.
 //
-// TODO: Encapsulate this better. seqNum state should be maintained internaly. Possible solutions:
+// TODO: Encapsulate this better. seqNum state should be maintained internally. Possible solutions:
 //
 //    - Allow write to have read access to dataport. Then seqNum is simply in the data port.
 //
@@ -890,8 +946,8 @@ void init_${spName}(${spType} *port, seqNum_t *seqNum) {
 // TODO: Currently using ggc builtin __atomic_thread_fence(__ATOMIC_RELEASE).
 // Would like to use c11 std, but have not figured out how to do this int the
 // seL4 cmake build environment.
-bool write_${spName}(${spType} *port, const ${portType} *data, seqNum_t *seqNum) {
-  // Mark the message dirty BEFORE we start writting.
+bool write_${s.name}(${s.structName} *port, const ${s.sel4TypeName} *data, seqNum_t *seqNum) {
+  // Mark the message dirty BEFORE we start writing.
   port->seqNum = DIRTY_SEQ_NUM;
   // Release memory fence - ensure write above to seqNum happens BEFORE reading data
   __atomic_thread_fence(__ATOMIC_RELEASE);
@@ -910,19 +966,19 @@ bool write_${spName}(${spType} *port, const ${portType} *data, seqNum_t *seqNum)
 // Read a message from a sampling port (data type: int)
 //
 // Return true upon successful read. Data is updated with the read
-// message. The sequence number of the message is also returned. The messaage,
+// message. The sequence number of the message is also returned. The message,
 // might be tha same previously read. The sequences number can be used to
 // detect rereading the same message or dropped messages.
 //
 // Return false if we fail to read a message. For now the only way to fail is
-// when we detect the possibliliy of a write durring read. In this case data
+// when we detect the possibility of a write during read. In this case data
 // may be incoherent and should not be used. Sequence number is set to
 // DIRTY_SEQ_NUM;
 //
 // TODO: Currently using ggc builtin __atomic_thread_fence(__ATOMIC_ACQUIRE).
 // Would like to use c11 std, but have not figured out how to do this int the
 // seL4 cmake build environment.
-bool read_${spName}(${spType} *port, ${portType} *data, seqNum_t *seqNum) {
+bool read_${s.name}(${s.structName} *port, ${s.sel4TypeName} *data, seqNum_t *seqNum) {
   seqNum_t newSeqNum = port->seqNum;
   // Acquire memory fence - Read seqNum BEFORE reading data
   __atomic_thread_fence(__ATOMIC_ACQUIRE);
@@ -934,7 +990,7 @@ bool read_${spName}(${spType} *port, ${portType} *data, seqNum_t *seqNum) {
   // sequence numbers since our last read. For this to happen, this reader
   // would have to be delayed for the entire time to wrap. 
   if (newSeqNum != DIRTY_SEQ_NUM && newSeqNum == port->seqNum) {
-    // Message data is good.  Write did not occure durring read. 
+    // Message data is good.  Write did not occur during read. 
     *seqNum = newSeqNum;
     return true;
   } else {
@@ -942,6 +998,10 @@ bool read_${spName}(${spType} *port, ${portType} *data, seqNum_t *seqNum) {
     *seqNum = DIRTY_SEQ_NUM;
     return false;
   }
+}
+
+bool is_empty_${s.name}(${s.structName} *port) {
+  return port->seqNum == DIRTY_SEQ_NUM;
 }
 """
     return ret
@@ -982,4 +1042,28 @@ bool read_${spName}(${spType} *port, ${portType} *data, seqNum_t *seqNum) {
 
     return body
   }
+  
+  def consumes(c: Consumes): ST = {
+    val maybe: String = if(c.optional) "maybe " else ""
+    return st"${maybe}consumes ${c.typ} ${c.name};"
+  }
+
+  def dataport(d: Dataport): ST = {
+    val maybe: String = if(d.optional) "maybe " else ""
+    return st"${maybe}dataport ${d.typ} ${d.name};"
+  }
+  
+  def emits(e: Emits): ST = {
+    return st"emits ${e.typ} ${e.name};"
+  }
+
+  def provides(p: Provides): ST = {
+    return st"provides ${p.typ} ${p.name};"
+  }
+
+  def uses(u: Uses): ST = {
+    val maybe: String = if(u.optional) "maybe " else ""
+    return st"${maybe}uses ${u.typ} ${u.name};"
+  }
+  
 }

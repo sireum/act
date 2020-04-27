@@ -314,7 +314,8 @@ import org.sireum.message.Reporter
             case ir.FeatureCategory.DataPort =>
               platform match {
                 case ActPlatform.SeL4_TB => connections = connections ++ createDataConnection(conn)
-                case ActPlatform.SeL4 => connections = connections ++ createDataConnection(conn)
+                  
+                case ActPlatform.SeL4 => connections = connections :+ createSharedDataConnection(conn) // adventium dataport profile
                 case ActPlatform.SeL4_Only => connections = connections :+ createSharedDataConnection(conn) // adventium dataport profile
               }
 
@@ -337,8 +338,10 @@ import org.sireum.message.Reporter
               }
               
               platform match {
-                case ActPlatform.SeL4 => connections = connections ++ createDataConnection(conn)
                 case ActPlatform.SeL4_TB => connections = connections ++ createDataConnection(conn)
+                  
+                //case ActPlatform.SeL4 => connections = connections ++ createDataConnection(conn)
+                case ActPlatform.SeL4 => eventDataPort_SB_Connection_Profile()
                 case ActPlatform.SeL4_Only => eventDataPort_SB_Connection_Profile()
               }
 
@@ -362,9 +365,11 @@ import org.sireum.message.Reporter
               }
 
               platform match {
-                case ActPlatform.SeL4 => eventPort_TB_Connection_Profile()
                 case ActPlatform.SeL4_TB => eventPort_TB_Connection_Profile()
-                case ActPlatform.SeL4_Only => eventPort_SB_Connection_Profile() // ihor aadl-event-direct profile
+
+                //case ActPlatform.SeL4 => eventPort_TB_Connection_Profile()  
+                case ActPlatform.SeL4 => eventPort_SB_Connection_Profile()
+                case ActPlatform.SeL4_Only => eventPort_SB_Connection_Profile()
               }
 
             case _ => halt (s"not expecting ${fdst.category}")
@@ -725,9 +730,11 @@ import org.sireum.message.Reporter
               val regCallback = s"${name}_reg_callback"
 
               if (isEventData) {
-                gcImplMethods = gcImplMethods :+ StringTemplate.cEventNotificationHandler(handlerName, regCallback)
+                val featureName = Util.getLastName(fend.identifier)
+                gcImplMethods = gcImplMethods :+ 
+                  StringTemplate.cEventNotificationHandler(handlerName, regCallback, featureName)
               }
-              gcImplPreInits = gcImplPreInits :+ StringTemplate.cRegCallback(handlerName, regCallback)
+              gcImplPostInits = gcImplPostInits :+ StringTemplate.cRegCallback(handlerName, regCallback, fend)
             } else {
               reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
             }
@@ -757,15 +764,17 @@ import org.sireum.message.Reporter
             externalCSources = externalCSources :+ s"${Util.DIR_INCLUDES}/${queueHeaderImplName}"
             camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
             
+            val isOptional = symbolTable.getInConnections(fpath).isEmpty
+            
             consumes = consumes :+ Consumes(
               name = Util.genSeL4NotificationName(fend, T),
               typ = Util.EVENT_NOTIFICATION_TYPE,
-              optional = F)
+              optional = isOptional)
 
             dataports = dataports :+ Dataport(
               name = Util.getEventDataSBQueueDestFeatureName(fid),
               typ = queueType,
-              optional = F)
+              optional = isOptional)
 
           case ir.Direction.Out =>
 
@@ -796,23 +805,25 @@ import org.sireum.message.Reporter
       f.category match {
         case ir.FeatureCategory.DataPort =>
           platform match {
-            case ActPlatform.SeL4_Only => handleDataPort_SB_Profile()
-            case ActPlatform.SeL4 => handleDataPort_TB_Profile()              
             case ActPlatform.SeL4_TB => handleDataPort_TB_Profile()
+
+            //case ActPlatform.SeL4 => handleDataPort_TB_Profile()
+            case ActPlatform.SeL4 => handleDataPort_SB_Profile()
+            case ActPlatform.SeL4_Only => handleDataPort_SB_Profile()
           }
           
         case ir.FeatureCategory.EventDataPort =>
           platform match {
-            case ActPlatform.SeL4_Only =>
-              eventDataPort_SB_Component_Profile()
-
-            case ActPlatform.SeL4 =>
-              handleDataPort_TB_Profile()
-              handleEventPort(T)
-
             case ActPlatform.SeL4_TB =>
               handleDataPort_TB_Profile()
               handleEventPort(T)
+
+            //case ActPlatform.SeL4 =>
+            //  handleDataPort_TB_Profile()
+            //  handleEventPort(T)
+              
+            case ActPlatform.SeL4 => eventDataPort_SB_Component_Profile()
+            case ActPlatform.SeL4_Only => eventDataPort_SB_Component_Profile()
           }
 
         case ir.FeatureCategory.EventPort =>
@@ -897,8 +908,10 @@ import org.sireum.message.Reporter
           }
           
           platform match {
-            case ActPlatform.SeL4 => handleEventPort_TB_Component_Profile()
             case ActPlatform.SeL4_TB => handleEventPort_TB_Component_Profile()
+            
+            //case ActPlatform.SeL4 => handleEventPort_TB_Component_Profile()
+            case ActPlatform.SeL4 => handleEventPort_SB_Component_Profile()
             case ActPlatform.SeL4_Only => handleEventPort_SB_Component_Profile()
           }
 
@@ -939,16 +952,12 @@ import org.sireum.message.Reporter
     
     if(!PeriodicUtil.requiresPacerArtifacts(c, symbolTable, actOptions.platform)) {
       semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH)
-      
+            
       val semWait: ST = st"MUTEXOP(${StringTemplate.SEM_WAIT}())"
       
-      gcRunLoopStartStmts = gcRunLoopStartStmts :+ semWait
+      gcRunPreLoopStmts = gcRunPreLoopStmts :+ semWait
       
-      if(Util.isPeriodic(c)) {
-        val initialLock:ST = st"""// Initial lock to await dispatch input.
-                                 |${semWait}"""
-        gcRunPreLoopStmts = gcRunPreLoopStmts :+ initialLock 
-      }
+      gcRunLoopStartStmts = gcRunLoopStartStmts :+ semWait
     }
       
     Util.getDispatchProtocol(c) match {
@@ -999,14 +1008,10 @@ import org.sireum.message.Reporter
       
       gcImplIncludes = gcImplIncludes :+ st"#include <${names.cEntryPointAdapterName}.h>"
 
-      gcImplPreInits = gcImplPreInits :+ st"" // blank line
-      
       gcImplPreInits = gcImplPreInits :+ StringTemplate.hamrIntialiseArchitecture(names.cEntryPointAdapterQualifiedName)
       
       gcImplPreInits = gcImplPreInits :+ StringTemplate.hamrInitialiseEntrypoint(names.cEntryPointAdapterQualifiedName)
-
-      gcRunLoopMidStmts = StringTemplate.hamrRunLoopEntries(names.cEntryPointAdapterQualifiedName)
-
+      
       val outgoingPorts: ISZ[ir.FeatureEnd] = Util.getOutPorts(c).filter(f =>
         symbolTable.outConnections.contains(Util.getName(f.identifier)))
 
@@ -1024,6 +1029,13 @@ import org.sireum.message.Reporter
 
       val unconnectedInPorts: ISZ[ir.FeatureEnd] = Util.getInPorts(c).filter(f =>
         !symbolTable.inConnections.contains(Util.getName(f.identifier)))
+
+      val freezeInEventPorts = 
+        inPorts.filter(p => p.category == ir.FeatureCategory.EventPort).map(eventPort =>
+          st"${StringTemplate.samplingPortFreezeMethodName(eventPort)}();")
+        
+      // remove any mid loop statements and replace with sel4 specific ones
+      gcRunLoopMidStmts = freezeInEventPorts ++ StringTemplate.hamrRunLoopEntries(names.cEntryPointAdapterQualifiedName)
 
       gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(c, names, f, typeMap))
     }
@@ -1132,13 +1144,14 @@ import org.sireum.message.Reporter
 
     val isEmptyMethodName = s"${sel4ExtName}_${portName}_IsEmpty"
     val sel4IsEmptyMethodName = Util.brand(s"${portName}_is_empty")
-    val isEmptyMethod = StringTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName)
+
     
     def handleInDataPort(): ST = {
       val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
       val sel4Type = Util.getSel4TypeName(typeMap.get(camkesType).get, performHamrIntegration)
       val slangPayloadType = StringTemplate.hamrSlangPayloadType(srcPort.classifier.get, hamrBasePackageName.get)
-
+      val isEmptyMethod = StringTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName, srcPort)
+      
       val comment = st"// receive ${portName}: ${srcPort.direction.name} ${srcPort.category.name} ${sel4Type}"
       val receiveMethod = StringTemplate.hamrReceiveIncomingDataPort(
         comment, methodName, sel4Type, slangPayloadType, sel4ReadMethod)
@@ -1151,6 +1164,8 @@ import org.sireum.message.Reporter
     def handleInEventPort(): ST = {
       val comment = st"// receive ${portName}: ${srcPort.direction.name} ${srcPort.category.name}"
       val receiveMethod = StringTemplate.hamrReceiveIncomingEventPort(comment, methodName, sel4ReadMethod)
+
+      val isEmptyMethod = StringTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName, srcPort)
       
       return st"""${isEmptyMethod}
                  |
@@ -1170,7 +1185,9 @@ import org.sireum.message.Reporter
   def buildSamplingPortInterfaces(): Unit = {
     platform match {
       case ActPlatform.SeL4_TB => return
-      case ActPlatform.SeL4 => return
+
+      //case ActPlatform.SeL4 => return
+      case ActPlatform.SeL4 => // use new mappings below
       case ActPlatform.SeL4_Only => // use new mappings below
     }
 
@@ -1213,7 +1230,9 @@ import org.sireum.message.Reporter
   def buildSBQueues(): Unit = {
     platform match {
       case ActPlatform.SeL4_TB => return
-      case ActPlatform.SeL4 => return
+
+      //case ActPlatform.SeL4 => return
+      case ActPlatform.SeL4 => // use new mappings below
       case ActPlatform.SeL4_Only => // use new mappings below
     }
 
@@ -1284,7 +1303,9 @@ import org.sireum.message.Reporter
   def buildMonitors(): Unit = {
     platform match {
       case ActPlatform.SeL4_TB => // 
-      case ActPlatform.SeL4 => // 
+
+      //case ActPlatform.SeL4 => // 
+      case ActPlatform.SeL4 => return 
       case ActPlatform.SeL4_Only => return  
     }
     
@@ -1527,14 +1548,18 @@ import org.sireum.message.Reporter
               case ir.FeatureCategory.DataPort =>
                 platform match {
                   case ActPlatform.SeL4_TB => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
-                  case ActPlatform.SeL4 => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
+
+                  //case ActPlatform.SeL4 => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
+                  case ActPlatform.SeL4 => // use new mappings
                   case ActPlatform.SeL4_Only => // use new mappings
                 }
                 
               case ir.FeatureCategory.EventDataPort =>
                 platform match {
                   case ActPlatform.SeL4_TB => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
-                  case ActPlatform.SeL4 => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
+                  
+                  //case ActPlatform.SeL4 => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
+                  case ActPlatform.SeL4 => buildIhorMonitor(dstFeature.asInstanceOf[ir.FeatureEnd])
                   case ActPlatform.SeL4_Only => buildIhorMonitor(dstFeature.asInstanceOf[ir.FeatureEnd])
                 }
                 
@@ -1543,9 +1568,11 @@ import org.sireum.message.Reporter
                   buildIhorEventMonitor(dstFeature.asInstanceOf[ir.FeatureEnd])
                 }
                 platform match {
-                  case ActPlatform.SeL4 => evenPort_Sel4_TB_Profile()
                   case ActPlatform.SeL4_TB => evenPort_Sel4_TB_Profile()
-                  case ActPlatform.SeL4_Only => // not using monitors 
+
+                  //case ActPlatform.SeL4 => evenPort_Sel4_TB_Profile()
+                  case ActPlatform.SeL4 => // not using monitors   
+                  case ActPlatform.SeL4_Only => // not using monitors   
                 }
 
               case _ =>
@@ -1720,31 +1747,65 @@ import org.sireum.message.Reporter
           } else {
             None[ST]()
           }
-        val cIncludes: ISZ[ST] = ISZ()      
-        val preInits: Option[ST] = None()
-        val postInits: Option[ST] = None()
-        val drainQueues: Option[(ST, ST)] = None()
 
-        return Some(C_SimpleContainer(cIncludes, inter, impl, preInits, postInits, drainQueues))
+        return Some(C_SimpleContainer(
+          cIncludes = ISZ(),
+          cInterface = inter,
+          cImplementation = impl,
+          preInits = None(), 
+          postInits = None(), 
+          drainQueues = None()))
       } 
       
       def dataport_SB_Profile() : Option[C_SimpleContainer] = {
         val samplingPort: SamplingPortInterface = getSamplingPort(feature)
 
-        val cImpl =  StringTemplate.sbSamplingPortImplementation(samplingPort, feature)
-
-        val cInterface = StringTemplate.sbSamplingPortInterface(samplingPort, feature)
+        var interfaces: ISZ[ST] = ISZ()
+        var implementations: ISZ[ST] = ISZ()
+        var preInits: ISZ[ST] = ISZ()
+        var postInits: ISZ[ST] = ISZ()
         
-        val cIncludes: ISZ[ST] = ISZ()
-        val preInits: Option[ST] = None()
-        val postInits: Option[ST] = None()
-        val drainQueues: Option[(ST, ST)] = None()
-        return Some(C_SimpleContainer(cIncludes, Some(cInterface), Some(cImpl), preInits, postInits, drainQueues))
+        preInits = preInits :+
+          StringTemplate.sbSamplingPortInitialise(samplingPort, feature)
+        
+        feature.direction match {
+          case ir.Direction.In =>
+            interfaces = interfaces :+
+              StringTemplate.sbSamplingPortGetterInterface(samplingPort, feature)
+
+            implementations = implementations :+
+              StringTemplate.sbSamplingPortGetterImplementation(samplingPort, feature)
+            
+          case ir.Direction.Out =>
+            interfaces = interfaces :+
+              StringTemplate.sbSamplingPortSetterInterface(samplingPort, feature)
+
+            
+            implementations = implementations :+
+              StringTemplate.sbSamplingPortSetterImplementation(samplingPort, feature)
+            
+          case _ => halt(s"Unexpected direction ${feature}")
+        }
+        
+        val interface: Option[ST] = if(interfaces.isEmpty) None() else Some(st"${(interfaces, "\n")}")
+        val implementation: Option[ST] = if(implementations.isEmpty) None() else Some(st"${(implementations, "\n")}")
+        val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n")}")
+        val postInit: Option[ST] = if(postInits.isEmpty) None() else Some(st"${(postInits, "\n")}")
+          
+        return Some(C_SimpleContainer(
+          cIncludes = ISZ(), 
+          cInterface = interface, 
+          cImplementation = implementation, 
+          preInits = preInit,
+          postInits = postInit,
+          drainQueues= None()))
       }
       
       val ret: Option[C_SimpleContainer] = platform match {
-        case ActPlatform.SeL4 => dataport_TB_Profile()
         case ActPlatform.SeL4_TB => dataport_TB_Profile()
+
+        //case ActPlatform.SeL4 => dataport_TB_Profile()
+        case ActPlatform.SeL4 => dataport_SB_Profile()
         case ActPlatform.SeL4_Only => dataport_SB_Profile()
       }
       
@@ -1759,10 +1820,13 @@ import org.sireum.message.Reporter
   
         val aadlPortType = typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get
         val sel4TypeName = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
-  
-        
+          
         val ret: Option[C_SimpleContainer] = feature.direction match {
           case ir.Direction.In =>
+            
+            if(symbolTable.getInConnections(featurePath).isEmpty){
+              return None()
+            }
   
             val queueSize = Util.getQueueSize(feature)
             val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
@@ -1770,20 +1834,26 @@ import org.sireum.message.Reporter
   
             val featureQueueName = Util.getEventDataSBQueueDestFeatureName(fid)
             val featureNotificationName = Util.genSeL4NotificationName(feature, T)
-            
+
+            var preInits: ISZ[ST] = ISZ()
+            var postInits: ISZ[ST] = ISZ()
             var drainQueue: Option[(ST,ST)] = None()
-            var preInits: Option[ST] = None()
             var cInterfaces: ISZ[ST] = ISZ()
             var cImplementations: ISZ[ST] = ISZ()
+
+            val counterVar = "numDropped"
+            val counterType = Util.SB_EVENT_COUNTER_TYPE
             
             val recvQueueFeatureName = Util.getEventData_SB_RecvQueueFeatureName(fid)
             val recvQueueName = Util.getEventData_SB_RecvQueueName(sel4TypeName, queueSize)
             val recvQueueType = Util.getEventData_SB_RecvQueueTypeName(sel4TypeName, queueSize)
-  
+
             val dequeuePollMethodName = s"${featureName}_dequeue_poll"
             val dequeueMethodName = s"${featureName}_dequeue"
-            val counterVar = "numDropped"
-            val counterType = Util.SB_EVENT_COUNTER_TYPE
+            val dequeueInfrastructureMethodName = s"${queueName}_dequeue"
+            
+            val isEmptyMethodName = s"${featureName}_is_empty"
+            val isEmptyInfrastructureMethodName = s"${queueName}_is_empty"
             
             cInterfaces = cInterfaces :+ st"bool ${dequeueMethodName}(${sel4TypeName} *);"
             
@@ -1793,7 +1863,7 @@ import org.sireum.message.Reporter
                                  | * ${dequeuePollMethodName}:
                                  | ************************************************************************/
                                  |bool ${dequeuePollMethodName}(${counterType} *${counterVar}, ${sel4TypeName} *data) {
-                                 |  return ${queueName}_dequeue(&${recvQueueFeatureName}, ${counterVar}, data);
+                                 |  return ${dequeueInfrastructureMethodName}(&${recvQueueFeatureName}, ${counterVar}, data);
                                  |}
                                  |                     
                                  |/************************************************************************
@@ -1802,66 +1872,87 @@ import org.sireum.message.Reporter
                                  |bool ${dequeueMethodName}(${sel4TypeName} *data) {
                                  |  ${counterType} ${counterVar};
                                  |  return ${dequeuePollMethodName}(&${counterVar}, data);
+                                 |}
+                                 |
+                                 |/************************************************************************
+                                 | * ${isEmptyMethodName}:
+                                 | *
+                                 | * Helper method to determine if infrastructure port has received new
+                                 | * events
+                                 | ************************************************************************/
+                                 |bool ${isEmptyMethodName}(){
+                                 |  return ${isEmptyInfrastructureMethodName}(&${recvQueueFeatureName});
                                  |}"""
             
             cImplementations = cImplementations :+ baseCimpl
-
-            if(aadlThread.isSporadic() && !performHamrIntegration) {
+            
+            if(aadlThread.isSporadic()) {
+              val handlerName = s"${featureNotificationName}_handler"
+              val regCallback = s"${featureNotificationName}_reg_callback"
               
-              Util.getComputeEntrypointSourceText(feature.properties) match {
-                case Some(userEntrypointMethodName) =>
-  
-                  val varName = featureName
-  
-                  val handlerName = s"${featureNotificationName}_handler"
-                  val regCallback = s"${featureNotificationName}_reg_callback"
-  
-                  val userEntrypointName = Util.getUserEventEntrypointMethodName(component, feature)
-  
-                  drainQueue = Some((st"",
-                    st"""{
-                        |  ${sel4TypeName} ${varName};
-                        |  while (${dequeueMethodName}((${sel4TypeName} *) &${varName})) {
-                        |    ${userEntrypointName}(&${varName});
-                        |  }
-                        |}"""))
-  
-                  cInterfaces = cInterfaces :+ st"void ${userEntrypointMethodName}(const ${sel4TypeName} *);"
-  
-                  preInits = Some(StringTemplate.cRegCallback(handlerName, regCallback))
-  
-                  val invokeHandler = s"${userEntrypointMethodName}((${sel4TypeName} *) in_arg);"
-                  val handler = st"""${StringTemplate.cEventNotificationHandler(handlerName, regCallback)}
-                                    |
-                                    |
-                                    |/************************************************************************
-                                    | * ${userEntrypointName}:
-                                    | *
-                                    | * This is the function invoked by an active thread dispatcher to
-                                    | * call to a user-defined entrypoint function.  It sets up the dispatch
-                                    | * context for the user-defined entrypoint, then calls it.
-                                    | *
-                                    | ************************************************************************/
-                                    |void ${userEntrypointName}(const ${sel4TypeName} * in_arg) {
-                                    |  ${invokeHandler}
-                                    |}
-                                    |"""
-  
-                  cImplementations = cImplementations :+ handler
-                  
-                case _ =>
+              cImplementations = cImplementations :+
+                StringTemplate.cEventNotificationHandler(handlerName, regCallback, featureName)
+              
+              postInits = postInits :+ StringTemplate.cRegCallback(handlerName, regCallback, feature)
+              
+              if(!performHamrIntegration) {
+                Util.getComputeEntrypointSourceText(feature.properties) match {
+                  case Some(userEntrypointMethodName) =>
+    
+                    val varName = featureName
+    
+                    val userEntrypointName = Util.getUserEventEntrypointMethodName(component, feature)
+                    
+                    drainQueue = Some((
+                      st"",
+                      st"""{
+                          |  ${sel4TypeName} ${varName};
+                          |  while (${dequeueMethodName}((${sel4TypeName} *) &${varName})) {
+                          |    ${userEntrypointName}(&${varName});
+                          |  }
+                          |}"""))
+    
+                    cInterfaces = cInterfaces :+ st"void ${userEntrypointMethodName}(const ${sel4TypeName} *);"
+      
+                    val invokeHandler = s"${userEntrypointMethodName}((${sel4TypeName} *) in_arg);"
+                    val entrypoint = st"""/************************************************************************
+                                      | * ${userEntrypointName}:
+                                      | *
+                                      | * This is the function invoked by an active thread dispatcher to
+                                      | * call to a user-defined entrypoint function.  It sets up the dispatch
+                                      | * context for the user-defined entrypoint, then calls it.
+                                      | *
+                                      | ************************************************************************/
+                                      |void ${userEntrypointName}(const ${sel4TypeName} * in_arg) {
+                                      |  ${invokeHandler}
+                                      |}
+                                      |"""
+    
+                    cImplementations = cImplementations :+ entrypoint
+                    
+                  case _ =>
+                }
               }
             }
             
             val cIncludes: ISZ[ST] = ISZ(st"""#include <${queueHeaderName}>
                                              |#include <${Util.SB_COUNTER_FILENAME}>""")
-            val postInits: Option[ST]= Some( st"${recvQueueName}_init(&${recvQueueFeatureName}, ${featureQueueName});")
+            
+            preInits = preInits :+ st"""// initialise data structure for incoming event data port ${fid}
+                                       |${recvQueueName}_init(&${recvQueueFeatureName}, ${featureQueueName});"""
             
             val cInterface: Option[ST] = if(cInterfaces.isEmpty) None() else Some(st"${(cInterfaces, "\n\n")}")
-            
             val cImplementation: Option[ST] = if(cImplementations.isEmpty) None() else Some(st"${(cImplementations, "\n\n")}")
+            val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n\n")}")
+            val postInit: Option[ST] = if(postInits.isEmpty) None() else Some(st"${(postInits, "\n\n")}")
             
-            Some(C_SimpleContainer(cIncludes, cInterface, cImplementation, preInits, postInits, drainQueue))
+            Some(C_SimpleContainer(
+              cIncludes = cIncludes, 
+              cInterface = cInterface, 
+              cImplementation = cImplementation, 
+              preInits = preInit,
+              postInits = postInit, 
+              drainQueues = drainQueue))
             
           case ir.Direction.Out =>
             
@@ -1869,7 +1960,9 @@ import org.sireum.message.Reporter
   
             var cIncludes: ISZ[ST] = ISZ()
   
-            var _postInits: ISZ[ST] = ISZ()
+            var preInits: ISZ[ST] = ISZ()
+            var postInits: ISZ[ST] = ISZ()
+            
             val enqueueEntries: ISZ[ST] = dsts.valueSet.elements.map(qo => {
   
               val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, qo.queueSize)
@@ -1879,7 +1972,8 @@ import org.sireum.message.Reporter
               val featureNotificationName = Util.genSeL4NotificationQueueName(feature, qo.queueSize)
               
               cIncludes = cIncludes :+ st"#include <${queueHeaderName}>"
-              _postInits = _postInits :+ st"${queueName}_init(${featureQueueName});"
+              preInits = preInits :+ st"""// initialise data structure for outgoing event data port ${fid}
+                                         |${queueName}_init(${featureQueueName});"""
               
               st"""${queueName}_enqueue(${featureQueueName}, (${sel4TypeName}*) data);
                   |${featureNotificationName}_emit();
@@ -1897,11 +1991,17 @@ import org.sireum.message.Reporter
             
             val cInterface: Option[ST] = Some(interface)
             val cImplementation: Option[ST] = Some(st)
-            val preInits: Option[ST] = None()
-            val postInits: Option[ST]= Some(st"${(_postInits, "\n")}")
+            val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n\n")}")
+            val postInit: Option[ST]= if(postInits.isEmpty) None() else Some(st"${(postInits, "\n\n")}")
             val drainQueues: Option[(ST,ST)] = None()
   
-            Some(C_SimpleContainer(cIncludes, cInterface, cImplementation, preInits, postInits, drainQueues))
+            Some(C_SimpleContainer(
+              cIncludes = cIncludes,
+              cInterface = cInterface,
+              cImplementation = cImplementation,
+              preInits = preInit, 
+              postInits = postInit,
+              drainQueues = drainQueues))
               
           case x => halt(s"Unexpected direction: ${x}")
         }
@@ -2010,7 +2110,9 @@ import org.sireum.message.Reporter
 
       val ret: Option[C_SimpleContainer] = platform match {
         case ActPlatform.SeL4_TB => handleEventData_TB_GlueCode_Profile()
-        case ActPlatform.SeL4 => handleEventData_TB_GlueCode_Profile()
+
+        //case ActPlatform.SeL4 => handleEventData_TB_GlueCode_Profile()
+        case ActPlatform.SeL4 => handleEventData_SB_GlueCode_Profile()
         case ActPlatform.SeL4_Only => handleEventData_SB_GlueCode_Profile()
         case _ => None()
       }
@@ -2140,14 +2242,14 @@ import org.sireum.message.Reporter
         val compName = Util.getClassifier(component.classifier.get)
         val counterName = Util.getEventSBCounterName(featureName)
                 
-        var preInits: Option[ST] = None()
+        var preInits: ISZ[ST] = ISZ()
+        var postInits: ISZ[ST] = ISZ()
         var interfaces: ISZ[ST] = ISZ()
         var implementations: ISZ[ST] = ISZ()
+        var drainQueues: ISZ[ST] = ISZ()
         
         feature.direction match {
           case ir.Direction.In =>
-
-            var drainQueues: ISZ[ST] = ISZ()
             
             val receivedEventsVarName = Util.brand(s"${featureName}_received_events")
             val lastCounterVarName = Util.brand(s"${featureName}_last_counter")
@@ -2155,6 +2257,8 @@ import org.sireum.message.Reporter
             val userPortInterfaceMethodName = Util.getEventPortSendReceiveMethodName(feature)
 
             interfaces = interfaces :+ st"""bool ${userPortInterfaceMethodName}(void);"""
+            
+            val isEmptyMethodName: String = Util.brand(s"${featureName}_is_empty")
             
             implementations = implementations :+ 
               st"""/************************************************************************
@@ -2181,9 +2285,20 @@ import org.sireum.message.Reporter
                   |  } else {
                   |    return false;
                   |  }
+                  |}
+                  |
+                  |/************************************************************************
+                  | * ${isEmptyMethodName};
+                  | * 
+                  | * Helper method to determine if infrastructure port has received 
+                  | * new events
+                  | *
+                  | ************************************************************************/
+                  |bool ${isEmptyMethodName}() {
+                  |  return *${counterName} == ${lastCounterVarName};
                   |}"""
 
-            val freezeEventsMethodName: String = Util.brand(s"freeze_event_port_${featureName}")
+            val freezeEventsMethodName: String = StringTemplate.samplingPortFreezeMethodName(feature)
             drainQueues = drainQueues :+ st"${freezeEventsMethodName}();"
             
             val currentCounter = s"current_${counterName}"
@@ -2229,114 +2344,101 @@ import org.sireum.message.Reporter
               val callback_reg = Util.brand(s"${featureName}_reg_callback")
   
               implementations = implementations :+
-                st"""/************************************************************************
-                    | * ${callback}:
-                    | * Invoked by: seL4 notification callback
-                    | *
-                    | * This is the function invoked by an seL4 notification callback to 
-                    | * dispatch the component due to the arrival of an event on port
-                    | * ${featureName}
-                    | *
-                    | ************************************************************************/
-                    |static void ${callback}(void *_ UNUSED){
-                    |  MUTEXOP(${StringTemplate.SEM_POST}());
-                    |  CALLBACKOP(${callback_reg}(${callback}, NULL));
-                    |}"""
+                StringTemplate.cEventNotificationHandler(callback, callback_reg, featureName)
   
-              preInits = Some(st"CALLBACKOP(${callback_reg}(${callback}, NULL));")
+              postInits = postInits :+ StringTemplate.cRegCallback(callback, callback_reg, feature)
               
-              Util.getComputeEntrypointSourceText(feature.properties) match {
-                case Some(computeEntrypointSourceText) =>
-
-                  drainQueues = drainQueues :+ 
-                      st"""{ 
-                          |  if(${receivedEventsVarName} > 0) {
-                          |    // dequeue one event and call the event handler
-                          |    ${userPortInterfaceMethodName}();
-                          |    ${entrypointMethodName}();
-                          |  }
+              if(!performHamrIntegration){
+                Util.getComputeEntrypointSourceText(feature.properties) match {
+                  case Some(computeEntrypointSourceText) =>
+  
+                    drainQueues = drainQueues :+ 
+                        st"""{ 
+                            |  if(${receivedEventsVarName} > 0) {
+                            |    // dequeue one event and call the event handler
+                            |    ${userPortInterfaceMethodName}();
+                            |    ${entrypointMethodName}();
+                            |  }
+                            |}"""
+    
+                    interfaces = interfaces :+ st"void ${computeEntrypointSourceText}(void);"
+    
+                    implementations = implementations :+ 
+                      st"""
+                          |/************************************************************************
+                          | *  ${entrypointMethodName}
+                          | *
+                          | * This is the function invoked by an active thread dispatcher to
+                          | * call to a user-defined entrypoint function.  It sets up the dispatch
+                          | * context for the user-defined entrypoint, then calls it.
+                          | *
+                          | ************************************************************************/
+                          |void ${entrypointMethodName}(void){
+                          |  ${computeEntrypointSourceText}();
                           |}"""
-  
-                  interfaces = interfaces :+ st"void ${computeEntrypointSourceText}(void);"
-  
-                  implementations = implementations :+ 
-                    st"""
-                        |/************************************************************************
-                        | *  ${entrypointMethodName}
-                        | *
-                        | * This is the function invoked by an active thread dispatcher to
-                        | * call to a user-defined entrypoint function.  It sets up the dispatch
-                        | * context for the user-defined entrypoint, then calls it.
-                        | *
-                        | ************************************************************************/
-                        |void ${entrypointMethodName}(void){
-                        |  ${computeEntrypointSourceText}();
-                        |}"""
-                  
-                case _ => 
+                    
+                  case _ => 
+                }
               }
             }
-
-            val interface: Option[ST] = if(interfaces.isEmpty) None() else Some(st"${(interfaces, "\n\n")}")
-            val implementation: Option[ST] = if(implementations.isEmpty) None() else Some(st"${(implementations, "\n\n")}")
-            val cIncludes: ISZ[ST] = ISZ(Util.sbCounterInclude())
-            
-            val drainQueue: Option[(ST, ST)] = Some((st"", st"${(drainQueues, "\n\n")}"))
-              
-            return Some(C_SimpleContainer(
-              cIncludes = cIncludes,
-              cInterface = interface,
-              cImplementation = implementation,
-              preInits = preInits,
-              postInits = None(),
-              drainQueues = drainQueue))
-            
           case ir.Direction.Out =>
 
             val sendMethodName = Util.getEventPortSendReceiveMethodName(feature)
             val emit = Util.brand(s"${featureName}_emit()")
 
-            val cHeaderEntries = st"bool ${sendMethodName}(void);"
+            interfaces = interfaces :+ st"bool ${sendMethodName}(void);"
             
-            val sendMethod = st"""/************************************************************************
-                     | * ${sendMethodName}
-                     | * Invoked from user code in the local thread.
-                     | *
-                     | * This is the function invoked by the local thread to make a
-                     | * call to send to a remote event port.
-                     | *
-                     | ************************************************************************/
-                     |bool ${sendMethodName}(void) {
-                     |  // ${counterName} is a dataport (shared memory) that is written by the sender 
-                     |  // and read by the receiver(s). This counter is monotonicly increasing, 
-                     |  // but can wrap.
-                     |  (*${counterName})++;
-                     |  
-                     |  // Release memory fence - ensure subsequent write occurs after any preceeding read or write
-                     |  ${counterName}_release();
-                     |  
-                     |  ${emit};
-                     |  
-                     |  return true;
-                     |}
-                     |"""
+            preInits = preInits :+ st"""// initialise shared counter for event port ${featureName}
+                                       |*${counterName} = 0;""" 
             
-            val cIncludes: ISZ[ST] = ISZ(Util.sbCounterInclude())
-            return Some(C_SimpleContainer(
-              cIncludes = cIncludes, 
-              cInterface = Some(cHeaderEntries), 
-              cImplementation = Some(sendMethod), 
-              preInits = None(), 
-              postInits = None(),
-              drainQueues = None()))
+            implementations = implementations :+ 
+              st"""/************************************************************************
+                  | * ${sendMethodName}
+                  | * Invoked from user code in the local thread.
+                  | *
+                  | * This is the function invoked by the local thread to make a
+                  | * call to send to a remote event port.
+                  | *
+                  | ************************************************************************/
+                  |bool ${sendMethodName}(void) {
+                  |  // ${counterName} is a dataport (shared memory) that is written by the sender 
+                  |  // and read by the receiver(s). This counter is monotonicly increasing, 
+                  |  // but can wrap.
+                  |  (*${counterName})++;
+                  |  
+                  |  // Release memory fence - ensure subsequent write occurs after any preceeding read or write
+                  |  ${counterName}_release();
+                  |  
+                  |  ${emit};
+                  |  
+                  |  return true;
+                  |}
+                  |"""
             
           case _ => halt(s"Unexpected direction ${feature.direction}")
         }
+
+        val interface: Option[ST] = if(interfaces.isEmpty) None() else Some(st"${(interfaces, "\n\n")}")
+        val implementation: Option[ST] = if(implementations.isEmpty) None() else Some(st"${(implementations, "\n\n")}")
+        val cIncludes: ISZ[ST] = ISZ(Util.sbCounterInclude())
+        val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n\n")}")
+        val postInit: Option[ST] = if(postInits.isEmpty) None() else Some(st"${(postInits, "\n\n")}")
+        val drainQueue: Option[(ST, ST)] = Some((st"", st"${(drainQueues, "\n\n")}"))
+
+        return Some(C_SimpleContainer(
+          cIncludes = cIncludes,
+          cInterface = interface,
+          cImplementation = implementation,
+          preInits = preInit,
+          postInits = postInit,
+          drainQueues = drainQueue))
       }
       
       val ret: Option[C_SimpleContainer] = platform match {
-        case ActPlatform.SeL4 => handleEventPort_TB_Profile()
         case ActPlatform.SeL4_TB => handleEventPort_TB_Profile()
+
+        //case ActPlatform.SeL4 => handleEventPort_TB_Profile()
+        case ActPlatform.SeL4 => handleEventPort_SB_Profile()
         case ActPlatform.SeL4_Only => handleEventPort_SB_Profile()
       }
       return ret
@@ -2371,7 +2473,10 @@ import org.sireum.message.Reporter
 
   def genComponentTypeImplementationFile(component:ir.Component, 
                                         
-                                         localCIncludes: ISZ[ST], blocks: ISZ[ST], preInits: ISZ[ST], postInits: ISZ[ST],
+                                         localCIncludes: ISZ[ST], 
+                                         blocks: ISZ[ST], 
+                                         preInits: ISZ[ST], 
+                                         postInits: ISZ[ST],
 
                                          gcRunInitStmts: ISZ[ST],
                                          gcRunPreLoopStmts: ISZ[ST],

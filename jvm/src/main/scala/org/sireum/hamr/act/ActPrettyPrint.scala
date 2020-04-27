@@ -105,7 +105,6 @@ import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
       for (spi <- container.samplingPorts) {
         val header = StringTemplate.samplingPortHeader(spi)
         val impl = StringTemplate.samplingPortImpl(spi)
-        val fname = spi.name
 
         add(spi.headerPath, header)
         add(spi.implPath, impl)
@@ -266,11 +265,11 @@ import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
           |component ${name} {
           |  ${(i.component.includes.map((i: String) => s"include ${i};"), "\n")}
           |  ${if(i.component.control) "control;" else ""}
-          |  ${(i.component.provides.map((p: Provides) => s"provides ${p.typ} ${p.name};"), "\n")}
-          |  ${(i.component.uses.map((u: Uses) => s"uses ${u.typ} ${u.name};"), "\n")}
-          |  ${(i.component.emits.map((e: Emits) => s"emits ${e.typ} ${e.name};"), "\n")}
-          |  ${(i.component.consumes.map((c: Consumes) => s"consumes ${c.typ} ${c.name};"), "\n")}
-          |  ${(i.component.dataports.map((d: Dataport) => s"dataport ${d.typ} ${d.name};"), "\n")}
+          |  ${(i.component.provides.map((p: Provides) => StringTemplate.provides(p)), "\n")}
+          |  ${(i.component.uses.map((u: Uses) => StringTemplate.uses(u)), "\n")}
+          |  ${(i.component.emits.map((e: Emits) => StringTemplate.emits(e)), "\n")}
+          |  ${(i.component.consumes.map((c: Consumes) => StringTemplate.consumes(c)), "\n")}
+          |  ${(i.component.dataports.map((d: Dataport) => StringTemplate.dataport(d)), "\n")}
           |  ${(i.component.binarySemaphores.map((b: BinarySemaphore) => s"has binary_semaphore ${b.name};"), "\n")}
           |  ${(i.component.semaphores.map((b: Semaphore) => s"has semaphore ${b.name};"), "\n")}
           |  ${(i.component.mutexes.map((m: Mutex) => s"has mutex ${m.name};"), "\n")}

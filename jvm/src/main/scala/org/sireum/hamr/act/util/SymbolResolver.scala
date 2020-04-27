@@ -20,7 +20,13 @@ import org.sireum.message.Reporter
                             inConnections: HashSMap[String, ISZ[ir.ConnectionInstance]],
                             outConnections: HashSMap[String, ISZ[ir.ConnectionInstance]]
                            ) {
-  
+
+  def getInConnections(featurePath: String): ISZ[ir.ConnectionInstance] = {
+    return if(inConnections.contains(featurePath)) inConnections.get(featurePath).get
+    else ISZ()
+  }
+
+
   def getMaxDomain(): Z = {
     var max: Z = z"2" // threads start a domain 2
     for(p <- getPeriodicThreads()) {

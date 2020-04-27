@@ -269,18 +269,9 @@ object Util {
   }
 
   def getTypeHeaderFileName(c: ir.Component) : String = {
-    /*
-    assert(c.category == ir.ComponentCategory.Process)
-    val processor: Option[ir.PropertyValue] = 
-      getDiscreetPropertyValue(c.properties, PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING)
-    
-    val procName: String = processor match {
-      case Some(v : ir.ReferenceProp) => getLastName(v.value)
-      case _ => return None[String]()
-    }
-   */
-    val name = Util.getLastName(c.identifier)
-    return brand(s"${name}_types")
+    //val name = Util.getLastName(c.identifier)
+    //return brand(s"${name}_types")
+    return brand(s"types")
   }
 
   def getContainerName(s: String) : String = {

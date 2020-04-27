@@ -11,6 +11,8 @@ import org.sireum.message.Reporter
 @datatype class Pacer(val symbolTable: SymbolTable,
                       val actOptions: ActOptions) extends PeriodicImpl {
 
+  val performHamrIntegration: B = Util.hamrIntegration(actOptions.platform)
+  
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
                                headerInclude: String,
@@ -79,6 +81,8 @@ import org.sireum.message.Reporter
 
   def handlePeriodicComponent(aadlThread: AadlThread,
                               reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+    assert(aadlThread.isPeriodic())
+    
     val component = aadlThread.component
     val classifier = Util.getClassifier(component.classifier.get)
     
@@ -91,24 +95,26 @@ import org.sireum.message.Reporter
     var gcMainLoopStartStms: ISZ[ST] = ISZ()
     var gcMainLoopStms: ISZ[ST]= ISZ()
 
-    // get user defined time triggered method 
-    Util.getComputeEntrypointSourceText(component.properties) match {
-      case Some(handler) =>
-        // header method so developer knows required signature
-        gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t * in_arg);"
-        
-        // initial pacer/period wait
-        gcMainPreLoopStms = gcMainPreLoopStms :+ PacerTemplate.pacerWait()
+    // initial pacer/period wait
+    gcMainPreLoopStms = gcMainPreLoopStms :+ PacerTemplate.pacerWait()
 
-        // pacer/period wait at start of loop
-        gcMainLoopStartStms = gcMainLoopStartStms :+ PacerTemplate.pacerWait()
-                
-        gcMethods = gcMethods :+ PacerTemplate.wrapPeriodicComputeEntrypoint(classifier, handler) 
-        
-        gcMainLoopStms = gcMainLoopStms :+ PacerTemplate.callPeriodicComputEntrypoint(classifier, handler)
+    // pacer/period wait at start of loop
+    gcMainLoopStartStms = gcMainLoopStartStms :+ PacerTemplate.pacerWait()
 
-      case _ =>
-        reporter.warn(None(), Util.toolName, s"Periodic thread ${classifier} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
+    if(!performHamrIntegration) {
+      // get user defined time triggered method 
+      Util.getComputeEntrypointSourceText(component.properties) match {
+        case Some(handler) =>
+          // header method so developer knows required signature
+          gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t * in_arg);"
+                     
+          gcMethods = gcMethods :+ PacerTemplate.wrapPeriodicComputeEntrypoint(classifier, handler) 
+          
+          gcMainLoopStms = gcMainLoopStms :+ PacerTemplate.callPeriodicComputEntrypoint(classifier, handler)
+  
+        case _ =>
+          reporter.warn(None(), Util.toolName, s"Periodic thread ${classifier} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
+      }
     }
     
     consumes = consumes :+ ast.Consumes(
