@@ -1031,7 +1031,8 @@ import org.sireum.message.Reporter
         !symbolTable.inConnections.contains(Util.getName(f.identifier)))
 
       val freezeInEventPorts = 
-        inPorts.filter(p => p.category == ir.FeatureCategory.EventPort).map(eventPort =>
+        inPorts.filter((p : ir.FeatureEnd) => p.category == ir.FeatureCategory.EventPort)
+          .map((eventPort : ir.FeatureEnd) =>
           st"${StringTemplate.samplingPortFreezeMethodName(eventPort)}();")
         
       // remove any mid loop statements and replace with sel4 specific ones
