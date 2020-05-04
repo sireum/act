@@ -7,6 +7,7 @@ import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Compositio
 import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
+import org.sireum.hamr.codegen.common.StringUtil
 
 @record class ActPrettyPrint {
 
@@ -72,7 +73,7 @@ import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
 
       sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.externalCSources
       includePaths = includePaths ++ c.cIncludes.map((r: Resource) => 
-        StringUtil.getDirectory(r.path)) ++ c.externalCIncludeDirs :+ Util.DIR_INCLUDES
+        Util.getDirectory(r.path)) ++ c.externalCIncludeDirs :+ Util.DIR_INCLUDES
 
       val hamrLib = getHamrLib(c.instanceName, hamrLibs)
       
@@ -90,7 +91,7 @@ import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
       val hamrLib = getHamrLib(Util.SlangTypeLibrary, hamrLibs)
       
       cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
-        ISZ(m.cimplementation.path), ISZ(StringUtil.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, hamrLib)
+        ISZ(m.cimplementation.path), ISZ(Util.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, hamrLib)
 
       add(s"${m.cimplementation.path}", m.cimplementation.content)
       add(s"${m.cinclude.path}", m.cinclude.content)

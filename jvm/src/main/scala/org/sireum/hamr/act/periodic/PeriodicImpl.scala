@@ -4,7 +4,7 @@ package org.sireum.hamr.act.periodic
 
 import org.sireum._
 import org.sireum.hamr.ir
-import org.sireum.hamr.act.util.{AadlProcess, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.{AadlProcess, AadlThread, CommonUtil, SymbolTable}
 import org.sireum.hamr.act.{ActOptions, ActPlatform, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, Counter, Util}
 import org.sireum.message.Reporter
 
@@ -15,7 +15,7 @@ object PeriodicUtil {
   }
 
   def requiresPacerArtifacts(c: ir.Component, symbolTable: SymbolTable, platform: ActPlatform.Type): B = {
-    return Util.isPeriodic(c) && usePacer(symbolTable, platform)
+    return CommonUtil.isPeriodic(c) && usePacer(symbolTable, platform)
   }
   
   def usePacer(symbolTable: SymbolTable, platform: ActPlatform.Type) : B = {

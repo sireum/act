@@ -6,7 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate._
-import org.sireum.hamr.act.util.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.{AadlThread, CommonUtil, PropertyUtil, SymbolTable}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -29,14 +29,14 @@ import org.sireum.message.Reporter
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
     
-    val periodicComponents = components.filter(c => Util.isPeriodic(c) && Util.isThread(c))
+    val periodicComponents = components.filter(c => CommonUtil.isPeriodic(c) && CommonUtil.isThread(c))
 
     if(periodicComponents.nonEmpty) {
       var periodicDispatcherNotifications: ISZ[ast.Emits] = ISZ()
       var periodicDispatcherCalendars: ISZ[ST] = ISZ()
 
       for(c <- periodicComponents) {
-        val componentId = Util.getLastName(c.identifier)
+        val componentId = CommonUtil.getLastName(c.identifier)
         val classifier = Util.getClassifier(c.classifier.get)
 
         if(hookupPeriodicComponentsToTimeServer) {
@@ -67,7 +67,7 @@ import org.sireum.message.Reporter
           PeriodicDispatcherTemplate.DISPATCH_PERIODIC_INSTANCE, dispatcherNotificationName,
           componentId, componentNotificationName)
 
-        val period: Z = Util.getPeriod(c) match {
+        val period: Z = PropertyUtil.getPeriod(c) match {
           case Some(_period) => _period
           case _ =>
             reporter.warn(None(), Util.toolName, s"Period not provided for periodic component ${classifier}, using ${Util.DEFAULT_PERIOD}")

@@ -57,11 +57,13 @@ trait Module extends CrossJvmJsJitPack {
 
   final override def testScalacPluginIvyDeps = scalacPluginIvyDeps
 
-  final override def deps = Seq(airObject)
-
   final override val jvmTestFrameworks = Seq("org.scalatest.tools.Framework")
 
   final override def jsTestFrameworks = jvmTestFrameworks
 
+  final override def deps = Seq(airObject, commonObject)
+
   def airObject: CrossJvmJsPublish
+
+  def commonObject: CrossJvmJsPublish
 }

@@ -6,6 +6,7 @@ import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Transformer
 import org.sireum.message.Reporter
 import org.sireum.hamr.act.Util.reporter
+import org.sireum.hamr.codegen.common.SymbolResolver
 
 object Act {
 
@@ -37,7 +38,7 @@ object Act {
 
     if(!result.ctx.hasErrors) {
       
-      val symbolTable = util.SymbolResolver.resolve(m2, options.hamrBasePackageName, reporter)
+      val symbolTable = SymbolResolver.resolve(m2, options.hamrBasePackageName, reporter)
       
       val auxFiles: ISZ[(String, String)] = options.auxFiles.entries.map(m => {
         val resourceName = s"${options.outputDir}/${Util.AUX_CODE_DIRECTORY_NAME}/${m._1}"

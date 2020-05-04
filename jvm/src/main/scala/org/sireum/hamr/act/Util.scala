@@ -3,6 +3,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
+import org.sireum.hamr.codegen.common.{CommonUtil, OsateProperties, PropertyUtil, StringUtil}
 import org.sireum.ops._
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, Component, FeatureEnd, Transformer}
@@ -41,38 +42,12 @@ object Util {
 
   val INTERFACE_PREFIX: String  = brand("Monitor")
 
-
-  val PROP_DATA_MODEL__DATA_REPRESENTATION: String = "Data_Model::Data_Representation"
-  val PROP_DATA_MODEL__DIMENSION: String = "Data_Model::Dimension"
-  val PROP_DATA_MODEL__BASE_TYPE: String = "Data_Model::Base_Type"
-  val PROP_DATA_MODEL__ENUMERATORS: String = "Data_Model::Enumerators"
-
-  val PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL: String = "Thread_Properties::Dispatch_Protocol"
-  val PROP_THREAD_PROPERTIES__PRIORITY: String =  "Thread_Properties::Priority"
-
-  val PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING: String = "Deployment_Properties::Actual_Processor_Binding"
-  val PROP_COMMUNICATION_PROPERTIES__QUEUE_SIZE: String = "Communication_Properties::Queue_Size"
-
-  val PROP_MEMORY_PROPERTIES__STACK_SIZE: String = "Memory_Properties::Stack_Size"
-
-  val PROP_PROGRAMMING_PROPERTIES__INITIALIZE_ENTRYPOINT_SOURCE_TEXT: String = "Programming_Properties::Initialize_Entrypoint_Source_Text"
-  val PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT: String = "Programming_Properties::Source_Text"
-  val PROP_PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "Programming_Properties::Compute_Entrypoint_Source_Text"
-  
   val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
   val PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "SB_SYS::Compute_Entrypoint_Source_Text"
     
   val PROP_SB_SYS__CAmkES_Owner_Thread: String = "SB_SYS::CAmkES_Owner_Thread"
   val PROP_TB_SYS__CAmkES_Owner_Thread: String = "TB_SYS::CAmkES_Owner_Thread"
 
-  val PROP_Timing_Properties__Compute_Execution_Time: String = "Timing_Properties::Compute_Execution_Time"
-  val PROP_Timing_Properties__Clock_Period: String = "Timing_Properties::Clock_Period"
-  val PROP_Timing_Properties__Frame_Period: String = "Timing_Properties::Frame_Period"
-  val PROP_Timing_Properties__Period: String = "Timing_Properties::Period"
-  
-  val PROP_CASE_Scheduling__Domain: String = "CASE_Scheduling::Domain"
-  val PROP_CASE_Scheduling__Schedule_Source_Text: String = "CASE_Scheduling::Schedule_Source_Text"
-  
   val DEFAULT_QUEUE_SIZE: Z = z"1"
   val DEFAULT_PRIORITY: Z = z"201"
   val DEFAULT_STACK_SIZE: Z = z"1024"
@@ -130,40 +105,9 @@ object Util {
     s = StringOps(s.substring(index, c.name.size))
     return StringUtil.replaceAll(s.s, ".", "_")
   }
-  
-  @pure def getProperty(properties: ISZ[ir.Property], propertyName: String): Option[ir.Property] = {
-    val op = properties.filter(container => getLastName(container.name) == propertyName)
-    val ret: Option[ir.Property] = if(op.nonEmpty) {
-      assert(op.size == 1) // sanity check, OSATE doesn't allow properties to be assigned to more than once
-      Some(op(0))
-    } else {
-      None()
-    }
-    return ret
-  }
-  
-  @pure def getDiscreetPropertyValue(properties: ISZ[ir.Property], propertyName: String): Option[ir.PropertyValue] = {
-    val ret: Option[ir.PropertyValue] = getPropertyValues(properties, propertyName) match {
-      case ISZ(a) => Some(a)
-      case _ => None[ir.PropertyValue]()
-    }
-    return ret
-  }
-  
-  @pure def getPropertyValues(properties: ISZ[ir.Property], propertyName: String): ISZ[ir.PropertyValue] = {
-    return properties.filter(container => getLastName(container.name) == propertyName).flatMap(p => p.propertyValues)
-  }
-
-  def getLastName(n : ir.Name) : String = {
-    return n.name(n.name.size - 1)
-  }
-
-  def getName(n : ir.Name) : String = {
-    return st"${(n.name, "_")}".render
-  }
 
   def getEventPortSendReceiveMethodName(feature: FeatureEnd): String = {
-    val featureName = Util.getLastName(feature.identifier)
+    val featureName = CommonUtil.getLastName(feature.identifier)
     val direction: String = feature.direction match {
       case ir.Direction.In => "dequeue"
       case ir.Direction.Out => "enqueue"
@@ -178,8 +122,8 @@ object Util {
   }
 
   def getMonitorName(comp: ir.Component, feature: ir.Feature) : String = {
-    val cname = Util.getLastName(comp.identifier)
-    val fname = Util.getLastName(feature.identifier)
+    val cname = CommonUtil.getLastName(comp.identifier)
+    val fname = CommonUtil.getLastName(feature.identifier)
     return brand(s"${cname}_${fname}_${MONITOR_COMP_SUFFIX}")
   }
 
@@ -194,16 +138,16 @@ object Util {
   }
 
   def genMonitorFeatureName(f: ir.Feature, num: Option[Z]): String = {
-    return brand(s"${Util.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}")
+    return brand(s"${CommonUtil.getLastName(f.identifier)}${if(num.nonEmpty) num.get else ""}")
   }
 
   def genSeL4NotificationName(f: ir.Feature, isDataPort: B): String = {
-    val name = s"${Util.getLastName(f.identifier)}${if(isDataPort) "_notification" else "" }"
+    val name = s"${CommonUtil.getLastName(f.identifier)}${if(isDataPort) "_notification" else "" }"
     return brand(name)
   }
 
   def genSeL4NotificationQueueName(f: ir.Feature, queueSize: Z): String = {
-    val name = s"${Util.getLastName(f.identifier)}_${queueSize}_notification"
+    val name = s"${CommonUtil.getLastName(f.identifier)}_${queueSize}_notification"
     return brand(name)
   }
   
@@ -246,7 +190,7 @@ object Util {
     if(feature.category == ir.FeatureCategory.DataPort) {
       return s"${INTERFACE_PREFIX}_${typeName}"
     } else {
-      return s"${INTERFACE_PREFIX}_${typeName}_${getQueueSize(feature)}"
+      return s"${INTERFACE_PREFIX}_${typeName}_${PropertyUtil.getQueueSize(feature, Util.DEFAULT_QUEUE_SIZE)}"
     }
   }
 
@@ -278,128 +222,14 @@ object Util {
     return brand(s"${s}_container")
   }
 
-
-  def getUnitPropZ(props: ISZ[ir.Property], propName: String): Option[Z] = {
-    val ret: Option[Z] = getDiscreetPropertyValue(props, propName) match {
-      case Some(v : ir.UnitProp) =>
-        R(v.value) match {
-          case Some(vv) => Some(conversions.R.toZ(vv))
-          case _ => None[Z]()
-        }
-      case _ => None[Z]()
-    }
-    return ret
-  }
-
-  def getQueueSize(f: ir.Feature): Z = {
-    val ret: Z = getUnitPropZ(f.properties, PROP_COMMUNICATION_PROPERTIES__QUEUE_SIZE) match {
-      case Some(z) => z
-      case _ => DEFAULT_QUEUE_SIZE
-    }
-    return ret
-  }
-
-  def getDispatchProtocol(c: ir.Component): Option[Dispatch_Protocol.Type] = {
-    val ret: Option[Dispatch_Protocol.Type] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
-      case Some(ir.ValueProp("Periodic")) => Some(Dispatch_Protocol.Periodic)
-      case Some(ir.ValueProp("Sporadic")) => Some(Dispatch_Protocol.Sporadic)
-      case _ => None[Dispatch_Protocol.Type]()
-    }
-    return ret
-  }
-
-  def getPriority(c: ir.Component): Option[Z] = {
-    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_THREAD_PROPERTIES__PRIORITY) match {
-      case Some(ir.UnitProp(z, _)) =>
-        R(z) match {
-          case Some(v) => Some(conversions.R.toZ(v))
-          case _ => None[Z]()
-        }
-      case _ => None[Z]()
-    }
-    return ret
-  }
-
-  /* unit conversions consistent with AADL/ISO */
-  def getStackSizeInBytes(c: ir.Component): Option[Z] = {
-    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_MEMORY_PROPERTIES__STACK_SIZE) match {
-      case Some(ir.UnitProp(z, u)) =>
-        R(z) match {
-          case Some(v) =>
-            val _v = conversions.R.toZ(v)
-            val _ret: Option[Z] = u match {
-              case Some("bits")  => Some(_v / z"8")
-              case Some("Bytes") => Some(_v)
-              case Some("KByte") => Some(_v * z"1000")
-              case Some("MByte") => Some(_v * z"1000" * z"1000")
-              case Some("GByte") => Some(_v * z"1000" * z"1000" * z"1000")
-              case Some("TByte") => Some(_v * z"1000" * z"1000" * z"1000" * z"1000")
-              case _ => None[Z]()
-            }
-            _ret
-          case _ => None[Z]()
-        }
-      case _ => None[Z]()
-    }
-    return ret
-
-  }
-
-  def convertToMS(value: String, unit: Option[String]): Option[Z] = {
-    val ret: Option[Z] = R(value) match {
-      case Some(v) =>
-        val _v = conversions.R.toZ(v)
-        val ret: Option[Z] = unit match {
-          case Some("ps")  => Some(_v / (z"1000" * z"1000" * z"1000"))
-          case Some("ns")  => Some(_v / (z"1000" * z"1000"))
-          case Some("us")  => Some(_v / (z"1000"))
-          case Some("ms")  => Some(_v)
-          case Some("sec") => Some(_v * z"1000")
-          case Some("min") => Some(_v * z"1000" * z"60")
-          case Some("hr")  => Some(_v * z"1000" * z"60" * z"60")
-          case _ => None[Z]()
-        }
-        ret
-      case _ => None()
-    }
-    return ret
-  }
-  
-  def getPeriod(c: ir.Component): Option[Z] = {
-    val ret: Option[Z] = getDiscreetPropertyValue(c.properties, PROP_Timing_Properties__Period) match {
-      case Some(ir.UnitProp(z, u)) => convertToMS(z, u)
-      case _ => None[Z]()
-    }
-    return ret
-  }
-
-  def getActualProcessorBinding(c: Component): Option[String] = {
-
-    val ret: Option[String] =
-      getDiscreetPropertyValue(c.properties, PROP_DEPLOYMENT_PROPERTIES__ACTUAL_PROCESSOR_BINDING) match {
-        case Some(v : ir.ReferenceProp) => Some(getName(v.value))
-        case _ => return None[String]()
-      }
-
-    return ret
-  }
-  
-  def getInitializeEntryPoint(properties: ISZ[ir.Property]): Option[String] = {
-    val ret: Option[String] = getDiscreetPropertyValue(properties, PROP_PROGRAMMING_PROPERTIES__INITIALIZE_ENTRYPOINT_SOURCE_TEXT) match {
-      case Some(ir.ValueProp(v)) => Some(v)
-      case _ => None[String]()
-    }
-    return ret
-  }
-
   def getComputeEntrypointSourceText(properties: ISZ[ir.Property]): Option[String] = {
     val PROP_sb = PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
     val PROP_tb = PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
-    val PROP_pp = PROP_PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT
+    val PROP_pp = OsateProperties.PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT
     
-    val sbcest = getProperty(properties, PROP_sb)
-    val tbcest = getProperty(properties, PROP_tb)
-    val ppcest = getProperty(properties, PROP_pp)
+    val sbcest = PropertyUtil.getProperty(properties, PROP_sb)
+    val tbcest = PropertyUtil.getProperty(properties, PROP_tb)
+    val ppcest = PropertyUtil.getProperty(properties, PROP_pp)
     
     if((sbcest.nonEmpty && tbcest.nonEmpty) || (sbcest.nonEmpty && ppcest.nonEmpty) || (tbcest.nonEmpty && ppcest.nonEmpty)){
       val props = st"${PROP_sb}, ${PROP_tb}, ${PROP_pp}"
@@ -433,12 +263,12 @@ object Util {
   }
 
   def getCamkesOwnerThread(p: ISZ[ir.Property]): Option[String] = {
-    var ret: Option[String] = getDiscreetPropertyValue(p, PROP_SB_SYS__CAmkES_Owner_Thread) match {
+    var ret: Option[String] = PropertyUtil.getDiscreetPropertyValue(p, PROP_SB_SYS__CAmkES_Owner_Thread) match {
       case Some(ir.ValueProp(v)) => Some(v)
       case _ => None[String]()
     }
     if(ret.isEmpty) {
-      ret = getDiscreetPropertyValue(p, PROP_TB_SYS__CAmkES_Owner_Thread) match {
+      ret = PropertyUtil.getDiscreetPropertyValue(p, PROP_TB_SYS__CAmkES_Owner_Thread) match {
         case Some(ir.ValueProp(v)) =>
           reporter.warn(None(), Util.toolName, s"Property ${PROP_TB_SYS__CAmkES_Owner_Thread} is deprecated, use ${PROP_SB_SYS__CAmkES_Owner_Thread} instead.")
 
@@ -447,51 +277,6 @@ object Util {
       }
     }
     return ret
-  }
-
-  def getSourceText(properties: ISZ[ir.Property]): ISZ[String] = {
-    return getPropertyValues(properties, PROP_PROGRAMMING_PROPERTIES__SOURCE_TEXT).map(p => p.asInstanceOf[ir.ValueProp].value)
-  }
-
-
-  def isThread(f: ir.Component): B = { return f.category == ir.ComponentCategory.Thread}
-
-  def isData(f: ir.Component): B = { return f.category == ir.ComponentCategory.Data }
-
-  def isPeriodic(c: ir.Component): B = { return getDispatchProtocol(c) == Some(Dispatch_Protocol.Periodic) }
-
-  def isSporadic(c: ir.Component): B = { return getDispatchProtocol(c) == Some(Dispatch_Protocol.Sporadic) }
-  
-  
-  def isEventPort(f: ir.Feature): B = {
-    return f.category == ir.FeatureCategory.EventPort || f.category == ir.FeatureCategory.EventDataPort
-  }
-
-  def isDataPort(f: ir.Feature): B = {
-    return f.category == ir.FeatureCategory.DataPort || f.category == ir.FeatureCategory.EventDataPort
-  }
-
-  def isDataAccesPort(f: ir.Feature): B = { return f.category == ir.FeatureCategory.DataAccess }
-  
-  def isSubprogramAccess(f: ir.Feature): B = { return f.category == ir.FeatureCategory.SubprogramAccess }
-  
-  def isSubprogramAccessGroup(f: ir.Feature): B = { return f.category == ir.FeatureCategory.SubprogramAccessGroup }
-  
-  def isInPort(f: ir.Feature): B = {
-    return (isEventPort(f) || isDataPort(f)) && f.asInstanceOf[FeatureEnd].direction == ir.Direction.In
-  }
-
-  def isOutPort(f: ir.Feature): B = {
-    return (isEventPort(f) || isDataPort(f)) && f.asInstanceOf[FeatureEnd].direction == ir.Direction.Out
-  }
-
-  
-  def getInPorts(c: ir.Component): ISZ[ir.FeatureEnd] = {
-    return c.features.filter(f => f.isInstanceOf[ir.FeatureEnd] && Util.isInPort(f)).map(f => f.asInstanceOf[FeatureEnd])
-  }
-
-  def getOutPorts(c: ir.Component): ISZ[ir.FeatureEnd] = {
-    return c.features.filter(f => f.isInstanceOf[ir.FeatureEnd] && Util.isOutPort(f)).map(f => f.asInstanceOf[FeatureEnd])
   }
 
   def relativizePaths(anchorDir: String, toRel: String, pathSep: C, anchorResource: String) : String = {
@@ -549,13 +334,6 @@ object Util {
     return if(f.nonEmpty) Some(f(0)) else None()
   }
 
-  def getPort(c: ir.Component, portName: ir.Name): Option[ir.FeatureEnd] = {
-    for(f <- c.features if(f.isInstanceOf[ir.FeatureEnd] && f.identifier == portName)) {
-      return Some(f.asInstanceOf[ir.FeatureEnd])
-    }
-    return None()
-  }
-
   def hamrIntegration(platform: ActPlatform.Type): B = {
     platform match {
       case ActPlatform.SeL4 => return T
@@ -572,9 +350,8 @@ object Util {
     return Resource(path, contents, overwrite, T)
   }
 
-
   def getUserEventEntrypointMethodName(component: ir.Component, feature: ir.FeatureEnd): String = {
-    val fid = Util.getLastName(feature.identifier)
+    val fid = CommonUtil.getLastName(feature.identifier)
     val cid = Util.getClassifier(component.classifier.get)
     return Util.brand(s"entrypoint_${cid}_${fid}")
   }
@@ -612,7 +389,6 @@ object Util {
   def getEventDataSBQueueDestFeatureName(featureId: String): String = {
     return brand(s"${featureId}_queue")
   }
-  
   
   def getEventSBCounterName(featureId: String): String = {
     return brand(s"${featureId}_counter")
@@ -662,10 +438,18 @@ object Util {
     return con
   }
 
+  def getDirectory(path: String): String = {
+    val so = StringOps(path)
+    val index = so.lastIndexOf('/')
+    if(index >= 0) {
+      return so.substring(0, index + 1)
+    } else {
+      return path
+    }
+  }
 }
 
 object TypeUtil {
-
 
   def isMissingType(c: ir.Component) : B = {
     return isMissingTypeClassifier(c.classifier.get)
@@ -688,7 +472,7 @@ object TypeUtil {
   }
 
   def isEnumDef(c: ir.Component): B = {
-    val ret: B = Util.getDiscreetPropertyValue(c.properties, Util.PROP_DATA_MODEL__DATA_REPRESENTATION) match {
+    val ret: B = PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__DATA_REPRESENTATION) match {
       case Some(ir.ValueProp("Enum")) => T
       case _ => F
     }
@@ -696,7 +480,7 @@ object TypeUtil {
   }
 
   def isArrayDef(c: ir.Component): B = {
-    val ret: B = Util.getDiscreetPropertyValue(c.properties, Util.PROP_DATA_MODEL__DATA_REPRESENTATION) match {
+    val ret: B = PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__DATA_REPRESENTATION) match {
       case Some(ir.ValueProp("Array")) => T
       case _ => F
     }
@@ -704,7 +488,7 @@ object TypeUtil {
   }
 
   def getArrayBaseType(c: ir.Component): Option[String] = {
-    Util.getDiscreetPropertyValue(c.properties, Util.PROP_DATA_MODEL__BASE_TYPE) match {
+    PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__BASE_TYPE) match {
       case Some(i: ir.ClassifierProp) =>
         if(isBaseTypeString(i.name)) {
           return translateBaseType(i.name)
@@ -716,7 +500,7 @@ object TypeUtil {
   }
 
   def getArrayDimension(c: ir.Component): Option[Z] = {
-    return Util.getUnitPropZ(c.properties, Util.PROP_DATA_MODEL__DIMENSION)
+    return PropertyUtil.getUnitPropZ(c.properties, OsateProperties.DATA_MODEL__DIMENSION)
   }
 
   def translateBaseType(c: String): Option[String] = {
@@ -749,35 +533,6 @@ object TypeUtil {
   }
 }
 
-object StringUtil {
-  def getDirectory(path: String): String = {
-    val so = StringOps(path)
-    val index = so.lastIndexOf('/')
-    if(index >= 0) {
-      return so.substring(0, index + 1)
-    } else {
-      return path
-    }
-  }
-
-  def replaceAll(s: String, from: String, to: String): String = {
-    return StringOps(s).replaceAllLiterally(from, to)
-  }
-
-  def toLowerCase(s: String):String = {
-    val cms = conversions.String.toCms(s)
-    return conversions.String.fromCms(cms.map((c: C) => COps(c).toLower))
-  }
-
-  def toUpperCase(s: String):String = {
-    val cms = conversions.String.toCms(s)
-    return conversions.String.fromCms(cms.map((c: C) => COps(c).toUpper))
-  }
-  
-  def sanitizeName(s: String): String = {
-    return replaceAll(replaceAll(s, "-", "_"), ".", "_")
-  }
-}
 
 @datatype class ActContainer(rootServer: String,
                              connectors: ISZ[ast.Connector],
@@ -865,11 +620,6 @@ object StringUtil {
                                                 mainPostLoopStatements: ISZ[ST]
                                                )
 
-@enum object Dispatch_Protocol {
-  'Periodic
-  'Sporadic
-}
-
 @datatype class SamplingPortInterface(name: String,
                                       structName: String,
                                       sel4TypeName: String,
@@ -939,12 +689,12 @@ object Transformers {
     )
 
     val missingArrayBaseType: ir.Property = ir.Property(
-      name = ir.Name(ISZ(Util.PROP_DATA_MODEL__BASE_TYPE), None()),
+      name = ir.Name(ISZ(OsateProperties.DATA_MODEL__BASE_TYPE), None()),
       propertyValues = ISZ(ir.ClassifierProp(Util.MISSING_AADL_TYPE)),
       appliesTo = ISZ())
 
     val sporadicProp: ir.Property = ir.Property(
-      name = ir.Name(ISZ(Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL), None()),
+      name = ir.Name(ISZ(OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL), None()),
       propertyValues = ISZ(ir.ValueProp("Sporadic")),
       appliesTo = ISZ())
 
@@ -962,7 +712,7 @@ object Transformers {
       o.category match {
         case ir.ComponentCategory.Data =>
           if(o.classifier.isEmpty) {
-            Util.reporter.warn(None(), Util.toolName, s"Classifier not specified for ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE}")
+            Util.reporter.warn(None(), Util.toolName, s"Classifier not specified for ${CommonUtil.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE}")
 
             ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
           } else if (TypeUtil.isArrayDef(o) && TypeUtil.getArrayBaseType(o).isEmpty) {
@@ -974,7 +724,7 @@ object Transformers {
           }
 
         case ir.ComponentCategory.Thread =>
-          Util.getDiscreetPropertyValue(o.properties, Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
+          PropertyUtil.getDiscreetPropertyValue(o.properties, OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
             case Some(ir.ValueProp(x)) =>
               if(x != "Periodic" && x != "Sporadic") {
                 Util.reporter.error(None(), Util.toolName, s"${o.classifier.get.name} has unsupported dispatch protocol ${x}.")
@@ -984,7 +734,7 @@ object Transformers {
                 ir.Transformer.TPostResult(ctx, None[ir.Component]())
               }
             case _ =>
-              Util.reporter.warn(None(), Util.toolName, s"${Util.PROP_THREAD_PROPERTIES__DISPATCH_PROTOCOL} not specified for thread ${o.classifier.get.name}.  Treating it as sporadic.")
+              Util.reporter.warn(None(), Util.toolName, s"${OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL} not specified for thread ${o.classifier.get.name}.  Treating it as sporadic.")
 
               ir.Transformer.TPostResult(ctx, Some(o(properties =  o.properties :+ sporadicProp)))
           }
@@ -993,8 +743,8 @@ object Transformers {
     }
 
     override def postFeatureEnd(ctx: CTX, o: FeatureEnd): Transformer.TPostResult[CTX, FeatureEnd] = {
-      if (Util.isDataPort(o) && o.classifier.isEmpty) {
-        Util.reporter.warn(None(), Util.toolName, s"No datatype specified for data port ${Util.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
+      if (CommonUtil.isDataPort(o) && o.classifier.isEmpty) {
+        Util.reporter.warn(None(), Util.toolName, s"No datatype specified for data port ${CommonUtil.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
 
         ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
       } else {
@@ -1033,44 +783,6 @@ object Transformers {
                            platform: ActPlatform.Type,
                            hamrLibs: Map[String, HamrLib],
                            hamrBasePackageName: Option[String])
-
-@datatype class Names(c: ir.Component,
-                      basePackage: String) {
-  val split: ISZ[String] = {
-    val san = StringUtil.replaceAll(c.classifier.get.name, "::", ":")
-    ops.StringOps(san).split(char => char == ':')
-  }
-    
-  def component: String = { return StringUtil.sanitizeName(split(1)) }
-  
-  def componentImpl: String = { return s"${component}_Impl"  }
-
-  def bridge: String = { return s"${component}_Bridge" }
-  
-  def aadlPackage: String = { return split(0) }
-
-  def packageName: String = { return s"${basePackage}.${aadlPackage}" }
-
-  def packagePath: String = { return s"${basePackage}/${aadlPackage}" }
-
-  def path: ISZ[String] = { return ISZ(basePackage, aadlPackage) }
-  
-  def identifier: String = { return Util.getLastName(c.identifier) }
-  
-  def instanceName: String = { return Util.getName(c.identifier) }  
-  
-  
-  def cPackageName: String = { return st"${(path, "_")}".render }
-  
-  def cEntryPointAdapterName: String = { return s"${component}_adapter" }
-  
-  def cEntryPointAdapterQualifiedName: String = { return s"${cPackageName}_${cEntryPointAdapterName}" }
-
-
-  def sel4SlangExtensionName: String = { return s"${component}_seL4Nix" }
-  
-  def sel4SlangExtensionQualifiedNameC: String = { return s"${cPackageName}_${sel4SlangExtensionName}" }
-}
 
 @record class Counter() {
   var count: Z = 0 // start at 0 so first is 1 which prevents capability conflict issues

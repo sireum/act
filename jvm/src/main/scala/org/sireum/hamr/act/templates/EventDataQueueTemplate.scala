@@ -4,6 +4,7 @@ package org.sireum.hamr.act.templates
 
 import org.sireum._
 import org.sireum.hamr.act._
+import org.sireum.hamr.codegen.common.StringUtil
 
 object EventDataQueueTemplate {
   def getQueueSizeMacroName(queueName: String): String = {

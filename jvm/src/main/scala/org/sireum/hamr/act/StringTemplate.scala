@@ -5,6 +5,7 @@ package org.sireum.hamr.act
 import org.sireum._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits, Provides, Uses}
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
+import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Component
 
@@ -336,7 +337,7 @@ object StringTemplate {
   }
   
   def sbSamplingPortGlobalVar(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    val portName = Util.getLastName(f.identifier)
+    val portName = CommonUtil.getLastName(f.identifier)
     val globalVarName = s"${Util.brand(portName)}_seqNum"
     return st"$globalVarName"
   }
@@ -348,7 +349,7 @@ object StringTemplate {
   def sbSamplingPortGetterInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
-    val portName = Util.getLastName(f.identifier)
+    val portName = CommonUtil.getLastName(f.identifier)
     val methodNamePrefix = Util.brand(portName)
 
     val ret: ST = st"bool ${methodNamePrefix}_read(${spi.sel4TypeName} * value);"
@@ -359,7 +360,7 @@ object StringTemplate {
   def sbSamplingPortSetterInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
-    val portName = Util.getLastName(f.identifier)
+    val portName = CommonUtil.getLastName(f.identifier)
     val methodNamePrefix = Util.brand(portName)
 
     val ret: ST = st"bool ${methodNamePrefix}_write(const ${spi.sel4TypeName} * value);"
@@ -370,7 +371,7 @@ object StringTemplate {
   def sbSamplingPortInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
-    val portName = Util.getLastName(f.identifier)
+    val portName = CommonUtil.getLastName(f.identifier)
     val methodNamePrefix = Util.brand(portName)
 
     val ret: ST = f.direction match {
@@ -384,7 +385,7 @@ object StringTemplate {
   def sbSamplingPortGetterImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
-    val sharedDataVarName = Util.brand(Util.getLastName(f.identifier))
+    val sharedDataVarName = Util.brand(CommonUtil.getLastName(f.identifier))
     val globalVarName = sbSamplingPortGlobalVar(spi, f)
 
     val isEmptyMethodName = s"${sharedDataVarName}_is_empty"
@@ -414,8 +415,8 @@ object StringTemplate {
 
   def sbSamplingPortInitialise(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
-    val featureName = Util.getLastName(f.identifier)
-    val sharedDataVarName = Util.brand(Util.getLastName(f.identifier))
+    val featureName = CommonUtil.getLastName(f.identifier)
+    val sharedDataVarName = Util.brand(CommonUtil.getLastName(f.identifier))
     val globalVarName = sbSamplingPortGlobalVar(spi, f)
     
     val initMethodName = s"init_${spi.name}"
@@ -427,7 +428,7 @@ object StringTemplate {
   def sbSamplingPortSetterImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
-    val sharedDataVarName = Util.brand(Util.getLastName(f.identifier))
+    val sharedDataVarName = Util.brand(CommonUtil.getLastName(f.identifier))
     val globalVarName = sbSamplingPortGlobalVar(spi, f)
 
     val ret: ST = st"""bool ${sharedDataVarName}_write(const ${spi.sel4TypeName} * value) {
@@ -438,7 +439,7 @@ object StringTemplate {
   }
   
   def sbSamplingPortConfigurationEntry(componentVarName: String, spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    val portName = Util.getLastName(f.identifier)
+    val portName = CommonUtil.getLastName(f.identifier)
     
     val ret: ST = f.direction match {
       case ir.Direction.In => st"""${componentVarName}.${portName}_access = "R";"""
@@ -710,14 +711,14 @@ cd $$BUILD_DIR
 
   def cRegCallback(handlerName: String, regCallback: String, feature: ir.FeatureEnd): ST = {
     val portType = feature.category.string
-    val featureName = Util.getLastName(feature.identifier)
+    val featureName = CommonUtil.getLastName(feature.identifier)
     val ret: ST = st"""// register callback for ${portType} port ${featureName}
                       |CALLBACKOP(${regCallback}(${handlerName}, NULL));"""
     return ret
   }
 
   def hamrGetInstanceName(basePackageName: String, c: Component): ST = {
-    return st"${basePackageName}_${Util.getName(c.identifier)}"
+    return st"${basePackageName}_${CommonUtil.getName(c.identifier)}"
   }
   
   def hamrIntialiseArchitecture(appName: String): ST = {
@@ -757,7 +758,7 @@ cd $$BUILD_DIR
   def hamrIsEmpty(methodName: String,
                   sel4IsEmptyMethodName: String,
                   srcPort: ir.FeatureEnd): ST = {
-    val ret: ST = st"""// is_empty ${Util.getLastName(srcPort.identifier)}: ${srcPort.direction.name} ${srcPort.category.name}
+    val ret: ST = st"""// is_empty ${CommonUtil.getLastName(srcPort.identifier)}: ${srcPort.direction.name} ${srcPort.category.name}
                       |B ${methodName}(STACK_FRAME_ONLY) {
                       |  return ${sel4IsEmptyMethodName}();
                       |}"""
@@ -865,7 +866,7 @@ cd $$BUILD_DIR
   }
   
   def samplingPortFreezeMethodName(feature: ir.FeatureEnd): String = {
-    return Util.brand(s"freeze_event_port_${Util.getLastName(feature.identifier)}")
+    return Util.brand(s"freeze_event_port_${CommonUtil.getLastName(feature.identifier)}")
   }
   
   def samplingPortHeader(s: SamplingPortInterface): ST = {

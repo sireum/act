@@ -5,7 +5,7 @@ package org.sireum.hamr.act.periodic
 import org.sireum._
 import org.sireum.hamr.act.ast.{Consumes, Emits}
 import org.sireum.hamr.act.{ActOptions, C_Container, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, CamkesGlueCodeHeaderContributions, CamkesGlueCodeImplContributions, Counter, Resource, Sel4ConnectorTypes, StringTemplate, Util, ast}
-import org.sireum.hamr.act.util.{AadlProcessor, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.{AadlProcessor, AadlThread, CaseSchedulingProperties, CommonUtil, HamrProperties, OsateProperties, SymbolTable}
 import org.sireum.message.Reporter
 
 @datatype class Pacer(val symbolTable: SymbolTable,
@@ -251,9 +251,9 @@ import org.sireum.message.Reporter
 
           threadComments = threadComments :+ 
             PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier,
-              ISZ(st"${Util.PROP_CASE_Scheduling__Domain} : ${domain}",
-                st"${Util.PROP_Timing_Properties__Compute_Execution_Time} : ${computeExecutionTime} ms",
-                st"${Util.PROP_Timing_Properties__Period} : ${period} ms"))  
+              ISZ(st"${CaseSchedulingProperties.DOMAIN} : ${domain}",
+                st"${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime} ms",
+                st"${OsateProperties.TIMING_PROPERTIES__PERIOD} : ${period} ms"))
           
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
           
