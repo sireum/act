@@ -6,7 +6,9 @@ import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Transformer
 import org.sireum.message.Reporter
 import org.sireum.hamr.act.Util.reporter
-import org.sireum.hamr.codegen.common.SymbolResolver
+import org.sireum.hamr.codegen.common.symbols.SymbolResolver
+import org.sireum.hamr.codegen.common.types.TypeResolver
+import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
 object Act {
 
@@ -39,7 +41,17 @@ object Act {
     if(!result.ctx.hasErrors) {
       
       val symbolTable = SymbolResolver.resolve(m2, options.hamrBasePackageName, reporter)
-      
+
+      val basePackageName: String = options.hamrBasePackageName match {
+        case Some(b) => b
+        case _ => ""
+      }
+      val aadlTypes = TypeResolver.processDataTypes(m2, symbolTable, basePackageName)
+
+      if(!CommonTypeUtil.verifyBitCodec(aadlTypes, symbolTable, reporter)){
+        return ActResult(resources)
+      }
+
       val auxFiles: ISZ[(String, String)] = options.auxFiles.entries.map(m => {
         val resourceName = s"${options.outputDir}/${Util.AUX_CODE_DIRECTORY_NAME}/${m._1}"
         resources = resources :+ Util.createResource(resourceName, st"${m._2}", T)
@@ -52,7 +64,7 @@ object Act {
       val auxHFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"h").map(m => m._1)
       val auxHeaderDirectories = (Set.empty ++ auxHFiles.map(m => Os.path(m).up.value)).elements
       
-      val (container, r) = Gen(m2, symbolTable, options, reporter).process(auxHFiles)
+      val (container, r) = Gen(m2, symbolTable, aadlTypes, options, reporter).process(auxHFiles)
       reporter.reports(r.messages)
       
       container match {
@@ -62,8 +74,14 @@ object Act {
             case _ => "."
           }
           resources = resources ++ ActPrettyPrint().tempEntry(
-            options.outputDir, container, auxCFiles, auxHeaderDirectories, rootDir,
-            options.hamrLibs, options.platform)
+            destDir = options.outputDir,
+            container = container,
+            cFiles = auxCFiles,
+            cHeaderDirectories = auxHeaderDirectories,
+            aadlRootDir = rootDir,
+            hamrLibs = options.hamrLibs,
+            platform = options.platform,
+            symbolTable = symbolTable)
         case _ =>
       }
     }

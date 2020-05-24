@@ -10,7 +10,12 @@ object EventDataQueueTemplate {
   def getQueueSizeMacroName(queueName: String): String = {
     return StringUtil.toUpperCase(s"${queueName}_SIZE")
   }
-  
+
+  def getQueueName(queueElementTypeName: String,
+                   queueSize: Z): String = {
+    return Util.getEventDataSBQueueName(queueElementTypeName, queueSize)
+  }
+
   def header(sbCounterFileName: String,
              counterTypeName: String,
              typeHeaderFileName: String,
@@ -163,7 +168,7 @@ object EventDataQueueTemplate {
                |""" 
     return r
   }
-  
+
   def implementation(queueHeaderFilename: String,
                      queueElementTypeName: String,
                      queueSize: Z,
@@ -171,13 +176,19 @@ object EventDataQueueTemplate {
                      counterTypeName: String
                     ): ST = {
 
-    val queueName = Util.getEventDataSBQueueName(queueElementTypeName, queueSize)
+    val queueName = getQueueName(queueElementTypeName, queueSize)
     val queueTypeName = Util.getEventDataSBQueueTypeName(queueElementTypeName, queueSize)
 
     val recvQueueName = Util.getEventData_SB_RecvQueueName(queueElementTypeName, queueSize)
     val recvQueueTypeName = Util.getEventData_SB_RecvQueueTypeName(queueElementTypeName, queueSize)
     val queueSizeMacroName = getQueueSizeMacroName(queueName)
-      
+
+    val initMethodName = getQueueInitMethodName(queueElementTypeName, queueSize)
+    val recvInitMethodName = getQueueRecvInitMethodName(queueElementTypeName, queueSize)
+    val dequeueMethodName = getQueueDequeueMethodName(queueElementTypeName, queueSize)
+    val enqueueMethodName = getQueueEnqueueMethodName(queueElementTypeName, queueSize)
+    val isEmptyMethodName = getQueueIsEmptyMethodName(queueElementTypeName, queueSize)
+
     val r = st"""/*
                 | * Copyright 2017, Data61
                 | * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
@@ -202,13 +213,13 @@ object EventDataQueueTemplate {
                 |//
                 |// See ${queueHeaderFilename} for API documentation. Only implementation details are documented here.
                 |
-                |void ${queueName}_init(${queueTypeName} *queue) {
+                |void ${initMethodName}(${queueTypeName} *queue) {
                 |  // NOOP for now. C's struct initialization is sufficient.  If we ever do need
                 |  // initialization logic, we may also need to synchronize with receiver
                 |  // startup.
                 |}
                 |
-                |void ${queueName}_enqueue(
+                |void ${enqueueMethodName}(
                 |  ${queueTypeName} *queue, 
                 |  ${queueElementTypeName} *data) {
                 |  
@@ -233,7 +244,7 @@ object EventDataQueueTemplate {
                 |//
                 |// See ${queueHeaderFilename} for API documentation. Only implementation details are documented here.
                 |
-                |void ${recvQueueName}_init(
+                |void ${recvInitMethodName}(
                 |  ${recvQueueTypeName} *recvQueue, 
                 |  ${queueTypeName} *queue) {
                 |  
@@ -241,7 +252,7 @@ object EventDataQueueTemplate {
                 |  recvQueue->queue = queue;
                 |}
                 |
-                |bool ${queueName}_dequeue(
+                |bool ${dequeueMethodName}(
                 |  ${recvQueueTypeName} *recvQueue, 
                 |  ${counterTypeName} *numDropped, 
                 |  ${queueElementTypeName} *data) {
@@ -292,9 +303,76 @@ object EventDataQueueTemplate {
                 |  }
                 |}
                 |
-                |bool ${queueName}_is_empty(${recvQueueTypeName} *recvQueue) {
+                |bool ${isEmptyMethodName}(${recvQueueTypeName} *recvQueue) {
                 |  return (recvQueue->queue->numSent == recvQueue->numRecv);
                 |}"""
     return r
   }
+
+  def getQueueInitMethodName(queueElementTypeName: String,
+                             queueSize: Z): String = {
+    val queueName = getQueueName(queueElementTypeName, queueSize)
+    return s"${queueName}_init"
+  }
+
+  def getQueueRecvInitMethodName(queueElementTypeName: String,
+                             queueSize: Z): String = {
+    val queueName = getQueueName(queueElementTypeName, queueSize)
+    return s"${queueName}_Recv_init"
+  }
+
+  def getQueueEnqueueMethodName(queueElementTypeName: String,
+                                queueSize: Z): String = {
+    val queueName = getQueueName(queueElementTypeName, queueSize)
+    return s"${queueName}_enqueue"
+  }
+
+  def getQueueDequeueMethodName(queueElementTypeName: String,
+                                queueSize: Z): String = {
+    val queueName = getQueueName(queueElementTypeName, queueSize)
+    return s"${queueName}_dequeue"
+  }
+
+  def getQueueIsEmptyMethodName(queueElementTypeName: String,
+                                queueSize: Z): String = {
+    val queueName = getQueueName(queueElementTypeName, queueSize)
+    return s"${queueName}_is_empty"
+  }
+
+  def genSbQueueTypeFiles(portType: String, queueSize: Z): ISZ[Resource] = {
+    val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(portType, queueSize)
+    val queueImplFilename = Util.getEventData_SB_QueueImplFileName(portType, queueSize)
+
+    val interface = EventDataQueueTemplate.header(
+      sbCounterFileName = Util.SB_COUNTER_HEADER_FILENAME,
+      counterTypeName = Util.SB_EVENT_COUNTER_TYPE,
+      typeHeaderFileName = Util.getSbTypeHeaderFilenameWithExtension(),
+
+      queueElementTypeName = portType,
+      queueSize = queueSize)
+
+    val impl = EventDataQueueTemplate.implementation(
+      queueHeaderFilename = queueHeaderFilename,
+      queueElementTypeName = portType,
+      queueSize = queueSize,
+
+      counterTypeName = Util.SB_EVENT_COUNTER_TYPE)
+
+    val auxResourceFiles = ISZ(
+      Resource(
+        path = s"${Util.getTypeIncludesPath()}/${queueHeaderFilename}",
+        content = interface,
+        overwrite = T,
+        makeExecutable = F),
+
+      Resource(
+        path = s"${Util.getTypeSrcPath()}/${queueImplFilename}",
+        content = impl,
+        overwrite = T,
+        makeExecutable = F)
+    )
+
+    return auxResourceFiles
+  }
+
 }

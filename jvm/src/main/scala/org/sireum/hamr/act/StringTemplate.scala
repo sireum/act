@@ -5,6 +5,7 @@ package org.sireum.hamr.act
 import org.sireum._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits, Provides, Uses}
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
+import org.sireum.hamr.act.templates.CMakeTemplate
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Component
@@ -19,29 +20,46 @@ object StringTemplate {
 
   val SeqNumName: String = "seqNum"
   val SeqNumType: String = s"${SeqNumName}_t"
-  
-  def tbInterface(macroName: String): ST = {
-    val r : ST = st"""#ifdef ${macroName}
-                     |#define ${macroName}
-                     |
-                     |#endif // ${macroName}
-                     |"""
-    return r
+
+  def cHeaderFile(filename: String,
+                  includes: ISZ[String],
+                  entries: ISZ[ST]): ST = {
+    val macroName = StringUtil.macroize(filename)
+
+    val _includes: Option[ST] = if(includes.nonEmpty) {
+      Some(st"${(includes.map(m => st"#include ${m}"), "\n")}\n")
+    } else {None()}
+
+    val _entries: Option[ST] = if(entries.nonEmpty) {
+      Some(st"${(entries, "\n\n")}")
+    } else { None() }
+
+    val ret: ST = st"""#ifndef ${macroName}
+                      |#define ${macroName}
+                      |
+                      |${_includes}
+                      |${_entries}
+                      |
+                      |#endif // ${macroName}
+                      |"""
+    return ret
   }
 
-  def tbTypeHeaderFile(macroName: String, 
-                       typeHeaderFileName: String,
+  def tbTypeHeaderFile(filename: String,
                        includes: Option[ST],
                        defs: ISZ[ST], 
                        preventBadging: B): ST = {
+
     val badges: ST = if(preventBadging) {st""} else {st"""
                                                          |#define $MON_READ_ACCESS 111
                                                          |#define $MON_WRITE_ACCESS 222"""}
-    val macroname = s"__${Util.cbrand("AADL")}_${typeHeaderFileName}__H"
 
-    val body = st"""#ifndef ${macroname}
-                   |#define ${macroname}
+    val macroName = StringUtil.macroize(filename)
+
+    val body = st"""#ifndef ${macroName}
+                   |#define ${macroName}
                    |
+                   |#include <stdio.h>
                    |#include <stdbool.h>
                    |#include <stdint.h>
                    |${includes}
@@ -73,7 +91,7 @@ object StringTemplate {
                    |
                    |${(defs, "\n\n")}
                    |
-                   |#endif // ${macroname}
+                   |#endif // ${macroName}
                    |"""
     return body
   }
@@ -120,7 +138,7 @@ object StringTemplate {
                                                                |int mon_get_sender_id(void);""" }
     val r : ST =
       st"""#include ${typeHeaderFilename}
-          |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
+          |#include <${monitorTypeHeaderFilename}.h>
           |
           |${senderSig}int monsig_emit(void);
           |
@@ -163,7 +181,7 @@ object StringTemplate {
           |#endif // $SB_VERIFY
           |
           |#include ${typeHeaderFilename}
-          |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
+          |#include <${monitorTypeHeaderFilename}.h>
           |
           |int mon_get_sender_id(void);
           |int monsig_emit(void);
@@ -272,7 +290,7 @@ object StringTemplate {
           |#endif // $SB_VERIFY
           |#include <camkes.h>
           |#include ${typeHeaderFilename}
-          |#include "../${Util.DIR_INCLUDES}/${monitorTypeHeaderFilename}.h"
+          |#include "<${monitorTypeHeaderFilename}.h>"
           |
           |struct queue {
           |    int head;
@@ -486,105 +504,152 @@ object StringTemplate {
     return st"""execute_process(COMMAND bash -c "$${CMAKE_CURRENT_LIST_DIR}/bin/compile-hamr-lib.sh")"""
   }
 
-  def cmakeLists(cmakeVersion: String, rootServer: String, entries: ISZ[ST]): ST = {
-    return st"""cmake_minimum_required(VERSION ${cmakeVersion})
-               |
-               |project (${rootServer} C)
-               |
-               |add_definitions(-DCAMKES)
-               |
-               |${(entries, "\n\n")}
-               |
-               |DeclareCAmkESRootserver(${rootServer}.camkes)
-               |"""
-  }
-
   def cmakeComponent(componentName: String, 
                      sources: ISZ[String], 
-                     includes: ISZ[String], 
+                     includes: ISZ[String],
+                     libs: ISZ[String],
                      hasAux: B,
                      hamrLib: Option[HamrLib]): ST = {
     var srcs: ISZ[ST] = ISZ()
     if(hasAux) { srcs = srcs :+ st"$${${AUX_C_SOURCES}} " }
     if(sources.nonEmpty) { srcs = srcs :+ st"""${(sources, " ")}""" }
 
-    var incls: ISZ[ST] = ISZ()
-    if(hasAux) { incls = incls :+ st"$${${AUX_C_INCLUDES}} " }
-    if(hamrLib.nonEmpty){
-      val hamrIncludeName = StringTemplate.cmakeHamrIncludesName(hamrLib.get.instanceName)  
-      incls = incls :+ st"$${${hamrIncludeName}} "
+    val _includes: Option[ST] = {
+      var incls: ISZ[String] = ISZ()
+      if (hasAux) {
+        incls = incls :+ st"$${${AUX_C_INCLUDES}}".render
+      }
+      if (hamrLib.nonEmpty) {
+        val hamrIncludeName = StringTemplate.cmakeHamrIncludesName(hamrLib.get.instanceName)
+        incls = incls :+ st"$${${hamrIncludeName}}".render
+      }
+      incls = incls ++ includes
+
+      if(incls.nonEmpty) Some(st"INCLUDES ${(incls, " ")}") else None()
     }
-    if(includes.nonEmpty) { incls = incls :+ st"""${(includes, " ")}""" }
 
-    val libs: ST = if(hamrLib.nonEmpty) { st"LIBS $${${StringTemplate.cmakeHamrLibName(hamrLib.get.instanceName)}}"}
-    else { st"" }
+    val _libs: Option[ST] = {
+      var candidates: ISZ[String] = libs
+      if(hamrLib.nonEmpty) {
+        val name = StringTemplate.cmakeHamrLibName(hamrLib.get.instanceName)
+        candidates = candidates :+ s"$${$name}"
+      }
 
-    val r: ST =
-      st"""DeclareCAmkESComponent(${componentName}
-          |  SOURCES $srcs
-          |  INCLUDES $incls
-          |  ${libs}
-          |)"""
-    return r
+      if(candidates.nonEmpty) {
+        Some(st"LIBS ${(candidates, " ")}")
+      } else {
+        None()
+      }
+    }
+
+    val ret: ST = st"""DeclareCAmkESComponent(${componentName}
+                      |  SOURCES $srcs
+                      |  ${_includes}
+                      |  ${_libs}
+                      |)"""
+
+    return ret
   }
   
-  def runCamkesScript(): ST = {
+  def runCamkesScript(hasVM: B): ST = {
+    val camkesDir: String = if(hasVM) { "camkes-arm-vm" } else { "camkes" }
+    val camkesGitLoc: String = if(hasVM) { "https://github.com/SEL4PROJ/camkes-arm-vm" } else { "https://docs.sel4.systems/projects/camkes" }
+    val buildSim: ST = if(hasVM) {
+      st"""../init-build.sh \
+          |    -DUSE_CACHED_LINUX_VM=true \
+          |    -DPLATFORM=qemu-arm-virt \
+          |    -DARM_HYP=ON \
+          |    -DCAMKES_APP=$$HAMR_CAMKES_PROJ
+          |
+          |#../init-build.sh \
+          |#    -DPLATFORM=qemu-arm-virt \
+          |#    -DARM_HYP=ON \
+          |#    -DCAMKES_APP=$$HAMR_CAMKES_PROJ
+          |
+          |ninja
+          |
+          |########################
+          |# simulate via QEMU
+          |########################
+          |
+          |qemu-system-aarch64 \
+          |    -machine virt,virtualization=on,highmem=off,secure=off \
+          |    -cpu cortex-a53 \
+          |    -nographic \
+          |    -m size=1024 \
+          |    -kernel images/capdl-loader-image-arm-qemu-arm-virt"""
+    } else {
+      st"""./init-build.sh -DCAMKES_APP=$$HAMR_CAMKES_PROJ
+          |
+          |ninja
+          |
+          |########################
+          |# simulate via QEMU
+          |########################
+          |
+          |./simulate"""
+    }
+
     val ret: ST = st"""#!/usr/bin/env bash
-
-set -e
-
-export SCRIPT_HOME=$$( cd "$$( dirname "$$0" )" &> /dev/null && pwd )
-export PROJECT_HOME=$$( cd "$$( dirname "$$0" )/.." &> /dev/null && pwd )
-cd $${PROJECT_HOME}
-
-
-# location of camkes-projects directory
-if [ -n "$$1" ]; then
-    CAMKES_DIR=$$1
-elif [ -d "/host/camkes-project" ]; then
-    CAMKES_DIR="/host/camkes-project"
-elif [ -d "$${HOME}/CASE/camkes" ]; then
-    CAMKES_DIR="$${HOME}/CASE/camkes"
-fi
-
-if [[ -z "$$CAMKES_DIR" || ! -d "$${CAMKES_DIR}" ]]; then
-    echo "Directory '$${CAMKES_DIR}' does not exist.  Please specify the location of your CAmkES project directory"
-    exit -1
-fi
-
-
-# use the directory name for the CAmkES apps directory name 
-HAMR_CAMKES_PROJ=$${PWD##*/}
-
-
-CAMKES_APPS_DIR=$$CAMKES_DIR/projects/camkes/apps/$$HAMR_CAMKES_PROJ
-
-# create a sym-link to the project in the CAmkES app directory
-if [ ! -e "$${CAMKES_APPS_DIR}" ]; then
-    ln -sv $$PROJECT_HOME $$CAMKES_APPS_DIR
-fi
-
-
-########################
-# run CAmkES/seL4 build
-########################
-
-cd $$CAMKES_DIR
-
-BUILD_DIR=build_$$HAMR_CAMKES_PROJ
-
-rm -rf $$BUILD_DIR
-mkdir $$BUILD_DIR
-cd $$BUILD_DIR
-
-../init-build.sh -DCAMKES_APP=$$HAMR_CAMKES_PROJ && ninja
-
-########################
-# simulate via QEMU
-########################
-
-./simulate                   
-"""
+                      |
+                      |set -e
+                      |
+                      |export SCRIPT_HOME=$$( cd "$$( dirname "$$0" )" &> /dev/null && pwd )
+                      |export PROJECT_HOME=$$( cd "$$( dirname "$$0" )/.." &> /dev/null && pwd )
+                      |cd $${PROJECT_HOME}
+                      |
+                      |
+                      |# location of camkes-projects directory
+                      |if [ -n "$$1" ]; then
+                      |    CAMKES_DIR=$$1
+                      |elif [ -d "/host/camkes-project" ]; then
+                      |    CAMKES_DIR="/host/camkes-project"
+                      |elif [ -d "$${HOME}/CASE/${camkesDir}" ]; then
+                      |    CAMKES_DIR="$${HOME}/CASE/${camkesDir}"
+                      |fi
+                      |
+                      |if [[ -z "$$CAMKES_DIR" || ! -d "$${CAMKES_DIR}" ]]; then
+                      |    echo "Directory '$${CAMKES_DIR}' does not exist.  Please specify the location of your ${camkesDir} project directory."
+                      |    echo "See ${camkesGitLoc}"
+                      |    exit -1
+                      |fi
+                      |
+                      |
+                      |# use the directory name for the CAmkES apps directory name
+                      |HAMR_CAMKES_PROJ=$${PWD##*/}
+                      |
+                      |
+                      |CAMKES_APPS_DIR=$$CAMKES_DIR/projects/camkes/apps/$$HAMR_CAMKES_PROJ
+                      |
+                      |# create a sym-link to the project in the CAmkES app directory
+                      |
+                      |if [ -e "$${CAMKES_APPS_DIR}" ]; then
+                      |  read -p "The following directory already exists, replace $${CAMKES_APPS_DIR} [Y|y]? " -n 1 -r; echo
+                      |  if [[ $$REPLY =~ ^[Yy]$$ ]]; then
+                      |    rm -rf $${CAMKES_APPS_DIR}
+                      |  else
+                      |    exit -1
+                      |  fi
+                      |fi
+                      |
+                      |ln -sv $$PROJECT_HOME $$CAMKES_APPS_DIR
+                      |
+                      |########################
+                      |# run CAmkES/seL4 build
+                      |########################
+                      |
+                      |cd $$CAMKES_DIR
+                      |
+                      |BUILD_DIR=build_$$HAMR_CAMKES_PROJ
+                      |
+                      |# rm -rf $${BUILD_DIR}
+                      |if [ ! -e "$${BUILD_DIR}" ]; then
+                      |  mkdir $${BUILD_DIR}
+                      |fi
+                      |
+                      |cd $${BUILD_DIR}
+                      |
+                      |${buildSim}"""
     return ret
   }
 
@@ -603,7 +668,7 @@ cd $$BUILD_DIR
   val SEM_WAIT: String = Util.brand("dispatch_sem_wait")
   val SEM_POST: String = Util.brand("dispatch_sem_post")
 
-  def componentTypeImpl(filename: String, 
+  def componentTypeImpl(componentHeaderFilename: String,
                         includes: ISZ[ST], 
                        
                         blocks: ISZ[ST],
@@ -625,7 +690,7 @@ cd $$BUILD_DIR
                |}""")
     } else { None() }
     
-    val ret:ST = st"""#include "../${Util.DIR_INCLUDES}/${filename}.h"
+    val ret:ST = st"""#include <${componentHeaderFilename}>
                      |${(includes, "\n")}
                      |#include <string.h>
                      |#include <camkes.h>
@@ -875,7 +940,8 @@ cd $$BUILD_DIR
     val ret = st"""#ifndef ${macroName}
 #define ${macroName}
 
-#include "seqNum.h"
+#include ${Util.getSbTypeHeaderFilenameForIncludes()}
+#include <seqNum.h>
 
 // Sampling port message with bool data
 typedef struct ${s.name} {
@@ -917,14 +983,8 @@ bool is_empty_${s.name}(${s.structName} *port);
   def samplingPortImpl(s: SamplingPortInterface): ST = {
     
     val ret = st"""
-#include <camkes.h>
-#include <stdio.h>
-#include <sel4/sel4.h>
-#include <utils/util.h>
-#include <sel4utils/util.h>
-#include <sel4utils/helpers.h>
 
-#include "${s.name}.h"
+#include <${s.name}.h>
 
 void init_${s.name}(${s.structName} *port, seqNum_t *seqNum) {
   *seqNum = 0; // First message sequence number will be 1.
@@ -1066,5 +1126,94 @@ bool is_empty_${s.name}(${s.structName} *port) {
     val maybe: String = if(u.optional) "maybe " else ""
     return st"${maybe}uses ${u.typ} ${u.name};"
   }
-  
+
+  def doNotEditComment(): ST = { return st"// This file will be regenerated, do not edit" }
+
+  def safeToEditComment(): ST = { return st"// This file will not be overwritten so is safe to edit" }
+
+  def doNotEditCmakeComment(): ST = { return st"# This file will be regenerated, do not edit" }
+
+  def safeToEditCamkeComment(): ST = { return st"# This file will not be overwritten so is safe to edit" }
+
+
+  def cmakeLists(rootServer: String,
+                 entries: ISZ[ST]): ST = {
+    return st"""${doNotEditCmakeComment()}
+               |
+               |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+               |
+               |project (${rootServer} C)
+               |
+               |add_definitions(-DCAMKES)
+               |
+               |${(entries, "\n\n")}
+               |
+               |DeclareCAmkESRootserver(${rootServer}.camkes)
+               |"""
+  }
+
+  def genSettingsCmake(settingsCmakeEntries: ISZ[ST]): ST = {
+    val ret: ST = st"""${safeToEditCamkeComment()}
+                      |
+                      |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+                      |
+                      |${(settingsCmakeEntries, "\n")}"""
+    return ret
+  }
+
+  def generateTypeCmakeLists(filenames: ISZ[String], hamrLib: Option[HamrLib]): ST = {
+    var cmakeEntries: ISZ[ST] = ISZ()
+    var linkHamrLib: Option[ST] = None()
+    var includes: ISZ[String] = ISZ("includes")
+
+    val filtered = Set.empty[String] ++ filenames // remove duplicates
+    val isInterfaceTypeLib = filtered.isEmpty
+
+    hamrLib match {
+      case Some(lib) =>
+        val libRelPath = StringUtil.replaceAll(lib.staticLib, "hamr", "../hamr")
+        cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrLib(lib.instanceName, libRelPath)
+
+        val xincludes = lib.includeDirs.map(m => StringUtil.replaceAll(m, "hamr", "../hamr"))
+        cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(lib.instanceName, xincludes)
+
+        val hamrlibname = s"$${${cmakeHamrLibName(lib.instanceName)}}"
+        linkHamrLib = Some(
+          CMakeTemplate.target_link_libraries(Util.SBTypeLibrary,
+          isInterfaceTypeLib,
+          ISZ(hamrlibname)))
+
+        includes = includes :+ s"$${${cmakeHamrIncludesName(lib.instanceName)}}"
+
+      case _ =>
+    }
+
+
+    val ret: ST = st"""${doNotEditCmakeComment()}
+                      |
+                      |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+                      |
+                      |project(${Util.SBTypeLibrary})
+                      |
+                      |${CMakeTemplate.CMAKE_SET_CMAKE_C_STANDARD}
+                      |
+                      |add_compile_options(-Werror)
+                      |
+                      |${(cmakeEntries, "\n\n")}
+                      |
+                      |${CMakeTemplate.addLibrary(Util.SBTypeLibrary, isInterfaceTypeLib, filtered.elements)}
+                      |
+                      |${linkHamrLib}
+                      |
+                      |# Assume that if the muslc target exists then this project is in an seL4 native
+                      |# component build environment, otherwise it is in a linux userlevel environment.
+                      |# In the linux userlevel environment, the C library will be linked automatically.
+                      |if(TARGET muslc)
+                      |  ${CMakeTemplate.target_link_libraries(Util.SBTypeLibrary, isInterfaceTypeLib, ISZ("muslc"))}
+                      |endif()
+                      |
+                      |${CMakeTemplate.target_include_directories(Util.SBTypeLibrary, isInterfaceTypeLib, includes)}
+                      |"""
+    return ret
+  }
 }

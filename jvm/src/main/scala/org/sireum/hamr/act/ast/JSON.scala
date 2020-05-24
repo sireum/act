@@ -2,7 +2,7 @@
 // @formatter:off
 
 /*
- Copyright (c) 2019, Robby, Kansas State University
+ Copyright (c) 2020, Robby, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -60,6 +60,7 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Assembly""""),
         ("configuration", printISZ(T, o.configuration, printString _)),
+        ("configurationMacros", printISZ(T, o.configurationMacros, printString _)),
         ("composition", printComposition(o.composition))
       ))
     }
@@ -70,7 +71,8 @@ object JSON {
         ("groups", printISZ(F, o.groups, printTODO _)),
         ("exports", printISZ(F, o.exports, printTODO _)),
         ("instances", printISZ(F, o.instances, printInstance _)),
-        ("connections", printISZ(F, o.connections, printConnection _))
+        ("connections", printISZ(F, o.connections, printConnection _)),
+        ("externalEntities", printISZ(T, o.externalEntities, printString _))
       ))
     }
 
@@ -99,7 +101,9 @@ object JSON {
         ("provides", printISZ(F, o.provides, printProvides _)),
         ("includes", printISZ(T, o.includes, printString _)),
         ("attributes", printISZ(F, o.attributes, printTODO _)),
-        ("imports", printISZ(T, o.imports, printString _))
+        ("imports", printISZ(T, o.imports, printString _)),
+        ("preprocessorIncludes", printISZ(T, o.preprocessorIncludes, printString _)),
+        ("externalEntities", printISZ(T, o.externalEntities, printString _))
       ))
     }
 
@@ -304,10 +308,13 @@ object JSON {
       parser.parseObjectKey("configuration")
       val configuration = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
+      parser.parseObjectKey("configurationMacros")
+      val configurationMacros = parser.parseISZ(parser.parseString _)
+      parser.parseObjectNext()
       parser.parseObjectKey("composition")
       val composition = parseComposition()
       parser.parseObjectNext()
-      return Assembly(configuration, composition)
+      return Assembly(configuration, configurationMacros, composition)
     }
 
     def parseComposition(): Composition = {
@@ -331,7 +338,10 @@ object JSON {
       parser.parseObjectKey("connections")
       val connections = parser.parseISZ(parseConnection _)
       parser.parseObjectNext()
-      return Composition(groups, exports, instances, connections)
+      parser.parseObjectKey("externalEntities")
+      val externalEntities = parser.parseISZ(parser.parseString _)
+      parser.parseObjectNext()
+      return Composition(groups, exports, instances, connections, externalEntities)
     }
 
     def parseInstance(): Instance = {
@@ -406,7 +416,13 @@ object JSON {
       parser.parseObjectKey("imports")
       val imports = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
-      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports)
+      parser.parseObjectKey("preprocessorIncludes")
+      val preprocessorIncludes = parser.parseISZ(parser.parseString _)
+      parser.parseObjectNext()
+      parser.parseObjectKey("externalEntities")
+      val externalEntities = parser.parseISZ(parser.parseString _)
+      parser.parseObjectNext()
+      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities)
     }
 
     def parseUses(): Uses = {

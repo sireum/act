@@ -7,12 +7,17 @@ import org.sireum._
 @sig trait ASTObject
 
 @datatype class Assembly(configuration: ISZ[String],
+                         configurationMacros: ISZ[String],
                          composition: Composition) extends ASTObject
 
 @datatype class Composition(groups: ISZ[TODO],
                             exports: ISZ[TODO],
                             instances: ISZ[Instance],
-                            connections: ISZ[Connection]) extends ASTObject
+                            connections: ISZ[Connection],
+
+                            // inserted at end of component definition
+                            externalEntities: ISZ[String]
+                           ) extends ASTObject
 
 @datatype class Instance(address_space: String,
                          name: String,
@@ -32,8 +37,13 @@ import org.sireum._
                           provides: ISZ[Provides],
                           includes: ISZ[String],
                           attributes: ISZ[TODO],
+                          imports: ISZ[String],
 
-                          imports: ISZ[String]
+                          // inserted before component def
+                          preprocessorIncludes: ISZ[String],
+
+                          // inserted at end of component definition
+                          externalEntities: ISZ[String]
                          ) extends ASTObject
 
 

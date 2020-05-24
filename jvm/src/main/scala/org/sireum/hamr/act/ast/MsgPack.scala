@@ -2,7 +2,7 @@
 // @formatter:off
 
 /*
- Copyright (c) 2019, Robby, Kansas State University
+ Copyright (c) 2020, Robby, Kansas State University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -108,6 +108,7 @@ object MsgPack {
     def writeAssembly(o: Assembly): Unit = {
       writer.writeZ(Constants.Assembly)
       writer.writeISZ(o.configuration, writer.writeString _)
+      writer.writeISZ(o.configurationMacros, writer.writeString _)
       writeComposition(o.composition)
     }
 
@@ -117,6 +118,7 @@ object MsgPack {
       writer.writeISZ(o.exports, writeTODO _)
       writer.writeISZ(o.instances, writeInstance _)
       writer.writeISZ(o.connections, writeConnection _)
+      writer.writeISZ(o.externalEntities, writer.writeString _)
     }
 
     def writeInstance(o: Instance): Unit = {
@@ -142,6 +144,8 @@ object MsgPack {
       writer.writeISZ(o.includes, writer.writeString _)
       writer.writeISZ(o.attributes, writeTODO _)
       writer.writeISZ(o.imports, writer.writeString _)
+      writer.writeISZ(o.preprocessorIncludes, writer.writeString _)
+      writer.writeISZ(o.externalEntities, writer.writeString _)
     }
 
     def writeUses(o: Uses): Unit = {
@@ -309,8 +313,9 @@ object MsgPack {
         reader.expectZ(Constants.Assembly)
       }
       val configuration = reader.readISZ(reader.readString _)
+      val configurationMacros = reader.readISZ(reader.readString _)
       val composition = readComposition()
-      return Assembly(configuration, composition)
+      return Assembly(configuration, configurationMacros, composition)
     }
 
     def readComposition(): Composition = {
@@ -326,7 +331,8 @@ object MsgPack {
       val exports = reader.readISZ(readTODO _)
       val instances = reader.readISZ(readInstance _)
       val connections = reader.readISZ(readConnection _)
-      return Composition(groups, exports, instances, connections)
+      val externalEntities = reader.readISZ(reader.readString _)
+      return Composition(groups, exports, instances, connections, externalEntities)
     }
 
     def readInstance(): Instance = {
@@ -367,7 +373,9 @@ object MsgPack {
       val includes = reader.readISZ(reader.readString _)
       val attributes = reader.readISZ(readTODO _)
       val imports = reader.readISZ(reader.readString _)
-      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports)
+      val preprocessorIncludes = reader.readISZ(reader.readString _)
+      val externalEntities = reader.readISZ(reader.readString _)
+      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities)
     }
 
     def readUses(): Uses = {

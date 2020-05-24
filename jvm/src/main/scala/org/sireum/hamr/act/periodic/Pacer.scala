@@ -3,16 +3,17 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
-import org.sireum.hamr.act.ast.{Consumes, Emits}
+import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits}
 import org.sireum.hamr.act.{ActOptions, C_Container, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, CamkesGlueCodeHeaderContributions, CamkesGlueCodeImplContributions, Counter, Resource, Sel4ConnectorTypes, StringTemplate, Util, ast}
-import org.sireum.hamr.codegen.common.{AadlProcessor, AadlThread, CaseSchedulingProperties, CommonUtil, HamrProperties, OsateProperties, SymbolTable}
+import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.message.Reporter
 
 @datatype class Pacer(val symbolTable: SymbolTable,
                       val actOptions: ActOptions) extends PeriodicImpl {
 
   val performHamrIntegration: B = Util.hamrIntegration(actOptions.platform)
-  
+
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
                                headerInclude: String,
@@ -33,9 +34,15 @@ import org.sireum.message.Reporter
       auxResources = auxResources ++ getSchedule(periodicComponents)
       
       // TODO handle components with different periods
-      var emitPeriods: ISZ[ast.Emits] = ISZ(emitPeriod(PacerTemplate.PACER_PERIOD_IDENTIFIER))
-      var gcEmitPeriods: ISZ[ST] = ISZ(gcEmitPeriod(PacerTemplate.PACER_PERIOD_IDENTIFIER))
-      
+      var emits: ISZ[ast.Emits] = ISZ()
+      var dataports: ISZ[ast.Dataport] = ISZ()
+      var includes: ISZ[String] = ISZ()
+
+      var gcPacerIncludes: ISZ[String] = ISZ()
+      var gcPacerImplEntries: ISZ[ST] = ISZ()
+      var gcPacerMethods: ISZ[ST] = ISZ()
+      var gcPacerInitEntries: ISZ[ST] = ISZ()
+
       // add pacer domain configuration
       configurations = configurations :+ PacerTemplate.pacerDomainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
       
@@ -46,37 +53,95 @@ import org.sireum.message.Reporter
         PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_TICK_IDENTIFIER,
         PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_TOCK_IDENTIFIER)
 
+      var requiresEmits = F
+      var requiresDataportVMs = F
+
       for (aadlThread <- periodicComponents) {
-        val componentId = aadlThread.identifier
+        val componentId = Util.getThreadIdentifier(aadlThread, symbolTable)
+
+        val isVM = aadlThread.toVirtualMachine(symbolTable)
+
+        requiresDataportVMs = requiresDataportVMs | isVM
+        requiresEmits = requiresEmits | !aadlThread.toVirtualMachine(symbolTable)
 
         configurations = configurations :+ PacerTemplate.pacerDomainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
-        
+
+        val (connectionType, srcFeatureName, dstFeatureName) : (Sel4ConnectorTypes.Type, String, String) =
+          if(isVM) {
+
+            dataports = dataports :+ dataportPeriod(PacerTemplate.pacerPeriodDataportIdentifier(componentId))
+
+            gcPacerImplEntries = gcPacerImplEntries :+ gcSendPeriodToVM(componentId)
+
+            gcPacerMethods = gcPacerMethods :+ PacerTemplate.vmGcSendMethod(
+              componentId,
+              PacerTemplate.pacerDataportQueueElemType(),
+              PacerTemplate.pacerDataportQueueSize())
+
+            gcPacerInitEntries = gcPacerInitEntries :+
+              PacerTemplate.vmGcInitMethodEntry(
+                componentId,
+                PacerTemplate.pacerDataportQueueElemType(),
+                PacerTemplate.pacerDataportQueueSize())
+
+            (Sel4ConnectorTypes.seL4SharedDataWithCaps,
+              PacerTemplate.pacerPeriodDataportIdentifier(componentId),
+              PacerTemplate.pacerClientDataportIdentifier())
+          } else {
+            (Sel4ConnectorTypes.seL4Notification,
+              PacerTemplate.pacerPeriodEmitIdentifier(),
+              PacerTemplate.pacerClientNotificationIdentifier())
+          }
+
         // connect dispatcher to component
         connections = connections :+ Util.createConnection(
-          Util.getConnectionName(connectionCounter.increment()),
-          Sel4ConnectorTypes.seL4Notification,
-          PacerTemplate.PACER_IDENTIFIER, PacerTemplate.pacerPeriodIdentifier(),
-          componentId, PacerTemplate.pacerClientNotificationIdentifier())
+          connectionName = Util.getConnectionName(connectionCounter.increment()),
+          connectionType = connectionType,
+          srcComponent = PacerTemplate.PACER_IDENTIFIER,
+          srcFeature = srcFeatureName,
+          dstComponent = componentId,
+          dstFeature = dstFeatureName)
       }
-      
-      val pacerComponent: ast.Instance = genPacerCamkesComponent(emitPeriods)
+
+      gcPacerMethods = gcPacerMethods :+ PacerTemplate.vmGcInitMethod(gcPacerInitEntries)
+
+      if(requiresEmits) {
+        emits = emits :+ emitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
+        gcPacerImplEntries = gcPacerImplEntries :+ gcEmitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
+      }
+
+      if(requiresDataportVMs) {
+
+        includes = includes :+ PacerTemplate.pacerDataportFilenameForIncludes()
+
+        gcPacerIncludes = gcPacerIncludes :+ PacerTemplate.pacerDataportFilenameForIncludes()
+      }
+
+      val pacerComponent: ast.Instance = genPacerCamkesComponent(includes, emits, dataports)
       
       instances = instances :+ pacerComponent
       
-      val pacerCCode: Resource = genPacerGlueCode(gcEmitPeriods)
-      
+      val pacerCCode: Resource = genPacerGlueCode(gcPacerIncludes, gcPacerMethods, gcPacerImplEntries)
+
+      val externalLibs: ISZ[String] = ISZ(Util.SBTypeLibrary)
+
       cContainers = cContainers :+ C_Container(
         instanceName = pacerComponent.component.name,
         componentId = pacerComponent.component.name,
         cSources = ISZ(pacerCCode),
         cIncludes = ISZ(),
         sourceText = ISZ(),
-        externalCSources = ISZ(),
-        externalCIncludeDirs = ISZ()
+        cmakeSOURCES = ISZ(),
+        cmakeINCLUDES = ISZ(),
+        cmakeLIBS = externalLibs
       )
     }
-    
-    return CamkesAssemblyContribution(imports, instances, connections, configurations, cContainers, auxResources)
+
+    val maxDomain: Z = symbolTable.getMaxDomain()
+    val settingCmakeEntries: ISZ[ST] = ISZ(PacerTemplate.settings_cmake_entries(maxDomain))
+
+    return CamkesAssemblyContribution(imports, instances, connections, configurations, cContainers,
+      settingCmakeEntries, auxResources)
   }
 
   def handlePeriodicComponent(aadlThread: AadlThread,
@@ -85,9 +150,11 @@ import org.sireum.message.Reporter
     
     val component = aadlThread.component
     val classifier = Util.getClassifier(component.classifier.get)
-    
+
     var consumes: ISZ[ast.Consumes] = ISZ()
-    
+    var dataports: ISZ[ast.Dataport] = ISZ()
+    var includes: ISZ[String] = ISZ()
+
     var gcHeaderMethods: ISZ[ST] = ISZ()
 
     var gcMethods: ISZ[ST] = ISZ()
@@ -116,18 +183,34 @@ import org.sireum.message.Reporter
           reporter.warn(None(), Util.toolName, s"Periodic thread ${classifier} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
       }
     }
-    
-    consumes = consumes :+ ast.Consumes(
-      name = PacerTemplate.pacerClientNotificationIdentifier(),
-      typ = "Period",
-      optional = F)
+
+    if(aadlThread.toVirtualMachine(symbolTable)) {
+
+      // TODO: any reason not to use int8 with size 1 ??
+      val queueType = Util.getEventDataSBQueueTypeName(
+        PacerTemplate.pacerDataportQueueElemType(),
+        PacerTemplate.pacerDataportQueueSize())
+
+      dataports = dataports :+ ast.Dataport(
+        name = PacerTemplate.pacerClientDataportIdentifier(),
+        typ = queueType,
+        optional = F)
+
+    } else {
+      consumes = consumes :+ ast.Consumes(
+        name = PacerTemplate.pacerClientNotificationIdentifier(),
+        typ = "Period",
+        optional = F)
+    }
 
     val shell = ast.Component(
       consumes = consumes,
-
+      dataports = dataports,
+      includes = includes,
       // filler
       control = F, hardware = F, name = "", mutexes = ISZ(), binarySemaphores = ISZ(), semaphores = ISZ(),
-      imports = ISZ(), emits = ISZ(), dataports = ISZ(), uses = ISZ(), provides = ISZ(), includes = ISZ(), attributes = ISZ()
+      imports = ISZ(), emits = ISZ(), uses = ISZ(), provides = ISZ(), attributes = ISZ(),
+      preprocessorIncludes = ISZ(), externalEntities = ISZ()
     )
     
     val componentContributions = CamkesComponentContributions(shell)
@@ -150,9 +233,24 @@ import org.sireum.message.Reporter
       typ = PacerTemplate.PACER_PERIOD_TYPE)
   }
 
+
+  def dataportPeriod(id: String): Dataport = {
+    return Dataport(
+      name = id,
+      typ = PacerTemplate.pacerDataportQueueType(),
+      optional = F
+    )
+  }
+
   def gcEmitPeriod(id: String): ST = { return st"${id}_emit()" }
-  
-  def genPacerCamkesComponent(periods: ISZ[Emits]): ast.Instance = {
+
+  def gcSendPeriodToVM(vmProcessId: String): ST = {
+    return st"${PacerTemplate.pacerSendPeriodToVmMethodName(vmProcessId)}(&${PacerTemplate.PACER_TICK_COUNT_IDENTIFIER})"
+  }
+
+  def genPacerCamkesComponent(includes: ISZ[String],
+                              periods: ISZ[Emits],
+                              dataports: ISZ[Dataport]): ast.Instance = {
     val emits: Emits = Emits(
       name = PacerTemplate.PACER_TICK_IDENTIFIER,
       typ = PacerTemplate.PACER_TICK_TOCK_TYPE)
@@ -172,21 +270,25 @@ import org.sireum.message.Reporter
         mutexes = ISZ(),
         binarySemaphores = ISZ(),
         semaphores = ISZ(),
-        dataports = ISZ(),
+        dataports = dataports,
         emits = periods :+ emits,
         uses = ISZ(),
         consumes = ISZ(consumes),
         provides = ISZ(),
-        includes = ISZ(),
+        includes = includes,
         attributes = ISZ(),
-        imports = ISZ()
+        preprocessorIncludes = ISZ(),
+        imports = ISZ(),
+        externalEntities = ISZ()
       )
     )
     return instance
   }
 
-  def genPacerGlueCode(periods: ISZ[ST]): Resource = {
-    val glueCode = PacerTemplate.pacerGlueCode(periods)
+  def genPacerGlueCode(gcIncludes: ISZ[String],
+                       gcMethods: ISZ[ST],
+                       gcLoopEntries: ISZ[ST]): Resource = {
+    val glueCode = PacerTemplate.pacerGlueCode(gcIncludes, gcMethods, gcLoopEntries)
  
     return Util.createResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
   }
@@ -265,10 +367,7 @@ import org.sireum.message.Reporter
         
         PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
     }
-    
-    val maxDomain = symbolTable.getMaxDomain()
-    val settingsCmake = Util.createResource("settings.cmake", PacerTemplate.settingsCmake(maxDomain), F)
-    
-    return ISZ(settingsCmake, Util.createResource(path, contents, F))
+
+    return ISZ(Util.createResource(path, contents, F))
   }
 }

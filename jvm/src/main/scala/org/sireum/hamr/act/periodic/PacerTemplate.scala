@@ -3,7 +3,8 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
-import org.sireum.hamr.act.Util
+import org.sireum.hamr.act.{Sel4ConnectorTypes, Util}
+import org.sireum.hamr.act.templates.EventDataQueueTemplate
 
 object PacerTemplate {
 
@@ -11,19 +12,31 @@ object PacerTemplate {
   val PACER_IDENTIFIER: String = "pacer"
     
   val PACER_PERIOD_TYPE: String = "Period"
-  val PACER_PERIOD_IDENTIFIER: String = "period"
-  
+  val PACER_PERIOD_EMIT_IDENTIFIER: String = "period"
+
+  val PACER_PERIOD_DATAPORT_IDENTIFIER_PREFIX: String = "period_to"
+
   val PACER_DOMAIN_FIELD: String = "_domain"
   val PACER_DOMAIN: Z = z"1" // pacer has to be in domain 1
-  
+
   val PACER_TICK_TOCK_TYPE: String = "TickTock"
   val PACER_TICK_IDENTIFIER: String = "tick"
   val PACER_TOCK_IDENTIFIER: String = "tock"
-  
-  def pacerPeriodIdentifier(): String = {
-    return PACER_PERIOD_IDENTIFIER
+  val PACER_TICK_COUNT_IDENTIFIER: String = "tickCount"
+
+  def pacerPeriodEmitIdentifier(): String = {
+    return PACER_PERIOD_EMIT_IDENTIFIER
   }
-  
+
+  def pacerSendPeriodToVmMethodName(vmProccessId: String): String = {
+    val portId = pacerPeriodDataportIdentifier(vmProccessId)
+    return s"send_${portId}"
+  }
+
+  def pacerPeriodDataportIdentifier(vmProcessId: String): String = {
+    return s"${PACER_PERIOD_DATAPORT_IDENTIFIER_PREFIX}_${vmProcessId}"
+  }
+
   def pacerComponentDir(): String= {
     return s"${Util.DIR_COMPONENTS}/${PACER_COMPONENT_TYPE}"
   }
@@ -33,7 +46,7 @@ object PacerTemplate {
   }
 
   def pacerGlueCodeFilename(): String = { 
-    return s"${PACER_COMPONENT_TYPE}.c"
+    return Util.genCImplFilename(PACER_COMPONENT_TYPE)
   }
   
   def pacerGlueCodePath(): String = {
@@ -43,7 +56,7 @@ object PacerTemplate {
   def periodicEntrypointMethodName(classifier: String): String = {
     return Util.brand(s"entrypoint_period_${classifier}")
   }
-  
+
   def callPeriodicComputEntrypoint(classifier: String, handler: String): ST = {
     val methodName = periodicEntrypointMethodName(classifier)
     val dummyVarName = Util.brand("dummy")
@@ -62,28 +75,36 @@ object PacerTemplate {
                |}"""
   }
   
-  def pacerGlueCode(periodEmits: ISZ[ST]): ST = {
-    val _p: ISZ[ST] = periodEmits.map(m => st"${m};")
+  def pacerGlueCode(includes: ISZ[String],
+                    methods: ISZ[ST],
+                    loopEntries: ISZ[ST]): ST = {
+    val _includes: ISZ[ST] = includes.map(m => st"#include ${m}")
+    val _entries: ISZ[ST] = loopEntries.map(m => st"${m};")
     val ret: ST = st"""// Copyright 2019 Adventium Labs
                       |
                       |#include <camkes.h>
                       |#include <stdio.h>
                       |#include <sel4/sel4.h>
+                      |${(_includes, "\n")}
+                      |
+                      |${(methods, "\n\n")}
                       |
                       |int run(void) {
                       |
-                      |  // Just used for output
-                      |  int tickCount = 0;
+                      |  ${pacerDataportQueueElemType()} ${PACER_TICK_COUNT_IDENTIFIER} = 0;
                       |
                       |  while (1) {
+                      |    //printf("%s: Period tick %d\n", get_instance_name(), ${PACER_TICK_COUNT_IDENTIFIER});
                       |
-                      |    printf("%s: Period tick %d\n", get_instance_name(), ++tickCount);
-                      |    tick_emit();
+                      |    ${PACER_TICK_COUNT_IDENTIFIER}++;
                       |
-                      |    ${(_p, "\n")}
+                      |    ${PACER_TICK_IDENTIFIER}_emit();
                       |
-                      |    tock_wait();
+                      |    ${(_entries, "\n")}
+                      |
+                      |    ${PACER_TOCK_IDENTIFIER}_wait();
                       |  }
+                      |
                       |  return 0;
                       |}"""
     return ret
@@ -152,7 +173,58 @@ object PacerTemplate {
   def pacerClientNotificationIdentifier(): String = {
     return Util.brand("pacer_notification")
   }
-  
+
+  def pacerClientDataportIdentifier(): String = {
+    return Util.brand("pacer_period_queue")
+  }
+
+  def pacerDataportFilename(): String = {
+    return Util.getEventData_SB_QueueHeaderFileName(
+      PacerTemplate.pacerDataportQueueElemType(),
+      PacerTemplate.pacerDataportQueueSize()
+    )
+  }
+
+  def pacerDataportFilenameForIncludes(): String = {
+    return s"<${pacerDataportFilename()}>"
+  }
+
+  def pacerDataportQueueElemType(): String = {
+    return "int8_t"
+  }
+
+  def pacerDataportQueueSize(): Z = {
+    return z"1"
+  }
+
+  def pacerDataportQueueType(): String = {
+    return Util.getEventDataSBQueueTypeName(pacerDataportQueueElemType(), pacerDataportQueueSize())
+  }
+
+  def vmGcInitMethodEntry(vmProcessId: String,
+                          queueElementTypeName: String,
+                          queueSize: Z): ST = {
+    val queueInitMethodName = EventDataQueueTemplate.getQueueInitMethodName(queueElementTypeName, queueSize)
+    return st"${queueInitMethodName}(${pacerPeriodDataportIdentifier(vmProcessId)});"
+  }
+
+  def vmGcInitMethod(entries: ISZ[ST]): ST = {
+    val ret: ST = st"""void pre_init(void) {
+                      |  ${(entries, "\n")}
+                      |}"""
+    return ret
+  }
+
+  def vmGcSendMethod(vmProcessId: String,
+                     queueElementTypeName: String,
+                     queueSize: Z): ST = {
+    val enqueueMethodName = EventDataQueueTemplate.getQueueEnqueueMethodName(queueElementTypeName, queueSize)
+    val ret: ST = st"""void ${pacerSendPeriodToVmMethodName(vmProcessId)}(${pacerDataportQueueElemType()} *data) {
+                      |  ${enqueueMethodName}(${pacerPeriodDataportIdentifier(vmProcessId)}, data);
+                      |}"""
+    return ret
+  }
+
   def pacerComponentTickIdentifier(): String = {
     return PACER_TICK_IDENTIFIER
   }
@@ -165,10 +237,8 @@ object PacerTemplate {
     return st"${identifier}.${PACER_DOMAIN_FIELD} = ${domain};" 
   }
 
-  def settingsCmake(numDomains: Z): ST = {
-    val ret: ST = st"""# this file will not be overwritten and is safe to edit
-                      |
-                      |set(KernelDomainSchedule "$${CMAKE_CURRENT_LIST_DIR}/kernel/domain_schedule.c" CACHE INTERNAL "")
+  def settings_cmake_entries(numDomains: Z): ST = {
+    val ret: ST = st"""set(KernelDomainSchedule "$${CMAKE_CURRENT_LIST_DIR}/kernel/domain_schedule.c" CACHE INTERNAL "")
                       |set(KernelNumDomains ${numDomains} CACHE STRING "" FORCE)
                       |"""
     return ret

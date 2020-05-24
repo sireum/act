@@ -3,14 +3,16 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.codegen.common.{CommonUtil, OsateProperties, PropertyUtil, StringUtil}
+import org.sireum.hamr.act.vm.VMGen
+import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
+import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.ops._
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, Component, FeatureEnd, Transformer}
 import org.sireum.message.{Position, Reporter}
 
 object Util {
-
   var reporter: Reporter = Reporter.create
   var verbose: B = T
 
@@ -54,15 +56,14 @@ object Util {
   val DEFAULT_PERIOD: Z = z"1"
 
   val DIR_SRC: String = "src"
-  val DIR_INCLUDES: String = "includes"
+  //val DIR_INCLUDES: String = "includes"
+  val DIR_TYPES: String = "types"
   val DIR_COMPONENTS: String = "components"
   val DIR_INTERFACES: String = "interfaces"
   val DIR_MONITORS: String = brand("Monitors")
-  val DIR_SAMPLING_PORTS: String = "sampling_ports"
 
+  val SBTypeLibrary: String = "SB_Type_Library"
   val SlangTypeLibrary: String = "SlangTypeLibrary"
-  
-  val CMAKE_VERSION: String = "3.8.2"
 
   val cKeywords: ISZ[String] = ISZ("auto", "break", "case", "char", "const", "continue", "default", "do", "double",
     "else", "enum", "extern", "float", "for", "goto", "if", "int", "long", "register", "return", "short",
@@ -79,17 +80,28 @@ object Util {
   val camkesStdConnectors: String = "<std_connector.camkes>"
   val camkesGlobalConnectors: String = "<global-connectors.camkes>"
   
-  def brand(s: String): String = {
+  @pure def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
   }
 
-  def cbrand(s: String): String = {
+  @pure def cbrand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_CAP_PREFIX}_$s"
   }
 
-  def nameToString(n: ir.Name): String = {
-    return org.sireum.ops.ISZOps(n.name).foldLeft((r: String, s: String) => if(r.size == 0) s else s"${r}_${s}", "")
-  }
+
+  @pure def getSbTypeHeaderFilename(): String = { return brand("types") }
+
+  @pure def getSbTypeHeaderFilenameWithExtension(): String = { return Util.genCHeaderFilename(getSbTypeHeaderFilename()) }
+
+  @pure def getSbTypeHeaderFilenameForIncludes(): String = { return s"<${getSbTypeHeaderFilenameWithExtension()}>" }
+
+
+  @pure def getTypeRootPath(): String = { return DIR_TYPES }
+
+  @pure def getTypeIncludesPath(): String = { return s"${getTypeRootPath()}/includes" }
+
+  @pure def getTypeSrcPath(): String = { return s"${getTypeRootPath()}/src" }
+
 
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
     val t: String = TypeUtil.translateBaseType(c.name) match {
@@ -104,6 +116,16 @@ object Util {
     val index = s.lastIndexOf(':') + 1
     s = StringOps(s.substring(index, c.name.size))
     return StringUtil.replaceAll(s.s, ".", "_")
+  }
+
+  def getThreadIdentifier(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
+    val ret: String = if(aadlThread.toVirtualMachine(symbolTable)) {
+      val parentProcess = aadlThread.getParent(symbolTable)
+      VMGen.virtualMachineIdentifier(parentProcess)
+    } else {
+      aadlThread.identifier
+    }
+    return ret
   }
 
   def getEventPortSendReceiveMethodName(feature: FeatureEnd): String = {
@@ -210,12 +232,6 @@ object Util {
       }
     }
     return ret
-  }
-
-  def getTypeHeaderFileName(c: ir.Component) : String = {
-    //val name = Util.getLastName(c.identifier)
-    //return brand(s"${name}_types")
-    return brand(s"types")
   }
 
   def getContainerName(s: String) : String = {
@@ -342,6 +358,10 @@ object Util {
     }
   }
 
+  def genCHeaderFilename(s: String): String = { return s"${s}.h"}
+
+  def genCImplFilename(s: String): String = { return s"${s}.c" }
+
   def createResource(path: String, contents: ST, overwrite: B): Resource = {
     return Resource(path, contents, overwrite, F)
   }
@@ -361,11 +381,11 @@ object Util {
   }
 
   def getEventData_SB_QueueHeaderFileName(typeName: String, queueSize: Z): String = {
-    return s"${getEventDataSBQueueName(typeName, queueSize)}.h"
+    return s"${Util.genCHeaderFilename(getEventDataSBQueueName(typeName, queueSize))}"
   }
 
   def getEventData_SB_QueueImplFileName(typeName: String, queueSize: Z): String = {
-    return s"${getEventDataSBQueueName(typeName, queueSize)}.c"
+    return s"${Util.genCImplFilename(getEventDataSBQueueName(typeName, queueSize))}"
   }
 
   def getEventDataSBQueueTypeName(typeName: String, queueSize: Z): String = {
@@ -396,21 +416,19 @@ object Util {
 
 
   val SB_EVENT_COUNTER_TYPE: String = Util.brand("event_counter_t")
-  val SB_COUNTER_FILENAME: String = Util.brand("event_counter.h")
+  val SB_COUNTER_HEADER_FILENAME: String = Util.brand(genCHeaderFilename("event_counter"))
 
   def sbCounterTypeDeclResource(): Resource = {
     val counter: ST =st"""#pragma once
                          |
                          |#include <stdint.h>
                          |
-                         |typedef _Atomic uintmax_t ${SB_EVENT_COUNTER_TYPE}; 
+                         |typedef _Atomic uintmax_t ${SB_EVENT_COUNTER_TYPE};
                          |"""
-    Util.createResource(s"${Util.DIR_INCLUDES}/${Util.SB_COUNTER_FILENAME}", counter, T)
+    Util.createResource(s"${Util.getTypeIncludesPath()}/${Util.SB_COUNTER_HEADER_FILENAME}", counter, T)
   }
-  
-  def sbCounterInclude(): ST = {
-    return st"#include <${Util.SB_COUNTER_FILENAME}>"
-  }
+
+  def getSbCounterFilenameForIncludes(): String = { return s"<${Util.SB_COUNTER_HEADER_FILENAME}>" }
 
   def getConnectionName(index: Z): String = { return s"conn${index}"}
   
@@ -542,6 +560,7 @@ object TypeUtil {
                              cContainers: ISZ[C_Container],
                              auxFiles: ISZ[Resource],
                              globalImports: ISZ[String],
+                             globalPreprocessorIncludes: ISZ[String],
                              requiresTimeServer: B
                             )
 
@@ -575,11 +594,16 @@ object TypeUtil {
 
 @datatype class C_Container(instanceName: String,
                             componentId: String,
+
                             cSources: ISZ[Resource],
                             cIncludes: ISZ[Resource],
+
                             sourceText: ISZ[String],
-                            externalCSources: ISZ[String],
-                            externalCIncludeDirs: ISZ[String])
+
+                            cmakeSOURCES: ISZ[String], // for CMakeLists SOURCES
+                            cmakeINCLUDES: ISZ[String], // for CMakeLists INCLUDES
+                            cmakeLIBS: ISZ[String] // for CMakeLists LIBS
+                           )
 
 @datatype class C_SimpleContainer(cIncludes: ISZ[ST],
                                   cInterface: Option[ST],
@@ -593,6 +617,7 @@ object TypeUtil {
                                            connections: ISZ[ast.Connection],
                                            configurations: ISZ[ST],
                                            cContainers: ISZ[C_Container],
+                                           settingCmakeEntries: ISZ[ST],
                                            auxResourceFiles: ISZ[Resource])
 
 @datatype class CamkesComponentContributions(shell: ast.Component)
@@ -623,8 +648,13 @@ object TypeUtil {
 @datatype class SamplingPortInterface(name: String,
                                       structName: String,
                                       sel4TypeName: String,
-                                      headerPath: String,
-                                      implPath: String) 
+                                      headerFilename: String,
+                                      implFilename: String) {
+
+  def headerPath: String = { return s"${Util.getTypeRootPath()}/includes/${headerFilename}" }
+
+  def implPath: String = { return s"${Util.getTypeRootPath()}/src/${implFilename}" }
+}
 
 @datatype class SharedData(owner: ir.Component,
                            ownerFeature: Option[ir.FeatureAccess],
@@ -635,11 +665,14 @@ object TypeUtil {
                             queueSize: Z)
 
 @enum object Sel4ConnectorTypes {
+  'seL4GlobalAsynch
   'seL4GlobalAsynchCallback
   'seL4Notification
   'seL4RPCCall
   'seL4SharedData
+  'seL4SharedDataWithCaps
   'seL4TimeServer
+  'seL4VMDTBPassthrough
 }
 
 object Transformers {

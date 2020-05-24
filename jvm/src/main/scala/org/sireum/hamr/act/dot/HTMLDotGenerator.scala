@@ -22,6 +22,9 @@ import org.sireum.hamr.act.ast._
   
   'seL4TimeServer
   'seL4GlobalAsynchCallback
+
+  'seL4VMDTBPassthrough
+  'seL4SharedDataWithCaps
 }
 
 object HTMLDotGenerator {
@@ -30,6 +33,8 @@ object HTMLDotGenerator {
   val orange: String = "orange"
   val green: String = "green"
   val brown: String = "brown"
+  val yellow: String = "yellow"
+  val pink: String = "pink"
   val unknown: String = "grey"
   
   val entityMap: Map[EntityType.Type, String] = Map.empty[EntityType.Type, String](ISZ(
@@ -51,7 +56,11 @@ object HTMLDotGenerator {
 
     (ConnectionType.seL4TimeServer, green),
 
-    (ConnectionType.seL4GlobalAsynchCallback, brown)
+    (ConnectionType.seL4GlobalAsynchCallback, brown),
+
+    (ConnectionType.seL4VMDTBPassthrough, yellow),
+
+    (ConnectionType.seL4SharedDataWithCaps, pink)
   ))
 
   def wrapColor(str: String, color: String): ST = {

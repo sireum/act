@@ -4,7 +4,7 @@ package org.sireum.hamr.act.periodic
 
 import org.sireum._
 import org.sireum.hamr.act.{ActOptions, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, Counter}
-import org.sireum.hamr.codegen.common.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -35,11 +35,9 @@ object Dispatcher {
 
   def handlePeriodicComponent(symbolTable: SymbolTable,
                               actOptions: ActOptions,
-                              
-                              c: ir.Component,
+
+                              aadlThread: AadlThread,
                               reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
-    
-    val aadlThread: AadlThread = symbolTable.getThread(c)
     
     return if(PeriodicUtil.usePacer(symbolTable, actOptions.platform))
       Pacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)

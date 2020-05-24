@@ -6,7 +6,9 @@ import org.sireum._
 import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate._
-import org.sireum.hamr.codegen.common.{AadlThread, CommonUtil, PropertyUtil, SymbolTable}
+import org.sireum.hamr.codegen.common.CommonUtil
+import org.sireum.hamr.codegen.common.properties.PropertyUtil
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -86,10 +88,15 @@ import org.sireum.message.Reporter
         headerInclude, periodicDispatcherCalendars)
 
       cContainers = cContainers :+ C_Container(
-        dispatchCamkesComponent.component.name,
-        dispatchCamkesComponent.component.name,
-        ISZ(dispatchCSource),
-        ISZ(), ISZ(), ISZ(), ISZ())
+        instanceName = dispatchCamkesComponent.component.name,
+        componentId = dispatchCamkesComponent.component.name,
+        cSources = ISZ(dispatchCSource),
+        cIncludes = ISZ(),
+        sourceText = ISZ(),
+        cmakeSOURCES = ISZ(),
+        cmakeINCLUDES = ISZ(),
+        cmakeLIBS = ISZ(Util.SBTypeLibrary)
+      )
 
       // connect dispatch timer to time server
       connections = connections :+ Util.createConnection(
@@ -115,7 +122,9 @@ import org.sireum.message.Reporter
       imports = imports ++ ISZ(Util.camkesStdConnectors, Util.camkesGlobalConnectors, PeriodicDispatcherTemplate.TIMER_SERVER_IMPORT)
     }
 
-    return CamkesAssemblyContribution(imports, instances, connections, configurations, cContainers, auxResources)
+    val settingsCmakeEntries: ISZ[ST] = ISZ()
+    return CamkesAssemblyContribution(imports, instances, connections, configurations, cContainers,
+      settingsCmakeEntries, auxResources)
   }
 
 
@@ -177,7 +186,8 @@ import org.sireum.message.Reporter
 
       // filler
       control = F, hardware = F, name = "", mutexes = ISZ(), binarySemaphores = ISZ(), semaphores = ISZ(),
-      dataports = ISZ(), emits = ISZ(), provides = ISZ(), includes = ISZ(), attributes = ISZ()
+      dataports = ISZ(), emits = ISZ(), provides = ISZ(), includes = ISZ(), attributes = ISZ(),
+      preprocessorIncludes = ISZ(), externalEntities = ISZ()
     )
     val componentContributions = CamkesComponentContributions(shell)
 
@@ -217,7 +227,9 @@ import org.sireum.message.Reporter
         provides = ISZ(),
         includes = ISZ(),
         attributes = ISZ(),
-        imports = ISZ(Util.camkesGlobalConnectors)
+        preprocessorIncludes = ISZ(),
+        imports = ISZ(Util.camkesGlobalConnectors),
+        externalEntities = ISZ()
       ))
     return i
   }
@@ -244,7 +256,9 @@ import org.sireum.message.Reporter
           typ = TIMER_TYPE)),
         includes = ISZ(),
         attributes = ISZ(),
-        imports = ISZ()
+        preprocessorIncludes = ISZ(),
+        imports = ISZ(),
+        externalEntities = ISZ()
       )
     )
     return i

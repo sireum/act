@@ -7,7 +7,8 @@ import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Compositio
 import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
-import org.sireum.hamr.codegen.common.StringUtil
+import org.sireum.hamr.act.templates.CMakeTemplate
+import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
 @record class ActPrettyPrint {
 
@@ -21,7 +22,8 @@ import org.sireum.hamr.codegen.common.StringUtil
                 cHeaderDirectories: ISZ[String],
                 aadlRootDir: String,
                 hamrLibs: Map[String, HamrLib],
-                platform: ActPlatform.Type
+                platform: ActPlatform.Type,
+                symbolTable: SymbolTable
                ): ISZ[Resource] = {
 
     rootServer = container.rootServer
@@ -43,7 +45,7 @@ import org.sireum.hamr.codegen.common.StringUtil
       var includePaths: ISZ[String] = ISZ()
 
       if(c.sourceText.nonEmpty) {
-        val dir = s"components/${c.componentId}/"
+        val dir = s"${Util.DIR_COMPONENTS}/${c.componentId}/"
         val rootDestDir = dir
 
         for(st <- c.sourceText) {
@@ -71,15 +73,21 @@ import org.sireum.hamr.codegen.common.StringUtil
         }
       }
 
-      sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.externalCSources
+      sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.cmakeSOURCES
       includePaths = includePaths ++ c.cIncludes.map((r: Resource) => 
-        Util.getDirectory(r.path)) ++ c.externalCIncludeDirs :+ Util.DIR_INCLUDES
+        Util.getDirectory(r.path)) ++ c.cmakeINCLUDES
 
       val hamrLib = getHamrLib(c.instanceName, hamrLibs)
       
       val hasAux = cFiles.nonEmpty && c.componentId != PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER
       
-      StringTemplate.cmakeComponent(c.componentId, sourcePaths, includePaths, hasAux, hamrLib)
+      StringTemplate.cmakeComponent(
+        componentName = c.componentId,
+        sources = sourcePaths,
+        includes = includePaths,
+        libs = c.cmakeLIBS,
+        hasAux = hasAux,
+        hamrLib = hamrLib)
     })
 
     for (m <- container.monitors) {
@@ -90,8 +98,13 @@ import org.sireum.hamr.codegen.common.StringUtil
 
       val hamrLib = getHamrLib(Util.SlangTypeLibrary, hamrLibs)
       
-      cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(m.i.component.name,
-        ISZ(m.cimplementation.path), ISZ(Util.getDirectory(m.cinclude.path), Util.DIR_INCLUDES), F, hamrLib)
+      cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(
+        componentName = m.i.component.name,
+        sources = ISZ(m.cimplementation.path),
+        includes = ISZ(Util.getDirectory(m.cinclude.path), Util.getTypeIncludesPath()),
+        libs = ISZ(),
+        hasAux = F,
+        hamrLib = hamrLib)
 
       add(s"${m.cimplementation.path}", m.cimplementation.content)
       add(s"${m.cinclude.path}", m.cinclude.content)
@@ -100,7 +113,7 @@ import org.sireum.hamr.codegen.common.StringUtil
 
     if(container.samplingPorts.nonEmpty) {
       
-      val seqNumFile = s"${Util.DIR_SAMPLING_PORTS}/${StringTemplate.SeqNumName}.h"
+      val seqNumFile = s"${Util.getTypeRootPath()}/includes/${Util.genCHeaderFilename(StringTemplate.SeqNumName)}"
       add(seqNumFile, StringTemplate.seqNumHeader())
       
       for (spi <- container.samplingPorts) {
@@ -117,7 +130,13 @@ import org.sireum.hamr.codegen.common.StringUtil
     if(actContainer.get.requiresTimeServer) {
       cmakeEntries = cmakeEntries :+ st"includeGlobalComponents()"
     }
-    
+
+    cmakeEntries = cmakeEntries :+ CMakeTemplate.addSubDir_TypeLibrary()
+
+    if(symbolTable.hasVM()) {
+      cmakeEntries = cmakeEntries :+ CMakeTemplate.addSubDir_VM()
+    }
+
     if(Util.hamrIntegration(platform) && hamrLibs.nonEmpty) {
       cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess()
       for(hamrLib <- hamrLibs.values){
@@ -141,7 +160,7 @@ import org.sireum.hamr.codegen.common.StringUtil
 
     cmakeEntries = cmakeEntries ++ cmakeComponents
 
-    val cmakelist = StringTemplate.cmakeLists(Util.CMAKE_VERSION, container.rootServer, cmakeEntries)
+    val cmakelist = StringTemplate.cmakeLists(container.rootServer, cmakeEntries)
 
     add("CMakeLists.txt", cmakelist)
 
@@ -150,7 +169,7 @@ import org.sireum.hamr.codegen.common.StringUtil
     val auxResources: ISZ[Resource] = container.auxFiles
 
     
-    addExeResource("bin/run-camkes.sh", StringTemplate.runCamkesScript()) 
+    addExeResource("bin/run-camkes.sh", StringTemplate.runCamkesScript(symbolTable.hasVM()))
     
     // add dest dir to path
     val ret = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
@@ -184,11 +203,12 @@ import org.sireum.hamr.codegen.common.StringUtil
 
     val comp = visitComposition(a.composition)
 
+    val preprocessorIncludes = actContainer.get.globalPreprocessorIncludes.map((m: String) => s"#include ${m}")
+
     var imports = Set.empty[String] ++ actContainer.get.globalImports.map((m: String) => s"import ${m};")
     
     imports = imports ++ resources.map((o: Resource) => s"""import "${o.path}";""")
-    
-    
+
     val connectors: ISZ[ST] = actContainer.get.connectors.map(c => {
       val fromType: ST = if(c.from_template.nonEmpty) st"""template "${c.from_template.get}"""" else st"""TODO"""
       val toType: ST = if(c.from_template.nonEmpty) st"""template "${c.to_template.get}"""" else st"""TODO"""
@@ -200,7 +220,10 @@ import org.sireum.hamr.codegen.common.StringUtil
     })
 
     val st =
-      st"""${(imports.elements, "\n")}
+      st"""${StringTemplate.doNotEditComment()}
+          |
+          |${(preprocessorIncludes, "\n")}
+          |${(imports.elements, "\n")}
           |
           |${(connectors, "\n")}
           |assembly {
@@ -208,6 +231,8 @@ import org.sireum.hamr.codegen.common.StringUtil
           |
           |  configuration {
           |    ${(a.configuration, "\n")}
+          |
+          |    ${(a.configurationMacros, "\n")}
           |  }
           |}
           |"""
@@ -241,11 +266,13 @@ import org.sireum.hamr.codegen.common.StringUtil
         st"""connection ${c.connectionType} ${c.name}(from ${from}, to ${to});"""
     }
 
+
     val st =
       st"""composition {
           |  ${(instances, "\n")}
           |
           |  ${(connections, "\n")}
+          |  ${(o.externalEntities, "\n")}
           |}"""
 
     /*
@@ -262,7 +289,7 @@ import org.sireum.hamr.codegen.common.StringUtil
 
     val st =
       st"""${(i.component.imports.map((i: String) => s"import ${i};"), "\n")}
-         |
+          |${(i.component.preprocessorIncludes.map((i: String) => s"#include ${i}"), "\n")}
           |component ${name} {
           |  ${(i.component.includes.map((i: String) => s"include ${i};"), "\n")}
           |  ${if(i.component.control) "control;" else ""}
@@ -274,6 +301,7 @@ import org.sireum.hamr.codegen.common.StringUtil
           |  ${(i.component.binarySemaphores.map((b: BinarySemaphore) => s"has binary_semaphore ${b.name};"), "\n")}
           |  ${(i.component.semaphores.map((b: Semaphore) => s"has semaphore ${b.name};"), "\n")}
           |  ${(i.component.mutexes.map((m: Mutex) => s"has mutex ${m.name};"), "\n")}
+          |  ${(i.component.externalEntities.map((s: String) => s), "\n")}
           |}
           """
 
