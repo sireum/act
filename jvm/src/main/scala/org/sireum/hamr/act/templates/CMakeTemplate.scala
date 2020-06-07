@@ -47,7 +47,7 @@ object CMakeTemplate {
       if(paths.isEmpty) { None() }
       else {
         val public: String = if(isTargetInterface) "" else "PUBLIC "
-        Some(st"${(paths.map(m => st"${public}${m}"), "\n")}") }
+        Some(st"${(paths.map((m: String) => st"${public}${m}"), "\n")}") }
 
     val ret: ST = st"""target_include_directories(${target}
                       |                           ${INTERFACE}

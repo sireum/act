@@ -462,7 +462,7 @@ object VM_Template {
     assert(componentIDs.size <= 2, "Currently only expecting two VMs (e.g. sender/receiver")
 
     var i = 1
-    val entries = componentIDs.map(componentId => {
+    val entries: ISZ[ST] = componentIDs.map((componentId: String) => {
       val vmid = s"VM${i}"
       i = i + 1
       st"""${componentId}.linux_address_config = {
@@ -608,7 +608,7 @@ object VM_Template {
 
   def vm_app_dummy(vmProcessId: String ,
                    includes: ISZ[String]): ST = {
-    val _includes = includes.map(m => st"#include ${m}")
+    val _includes = includes.map((m: String) => st"#include ${m}")
 
     val ret: ST = st"""#include <stdio.h>
                       |#include <stdlib.h>

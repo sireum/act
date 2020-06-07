@@ -27,7 +27,7 @@ object StringTemplate {
     val macroName = StringUtil.macroize(filename)
 
     val _includes: Option[ST] = if(includes.nonEmpty) {
-      Some(st"${(includes.map(m => st"#include ${m}"), "\n")}\n")
+      Some(st"${(includes.map((m: String) => st"#include ${m}"), "\n")}\n")
     } else {None()}
 
     val _entries: Option[ST] = if(entries.nonEmpty) {
@@ -1174,7 +1174,7 @@ bool is_empty_${s.name}(${s.structName} *port) {
         val libRelPath = StringUtil.replaceAll(lib.staticLib, "hamr", "../hamr")
         cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrLib(lib.instanceName, libRelPath)
 
-        val xincludes = lib.includeDirs.map(m => StringUtil.replaceAll(m, "hamr", "../hamr"))
+        val xincludes = lib.includeDirs.map((m: String) => StringUtil.replaceAll(m, "hamr", "../hamr"))
         cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(lib.instanceName, xincludes)
 
         val hamrlibname = s"$${${cmakeHamrLibName(lib.instanceName)}}"

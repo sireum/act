@@ -111,7 +111,7 @@ object VMGen {
   }
 
   def mergeISZs[T](a: ISZ[T], b: ISZ[T]): ISZ[T] = {
-    return (Set.empty[T]() ++ a ++ b).elements
+    return (Set.empty[T] ++ a ++ b).elements
   }
 
   def mergeVMs(assemblies: ISZ[Assembly]): ISZ[Assembly] = {
@@ -228,7 +228,7 @@ object VMGen {
   var uses: ISZ[Uses] = ISZ()
   var consumes: ISZ[Consumes] = ISZ()
   var provides: ISZ[Provides] = ISZ()
-  var includes: Set[String] = Set.empty[String]()
+  var includes: Set[String] = Set.empty[String]
   var imports: ISZ[String] = ISZ()
 
   var externalCSources: ISZ[String] = ISZ()
@@ -298,10 +298,10 @@ object VMGen {
         dataports = dataports ++ componentContributions.shell.dataports
 
         crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_dataport_method(PacerTemplate.pacerClientDataportIdentifier)
+          VM_Template.vm_cross_conn_extern_dataport_method(PacerTemplate.pacerClientDataportIdentifier())
 
         crossConnConnections = crossConnConnections :+
-          VM_Template.vm_cross_conn_Connection_Period(PacerTemplate.pacerClientDataportIdentifier, crossConnConnections.size)
+          VM_Template.vm_cross_conn_Connection_Period(PacerTemplate.pacerClientDataportIdentifier(), crossConnConnections.size)
 
       case x =>
         halt(s"Not currently supporting ${x} dispatch protocol")
@@ -407,7 +407,7 @@ object VMGen {
 
     includes = includes + s"<${Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)}>"
 
-    def getEventDataPortname(connection: ir.ConnectionInstance, queueSize: Z): String = {
+    def getEventDataPortname(connection: ir.ConnectionInstance): String = {
       val srcFeature = symbolTable.getFeatureFromName(connection.src.feature.get).asInstanceOf[ir.FeatureEnd]
       val dstFeature = symbolTable.getFeatureFromName(connection.dst.feature.get).asInstanceOf[ir.FeatureEnd]
       return VMGen.getEventDataportName(srcFeature, dstFeature, queueSize)
@@ -432,7 +432,7 @@ object VMGen {
           typ = Util.EVENT_NOTIFICATION_TYPE,
           optional = T)
 
-        val dataportName = getEventDataPortname(connections(0), queueSize) //Util.getEventDataSBQueueDestFeatureName(fid)
+        val dataportName = getEventDataPortname(connections(0)) //Util.getEventDataSBQueueDestFeatureName(fid)
 
         dataports = dataports :+ Dataport(
           name = dataportName,
@@ -468,7 +468,7 @@ object VMGen {
           name = emitsName,
           typ = Util.EVENT_NOTIFICATION_TYPE)
 
-        val dataPortName = getEventDataPortname(connections(0), queueSize)
+        val dataPortName = getEventDataPortname(connections(0))
 
         dataports = dataports :+ Dataport(
           name = dataPortName,

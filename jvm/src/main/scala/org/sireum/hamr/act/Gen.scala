@@ -74,7 +74,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     if(!hasErrors()) {
       auxResourceFiles = auxResourceFiles :+
         Util.createResource(
-          path = s"${Util.getTypeIncludesPath}/${Util.getSbTypeHeaderFilenameWithExtension()}",
+          path = s"${Util.getTypeIncludesPath()}/${Util.getSbTypeHeaderFilenameWithExtension()}",
           contents = processDataTypes(sortedData),
           overwrite = T)
     }
@@ -88,7 +88,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       val assemblies: ISZ[Assembly] = astObjects.filter(f => f.isInstanceOf[Assembly]).map(m => m.asInstanceOf[Assembly])
       val otherAstObjects: ISZ[ASTObject] =  astObjects.filter(f => !f.isInstanceOf[Assembly])
 
-      val vmProcessIDs = symbolTable.getProcesses().filter(p => p.toVirtualMachine()).map(m => VMGen.virtualMachineIdentifier(m))
+      val vmProcessIDs = symbolTable.getProcesses().filter((p: AadlProcess) => p.toVirtualMachine()).map((m: AadlProcess) => VMGen.virtualMachineIdentifier(m))
       if(vmProcessIDs.nonEmpty) {
         auxResourceFiles = auxResourceFiles ++ VMGen.getAuxResources(vmProcessIDs)
       }
@@ -149,10 +149,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
           ops.StringOps(m.path).substring(prefix.size, m.path.size)
         })
 
-        filenames = filenames ++ samplingPorts.values.map(m => {
+        val spis: ISZ[String] = samplingPorts.values.map((m: SamplingPortInterface) => {
           assert(ops.StringOps(m.implPath).startsWith(prefix), s"Unexpected type path ${m.implPath}")
           ops.StringOps(m.implPath).substring(prefix.size, m.implPath.size)
         })
+
+        filenames = filenames ++ spis
 
         val contents: ST = StringTemplate.generateTypeCmakeLists(filenames, actOptions.hamrLibs.get(Util.SlangTypeLibrary))
 
@@ -435,7 +437,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                 val dstComponentId: String = Util.getThreadIdentifier(dstAadlThread, symbolTable)
 
                 val srcPath: String = CommonUtil.getName(conn.src.feature.get)
-                val dstPath: String = CommonUtil.getName(conn.dst.feature.get)
+                //val dstPath: String = CommonUtil.getName(conn.dst.feature.get)
 
                 val srcFeature: ir.Feature = symbolTable.getFeatureFromName(conn.src.feature.get)
                 val dstFeature: ir.Feature = symbolTable.getFeatureFromName(conn.dst.feature.get)
@@ -1112,7 +1114,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
             reporter.warn(None(), Util.toolName, s"Skipping ${f.category} for ${fid}.${fid}")
         }
 
-        generateGlueCodePortInterfaceMethod(aadlThread, f.asInstanceOf[ir.FeatureEnd]) match {
+        generateGlueCodePortInterfaceMethod(aadlThread, f) match {
           case Some(C_SimpleContainer(cIncludes, interface, impl, preInit, postInits, drainQueues)) =>
             if (cIncludes.nonEmpty) {
               gcImplIncludes = gcImplIncludes ++ cIncludes
