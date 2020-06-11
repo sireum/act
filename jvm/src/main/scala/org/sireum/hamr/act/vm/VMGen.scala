@@ -6,8 +6,8 @@ import org.sireum.hamr.act.{ActOptions, ActPlatform, ActPrettyPrint, QueueObject
 import org.sireum.hamr.ir
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
-import org.sireum.hamr.act.templates.EventDataQueueTemplate
-import org.sireum.hamr.codegen.common.CommonUtil
+import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
+import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlProcess, AadlThread, Dispatch_Protocol, SymbolTable}
 import org.sireum.hamr.ir.FeatureEnd
@@ -33,13 +33,38 @@ object VMGen {
     return s"${Util.DIR_COMPONENTS}/${DIR_VM}"
   }
 
-  def getAuxResources(vmProcessIDs: ISZ[String]): ISZ[Resource] = {
+  def getAuxResources(vmProcessIDs: ISZ[String], platform: ActPlatform.Type): ISZ[Resource] = {
     assert(vmProcessIDs.nonEmpty, "Expecting 1 or more ids of processes going to VMs")
     var auxResourceFiles: ISZ[Resource] = ISZ()
 
+    val projectRoot = s"$${CMAKE_CURRENT_SOURCE_DIR}/../.."
+
+    var libNames: ISZ[String] = ISZ(Util.SBTypeLibrary)
+
+    var vmVars: ISZ[ST] = ISZ(
+      VM_Template.vm_cmake_var(
+          VM_Template.makeDirVariable(Util.SBTypeLibrary),s"${projectRoot}/${Util.getTypeRootPath()}"))
+
+    var appAddSubdirs: ISZ[ST] = ISZ(
+      CMakeTemplate.cmake_add_subdirectory_binned(
+        VM_Template.cmakeReferenceVar(VM_Template.makeDirVariable(Util.SBTypeLibrary)),
+        Some(Util.SBTypeLibrary)))
+
+    if(platform == ActPlatform.SeL4) {
+      libNames = libNames :+ Util.SlangTypeLibrary
+
+      appAddSubdirs = CMakeTemplate.cmake_add_subdirectory_binned(
+        VM_Template.cmakeReferenceVar(VM_Template.makeDirVariable(Util.SlangTypeLibrary)),
+        Some(Util.SlangTypeLibrary)) +: appAddSubdirs
+
+      vmVars = VM_Template.vm_cmake_var(
+          VM_Template.makeDirVariable(Util.SlangTypeLibrary),
+          s"${projectRoot}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${Util.SlangTypeLibrary}") +: vmVars
+    }
+
     auxResourceFiles = auxResourceFiles :+ Resource(
       path = s"${getRootVMDir()}/CMakeLists.txt",
-      content = VM_Template.vm_cmakelists(vmProcessIDs),
+      content = VM_Template.vm_cmakelists(vmProcessIDs, libNames, vmVars),
       overwrite = T, makeExecutable = F)
 
     auxResourceFiles = auxResourceFiles :+ Resource(
@@ -63,9 +88,10 @@ object VMGen {
       overwrite = T, makeExecutable = F)
 
     for(vmProcessID <- vmProcessIDs) {
+
       auxResourceFiles = auxResourceFiles :+ Resource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/CMakeLists.txt",
-        content = VM_Template.vm_cmakelists_app(vmProcessID),
+        content = VM_Template.vm_cmakelists_app(vmProcessID, libNames, appAddSubdirs),
         overwrite = T, makeExecutable = F)
 
       auxResourceFiles = auxResourceFiles :+ Resource(

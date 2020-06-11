@@ -90,7 +90,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
       val vmProcessIDs = symbolTable.getProcesses().filter((p: AadlProcess) => p.toVirtualMachine()).map((m: AadlProcess) => VMGen.virtualMachineIdentifier(m))
       if(vmProcessIDs.nonEmpty) {
-        auxResourceFiles = auxResourceFiles ++ VMGen.getAuxResources(vmProcessIDs)
+        auxResourceFiles = auxResourceFiles ++ VMGen.getAuxResources(vmProcessIDs, platform)
       }
 
       val mergedAssemblies: ISZ[Assembly] = VMGen.mergeVMs(assemblies)
@@ -156,12 +156,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
         filenames = filenames ++ spis
 
-        val contents: ST = CMakeTemplate.cmake_generateTypeCmakeLists(filenames, actOptions.hamrLibs.get(Util.SlangTypeLibrary))
+        val contents: ST = CMakeTemplate.cmake_generateTypeCmakeLists(filenames)
 
         auxResourceFiles = auxResourceFiles :+
           Util.createResource(s"${Util.getTypeRootPath()}/CMakeLists.txt", contents, T)
 
-      }
+      } // end sb type library
 
       return (Some(ActContainer(
         rootServer = CommonUtil.getLastName(symbolTable.rootSystem.component.identifier),

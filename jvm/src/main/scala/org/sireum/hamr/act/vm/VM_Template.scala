@@ -20,7 +20,6 @@ object VM_Template {
     val ret: ISZ[String] = ISZ(
       s"VM_GENERAL_COMPOSITION_DEF()",
       s"VM_COMPONENT_CONNECTIONS_DEF(${processID})",
-      //s"VM_VIRTUAL_SERIAL_COMPOSITION_DEF(${processID})",
       s"VM_VIRTUAL_SERIAL_COMPONENTS_DEF()",
       s"PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF(${processID})"
     )
@@ -42,7 +41,6 @@ object VM_Template {
     val ret: ISZ[String] = ISZ(
       "VM_GENERAL_CONFIGURATION_DEF()",
       s"VM_CONFIGURATION_DEF(${vmProcessId})",
-      //s"VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(${vmProcessId})",
       s"VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF()",
       s"PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(${vmProcessId})"
     )
@@ -206,7 +204,13 @@ object VM_Template {
     return ISZ(ret)
   }
 
-  def vm_cmakelists(vmIDs: ISZ[String]): ST = {
+  def vm_cmake_var(varName: String, varValue: String): ST = {
+    return st"-D${varName}=${varValue}"
+  }
+
+  def vm_cmakelists(vmIDs: ISZ[String],
+                    libNames: ISZ[String],
+                    cmakeVars: ISZ[ST]): ST = {
     val extendVMs: ISZ[ST] = vmIDs.map(m => {
       st"""ExtendCAmkESComponentInstance(VM ${m}
           |  SOURCES src/cross_vm_connections_${m}.c)"""
@@ -331,7 +335,7 @@ object VM_Template {
                      |        EXCLUDE_FROM_ALL
                      |        CMAKE_ARGS
                      |        -DCMAKE_C_COMPILER=$${CMAKE_C_COMPILER}
-                     |        -DQUEUE_LIB=$${CMAKE_CURRENT_SOURCE_DIR}/../../${Util.getTypeRootPath()}
+                     |        ${(cmakeVars, "\n")}
                      |        -DCMAKE_C_FLAGS=$${BASE_C_FLAGS}
                      |    )
                      |
@@ -382,7 +386,7 @@ object VM_Template {
                      |
                      |# Link the vm component against the SB type library.
                      |DeclareCAmkESComponent(VM
-                     |  LIBS ${Util.SBTypeLibrary}
+                     |  LIBS ${(libNames, "\n")}
                      |)
                      |
                      |CAmkESAddCPPInclude($${CAMKES_ARM_VM_DIR}/components/VM)"""
@@ -591,22 +595,29 @@ object VM_Template {
     return ret
   }
 
-  def vm_cmakelists_app(processID: String): ST = {
+  /* @param libPathNames should be path, libName pairs
+   */
+  def vm_cmakelists_app(processID: String,
+                        libNames: ISZ[String],
+                        addSubDirs: ISZ[ST]): ST = {
+
     val ret: ST = st"""${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
                       |
                       |project(${processID} C)
                       |
                       |${CMakeTemplate.CMAKE_SET_CMAKE_C_STANDARD}
                       |
-                      |add_subdirectory($${QUEUE_LIB} ${Util.SBTypeLibrary})
+                      |${(addSubDirs, "\n\n")}
                       |
                       |add_executable(${processID} ${processID}.c)
                       |
-                      |target_link_libraries(${processID} ${Util.SBTypeLibrary} -static-libgcc -static)"""
+                      |target_link_libraries(${processID}
+                      |                      ${(libNames, "\n")}
+                      |                      -static-libgcc -static)"""
     return ret
   }
 
-  def vm_app_dummy(vmProcessId: String ,
+  def vm_ap_dummy(vmProcessId: String ,
                    includes: ISZ[String]): ST = {
     val _includes = includes.map((m: String) => st"#include ${m}")
 
@@ -632,4 +643,13 @@ object VM_Template {
                       |}"""
     return ret
   }
+
+  def makeDirVariable(s: String): String = {
+    return s"${s}_DIR"
+  }
+
+  def cmakeReferenceVar(s: String): String = {
+    return s"$${${s}}"
+  }
+
 }

@@ -6,8 +6,9 @@ import org.sireum._
 import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Composition, Consumes, Dataport, Direction, Emits, Instance, Method, Mutex, Procedure, Provides, Semaphore, Uses}
 import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
-import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
+import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
 import org.sireum.hamr.act.templates.CMakeTemplate
+import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
 @record class ActPrettyPrint {
@@ -21,7 +22,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
                 cFiles: ISZ[String],
                 cHeaderDirectories: ISZ[String],
                 aadlRootDir: String,
-                hamrLibs: Map[String, HamrLib],
+                slangLibInstanceNames: ISZ[String],
                 platform: ActPlatform.Type,
                 symbolTable: SymbolTable
                ): ISZ[Resource] = {
@@ -77,7 +78,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       includePaths = includePaths ++ c.cIncludes.map((r: Resource) => 
         Util.getDirectory(r.path)) ++ c.cmakeINCLUDES
 
-      val hamrLib = getHamrLib(c.instanceName, hamrLibs)
+      val slangLib: Option[String] = getSlangLibrary(c.instanceName, platform)
       
       val hasAux = cFiles.nonEmpty && c.componentId != PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER
 
@@ -87,7 +88,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
         includes = includePaths,
         libs = c.cmakeLIBS,
         hasAux = hasAux,
-        hamrLib = hamrLib)
+        slangLib = slangLib)
     })
 
     for (m <- container.monitors) {
@@ -96,7 +97,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
         case i: Ihor_Monitor => prettyPrint(ISZ(i.interfaceReceiver, i.interfaceSender))
       }
 
-      val hamrLib = getHamrLib(Util.SlangTypeLibrary, hamrLibs)
+      val slangLib: Option[String] = if(platform == ActPlatform.SeL4) Some(Util.SlangTypeLibrary) else None()
       
       cmakeComponents = cmakeComponents :+ CMakeTemplate.cmake_DeclareCamkesComponent(
         componentName = m.i.component.name,
@@ -104,7 +105,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
         includes = ISZ(Util.getDirectory(m.cinclude.path), Util.getTypeIncludesPath()),
         libs = ISZ(),
         hasAux = F,
-        hamrLib = hamrLib)
+        slangLib = slangLib)
 
       add(s"${m.cimplementation.path}", m.cimplementation.content)
       add(s"${m.cinclude.path}", m.cinclude.content)
@@ -131,26 +132,21 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       cmakeEntries = cmakeEntries :+ st"includeGlobalComponents()"
     }
 
+    if(Util.hamrIntegration(platform) && slangLibInstanceNames.nonEmpty) {
+      for(slangLib <- slangLibInstanceNames){
+        val path = s"$${CMAKE_CURRENT_LIST_DIR}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${slangLib}"
+        cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_add_subdirectory(path)
+      }
+    }
+
+    // add type library after hamr libs as it will depend on the former if sel4 platform
     cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_TypeLibrary()
 
+    // hmm, not sure when this should be added
     if(symbolTable.hasVM()) {
       cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_VM()
     }
 
-    if(Util.hamrIntegration(platform) && hamrLibs.nonEmpty) {
-
-      //cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess()
-
-      for(hamrLib <- hamrLibs.values){
-        
-        //cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrLib(hamrLib.instanceName, hamrLib.staticLib)
-
-        //cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(hamrLib.instanceName, hamrLib.includeDirs)
-
-        cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_add_subdirectory(s"$${CMAKE_CURRENT_LIST_DIR}/hamr/${hamrLib.instanceName}")
-      }
-    }
-    
     if(container.connectors.nonEmpty) {
       cmakeEntries = cmakeEntries :+
         st"""# add path to connector templates
@@ -363,9 +359,13 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     resources = resources :+ Util.createExeResource(path, content, T)
   }
 
-  def getHamrLib(instanceName: String, hamrLibs: Map[String, HamrLib]): Option[HamrLib] = {
-    return if(hamrLibs.contains(instanceName)) hamrLibs.get(instanceName)
-    else if(hamrLibs.contains(Util.SlangTypeLibrary)) hamrLibs.get(Util.SlangTypeLibrary)
-    else None()
+  def getSlangLibrary(componentName: String, platform: ActPlatform.Type): Option[String] = {
+    val libName = if(componentName == PacerTemplate.PACER_COMPONENT_TYPE ||
+      componentName == PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER) {
+      Util.SlangTypeLibrary
+    } else {
+      componentName
+    }
+    if(platform == ActPlatform.SeL4) Some(libName) else None()
   }
 }

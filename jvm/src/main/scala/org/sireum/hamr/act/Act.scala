@@ -66,7 +66,12 @@ object Act {
       
       val (container, r) = Gen(m2, symbolTable, aadlTypes, options, reporter).process(auxHFiles)
       reporter.reports(r.messages)
-      
+
+      val slangLibInstanceNames: ISZ[String] = options.platform match {
+        case ActPlatform.SeL4 => symbolTable.getThreads().map(m => m.path) :+ Util.SlangTypeLibrary
+        case _ => ISZ()
+      }
+
       container match {
         case Some(container) =>
           val rootDir: String = options.aadlRootDirectory match {
@@ -79,7 +84,7 @@ object Act {
             cFiles = auxCFiles,
             cHeaderDirectories = auxHeaderDirectories,
             aadlRootDir = rootDir,
-            hamrLibs = options.hamrLibs,
+            slangLibInstanceNames: ISZ[String],
             platform = options.platform,
             symbolTable = symbolTable)
         case _ =>

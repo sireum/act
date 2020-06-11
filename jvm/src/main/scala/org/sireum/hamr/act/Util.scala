@@ -806,15 +806,10 @@ object Transformers {
   'SeL4_TB
 }
 
-@datatype class HamrLib(instanceName: String,
-                        includeDirs: ISZ[String],
-                        staticLib: String)
-
 @datatype class ActOptions(outputDir: String,
                            auxFiles: Map[String, String],
                            aadlRootDirectory: Option[String],
                            platform: ActPlatform.Type,
-                           hamrLibs: Map[String, HamrLib],
                            hamrBasePackageName: Option[String])
 
 @record class Counter() {

@@ -3,7 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
-import org.sireum.hamr.act.{HamrLib, StringTemplate, Util}
+import org.sireum.hamr.act.{StringTemplate, Util}
 import org.sireum.hamr.act.vm.VMGen
 import org.sireum.hamr.codegen.common.StringUtil
 
@@ -91,7 +91,7 @@ object CMakeTemplate {
                                    includes: ISZ[String],
                                    libs: ISZ[String],
                                    hasAux: B,
-                                   hamrLib: Option[HamrLib]): ST = {
+                                   slangLib: Option[String]): ST = {
     var srcs: ISZ[ST] = ISZ()
     if(hasAux) { srcs = srcs :+ st"$${${AUX_C_SOURCES}} " }
     if(sources.nonEmpty) { srcs = srcs :+ st"""${(sources, " ")}""" }
@@ -101,10 +101,6 @@ object CMakeTemplate {
       if (hasAux) {
         incls = incls :+ st"$${${AUX_C_INCLUDES}}".render
       }
-      if (hamrLib.nonEmpty) {
-        val hamrIncludeName = cmakeHamrIncludesName(hamrLib.get.instanceName)
-        incls = incls :+ st"$${${hamrIncludeName}}".render
-      }
       incls = incls ++ includes
 
       if(incls.nonEmpty) Some(st"INCLUDES ${(incls, " ")}") else None()
@@ -112,8 +108,8 @@ object CMakeTemplate {
 
     val _libs: Option[ST] = {
       var candidates: ISZ[String] = libs
-      if(hamrLib.nonEmpty) {
-        candidates = candidates :+ hamrLib.get.instanceName
+      if(slangLib.nonEmpty) {
+        candidates = candidates :+ slangLib.get
       }
 
       if(candidates.nonEmpty) {
@@ -133,33 +129,11 @@ object CMakeTemplate {
   }
 
 
-  def cmake_generateTypeCmakeLists(filenames: ISZ[String], hamrLib: Option[HamrLib]): ST = {
-    var cmakeEntries: ISZ[ST] = ISZ()
-    var linkHamrLib: Option[ST] = None()
-    var includes: ISZ[String] = ISZ("includes")
+  def cmake_generateTypeCmakeLists(filenames: ISZ[String]): ST = {
+    val includes: ISZ[String] = ISZ("includes")
 
     val filtered = Set.empty[String] ++ filenames // remove duplicates
     val isInterfaceTypeLib = filtered.isEmpty
-
-    hamrLib match {
-      case Some(lib) =>
-        val libRelPath = StringUtil.replaceAll(lib.staticLib, "hamr", "../hamr")
-        cmakeEntries = cmakeEntries :+ cmakeHamrLib(lib.instanceName, libRelPath)
-
-        val xincludes = lib.includeDirs.map((m: String) => StringUtil.replaceAll(m, "hamr", "../hamr"))
-        cmakeEntries = cmakeEntries :+ cmakeHamrIncludes(lib.instanceName, xincludes)
-
-        val hamrlibname = s"$${${cmakeHamrLibName(lib.instanceName)}}"
-        linkHamrLib = Some(
-          CMakeTemplate.target_link_libraries(Util.SBTypeLibrary,
-            isInterfaceTypeLib,
-            ISZ(hamrlibname)))
-
-        includes = includes :+ s"$${${cmakeHamrIncludesName(lib.instanceName)}}"
-
-      case _ =>
-    }
-
 
     val ret: ST = st"""${StringTemplate.doNotEditCmakeComment()}
                       |
@@ -173,17 +147,19 @@ object CMakeTemplate {
                       |
                       |${CMakeTemplate.addStackUsageOption()}
                       |
-                      |${(cmakeEntries, "\n\n")}
-                      |
                       |${CMakeTemplate.addLibrary(Util.SBTypeLibrary, isInterfaceTypeLib, filtered.elements)}
-                      |
-                      |${linkHamrLib}
                       |
                       |# Assume that if the muslc target exists then this project is in an seL4 native
                       |# component build environment, otherwise it is in a linux userlevel environment.
                       |# In the linux userlevel environment, the C library will be linked automatically.
                       |if(TARGET muslc)
                       |  ${CMakeTemplate.target_link_libraries(Util.SBTypeLibrary, isInterfaceTypeLib, ISZ("muslc"))}
+                      |endif()
+                      |
+                      |add_definitions(-DCAMKES)
+                      |
+                      |if(TARGET ${Util.SlangTypeLibrary})
+                      |  ${CMakeTemplate.target_link_libraries(Util.SBTypeLibrary, isInterfaceTypeLib, ISZ(Util.SlangTypeLibrary))}
                       |endif()
                       |
                       |${CMakeTemplate.target_include_directories(Util.SBTypeLibrary, isInterfaceTypeLib, includes)}
@@ -217,8 +193,14 @@ object CMakeTemplate {
                       |${(settingsCmakeEntries, "\n")}"""
     return ret
   }
+
+  def cmake_add_subdirectory_binned(path: String, binDir: Option[String]): ST = {
+    val bin: ST = if(binDir.nonEmpty) st" ${binDir.get}"else st""
+    return st"add_subdirectory(${path}${bin})"
+  }
+
   def cmake_add_subdirectory(path: String): ST = {
-    return st"add_subdirectory(${path})"
+    return cmake_add_subdirectory_binned(path, None())
   }
 
   def cmake_addSubDir_TypeLibrary(): ST = {
