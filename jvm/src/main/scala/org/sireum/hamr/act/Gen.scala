@@ -7,7 +7,7 @@ import org.sireum.ops.ISZOps
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUtil}
-import org.sireum.hamr.act.templates.EventDataQueueTemplate
+import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.vm.{VMGen, VM_Template}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
@@ -123,7 +123,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       }
 
       auxResourceFiles = auxResourceFiles :+
-        Util.createResource("settings.cmake", StringTemplate.genSettingsCmake(settingsCmakeEntries), F)
+        Util.createResource("settings.cmake", CMakeTemplate.genSettingsCmake(settingsCmakeEntries), F)
 
       val composition = Composition(
         groups = ISZ(),
@@ -156,7 +156,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
         filenames = filenames ++ spis
 
-        val contents: ST = StringTemplate.generateTypeCmakeLists(filenames, actOptions.hamrLibs.get(Util.SlangTypeLibrary))
+        val contents: ST = CMakeTemplate.cmake_generateTypeCmakeLists(filenames, actOptions.hamrLibs.get(Util.SlangTypeLibrary))
 
         auxResourceFiles = auxResourceFiles :+
           Util.createResource(s"${Util.getTypeRootPath()}/CMakeLists.txt", contents, T)

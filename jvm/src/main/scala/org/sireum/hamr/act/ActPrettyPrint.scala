@@ -80,8 +80,8 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       val hamrLib = getHamrLib(c.instanceName, hamrLibs)
       
       val hasAux = cFiles.nonEmpty && c.componentId != PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER
-      
-      StringTemplate.cmakeComponent(
+
+      CMakeTemplate.cmake_DeclareCamkesComponent(
         componentName = c.componentId,
         sources = sourcePaths,
         includes = includePaths,
@@ -98,7 +98,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
       val hamrLib = getHamrLib(Util.SlangTypeLibrary, hamrLibs)
       
-      cmakeComponents = cmakeComponents :+ StringTemplate.cmakeComponent(
+      cmakeComponents = cmakeComponents :+ CMakeTemplate.cmake_DeclareCamkesComponent(
         componentName = m.i.component.name,
         sources = ISZ(m.cimplementation.path),
         includes = ISZ(Util.getDirectory(m.cinclude.path), Util.getTypeIncludesPath()),
@@ -131,19 +131,23 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       cmakeEntries = cmakeEntries :+ st"includeGlobalComponents()"
     }
 
-    cmakeEntries = cmakeEntries :+ CMakeTemplate.addSubDir_TypeLibrary()
+    cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_TypeLibrary()
 
     if(symbolTable.hasVM()) {
-      cmakeEntries = cmakeEntries :+ CMakeTemplate.addSubDir_VM()
+      cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_VM()
     }
 
     if(Util.hamrIntegration(platform) && hamrLibs.nonEmpty) {
-      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess()
+
+      //cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrExecuteProcess()
+
       for(hamrLib <- hamrLibs.values){
         
-        cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrLib(hamrLib.instanceName, hamrLib.staticLib)
+        //cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrLib(hamrLib.instanceName, hamrLib.staticLib)
 
-        cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(hamrLib.instanceName, hamrLib.includeDirs)
+        //cmakeEntries = cmakeEntries :+ StringTemplate.cmakeHamrIncludes(hamrLib.instanceName, hamrLib.includeDirs)
+
+        cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_add_subdirectory(s"$${CMAKE_CURRENT_LIST_DIR}/hamr/${hamrLib.instanceName}")
       }
     }
     
@@ -155,12 +159,12 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     }
 
     if(cFiles.nonEmpty) {
-      cmakeEntries = cmakeEntries :+ StringTemplate.cmakeAuxSources(cFiles, cHeaderDirectories)
+      cmakeEntries = cmakeEntries :+ CMakeTemplate.cmakeAuxSources(cFiles, cHeaderDirectories)
     }
 
     cmakeEntries = cmakeEntries ++ cmakeComponents
 
-    val cmakelist = StringTemplate.cmakeLists(container.rootServer, cmakeEntries)
+    val cmakelist = CMakeTemplate.cmakeLists(container.rootServer, cmakeEntries)
 
     add("CMakeLists.txt", cmakelist)
 
