@@ -360,12 +360,13 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
   }
 
   def getSlangLibrary(componentName: String, platform: ActPlatform.Type): Option[String] = {
-    val libName = if(componentName == PacerTemplate.PACER_COMPONENT_TYPE ||
-      componentName == PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER) {
-      Util.SlangTypeLibrary
-    } else {
-      componentName
-    }
-    if(platform == ActPlatform.SeL4) Some(libName) else None()
+    val libName: String =
+      if(componentName == PacerTemplate.PACER_COMPONENT_TYPE ||
+        componentName == PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER) {
+        Util.SlangTypeLibrary
+      } else {
+        componentName
+      }
+    return if(platform == ActPlatform.SeL4) Some(libName) else None()
   }
 }

@@ -617,7 +617,7 @@ object VM_Template {
     return ret
   }
 
-  def vm_ap_dummy(vmProcessId: String ,
+  def vm_app_dummy(vmProcessId: String ,
                    includes: ISZ[String]): ST = {
     val _includes = includes.map((m: String) => st"#include ${m}")
 
