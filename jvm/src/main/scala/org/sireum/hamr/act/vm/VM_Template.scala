@@ -208,13 +208,18 @@ object VM_Template {
     return st"-D${varName}=${varValue}"
   }
 
+  def vm_cmake_DeclareCamkesArmVM(threadId: String,
+                                  connectionFilenames: ISZ[String],
+                                  libNames: ISZ[String]): ST = {
+    return st"""DeclareCamkesARMVM(
+               |  ${threadId}
+               |  EXTRA_SOURCES ${(connectionFilenames, "\n")}
+               |  EXTRA_LIBS ${(libNames, "\n")})"""
+  }
+
   def vm_cmakelists(vmIDs: ISZ[String],
-                    libNames: ISZ[String],
+                    vmCamkesComponents: ISZ[ST],
                     cmakeVars: ISZ[ST]): ST = {
-    val extendVMs: ISZ[ST] = vmIDs.map(m => {
-      st"""ExtendCAmkESComponentInstance(VM ${m}
-          |  SOURCES src/cross_vm_connections_${m}.c)"""
-    })
 
     val ret: ST =st"""${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
                      |
@@ -381,13 +386,8 @@ object VM_Template {
                      |
                      |CAmkESAddImportPath($${CMAKE_CURRENT_SOURCE_DIR}/$${KernelARMPlatform}/)
                      |
-                     |# Define our VM Component with out cross vm dataports glue code
-                     |${(extendVMs, "\n")}
-                     |
-                     |# Link the vm component against the SB type library.
-                     |DeclareCAmkESComponent(VM
-                     |  LIBS ${(libNames, "\n")}
-                     |)
+                     |# Define our VM Component with our cross vm dataports glue code
+                     |${(vmCamkesComponents, "\n\n")}
                      |
                      |CAmkESAddCPPInclude($${CAMKES_ARM_VM_DIR}/components/VM)"""
     return ret

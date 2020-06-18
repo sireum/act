@@ -140,8 +140,10 @@ import org.sireum.message.Reporter
     var gcHeaderMethods: ISZ[ST] = ISZ()
 
     var gcMethods: ISZ[ST] = ISZ()
+
+    var gcMainPreInitStatements: ISZ[ST] = ISZ()
+
     var gcMainPreLoopStms: ISZ[ST] = ISZ()
-    
     var gcMainLoopStms: ISZ[ST]= ISZ()
 
     // import Timer.idl4
@@ -163,7 +165,7 @@ import org.sireum.message.Reporter
 
     gcMethods = gcMethods :+ PeriodicDispatcherTemplate.periodicDispatchElems(classifier, hookupPeriodicComponentsToTimeServer)
 
-    gcMainPreLoopStms = gcMainPreLoopStms :+ PeriodicDispatcherTemplate.registerPeriodicCallback()
+    gcMainPreInitStatements = gcMainPreInitStatements :+ PeriodicDispatcherTemplate.registerPeriodicCallback()
 
     Util.getComputeEntrypointSourceText(component.properties) match {
       case Some(handler) =>
@@ -193,10 +195,14 @@ import org.sireum.message.Reporter
 
     val glueCodeContributions = CamkesGlueCodeContributions(
       CamkesGlueCodeHeaderContributions(includes = ISZ(), methods = gcHeaderMethods),
-      CamkesGlueCodeImplContributions(includes = ISZ(), globals = ISZ(), methods = gcMethods, preInitStatements = ISZ(),
+      CamkesGlueCodeImplContributions(includes = ISZ(), globals = ISZ(), methods = gcMethods,
+        preInitStatements = gcMainPreInitStatements,
         postInitStatements = ISZ(), 
-        mainPreLoopStatements = gcMainPreLoopStms, 
-        mainLoopStartStatements = ISZ(), mainLoopStatements = gcMainLoopStms, mainLoopEndStatements = ISZ(),
+
+        mainPreLoopStatements = gcMainPreLoopStms,
+        mainLoopStartStatements = ISZ(),
+        mainLoopStatements = gcMainLoopStms,
+        mainLoopEndStatements = ISZ(),
         mainPostLoopStatements = ISZ())
     )
 

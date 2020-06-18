@@ -9,7 +9,39 @@ import org.sireum.hamr.act.{ActOptions, ActPlatform, CamkesAssemblyContribution,
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.message.Reporter
 
+
+@sig trait PeriodicImpl {
+  def symbolTable: SymbolTable
+  def actOptions: ActOptions
+
+  def handlePeriodicComponents(connectionCounter: Counter,
+                               timerAttributeCounter: Counter,
+                               headerInclude: String,
+                               reporter: Reporter): CamkesAssemblyContribution
+
+  def handlePeriodicComponent(aadlThread: AadlThread,
+                              reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions)
+}
+
+@enum object PeriodicDispatchingType {
+  'Pacer
+  'SelfPacer
+  'PeriodicDispatcher
+}
+
 object PeriodicUtil {
+
+  def getDispatchingType(symbolTable: SymbolTable, actPlatform: ActPlatform.Type): PeriodicDispatchingType.Type = {
+    return if(PeriodicUtil.usePacer(symbolTable, actPlatform)) {
+      if(symbolTable.hasVM()) {
+        PeriodicDispatchingType.Pacer
+      } else {
+        PeriodicDispatchingType.SelfPacer
+      }
+    } else {
+      PeriodicDispatchingType.PeriodicDispatcher
+    }
+  }
 
   def requiresTimeServer(symbolTable: SymbolTable, platform: ActPlatform.Type): B = {
     return symbolTable.hasPeriodicThreads() && !usePacer(symbolTable, platform)
@@ -32,16 +64,4 @@ object PeriodicUtil {
   }
 }
 
-@sig trait PeriodicImpl {
-  def symbolTable: SymbolTable
-  def actOptions: ActOptions
-  
-  def handlePeriodicComponents(connectionCounter: Counter,
-                               timerAttributeCounter: Counter,
-                               headerInclude: String,
-                               reporter: Reporter): CamkesAssemblyContribution
-  
-  def handlePeriodicComponent(aadlThread: AadlThread,
-                              reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions)
-} 
 

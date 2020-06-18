@@ -234,7 +234,7 @@ object PacerTemplate {
   }
 
   def pacerDomainConfiguration(identifier: String, domain: Z): ST = {
-    return st"${identifier}.${PACER_DOMAIN_FIELD} = ${domain};" 
+    return st"${identifier}.${PACER_DOMAIN_FIELD} = ${domain};"
   }
 
   def settings_cmake_entries(numDomains: Z): ST = {

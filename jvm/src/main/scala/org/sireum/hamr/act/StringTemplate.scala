@@ -545,7 +545,7 @@ object StringTemplate {
                       |# create a sym-link to the project in the CAmkES app directory
                       |
                       |if [ -e "$${CAMKES_APPS_DIR}" ]; then
-                      |  read -p "The following directory already exists, replace $${CAMKES_APPS_DIR} [Y|y]? " -n 1 -r; echo
+                      |  read -p "The following app directory already exists, replace $${CAMKES_APPS_DIR} [Y|y]? " -n 1 -r; echo
                       |  if [[ $$REPLY =~ ^[Yy]$$ ]]; then
                       |    rm -rf $${CAMKES_APPS_DIR}
                       |  else
@@ -559,12 +559,15 @@ object StringTemplate {
                       |# run CAmkES/seL4 build
                       |########################
                       |
-                      |cd $$CAMKES_DIR
+                      |BUILD_DIR=$$CAMKES_DIR/build_$$HAMR_CAMKES_PROJ
                       |
-                      |BUILD_DIR=build_$$HAMR_CAMKES_PROJ
-                      |
-                      |# rm -rf $${BUILD_DIR}
-                      |if [ ! -e "$${BUILD_DIR}" ]; then
+                      |if [ -e "$${BUILD_DIR}" ]; then
+                      |  read -p "The following build directory already exists, replace $${BUILD_DIR} [Y|y]? " -n 1 -r; echo
+                      |  if [[ $$REPLY =~ ^[Yy]$$ ]]; then
+                      |    rm -rf $${BUILD_DIR}
+                      |    mkdir $${BUILD_DIR}
+                      |  fi
+                      |else
                       |  mkdir $${BUILD_DIR}
                       |fi
                       |

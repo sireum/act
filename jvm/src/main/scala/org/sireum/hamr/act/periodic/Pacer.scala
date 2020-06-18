@@ -212,14 +212,14 @@ import org.sireum.message.Reporter
       imports = ISZ(), emits = ISZ(), uses = ISZ(), provides = ISZ(), attributes = ISZ(),
       preprocessorIncludes = ISZ(), externalEntities = ISZ()
     )
-    
+
     val componentContributions = CamkesComponentContributions(shell)
 
     val glueCodeContributions = CamkesGlueCodeContributions(
       CamkesGlueCodeHeaderContributions(includes = ISZ(), methods = gcHeaderMethods),
       CamkesGlueCodeImplContributions(includes = ISZ(), globals = ISZ(), methods = gcMethods, preInitStatements = ISZ(),
-        postInitStatements = ISZ(), 
-        mainPreLoopStatements = gcMainPreLoopStms, 
+        postInitStatements = ISZ(),
+        mainPreLoopStatements = gcMainPreLoopStms,
         mainLoopStartStatements = gcMainLoopStartStms, mainLoopStatements = gcMainLoopStms, mainLoopEndStatements = ISZ(),
         mainPostLoopStatements = ISZ()
       )

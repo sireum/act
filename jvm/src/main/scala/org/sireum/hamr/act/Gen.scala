@@ -88,9 +88,9 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       val assemblies: ISZ[Assembly] = astObjects.filter(f => f.isInstanceOf[Assembly]).map(m => m.asInstanceOf[Assembly])
       val otherAstObjects: ISZ[ASTObject] =  astObjects.filter(f => !f.isInstanceOf[Assembly])
 
-      val vmProcessIDs = symbolTable.getProcesses().filter((p: AadlProcess) => p.toVirtualMachine()).map((m: AadlProcess) => VMGen.virtualMachineIdentifier(m))
-      if(vmProcessIDs.nonEmpty) {
-        auxResourceFiles = auxResourceFiles ++ VMGen.getAuxResources(vmProcessIDs, platform)
+      val threadsToVMs = symbolTable.getThreads().filter((p: AadlThread) => p.toVirtualMachine(symbolTable))
+      if(threadsToVMs.nonEmpty) {
+        auxResourceFiles = auxResourceFiles ++ VMGen.getAuxResources(threadsToVMs, platform, symbolTable)
       }
 
       val mergedAssemblies: ISZ[Assembly] = VMGen.mergeVMs(assemblies)
@@ -386,13 +386,9 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                     if(srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
                     else Sel4ConnectorTypes.seL4SharedData
 
-                  val srcFeatureQueueName: String =
-                    if(srcToVM) VMGen.getDataportName(srcFeature, dstFeature)
-                    else Util.brand(CommonUtil.getLastName(srcFeature.identifier))
+                  val srcFeatureQueueName: String = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
 
-                  val dstFeatureQueueName: String =
-                    if(dstToVM) VMGen.getDataportName(srcFeature, dstFeature)
-                    else Util.brand(CommonUtil.getLastName(dstFeature.identifier))
+                  val dstFeatureQueueName: String = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
 
                   connections = connections :+ createConnection(
                     queueConnectorType,
@@ -437,7 +433,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                 val dstComponentId: String = Util.getThreadIdentifier(dstAadlThread, symbolTable)
 
                 val srcPath: String = CommonUtil.getName(conn.src.feature.get)
-                //val dstPath: String = CommonUtil.getName(conn.dst.feature.get)
 
                 val srcFeature: ir.Feature = symbolTable.getFeatureFromName(conn.src.feature.get)
                 val dstFeature: ir.Feature = symbolTable.getFeatureFromName(conn.dst.feature.get)
@@ -463,13 +458,9 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                     if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
                     else Sel4ConnectorTypes.seL4SharedData
 
-                  val srcFeatureQueueName: String =
-                    if (srcToVM) VMGen.getEventDataportName(srcFeature, dstFeature, queueSize)
-                    else Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
+                  val srcFeatureQueueName: String = Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
 
-                  val dstFeatureQueueName: String =
-                    if (dstToVM) VMGen.getEventDataportName(srcFeature, dstFeature, queueSize)
-                    else Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
+                  val dstFeatureQueueName: String = Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
 
                   connections = connections :+ createConnection(
                     queueConnectorType,
@@ -582,13 +573,13 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
           val aadlThread = symbolTable.getThread(sc)
 
           if(aadlThread.toVirtualMachine(symbolTable)) {
-            val vmProcessID: String = VMGen.virtualMachineIdentifier(aadlProcess)
+            val processId = Util.getThreadIdentifier(aadlThread, symbolTable)
             val (component, auxResources) =
               VMGen(symbolTable, typeMap, samplingPorts, srcQueues, actOptions, reporter).genThread(aadlThread)
 
             instances = instances :+
               Instance(address_space = "",
-                name = vmProcessID,
+                name = processId,
                 component = component
               )
 
@@ -596,8 +587,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
             connections = connections :+ createConnection(
               Sel4ConnectorTypes.seL4VMDTBPassthrough,
-              vmProcessID, "dtb_self",
-              vmProcessID, "dtb"
+              processId, "dtb_self",
+              processId, "dtb"
             )
 
             globalPreprocessorIncludes = globalPreprocessorIncludes ++
@@ -609,7 +600,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               VM_Template.vm_composition_macros(aadlProcess.identifier)
 
             camkesConfiguration = camkesConfiguration ++
-              VM_Template.vm_assembly_configuration_entries(vmProcessID)
+              VM_Template.vm_assembly_configuration_entries(processId)
 
             camkesConfigurationMacros = camkesConfigurationMacros ++
               VM_Template.vm_assembly_configuration_macros(aadlProcess.identifier)
@@ -770,7 +761,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     assert(c.subComponents.isEmpty)
     assert(c.connectionInstances.isEmpty)
 
-    val cid = Util.getClassifier(c.classifier.get)
+    val cid = Util.getCamkesComponentName(aadlThread, symbolTable)
 
     var provides: ISZ[Provides] = ISZ()
     var uses: ISZ[Uses] = ISZ()
@@ -1176,12 +1167,14 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         binarySemaphores = binarySemaphores ++ componentContributions.shell.binarySemaphores
         semaphores = semaphores ++ componentContributions.shell.semaphores
         imports = imports ++ componentContributions.shell.imports
-        uses = uses ++ componentContributions.shell.uses
+        emits = emits ++ componentContributions.shell.emits
         consumes = consumes ++ componentContributions.shell.consumes
+        uses = uses ++ componentContributions.shell.uses
 
         gcImplMethods = glueCodeContributions.impl.methods ++ gcImplMethods
-        gcRunInitStmts = gcRunInitStmts ++ glueCodeContributions.impl.mainPreLoopStatements
-        
+
+        gcRunInitStmts = gcRunInitStmts ++ glueCodeContributions.impl.preInitStatements
+        gcRunPreLoopStmts = gcRunPreLoopStmts ++ glueCodeContributions.impl.mainPreLoopStatements
         gcRunLoopStartStmts = gcRunLoopStartStmts ++ glueCodeContributions.impl.mainLoopStartStatements
         gcRunLoopMidStmts = gcRunLoopMidStmts ++ glueCodeContributions.impl.mainLoopStatements
         gcRunLoopEndStmts = gcRunLoopEndStmts ++ glueCodeContributions.impl.mainLoopEndStatements
@@ -1261,7 +1254,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       gcRunInitStmts = gcRunInitStmts,
       gcRunPreLoopStmts = gcRunPreLoopStmts,
       gcRunLoopStartStmts = gcRunLoopStartStmts,
-      gcRunLoopMidStmts = gcRunLoopMidStmts)
+      gcRunLoopMidStmts = gcRunLoopMidStmts,
+      gcRunLoopEndStmts = gcRunLoopEndStmts)
     
     containers = containers :+ C_Container(
       instanceName = names.instanceName,
@@ -2703,7 +2697,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                                          gcRunInitStmts: ISZ[ST],
                                          gcRunPreLoopStmts: ISZ[ST],
                                          gcRunLoopStartStmts: ISZ[ST],
-                                         gcRunLoopMidStmts: ISZ[ST]): Resource = {
+                                         gcRunLoopMidStmts: ISZ[ST],
+                                         gcRunLoopEndStmts: ISZ[ST]): Resource = {
     val name = Util.getClassifier(component.classifier.get)
     val componentHeaderFilename = Util.genCHeaderFilename(Util.brand(name))
     val componentImplFilename = Util.genCImplFilename(Util.brand(name))
@@ -2714,7 +2709,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       preLoopStmts = gcRunPreLoopStmts,
       loopStartStmts = gcRunLoopStartStmts,
       loopBodyStmts = gcRunLoopMidStmts,
-      loopEndStmts = ISZ(),
+      loopEndStmts = gcRunLoopEndStmts,
       postLoopStmts = ISZ())
     
     val glueCodeImpl: ST =  StringTemplate.componentTypeImpl(

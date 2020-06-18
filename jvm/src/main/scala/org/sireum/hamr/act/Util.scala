@@ -118,10 +118,17 @@ object Util {
     return StringUtil.replaceAll(s.s, ".", "_")
   }
 
+  def getCamkesComponentName(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
+    val name = Util.getClassifier(aadlThread.component.classifier.get)
+    return if(aadlThread.toVirtualMachine(symbolTable)) s"VM_${name}"
+    else name
+
+  }
+
   def getThreadIdentifier(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
     val ret: String = if(aadlThread.toVirtualMachine(symbolTable)) {
       val parentProcess = aadlThread.getParent(symbolTable)
-      VMGen.virtualMachineIdentifier(parentProcess)
+      s"vm${parentProcess.identifier}"
     } else {
       aadlThread.identifier
     }

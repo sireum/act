@@ -33,8 +33,10 @@ object VMGen {
     return s"${Util.DIR_COMPONENTS}/${DIR_VM}"
   }
 
-  def getAuxResources(vmProcessIDs: ISZ[String], platform: ActPlatform.Type): ISZ[Resource] = {
-    assert(vmProcessIDs.nonEmpty, "Expecting 1 or more ids of processes going to VMs")
+  def getAuxResources(threadsToVMs: ISZ[AadlThread],
+                      platform: ActPlatform.Type,
+                      symbolTable: SymbolTable): ISZ[Resource] = {
+    assert(threadsToVMs.nonEmpty, "Expecting 1 or more threads going to VMs")
     var auxResourceFiles: ISZ[Resource] = ISZ()
 
     val projectRoot = s"$${CMAKE_CURRENT_SOURCE_DIR}/../.."
@@ -62,19 +64,27 @@ object VMGen {
           s"${projectRoot}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${Util.SlangTypeLibrary}") +: vmVars
     }
 
+    val vmThreadIds = threadsToVMs.map(m => Util.getThreadIdentifier(m, symbolTable))
+
+    val declareCamkesArmVMs: ISZ[ST] = threadsToVMs.map(m => {
+      val id = Util.getCamkesComponentName(m, symbolTable)
+      val connectionFilename = s"src/${getCrossVMConnectionsFilename(m, symbolTable)}"
+      VM_Template.vm_cmake_DeclareCamkesArmVM(id, ISZ(connectionFilename), libNames)
+    })
+
     auxResourceFiles = auxResourceFiles :+ Resource(
       path = s"${getRootVMDir()}/CMakeLists.txt",
-      content = VM_Template.vm_cmakelists(vmProcessIDs, libNames, vmVars),
+      content = VM_Template.vm_cmakelists(vmThreadIds, declareCamkesArmVMs, vmVars),
       overwrite = T, makeExecutable = F)
 
     auxResourceFiles = auxResourceFiles :+ Resource(
       path = s"${getRootVMDir()}/${DIR_VM_EXYNOS5422}/devices.camkes",
-      content = VM_Template.vm_exynos5422_devices_camkes(vmProcessIDs),
+      content = VM_Template.vm_exynos5422_devices_camkes(vmThreadIds),
       overwrite = T, makeExecutable = F)
 
     auxResourceFiles = auxResourceFiles :+ Resource(
       path = s"${getRootVMDir()}/${DIR_VM_QEMU_ARM_VIRT}/devices.camkes",
-      content = VM_Template.vm_qemu_arm_virt_devices_camkes(vmProcessIDs),
+      content = VM_Template.vm_qemu_arm_virt_devices_camkes(vmThreadIds),
       overwrite = T, makeExecutable = F)
 
     auxResourceFiles = auxResourceFiles :+ Resource(
@@ -87,7 +97,7 @@ object VMGen {
       content = VM_Template.vm_overlay_script__init_scripts__inittab_hvc0(),
       overwrite = T, makeExecutable = F)
 
-    for(vmProcessID <- vmProcessIDs) {
+    for(vmProcessID <- vmThreadIds) {
 
       auxResourceFiles = auxResourceFiles :+ Resource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/CMakeLists.txt",
@@ -106,12 +116,8 @@ object VMGen {
     return auxResourceFiles
   }
 
-  def virtualMachineIdentifier(aadlProcess: AadlProcess): String = {
-    return s"${VM_ID_PREFIX}${aadlProcess.identifier}"
-  }
-
-  def getCrossVMConnectionsFilename(aadlProcess: AadlProcess): String = {
-    val vid = virtualMachineIdentifier(aadlProcess)
+  def getCrossVMConnectionsFilename(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
+    val vid = Util.getThreadIdentifier(aadlThread, symbolTable)
     return Util.genCImplFilename(s"cross_vm_connections_${vid}")
   }
 
@@ -122,18 +128,6 @@ object VMGen {
       PacerTemplate.pacerDataportFilenameForIncludes())
 
     return ret
-  }
-
-  def getEventDataportName(srcFeature: ir.Feature, dstFeature: ir.Feature, queueSize: Z): String = {
-    val s = CommonUtil.getLastName(srcFeature.identifier)
-    val d = CommonUtil.getLastName(dstFeature.identifier)
-    return Util.getEventDataSBQueueSrcFeatureName(s"${s}_${d}", queueSize)
-  }
-
-  def getDataportName(srcFeature: ir.Feature, dstFeature: ir.Feature): String = {
-    val s = CommonUtil.getLastName(srcFeature.identifier)
-    val d = CommonUtil.getLastName(dstFeature.identifier)
-    return Util.brand(s"${s}_${d}")
   }
 
   def mergeISZs[T](a: ISZ[T], b: ISZ[T]): ISZ[T] = {
@@ -335,7 +329,7 @@ object VMGen {
 
     val vmCrossConns: ST = VM_Template.vm_cross_vm_connections(crossConnGCMethods, crossConnConnections)
     auxResources = auxResources :+ Util.createResource(
-      path = s"${VMGen.getRootVMDir()}/${VMGen.DIR_VM_SRC}/${VMGen.getCrossVMConnectionsFilename(parent)}",
+      path = s"${VMGen.getRootVMDir()}/${VMGen.DIR_VM_SRC}/${VMGen.getCrossVMConnectionsFilename(aadlThread, symbolTable)}",
       contents = vmCrossConns,
       overwrite = T
     )
@@ -345,7 +339,7 @@ object VMGen {
     val c = Component(
       control = F,
       hardware = F,
-      name = VMGen.VM_COMPONENT_TYPE_NAME,
+      name = Util.getCamkesComponentName(aadlThread, symbolTable),
       mutexes = ISZ(),
       binarySemaphores = ISZ(),
       semaphores = ISZ(),
@@ -370,32 +364,6 @@ object VMGen {
 
     val fid = CommonUtil.getLastName(f.identifier)
 
-    val connection: ir.ConnectionInstance = f.direction match {
-      case ir.Direction.In =>
-        val connections = symbolTable.inConnections.get(CommonUtil.getName(f.identifier)).get
-        // TODO: fan ins ????
-        if(connections.size != 1) {
-          // this would probably be bad if sender is fan-outing to a mix of
-          // native and VM components.  Perhaps okay if broadcasting to
-          // all native though?
-          halt(s"Not currently supporting fan-ins for vm isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
-        }
-        connections(0)
-
-      case ir.Direction.Out =>
-
-        val connections = symbolTable.outConnections.get(CommonUtil.getName(f.identifier)).get
-        // TODO: what to do about fan outs?
-        if(connections.size != 1) {
-          // what if receivers have different queue sizes?  Would need to
-          // broadcast.  Need examples
-          halt(s"Not currently supporting fan-outs for VM isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
-        }
-        connections(0)
-
-      case x => halt(s"Not expecting direction ${x} for feature ${fid}")
-    }
-
     val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.classifier.get)).get
     val sel4TypeName: String = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
 
@@ -403,15 +371,12 @@ object VMGen {
 
     includes = includes + s"<${spi.headerFilename}>"
 
-    val srcFeature = symbolTable.getFeatureFromName(connection.src.feature.get).asInstanceOf[ir.FeatureEnd]
-    val dstFeature = symbolTable.getFeatureFromName(connection.dst.feature.get).asInstanceOf[ir.FeatureEnd]
-
-    val dataPortName = VMGen.getDataportName(srcFeature, dstFeature)
+    val dataPortName = Util.brand(fid)
 
     dataports = dataports :+ Dataport(
       name = dataPortName,
       typ = spi.structName,
-      optional = T)
+      optional = F)
 
     crossConnGCMethods = crossConnGCMethods :+
       VM_Template.vm_cross_conn_extern_dataport_method(dataPortName)
@@ -425,6 +390,9 @@ object VMGen {
   }
 
   def handleEventDataPort(f: FeatureEnd, parent: AadlThread): Unit = {
+
+    val fid = CommonUtil.getLastName(f.identifier)
+
     val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.classifier.get)).get
     val sel4TypeName: String = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
 
@@ -432,12 +400,6 @@ object VMGen {
     val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
 
     includes = includes + s"<${Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)}>"
-
-    def getEventDataPortname(connection: ir.ConnectionInstance): String = {
-      val srcFeature = symbolTable.getFeatureFromName(connection.src.feature.get).asInstanceOf[ir.FeatureEnd]
-      val dstFeature = symbolTable.getFeatureFromName(connection.dst.feature.get).asInstanceOf[ir.FeatureEnd]
-      return VMGen.getEventDataportName(srcFeature, dstFeature, queueSize)
-    }
 
     f.direction match {
       case ir.Direction.In =>
@@ -456,14 +418,14 @@ object VMGen {
         consumes = consumes :+ Consumes(
           name = notificationName,
           typ = Util.EVENT_NOTIFICATION_TYPE,
-          optional = T)
+          optional = F)
 
-        val dataportName = getEventDataPortname(connections(0)) //Util.getEventDataSBQueueDestFeatureName(fid)
+        val dataportName = Util.getEventDataSBQueueDestFeatureName(fid)
 
         dataports = dataports :+ Dataport(
           name = dataportName,
           typ = queueType,
-          optional = T)
+          optional = F)
 
         crossConnGCMethods = crossConnGCMethods :+
           VM_Template.vm_cross_conn_extern_dataport_method(dataportName)
@@ -494,12 +456,12 @@ object VMGen {
           name = emitsName,
           typ = Util.EVENT_NOTIFICATION_TYPE)
 
-        val dataPortName = getEventDataPortname(connections(0))
+        val dataPortName = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize)
 
         dataports = dataports :+ Dataport(
           name = dataPortName,
           typ = queueType,
-          optional = T)
+          optional = F)
 
         crossConnGCMethods = crossConnGCMethods :+
           VM_Template.vm_cross_conn_extern_dataport_method(dataPortName)
