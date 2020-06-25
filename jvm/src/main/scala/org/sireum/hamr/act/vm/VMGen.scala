@@ -64,7 +64,7 @@ object VMGen {
           s"${projectRoot}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${Util.SlangTypeLibrary}") +: vmVars
     }
 
-    val vmThreadIds = threadsToVMs.map(m => Util.getThreadIdentifier(m, symbolTable))
+    val vmThreadIds = threadsToVMs.map((m: AadlThread) => Util.getThreadIdentifier(m, symbolTable))
 
     val declareCamkesArmVMs: ISZ[ST] = threadsToVMs.map(m => {
       val id = Util.getCamkesComponentName(m, symbolTable)
@@ -315,16 +315,28 @@ object VMGen {
         val (componentContributions, glueCodeContributions) =
           Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread, reporter)
 
+        consumes = consumes ++ componentContributions.shell.consumes
+
         dataports = dataports ++ componentContributions.shell.dataports
 
+        // extern method name for pacer dataport queue
         crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_dataport_method(PacerTemplate.pacerClientDataportIdentifier())
+          VM_Template.vm_cross_conn_extern_dataport_method(PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
 
+        // extern method name for pacer notification
+        crossConnGCMethods = crossConnGCMethods :+
+          VM_Template.vm_cross_conn_extern_notification_methods(PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier())
+
+        // connection creation for pacer dataport/notification
         crossConnConnections = crossConnConnections :+
-          VM_Template.vm_cross_conn_Connection_Period(PacerTemplate.pacerClientDataportIdentifier(), crossConnConnections.size)
+          VM_Template.vm_cross_conn_Connections(
+            methodNamePrefix = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(),
+            emitMethodNamePrefix = None(),
+            notificationNamePrefix = Some(PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier()),
+            counter = crossConnConnections.size)
 
       case x =>
-        halt(s"Not currently supporting ${x} dispatch protocol")
+        halt(s"Not currently supporting VMs containing ${x} dispatch protocol")
     }
 
     val vmCrossConns: ST = VM_Template.vm_cross_vm_connections(crossConnGCMethods, crossConnConnections)

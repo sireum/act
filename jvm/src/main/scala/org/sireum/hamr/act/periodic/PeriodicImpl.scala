@@ -32,7 +32,7 @@ import org.sireum.message.Reporter
 object PeriodicUtil {
 
   def getDispatchingType(symbolTable: SymbolTable, actPlatform: ActPlatform.Type): PeriodicDispatchingType.Type = {
-    return if(PeriodicUtil.usePacer(symbolTable, actPlatform)) {
+    val ret: PeriodicDispatchingType.Type = if(PeriodicUtil.usePacer(symbolTable, actPlatform)) {
       if(symbolTable.hasVM()) {
         PeriodicDispatchingType.Pacer
       } else {
@@ -41,6 +41,7 @@ object PeriodicUtil {
     } else {
       PeriodicDispatchingType.PeriodicDispatcher
     }
+    return ret
   }
 
   def requiresTimeServer(symbolTable: SymbolTable, platform: ActPlatform.Type): B = {

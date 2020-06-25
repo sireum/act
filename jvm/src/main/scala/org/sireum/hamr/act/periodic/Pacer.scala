@@ -66,44 +66,61 @@ import org.sireum.message.Reporter
 
         configurations = configurations :+ PacerTemplate.pacerDomainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
 
-        val (connectionType, srcFeatureName, dstFeatureName) : (Sel4ConnectorTypes.Type, String, String) =
-          if(isVM) {
 
-            dataports = dataports :+ dataportPeriod(PacerTemplate.pacerPeriodDataportIdentifier(componentId))
+        if(isVM) {
 
-            gcPacerImplEntries = gcPacerImplEntries :+ gcSendPeriodToVM(componentId)
+          val pacerDataportName = PacerTemplate.pacerVM_PacerPeriodDataportIdentifier(componentId)
+          val pacerEmitName = PacerTemplate.pacerVM_PacerPeriodEmitsIdentifier(componentId)
 
-            gcPacerMethods = gcPacerMethods :+ PacerTemplate.vmGcSendMethod(
+          dataports = dataports :+ dataportPeriod(pacerDataportName)
+
+          emits = emits :+ emitPeriodVM(pacerEmitName)
+
+          gcPacerImplEntries = gcPacerImplEntries :+ gcSendPeriodToVM(componentId)
+
+          gcPacerMethods = gcPacerMethods :+ PacerTemplate.pacerVM_PacerGcSendPeriodMethod(
+            componentId,
+            PacerTemplate.pacerDataportQueueElemType(),
+            PacerTemplate.pacerDataportQueueSize())
+
+          gcPacerInitEntries = gcPacerInitEntries :+
+            PacerTemplate.pacerVM_PacerGcInitMethodEntry(
               componentId,
               PacerTemplate.pacerDataportQueueElemType(),
               PacerTemplate.pacerDataportQueueSize())
 
-            gcPacerInitEntries = gcPacerInitEntries :+
-              PacerTemplate.vmGcInitMethodEntry(
-                componentId,
-                PacerTemplate.pacerDataportQueueElemType(),
-                PacerTemplate.pacerDataportQueueSize())
+          // connect notification to client
+          connections = connections :+ Util.createConnection(
+            connectionName = Util.getConnectionName(connectionCounter.increment()),
+            connectionType = Sel4ConnectorTypes.seL4GlobalAsynch,
+            srcComponent = PacerTemplate.PACER_IDENTIFIER,
+            srcFeature = pacerEmitName,
+            dstComponent = componentId,
+            dstFeature = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier())
 
-            (Sel4ConnectorTypes.seL4SharedDataWithCaps,
-              PacerTemplate.pacerPeriodDataportIdentifier(componentId),
-              PacerTemplate.pacerClientDataportIdentifier())
-          } else {
-            (Sel4ConnectorTypes.seL4Notification,
-              PacerTemplate.pacerPeriodEmitIdentifier(),
-              PacerTemplate.pacerClientNotificationIdentifier())
-          }
+          // connect queue to client
+          connections = connections :+ Util.createConnection(
+            connectionName = Util.getConnectionName(connectionCounter.increment()),
+            connectionType = Sel4ConnectorTypes.seL4SharedDataWithCaps,
+            srcComponent = PacerTemplate.PACER_IDENTIFIER,
+            srcFeature = pacerDataportName,
+            dstComponent = componentId,
+            dstFeature = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
 
-        // connect dispatcher to component
-        connections = connections :+ Util.createConnection(
-          connectionName = Util.getConnectionName(connectionCounter.increment()),
-          connectionType = connectionType,
-          srcComponent = PacerTemplate.PACER_IDENTIFIER,
-          srcFeature = srcFeatureName,
-          dstComponent = componentId,
-          dstFeature = dstFeatureName)
+        } else {
+
+          // connect period notification to client
+          connections = connections :+ Util.createConnection(
+            connectionName = Util.getConnectionName(connectionCounter.increment()),
+            connectionType = Sel4ConnectorTypes.seL4Notification,
+            srcComponent = PacerTemplate.PACER_IDENTIFIER,
+            srcFeature = PacerTemplate.pacerPeriodEmitIdentifier(),
+            dstComponent = componentId,
+            dstFeature = PacerTemplate.pacerClientNotificationIdentifier())
+        }
       }
 
-      gcPacerMethods = gcPacerMethods :+ PacerTemplate.vmGcInitMethod(gcPacerInitEntries)
+      gcPacerMethods = gcPacerMethods :+ PacerTemplate.pacerVM_PacerGcInitMethod(gcPacerInitEntries)
 
       if(requiresEmits) {
         emits = emits :+ emitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
@@ -191,15 +208,20 @@ import org.sireum.message.Reporter
         PacerTemplate.pacerDataportQueueElemType(),
         PacerTemplate.pacerDataportQueueSize())
 
+      consumes = consumes :+ ast.Consumes(
+        name = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier(),
+        typ = PacerTemplate.PACER_PERIOD_VM_TYPE,
+        optional = F)
+
       dataports = dataports :+ ast.Dataport(
-        name = PacerTemplate.pacerClientDataportIdentifier(),
+        name = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(),
         typ = queueType,
         optional = F)
 
     } else {
       consumes = consumes :+ ast.Consumes(
         name = PacerTemplate.pacerClientNotificationIdentifier(),
-        typ = "Period",
+        typ = PacerTemplate.PACER_PERIOD_TYPE,
         optional = F)
     }
 
@@ -229,10 +251,16 @@ import org.sireum.message.Reporter
   }
 
   def emitPeriod(id: String): Emits = {
-    return Emits(name = id,
+    return Emits(
+      name = id,
       typ = PacerTemplate.PACER_PERIOD_TYPE)
   }
 
+  def emitPeriodVM(id: String) : Emits = {
+    return Emits(
+      name = id,
+      typ = PacerTemplate.PACER_PERIOD_VM_TYPE)
+  }
 
   def dataportPeriod(id: String): Dataport = {
     return Dataport(
@@ -245,7 +273,7 @@ import org.sireum.message.Reporter
   def gcEmitPeriod(id: String): ST = { return st"${id}_emit()" }
 
   def gcSendPeriodToVM(vmProcessId: String): ST = {
-    return st"${PacerTemplate.pacerSendPeriodToVmMethodName(vmProcessId)}(&${PacerTemplate.PACER_TICK_COUNT_IDENTIFIER})"
+    return st"${PacerTemplate.pacerVM_PacerSendPeriodToVmMethodName(vmProcessId)}(&${PacerTemplate.PACER_TICK_COUNT_IDENTIFIER})"
   }
 
   def genPacerCamkesComponent(includes: ISZ[String],

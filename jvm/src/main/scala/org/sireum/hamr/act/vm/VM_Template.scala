@@ -95,15 +95,6 @@ object VM_Template {
     return ret
   }
 
-  def vm_cross_conn_Connection_Period(id: String, counter: Z): ST = {
-    val ret: ST = st"""connections[${counter}] = (struct camkes_crossvm_connection) {
-                      |  .handle = &${id}_handle,
-                      |  .emit_fn = NULL,
-                      |  .consume_badge = -1
-                      |};"""
-    return ret
-  }
-
   def vm_cross_vm_connections(glueCodeMethods: ISZ[ST],
                               connections: ISZ[ST]): ST = {
     val numConnections: Z = connections.size
@@ -146,7 +137,7 @@ object VM_Template {
                       |}
                       |
                       |void init_cross_vm_connections(vm_t *vm, void *cookie) {
-                      |    ${(connections, ";\n\n")}
+                      |    ${(connections, ";\n\n")};
                       |
                       |    for (int i = 0; i < NUM_CONNECTIONS; i++) {
                       |        if (connections[i].consume_badge != -1) {

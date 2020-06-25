@@ -19,7 +19,7 @@ object Dispatcher {
                                headerInclude: String,
                                reporter: Reporter): CamkesAssemblyContribution = {
 
-    return PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
+    val ret: CamkesAssemblyContribution = PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
       case PeriodicDispatchingType.Pacer =>
         Pacer(symbolTable, actOptions).handlePeriodicComponents(
           connectionCounter,
@@ -41,6 +41,7 @@ object Dispatcher {
           headerInclude,
           reporter)
     }
+    return ret
   }
 
   def handlePeriodicComponent(symbolTable: SymbolTable,
@@ -49,16 +50,19 @@ object Dispatcher {
                               aadlThread: AadlThread,
                               reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
     
-    return PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
-      case PeriodicDispatchingType.Pacer =>
-        Pacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
+    val ret: (CamkesComponentContributions, CamkesGlueCodeContributions) =
+      PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
+        case PeriodicDispatchingType.Pacer =>
+          Pacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
 
-      case PeriodicDispatchingType.SelfPacer =>
-        SelfPacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
+        case PeriodicDispatchingType.SelfPacer =>
+          SelfPacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
 
-      case PeriodicDispatchingType.PeriodicDispatcher =>
-        PeriodicDispatcher(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
-    }
+        case PeriodicDispatchingType.PeriodicDispatcher =>
+          PeriodicDispatcher(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
+      }
+
+    return ret
   }
 }
 
