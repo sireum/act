@@ -7,6 +7,8 @@ import org.sireum.hamr.act.templates.CMakeTemplate
 
 object VM_Template {
 
+  val USE_PRECONFIGURED_ROOTFS: String = "USE_PRECONFIGURED_ROOTFS"
+
   val data61_VM_Macros_Location: String = "<configurations/vm.h>"
 
   def vm_assembly_preprocessor_includes(): ISZ[String] = {
@@ -229,7 +231,20 @@ object VM_Template {
                      |include(ExternalProject)
                      |include(external-project-helpers)
                      |
-                     |if("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt" AND (NOT USE_CACHED_LINUX_VM))
+                     |OPTION(${USE_PRECONFIGURED_ROOTFS}
+                     |       "Use preconfigured rootfs"
+                     |       OFF)
+                     |
+                     |MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
+                     |MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
+                     |MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
+                     |MESSAGE("CAMKES_VM_LINUX_DIR = $${CAMKES_VM_LINUX_DIR}")
+                     |MESSAGE("CMAKE_CURRENT_BINARY_DIR = $${CMAKE_CURRENT_BINARY_DIR}")
+                     |MESSAGE("CMAKE_CURRENT_SOURCE_DIR = $${CMAKE_CURRENT_SOURCE_DIR}")
+                     |MESSAGE("CMAKE_C_COMPILER = $${CMAKE_C_COMPILER}")
+                     |MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
+                     |
+                     |if("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt" AND (NOT ${USE_PRECONFIGURED_ROOTFS}))
                      |    MESSAGE("Downloading VM")
                      |
                      |    set(cpp_flags "-DKERNELARMPLATFORM_QEMU-ARM-VIRT")
@@ -545,6 +560,8 @@ object VM_Template {
   def vm_overlay_script__init_scripts__inittab_hvc0(): ST = {
     val ret: ST = st"""# @TAG(CUSTOM)
                       |# /etc/inittab
+                      |#
+                      |${StringTemplate.safeToEditCamkeComment()}
                       |#
                       |# Copyright (C) 2001 Erik Andersen <andersen@codepoet.org>
                       |#

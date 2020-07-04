@@ -168,14 +168,16 @@ object CMakeTemplate {
   }
 
   def cmakeLists(rootServer: String,
-                 entries: ISZ[ST]): ST = {
+                 entries: ISZ[ST],
+                 definitions: ISZ[ST]): ST = {
+
     return st"""${StringTemplate.doNotEditCmakeComment()}
                |
                |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
                |
                |project (${rootServer} C)
                |
-               |add_definitions(-DCAMKES)
+               |${(definitions, "\n\n")}
                |
                |${CMakeTemplate.addStackUsageOption()}
                |
@@ -211,7 +213,22 @@ object CMakeTemplate {
     return cmake_add_subdirectory(s"$${CMAKE_CURRENT_LIST_DIR}/${VMGen.getRootVMDir()}")
   }
 
-  def cmake_add_definitions(defs: ISZ[String]): ST = { return st"add_definition(${(defs, "\n")})" }
+  def cmake_add_definitions(defs: ISZ[String]): ST = {
+    val _defs = defs.map(m => s"-D${m}")
+    return st"add_definitions(${(_defs, "\n")})"
+  }
+
+  def cmake_add_option(name: String, description: String, defaultValue: B): ST = {
+    val _default: String = if(defaultValue) "ON" else "OFF"
+    val ret: ST = st"""option(${name}
+                      |       "${description}"
+                      |       ${_default})
+                      |
+                      |if(${name} OR "$$ENV{${name}}" STREQUAL "ON")
+                      |   add_definitions(-D${name})
+                      |endif()"""
+    return ret
+  }
 
   def addStackUsageOption(): ST = {
     return st"""if ("$${CMAKE_CXX_COMPILER_ID}" MATCHES "(C|c?)lang")

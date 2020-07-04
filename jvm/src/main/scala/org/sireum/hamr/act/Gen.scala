@@ -6,8 +6,10 @@ import org.sireum._
 import org.sireum.ops.ISZOps
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
+import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
+import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.act.vm.{VMGen, VM_Template}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
@@ -774,7 +776,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
     var cmakeSOURCES: ISZ[String] = ISZ()
     var cmakeINCLUDES: ISZ[String] = ISZ()
-    var camkeLIBS: ISZ[String] = ISZ()
     
     var imports : Set[String] = Set.empty
 
@@ -1245,8 +1246,15 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(c, names, f, typeMap))
     }
 
+    var cSources: ISZ[Resource] = ISZ()
+
+    if(CakeML.requiresFFIs(aadlThread)) {
+      val ffis: Resource = CakeML.processThread(aadlThread, hamrBasePackageName.get)
+      cSources = cSources :+ ffis
+    }
+
     val gcImpl = genComponentTypeImplementationFile(
-      component = c,
+      aadlThread = aadlThread,
       localCIncludes = auxCImplIncludes ++ gcImplIncludes,
       blocks = gcImplMethods,
       preInits = gcImplPreInits,
@@ -1255,13 +1263,16 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       gcRunPreLoopStmts = gcRunPreLoopStmts,
       gcRunLoopStartStmts = gcRunLoopStartStmts,
       gcRunLoopMidStmts = gcRunLoopMidStmts,
-      gcRunLoopEndStmts = gcRunLoopEndStmts)
-    
+      gcRunLoopEndStmts = gcRunLoopEndStmts,
+      containsFFIs = CakeML.requiresFFIs(aadlThread))
+
+    cSources = cSources :+ gcImpl
+
     containers = containers :+ C_Container(
       instanceName = names.instanceName,
       componentId = cid,
 
-      cSources = ISZ(gcImpl),
+      cSources = cSources,
       cIncludes = ISZ(genComponentTypeInterfaceFile(c, gcInterfaceStatements)),
 
       sourceText = if(performHamrIntegration) ISZ() else PropertyUtil.getSourceText(c.properties),
@@ -2687,7 +2698,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       overwrite = T)
   }
 
-  def genComponentTypeImplementationFile(component:ir.Component, 
+  def genComponentTypeImplementationFile(aadlThread: AadlThread,
                                         
                                          localCIncludes: ISZ[ST], 
                                          blocks: ISZ[ST], 
@@ -2698,20 +2709,25 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                                          gcRunPreLoopStmts: ISZ[ST],
                                          gcRunLoopStartStmts: ISZ[ST],
                                          gcRunLoopMidStmts: ISZ[ST],
-                                         gcRunLoopEndStmts: ISZ[ST]): Resource = {
-    val name = Util.getClassifier(component.classifier.get)
+                                         gcRunLoopEndStmts: ISZ[ST],
+
+                                         containsFFIs: B): Resource = {
+
+    val path = PathUtil.getComponentSourcePath(aadlThread)
+    val name = Util.getClassifier(aadlThread.component.classifier.get)
     val componentHeaderFilename = Util.genCHeaderFilename(Util.brand(name))
     val componentImplFilename = Util.genCImplFilename(Util.brand(name))
 
     val runMethod: ST = StringTemplate.runMethod(
-      locals = ISZ(),
-      initStmts = gcRunInitStmts,
-      preLoopStmts = gcRunPreLoopStmts,
-      loopStartStmts = gcRunLoopStartStmts,
-      loopBodyStmts = gcRunLoopMidStmts,
-      loopEndStmts = gcRunLoopEndStmts,
-      postLoopStmts = ISZ())
-    
+          locals = ISZ(),
+          initStmts = gcRunInitStmts,
+          preLoopStmts = gcRunPreLoopStmts,
+          loopStartStmts = gcRunLoopStartStmts,
+          loopBodyStmts = gcRunLoopMidStmts,
+          loopEndStmts = gcRunLoopEndStmts,
+          postLoopStmts = ISZ(),
+          containsFFIs = containsFFIs)
+
     val glueCodeImpl: ST =  StringTemplate.componentTypeImpl(
       componentHeaderFilename = componentHeaderFilename,
       includes = localCIncludes,
@@ -2721,7 +2737,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       runMethod = runMethod)
 
     return Util.createResource(
-      path = s"${Util.DIR_COMPONENTS}/${name}/src/${componentImplFilename}",
+      path = s"${path}/${componentImplFilename}",
       contents = glueCodeImpl,
       overwrite = T)
   }

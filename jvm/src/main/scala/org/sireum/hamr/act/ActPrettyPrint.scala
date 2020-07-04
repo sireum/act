@@ -6,8 +6,9 @@ import org.sireum._
 import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Composition, Consumes, Dataport, Direction, Emits, Instance, Method, Mutex, Procedure, Provides, Semaphore, Uses}
 import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
+import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
-import org.sireum.hamr.act.templates.CMakeTemplate
+import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate}
 import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
@@ -160,7 +161,13 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
     cmakeEntries = cmakeEntries ++ cmakeComponents
 
-    val cmakelist = CMakeTemplate.cmakeLists(container.rootServer, cmakeEntries)
+    var definitions: ISZ[ST] = ISZ(CMakeTemplate.cmake_add_definitions(ISZ("CAMKES")))
+
+    if(CakeML.modelRequiresFFIs(symbolTable)) {
+      definitions = definitions ++ CakeMLTemplate.cmakeAddDefinitions()
+    }
+
+    val cmakelist = CMakeTemplate.cmakeLists(container.rootServer, cmakeEntries, definitions)
 
     add("CMakeLists.txt", cmakelist)
 
@@ -172,7 +179,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     addExeResource("bin/run-camkes.sh", StringTemplate.runCamkesScript(symbolTable.hasVM()))
     
     // add dest dir to path
-    val ret = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
+    val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
       path = s"${destDir}/${o.path}", 
       content = o.content,
       overwrite = o.overwrite,

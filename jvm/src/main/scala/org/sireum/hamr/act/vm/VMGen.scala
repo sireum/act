@@ -95,7 +95,7 @@ object VMGen {
     auxResourceFiles = auxResourceFiles :+ Resource(
       path = s"${getRootVMDir()}/${DIR_VM_OVERLAY_FILES_INIT_SCRIPT}/inittab_hvc0",
       content = VM_Template.vm_overlay_script__init_scripts__inittab_hvc0(),
-      overwrite = T, makeExecutable = F)
+      overwrite = F, makeExecutable = F)
 
     for(vmProcessID <- vmThreadIds) {
 

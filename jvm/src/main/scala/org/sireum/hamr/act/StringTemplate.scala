@@ -5,7 +5,8 @@ package org.sireum.hamr.act
 import org.sireum._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits, Provides, Uses}
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
-import org.sireum.hamr.act.templates.CMakeTemplate
+import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate}
+import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Component
@@ -477,7 +478,7 @@ object StringTemplate {
     val camkesGitLoc: String = if(hasVM) { "https://github.com/SEL4PROJ/camkes-arm-vm" } else { "https://docs.sel4.systems/projects/camkes" }
     val buildSim: ST = if(hasVM) {
       st"""../init-build.sh \
-          |    -DUSE_CACHED_LINUX_VM=true \
+          |    -D${VM_Template.USE_PRECONFIGURED_ROOTFS}=ON \
           |    -DPLATFORM=qemu-arm-virt \
           |    -DARM_HYP=ON \
           |    -DCAMKES_APP=$$HAMR_CAMKES_PROJ
@@ -613,9 +614,11 @@ object StringTemplate {
                |  ${(postInits, "\n\n")}
                |}""")
     } else { None() }
-    
+
+    val filteredIncludes: Set[String] = Set.empty ++ includes.map(s => s.render)
+
     val ret:ST = st"""#include <${componentHeaderFilename}>
-                     |${(includes, "\n")}
+                     |${(filteredIncludes.elements, "\n")}
                      |#include <string.h>
                      |#include <camkes.h>
                      |
@@ -634,28 +637,35 @@ object StringTemplate {
                 loopStartStmts: ISZ[ST],
                 loopBodyStmts: ISZ[ST],
                 loopEndStmts: ISZ[ST],
-                postLoopStmts: ISZ[ST]): ST = {
+                postLoopStmts: ISZ[ST],
+                containsFFIs: B): ST = {
     
     def flatten(i: ISZ[ST]): Option[ST] = { return if(i.nonEmpty) Some(st"""${(i, "\n")}""") else None() }
 
-    val ret: ST = st"""
-          |/************************************************************************
-          | * int run(void)
-          | * Main active thread function.
-          | ************************************************************************/
-          |int run(void) {
-          |  ${flatten(locals)}
-          |  ${flatten(initStmts)}
-          |  ${flatten(preLoopStmts)}
-          |  for(;;) {
-          |    ${flatten(loopStartStmts)}
-          |    ${flatten(loopBodyStmts)}
-          |    ${flatten(loopEndStmts)}
-          |  }
-          |  ${flatten(postLoopStmts)}
-          |  return 0;
-          |}"""
-    return ret
+    val ret: ST = st"""/************************************************************************
+                      | * int run(void)
+                      | * Main active thread function.
+                      | ************************************************************************/
+                      |int run(void) {
+                      |  ${flatten(locals)}
+                      |  ${flatten(initStmts)}
+                      |  ${flatten(preLoopStmts)}
+                      |  for(;;) {
+                      |    ${flatten(loopStartStmts)}
+                      |    ${flatten(loopBodyStmts)}
+                      |    ${flatten(loopEndStmts)}
+                      |  }
+                      |  ${flatten(postLoopStmts)}
+                      |  return 0;
+                      |}"""
+
+    if(containsFFIs) {
+      return st"""#ifndef ${CakeMLTemplate.PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT}
+                 |${ret}
+                 |#endif"""
+    } else {
+      return ret
+    }
   }
 
   def componentInitializeEntryPoint(componentName: String, methodName: String): (ST, ST) = {
