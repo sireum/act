@@ -1,5 +1,8 @@
+// #Sireum
+
 package org.sireum.hamr.act.utils
 
+import org.sireum._
 import org.sireum.hamr.act.Util
 import org.sireum.hamr.codegen.common.symbols.AadlThread
 

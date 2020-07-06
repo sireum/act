@@ -615,7 +615,7 @@ object StringTemplate {
                |}""")
     } else { None() }
 
-    val filteredIncludes: Set[String] = Set.empty ++ includes.map(s => s.render)
+    val filteredIncludes: Set[String] = Set.empty[String] ++ includes.map((s: ST) => s.render)
 
     val ret:ST = st"""#include <${componentHeaderFilename}>
                      |${(filteredIncludes.elements, "\n")}

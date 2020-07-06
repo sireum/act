@@ -214,7 +214,7 @@ object CMakeTemplate {
   }
 
   def cmake_add_definitions(defs: ISZ[String]): ST = {
-    val _defs = defs.map(m => s"-D${m}")
+    val _defs = defs.map((m: String) => s"-D${m}")
     return st"add_definitions(${(_defs, "\n")})"
   }
 

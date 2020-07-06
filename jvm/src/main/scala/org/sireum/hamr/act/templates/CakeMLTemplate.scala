@@ -186,7 +186,7 @@ object CakeMLTemplate {
   def genMethodSignature(methodName: String,
                          returnType: String,
                          parameters: ISZ[(String, String)]): ST = {
-    val params = parameters.map(m => st"${m._1} ${m._2}")
+    val params = parameters.map((m : ((String, String))) => st"${m._1} ${m._2}")
     val ret: ST = st"""${returnType} ${methodName}(${(params, ",\n")})"""
     return ret
   }

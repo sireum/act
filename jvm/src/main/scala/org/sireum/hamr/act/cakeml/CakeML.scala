@@ -10,7 +10,7 @@ import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, SeL4NixNamesUtil}
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
-import org.sireum.hamr.ir.{Direction, ValueProp}
+import org.sireum.hamr.ir
 import org.sireum.ops.ISZOps
 
 object CakeML {
@@ -18,14 +18,14 @@ object CakeML {
 
   def requiresFFIs(aadlThread: AadlThread): B = {
     val ret: B = PropertyUtil.getDiscreetPropertyValue(aadlThread.component.properties, PROP__CASE_PROPERTIES__COMPONENT_TYPE) match {
-      case Some(ValueProp("MONITOR")) => T
-      case Some(ValueProp("FILTER")) => T
+      case Some(ir.ValueProp("MONITOR")) => T
+      case Some(ir.ValueProp("FILTER")) => T
       case _ => F
     }
     return ret
   }
 
-  def modelRequiresFFIs(symbolTable: SymbolTable): Boolean = {
+  def modelRequiresFFIs(symbolTable: SymbolTable): B = {
     return ISZOps(symbolTable.getThreads()).exists(t => requiresFFIs(t))
   }
 
@@ -52,7 +52,7 @@ object CakeML {
     globals = globals ++ CakeMLTemplate.portIdsGlobalVars()
     globals = globals :+ CakeMLTemplate.initializedGlobalVar()
 
-    val _includes = includes.map(m => s"#include <${m}>")
+    val _includes = includes.map((m : String) => s"#include <${m}>")
 
     { // initialization
       val statements: ISZ[ST] = ISZ(
@@ -98,18 +98,18 @@ object CakeML {
 
   def processPorts(aadlThread: AadlThread, basePackageName: String): ISZ[ST] = {
     var methods: ISZ[ST] = ISZ()
-    val ports = aadlThread.getFeatureEnds().filter(f => CommonUtil.isEventPort(f) || CommonUtil.isDataPort(f))
+    val ports: ISZ[ir.FeatureEnd] = aadlThread.getFeatureEnds().filter((f: ir.FeatureEnd) => CommonUtil.isEventPort(f) || CommonUtil.isDataPort(f))
     val names = Names(aadlThread.component, basePackageName)
 
-    methods = methods ++ ports.map(p => {
+    val _ports: ISZ[ST] = ports.map((p: ir.FeatureEnd) => {
       val portName = CommonUtil.getLastName(p.identifier)
 
       p.direction match {
-        case Direction.In =>
+        case ir.Direction.In =>
           val ffiName = CakeMLTemplate.ffi_getterMethodName(portName)
           val slangName = SeL4NixNamesUtil.apiHelperGetterMethodName(portName, names)
           CakeMLTemplate.ffi_get(ffiName, slangName)
-        case Direction.Out =>
+        case ir.Direction.Out =>
           val ffiName = CakeMLTemplate.ffi_setterMethodName(portName)
           val slangName = SeL4NixNamesUtil.apiHelperSetterMethodName(portName, names)
           val isDataPort = CommonUtil.isDataPort(p)
@@ -117,6 +117,8 @@ object CakeML {
         case x => halt(s"Not expecting direction ${x}")
       }
     })
+
+    methods = methods ++ _ports
 
     return methods
   }
