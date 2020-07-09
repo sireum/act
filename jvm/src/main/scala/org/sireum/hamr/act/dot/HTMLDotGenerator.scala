@@ -103,23 +103,32 @@ object HTMLDotGenerator {
            |];"""
     })
     
-    val conns: ISZ[ST] = model.composition.connections.map(c => {
-      assert(c.from_ends.size == 1)
-      assert(c.to_ends.size == 1)
+    val conns: ISZ[ST] = model.composition.connections.flatMap(conn => {
+      var accum: ISZ[ST] = ISZ()
 
-      val from = c.from_ends(0)
-      val to = c.to_ends(0)
+      var fromIndex = z"0"
+      for(from <- conn.from_ends) {
+        var toIndex = z"0"
+        for(to <- conn.to_ends) {
 
-      val color: String = ConnectionType.byName(c.connectionType) match {
-        case Some(connType) => connMap.getOrElse(connType, unknown)
-        case _ => unknown
+          val color: String = ConnectionType.byName(conn.connectionType) match {
+            case Some(connType) => connMap.getOrElse(connType, unknown)
+            case _ => unknown
+          }
+
+          accum = accum :+
+          st""""${from.component}":${from.end} -> "${to.component}":${to.end} [
+              |  color="${color}"
+              |  //label = "${conn.connectionType}"
+              |  id = ${conn.name}
+
+              |];"""
+
+          toIndex = toIndex + 1
+        }
+        fromIndex = fromIndex + 1
       }
-      
-      st""""${from.component}":${from.end} -> "${to.component}":${to.end} [
-           |  color="${color}"
-           |  //label = "${c.connectionType}"
-           |  id = ${c.name}
-           |];"""
+      accum
     })
 
     val connTypeRows: ISZ[ST] = connMap.entries.map(e => {

@@ -8,7 +8,7 @@ import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
-import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate}
+import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
@@ -161,13 +161,21 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
     cmakeEntries = cmakeEntries ++ cmakeComponents
 
-    var definitions: ISZ[ST] = ISZ(CMakeTemplate.cmake_add_definitions(ISZ("CAMKES")))
+    var preludes: ISZ[ST] = ISZ(CMakeTemplate.cmake_add_definitions(ISZ("CAMKES")))
 
     if(CakeML.modelRequiresFFIs(symbolTable)) {
-      definitions = definitions ++ CakeMLTemplate.cmakeAddDefinitions()
+      val filename = "CMake_CakeMlOptions.cmake"
+      add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS))
+      preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
-    val cmakelist = CMakeTemplate.cmakeLists(container.rootServer, cmakeEntries, definitions)
+    if(platform == ActPlatform.SeL4) {
+      val filename= "CMake_TranspilerOptions.cmake"
+      add(filename, CMakeTemplate.cmake_add_options(SlangEmbeddedTemplate.TRANSPILER_OPTIONS))
+      preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
+    }
+
+    val cmakelist = CMakeTemplate.cmakeLists(container.rootServer, cmakeEntries, preludes)
 
     add("CMakeLists.txt", cmakelist)
 
@@ -266,11 +274,11 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     }
 
     for(c <- o.connections) {
-      val from = s"${c.from_ends(0).component}.${c.from_ends(0).end}"
-      val to = s"${c.to_ends(0).component}.${c.to_ends(0).end}"
+      val froms = c.from_ends.map(m => st"from ${m.component}.${m.end}")
+      val tos = c.to_ends.map(m => st"to ${m.component}.${m.end}")
 
       connections = connections :+
-        st"""connection ${c.connectionType} ${c.name}(from ${from}, to ${to});"""
+        st"""connection ${c.connectionType} ${c.name}(${(froms, ", ")}, ${(tos, ", ")});"""
     }
 
 

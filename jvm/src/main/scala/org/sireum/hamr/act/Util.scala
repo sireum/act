@@ -438,26 +438,40 @@ object Util {
   def getSbCounterFilenameForIncludes(): String = { return s"<${Util.SB_COUNTER_HEADER_FILENAME}>" }
 
   def getConnectionName(index: Z): String = { return s"conn${index}"}
-  
+
+  def createConnectionEnd(isFrom: B, componentName: String, featureName: String): ast.ConnectionEnd = {
+    return ast.ConnectionEnd(isFrom, componentName, featureName)
+  }
+
+  def createConnections(connectionName: String,
+                        connectionType: Sel4ConnectorTypes.Type,
+                        fromEnds: ISZ[ast.ConnectionEnd], toEnds: ISZ[ast.ConnectionEnd]): ast.Connection = {
+    return ast.Connection(
+      name = connectionName,
+      connectionType = connectionType.string,
+      from_ends = fromEnds,
+      to_ends = toEnds)
+  }
+
   def createConnection(connectionName: String, 
                        connectionType: Sel4ConnectorTypes.Type,
                        srcComponent: String, srcFeature: String,
                        dstComponent: String, dstFeature: String): ast.Connection = {
-    val from_ends: ISZ[ast.ConnectionEnd] = ISZ(ast.ConnectionEnd(
+    val from_ends: ISZ[ast.ConnectionEnd] = ISZ(createConnectionEnd(
       isFrom = T,
-      component = srcComponent,
-      end = srcFeature))
+      componentName = srcComponent,
+      featureName = srcFeature))
 
-    val to_ends: ISZ[ast.ConnectionEnd] = ISZ(ast.ConnectionEnd(
+    val to_ends: ISZ[ast.ConnectionEnd] = ISZ(createConnectionEnd(
       isFrom = F,
-      component = dstComponent,
-      end = dstFeature))
+      componentName = dstComponent,
+      featureName = dstFeature))
 
-    val con = ast.Connection(
-      name = connectionName,
-      connectionType = s"$connectionType",
-      from_ends = from_ends,
-      to_ends = to_ends
+    val con = createConnections(
+      connectionName = connectionName,
+      connectionType = connectionType,
+      fromEnds = from_ends,
+      toEnds = to_ends
     )
 
     return con

@@ -3,9 +3,9 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
+import org.sireum.hamr.act.utils.{CMakeOption, CMakePreprocessorOption, CMakeStandardOption}
 import org.sireum.hamr.act.{StringTemplate, Util}
 import org.sireum.hamr.act.vm.VMGen
-import org.sireum.hamr.codegen.common.StringUtil
 
 object CMakeTemplate {
 
@@ -169,7 +169,7 @@ object CMakeTemplate {
 
   def cmakeLists(rootServer: String,
                  entries: ISZ[ST],
-                 definitions: ISZ[ST]): ST = {
+                 preludes: ISZ[ST]): ST = {
 
     return st"""${StringTemplate.doNotEditCmakeComment()}
                |
@@ -177,7 +177,7 @@ object CMakeTemplate {
                |
                |project (${rootServer} C)
                |
-               |${(definitions, "\n\n")}
+               |${(preludes, "\n\n")}
                |
                |${CMakeTemplate.addStackUsageOption()}
                |
@@ -218,16 +218,30 @@ object CMakeTemplate {
     return st"add_definitions(${(_defs, "\n")})"
   }
 
-  def cmake_add_option(name: String, description: String, defaultValue: B): ST = {
-    val _default: String = if(defaultValue) "ON" else "OFF"
-    val ret: ST = st"""option(${name}
-                      |       "${description}"
-                      |       ${_default})
-                      |
-                      |if(${name} OR "$$ENV{${name}}" STREQUAL "ON")
-                      |   add_definitions(-D${name})
-                      |endif()"""
+  def cmake_add_option(option: CMakeOption): ST = {
+    val _default: String = if(option.defaultValue) "ON" else "OFF"
+
+    val s: ST = st"""option(${option.name}
+                    |       "${option.description}"
+                    |       ${_default})"""
+
+    val ret: ST = option match {
+      case c: CMakePreprocessorOption =>
+        return st"""${s}
+                   |
+                   |if(${c.name} OR "$$ENV{${c.name}}" STREQUAL "ON")
+                   |   add_definitions(-D${c.preprocessorName})
+                   |endif()"""
+      case _ => s
+    }
+
     return ret
+  }
+
+  def cmake_add_options(options: ISZ[CMakeOption]): ST = {
+    val ret: ISZ[ST] = options.map((m : CMakeOption) => CMakeTemplate.cmake_add_option(m))
+
+    return st"${(ret, "\n\n")}"
   }
 
   def addStackUsageOption(): ST = {
@@ -238,4 +252,6 @@ object CMakeTemplate {
                |  add_compile_options("$$<$$<CONFIG:Release>:-Os>")
                |endif()"""
   }
+
+  def include(filename: String): ST = { return st"include(${filename})" }
 }

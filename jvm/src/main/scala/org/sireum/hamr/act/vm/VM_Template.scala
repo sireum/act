@@ -4,12 +4,17 @@ package org.sireum.hamr.act.vm
 import org.sireum._
 import org.sireum.hamr.act.{StringTemplate, Util}
 import org.sireum.hamr.act.templates.CMakeTemplate
+import org.sireum.hamr.act.utils.{CMakeOption, CMakeStandardOption}
 
 object VM_Template {
 
   val USE_PRECONFIGURED_ROOTFS: String = "USE_PRECONFIGURED_ROOTFS"
 
   val data61_VM_Macros_Location: String = "<configurations/vm.h>"
+
+  val VM_CMAKE_OPTIONS: ISZ[CMakeOption] = ISZ(
+    CMakeStandardOption(USE_PRECONFIGURED_ROOTFS, F, "Use preconfigured rootfs")
+  )
 
   def vm_assembly_preprocessor_includes(): ISZ[String] = {
     val ret: ISZ[String] = ISZ(
@@ -231,18 +236,16 @@ object VM_Template {
                      |include(ExternalProject)
                      |include(external-project-helpers)
                      |
-                     |OPTION(${USE_PRECONFIGURED_ROOTFS}
-                     |       "Use preconfigured rootfs"
-                     |       OFF)
+                     |${CMakeTemplate.cmake_add_options(VM_CMAKE_OPTIONS)}
                      |
-                     |MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
-                     |MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
-                     |MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
-                     |MESSAGE("CAMKES_VM_LINUX_DIR = $${CAMKES_VM_LINUX_DIR}")
-                     |MESSAGE("CMAKE_CURRENT_BINARY_DIR = $${CMAKE_CURRENT_BINARY_DIR}")
-                     |MESSAGE("CMAKE_CURRENT_SOURCE_DIR = $${CMAKE_CURRENT_SOURCE_DIR}")
-                     |MESSAGE("CMAKE_C_COMPILER = $${CMAKE_C_COMPILER}")
-                     |MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
+                     |#MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
+                     |#MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
+                     |#MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
+                     |#MESSAGE("CAMKES_VM_LINUX_DIR = $${CAMKES_VM_LINUX_DIR}")
+                     |#MESSAGE("CMAKE_CURRENT_BINARY_DIR = $${CMAKE_CURRENT_BINARY_DIR}")
+                     |#MESSAGE("CMAKE_CURRENT_SOURCE_DIR = $${CMAKE_CURRENT_SOURCE_DIR}")
+                     |#MESSAGE("CMAKE_C_COMPILER = $${CMAKE_C_COMPILER}")
+                     |#MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
                      |
                      |if("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt" AND (NOT ${USE_PRECONFIGURED_ROOTFS}))
                      |    MESSAGE("Downloading VM")
@@ -327,7 +330,7 @@ object VM_Template {
                      |else()
                      |    MESSAGE("Using pre-configured rootfs")
                      |
-                     |    # User pre-configured rootfs file with crossvm modules and apps installed
+                     |    # Use pre-configured rootfs file with crossvm modules and apps installed
                      |    set(rootfs_file "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/rootfs_crossvm.cpio.gz")
                      |endif()
                      |

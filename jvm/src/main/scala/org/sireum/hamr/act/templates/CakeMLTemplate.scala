@@ -2,6 +2,8 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
+import org.sireum.hamr.act.utils.{CMakeOption, CMakePreprocessorOption}
+import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 
 object CakeMLTemplate {
 
@@ -20,23 +22,17 @@ object CakeMLTemplate {
   val defaultArgs: String = "unsigned char *parameter, long parameterSizeBytes"
   val defaultArgs2: String = s"${defaultArgs}, unsigned char *output, long outputSizeBytes"
 
-  def cmakeAddDefinitions(): ISZ[ST] = {
-    val ret: ISZ[ST] = ISZ(
-      CMakeTemplate.cmake_add_option(
-        PREPROCESSOR_CAKEML_DUMP_BUFFERS,
-        "Print the contents of byte-arrays being sent to CakeML",
-        F),
-      CMakeTemplate.cmake_add_option(
-        PREPROCESSOR_CAKEML_CHECK_AND_REPORT_BUFFER_OVERRUNS,
-        "Print warning messages if byte-arrays being sent to CakeML are larger than expected",
-        F),
-      CMakeTemplate.cmake_add_option(
-        PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT,
-        "Enable if CakeML assembly files have been included",
-        F)
-    )
-    return ret
-  }
+  val METHOD_NAME_CHECK_AND_REPORT_BUFFER_OVERRUN: String = "checkAndReportBufferOverrun"
+  val METHOD_NAME_DUMP_BUFFER: String = "dumpBuffer"
+
+  val CAKEML_OPTIONS: ISZ[CMakeOption] = ISZ(
+    CMakePreprocessorOption(PREPROCESSOR_CAKEML_DUMP_BUFFERS, PREPROCESSOR_CAKEML_DUMP_BUFFERS,
+      F, "Print the contents of byte-arrays being sent to CakeML"),
+    CMakePreprocessorOption(PREPROCESSOR_CAKEML_CHECK_AND_REPORT_BUFFER_OVERRUNS, PREPROCESSOR_CAKEML_CHECK_AND_REPORT_BUFFER_OVERRUNS,
+      F, "Print warning messages if byte-arrays being sent to CakeML are larger than expected"),
+    CMakePreprocessorOption(PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT, PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT,
+      F, "Enable if CakeML assembly files have been included")
+  )
 
   def entryPointGlobalVar(typeName: String, cEntryPointAdapterQualifiedName: String): ST = {
     return st"${typeName} ${GLOBAL_VAR__ENTRY_POINTS};"
@@ -67,16 +63,21 @@ object CakeMLTemplate {
   }
 
   def ffi_initializeEntryPoints(typeName: String, cEntryPointAdapterQualifiedName: String): ST = {
-    return st"${GLOBAL_VAR__ENTRY_POINTS} = (${typeName}) ${cEntryPointAdapterQualifiedName}_entryPoints();"
+    return st"${GLOBAL_VAR__ENTRY_POINTS} = (${typeName}) ${cEntryPointAdapterQualifiedName}_entryPoints(${StackFrameTemplate.SF_LAST});"
   }
 
   def ffi_initializeThis(cComponentType: String): ST = {
     return st"${GLOBAL_VAR__THIS} = (${cComponentType}) &entryPoints->component;"
   }
 
-  def initMethod(statements: ISZ[ST]): ST = {
-    val ret: ST = st"""void init() {
+  def initMethod(statements: ISZ[ST], fileUri: String): ST = {
+    val methodName = "init"
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(T, fileUri, "", methodName, 0)
+
+    val ret: ST = st"""void ${methodName}(${StackFrameTemplate.STACK_FRAME_ONLY}) {
                       |  if(!initialized) {
+                      |    ${declNewStackFrame};
+                      |
                       |    ${(statements, "\n")}
                       |    initialized = true;
                       |  }
@@ -84,43 +85,66 @@ object CakeMLTemplate {
     return ret
   }
 
-  def ffi_initialization(statements: ISZ[ST]): ST = {
-    val ret: ST = st"""void ffiinitializeComponent(${defaultArgs}) {
+  def ffi_initialization(statements: ISZ[ST], fileUri: String): ST = {
+    val methodName = "ffiinitializeComponent"
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+
+    val ret: ST = st"""void ${methodName}(${defaultArgs}) {
+                      |  ${declNewStackFrame};
+                      |
                       |  ${(statements, "\n")}
                       |}"""
     return ret
   }
 
-  def ffi_artReceiveInput(entryPoints: String): ST = {
-    val ret: ST = st"""void ffiapi_receiveInput(${defaultArgs2}) {
-                      |  init();
+  def ffi_artReceiveInput(entryPoints: String, fileUri: String): ST = {
+    val methodName = "ffiapi_receiveInput"
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+
+    val ret: ST = st"""void ${methodName}(${defaultArgs2}) {
+                      |  ${declNewStackFrame};
+                      |
+                      |  ${callInit()}
                       |  art_Art_receiveInput(SF ${GLOBAL_VAR__EVENT_IN_PORT_IDS}, ${GLOBAL_VAR__DATA_IN_PORT_IDS});
                       |}"""
     return ret
   }
 
-  def ffi_artSendOutput(entryPoints: String): ST = {
-    val ret: ST = st"""void ffiapi_sendOutput(${defaultArgs2}) {
-                      |  init();
+  def ffi_artSendOutput(entryPoints: String, fileUri: String): ST = {
+    val methodName = "ffiapi_sendOutput"
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+
+    val ret: ST = st"""void ${methodName}(${defaultArgs2}) {
+                      |  ${declNewStackFrame};
+                      |
+                      |  ${callInit()}
                       |  art_Art_sendOutput(SF ${GLOBAL_VAR__EVENT_OUT_PORT_IDS}, ${GLOBAL_VAR__DATA_OUT_PORT_IDS});
                       |}"""
     return ret
   }
 
   def logSignature(bridgeApi: String, loggerName: String, cThisApi: String): ST = {
-    return st"${bridgeApi}_log${loggerName}_(${cThisApi}(${GLOBAL_VAR__THIS}), str)"
+    return st"${bridgeApi}_${loggerName}_(${StackFrameTemplate.SF} ${cThisApi}(${GLOBAL_VAR__THIS}), str)"
   }
 
-  def ffi_artLoggers(bridgeApi: String, cThisApi: String): ISZ[ST] = {
+  def ffi_artLoggers(bridgeApi: String, cThisApi: String, fileUri: String): ISZ[ST] = {
     val ret: ISZ[ST] = ISZ("Info", "Debug", "Error").map(name => {
-      st"""void ffiapi_log${name}(${defaultArgs2}){
-          |  init();
+
+      val methodName = s"log${name}"
+      val ffiMethodName = s"ffiapi_${methodName}"
+
+      val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", ffiMethodName, 0)
+
+      st"""void ${ffiMethodName}(${defaultArgs2}){
+          |  ${declNewStackFrame};
+          |
+          |  ${callInit()}
           |  DeclNewString(_str);
           |  String str = (String)&_str;
           |  str->size = parameterSizeBytes;
           |  memcpy(str->value, parameter, parameterSizeBytes);
           |
-          |  ${logSignature(bridgeApi, name, cThisApi)};
+          |  ${logSignature(bridgeApi, methodName, cThisApi)};
           |} """
     })
     return ret
@@ -130,58 +154,78 @@ object CakeMLTemplate {
 
   def ffi_setterMethodName(port: String): String = { return s"ffiapi_send_${port}_out" }
 
-  def ffi_get(ffiMethodName: String, slangMethodName: String): ST = {
+  def ffi_get(ffiMethodName: String, slangMethodName: String, fileUri: String): ST = {
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", ffiMethodName, 0)
+
     val ret: ST = st"""void ${ffiMethodName}(${defaultArgs2}) {
-                      |  init();
+                      |  ${declNewStackFrame};
+                      |
+                      |  ${callInit()}
                       |  size_t numBits = 0;
-                      |  output[0] = ${slangMethodName}(this, &numBits, (U8 *)(output + 1));
-                      |  checkAndReportBufferOverrun(numBits / 8, (outputSizeBytes-1));
-                      |  dumpBuffer(numBits, output);
+                      |  output[0] = ${slangMethodName}(${StackFrameTemplate.SF} this, &numBits, (U8 *)(output + 1));
+                      |  ${METHOD_NAME_CHECK_AND_REPORT_BUFFER_OVERRUN}(${StackFrameTemplate.SF} numBits / 8, (outputSizeBytes-1));
+                      |  ${METHOD_NAME_DUMP_BUFFER}(${StackFrameTemplate.SF} numBits, output);
                       |}"""
     return ret
   }
 
-  def ffi_send(ffiMethodName: String, slangMethodName: String, isDataPort: B): ST = {
+  def ffi_send(ffiMethodName: String, slangMethodName: String, isDataPort: B, fileUri: String): ST = {
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", ffiMethodName, 0)
+
     val args: String = if(isDataPort) ", parameterSizeBytes*8, (U8 *)parameter" else ""
     val ret: ST = st"""void ${ffiMethodName}(${defaultArgs2}) {
-                      |  init();
-                      |  ${slangMethodName}(this${args});
+                      |  ${declNewStackFrame};
+                      |
+                      |  ${callInit()}
+                      |  ${slangMethodName}(${StackFrameTemplate.SF} this${args});
                       |}"""
     return ret
   }
 
-  def checkAndReportBufferOverrun(bridgeApi: String, cThisApi: String): ST = {
-    val ret: ST = st"""void checkAndReportBufferOverrun(long bytesWritten, long bufferSizeBytes) {
+  def checkAndReportBufferOverrun(bridgeApi: String, cThisApi: String, fileUri: String): ST = {
+    val methodName = METHOD_NAME_CHECK_AND_REPORT_BUFFER_OVERRUN
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+
+    val ret: ST = st"""void ${methodName}(${StackFrameTemplate.STACK_FRAME} long bytesWritten, long bufferSizeBytes) {
                       |  #ifdef ${PREPROCESSOR_CAKEML_CHECK_AND_REPORT_BUFFER_OVERRUNS}
-                      |  init();
+                      |  ${declNewStackFrame};
+                      |
+                      |  ${callInit()}
                       |  if (bytesWritten > bufferSizeBytes) {
                       |    DeclNewString(_str);
                       |    String str = (String)&_str;
-                      |    String__append(str, string("Wrote too many bytes to buffer"));
-                      |    ${logSignature(bridgeApi, "Info", cThisApi)};
+                      |    String__append(${StackFrameTemplate.SF} str, string("Wrote too many bytes to buffer"));
+                      |    ${logSignature(bridgeApi, "logInfo", cThisApi)};
                       |  }
                       |  #endif
                       |}"""
     return ret
   }
 
-  def dumpBuffer(bridgeApi: String, cThisApi: String): ST = {
-    val ret: ST = st"""void dumpBuffer(size_t numBits, U8* buffer) {
+  def dumpBuffer(bridgeApi: String, cThisApi: String, fileUri: String): ST = {
+    val methodName = METHOD_NAME_DUMP_BUFFER
+    val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+
+    val ret: ST = st"""void dumpBuffer(${StackFrameTemplate.STACK_FRAME} size_t numBits, U8* buffer) {
                       |  #ifdef ${PREPROCESSOR_CAKEML_DUMP_BUFFERS}
-                      |  init();
+                      |  ${declNewStackFrame};
+                      |
+                      |  ${callInit()}
                       |  DeclNewString(_str);
                       |  String str = (String)&_str;
-                      |  String__append(str, string("["));
+                      |  String__append(${StackFrameTemplate.SF} str, string("["));
                       |  size_t end = ((numBits / 8) > 80) ? 80 : (numBits / 8);
                       |  for (int i = 0 ; i < end ; ++i) {
-                      |    U8_string_(str, buffer[i]);
+                      |    U8_string_(${StackFrameTemplate.SF} str, buffer[i]);
                       |  }
-                      |  String__append(str, string("]"));
-                      |  ${logSignature(bridgeApi, "Info", cThisApi)};
+                      |  String__append(${StackFrameTemplate.SF} str, string("]"));
+                      |  ${logSignature(bridgeApi, "logInfo", cThisApi)};
                       |  #endif
                       |}"""
     return ret
   }
+
+  def callInit(): ST = { return st"init(${StackFrameTemplate.SF_LAST});" }
 
   def genMethodSignature(methodName: String,
                          returnType: String,

@@ -61,21 +61,21 @@ object CakeML {
         CakeMLTemplate.initializePortIds(names.cBridgeEntryPoints)
       )
 
-      methods = methods :+ CakeMLTemplate.initMethod(statements)
-      methods = methods :+ CakeMLTemplate.ffi_initialization(statements)
+      methods = methods :+ CakeMLTemplate.initMethod(statements, filename)
+      methods = methods :+ CakeMLTemplate.ffi_initialization(statements, filename)
     }
 
-    methods = methods :+ CakeMLTemplate.checkAndReportBufferOverrun(names.cBridgeApi, names.cThisApi)
+    methods = methods :+ CakeMLTemplate.checkAndReportBufferOverrun(names.cBridgeApi, names.cThisApi, filename)
 
-    methods = methods :+ CakeMLTemplate.dumpBuffer(names.cBridgeApi, names.cThisApi)
+    methods = methods :+ CakeMLTemplate.dumpBuffer(names.cBridgeApi, names.cThisApi, filename)
 
-    methods = methods :+ CakeMLTemplate.ffi_artReceiveInput(names.cBridgeEntryPoints)
+    methods = methods :+ CakeMLTemplate.ffi_artReceiveInput(names.cBridgeEntryPoints, filename)
 
-    methods = methods :+ CakeMLTemplate.ffi_artSendOutput(names.cBridgeEntryPoints)
+    methods = methods :+ CakeMLTemplate.ffi_artSendOutput(names.cBridgeEntryPoints, filename)
 
-    methods = methods ++ CakeMLTemplate.ffi_artLoggers(names.cBridgeApi, names.cThisApi)
+    methods = methods ++ CakeMLTemplate.ffi_artLoggers(names.cBridgeApi, names.cThisApi, filename)
 
-    methods = methods ++ processPorts(aadlThread, basePackageName)
+    methods = methods ++ processPorts(aadlThread, basePackageName, filename)
 
     methods = methods :+ CakeMLTemplate.postlude()
 
@@ -96,7 +96,7 @@ object CakeML {
   }
 
 
-  def processPorts(aadlThread: AadlThread, basePackageName: String): ISZ[ST] = {
+  def processPorts(aadlThread: AadlThread, basePackageName: String, fileUri: String): ISZ[ST] = {
     var methods: ISZ[ST] = ISZ()
     val ports: ISZ[ir.FeatureEnd] = aadlThread.getFeatureEnds().filter((f: ir.FeatureEnd) => CommonUtil.isEventPort(f) || CommonUtil.isDataPort(f))
     val names = Names(aadlThread.component, basePackageName)
@@ -108,12 +108,12 @@ object CakeML {
         case ir.Direction.In =>
           val ffiName = CakeMLTemplate.ffi_getterMethodName(portName)
           val slangName = SeL4NixNamesUtil.apiHelperGetterMethodName(portName, names)
-          CakeMLTemplate.ffi_get(ffiName, slangName)
+          CakeMLTemplate.ffi_get(ffiName, slangName, fileUri)
         case ir.Direction.Out =>
           val ffiName = CakeMLTemplate.ffi_setterMethodName(portName)
           val slangName = SeL4NixNamesUtil.apiHelperSetterMethodName(portName, names)
           val isDataPort = CommonUtil.isDataPort(p)
-          CakeMLTemplate.ffi_send(ffiName, slangName, isDataPort)
+          CakeMLTemplate.ffi_send(ffiName, slangName, isDataPort, fileUri)
         case x => halt(s"Not expecting direction ${x}")
       }
     })

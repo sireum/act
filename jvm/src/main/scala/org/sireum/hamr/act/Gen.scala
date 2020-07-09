@@ -7,13 +7,15 @@ import org.sireum.ops.ISZOps
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
 import org.sireum.hamr.act.cakeml.CakeML
+import org.sireum.hamr.act.connections.{Connections, Monitors, SBConnections, SharedDataUtil, TBConnections}
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUtil}
-import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
+import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.act.vm.{VMGen, VM_Template}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
+import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
@@ -85,6 +87,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       gen(symbolTable.rootSystem.component)
     }
 
+    if(!hasErrors() && platform != ActPlatform.SeL4_TB) {
+      val (connections, configEntries) = processSBConnections()
+      camkesConnections = camkesConnections ++ connections
+      camkesConfiguration = camkesConfiguration ++ configEntries
+    }
+
     if(!hasErrors()) {
       // merge assemblies
       val assemblies: ISZ[Assembly] = astObjects.filter(f => f.isInstanceOf[Assembly]).map(m => m.asInstanceOf[Assembly])
@@ -134,12 +142,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         connections = connections.elements,
         externalEntities = compositionMacros.elements
       )
-      
+
       astObjects = ISZ(Assembly(
         configuration = (Set.empty[String] ++ camkesConfiguration.map((m : ST) => m.render)).elements,
         configurationMacros = camkesConfigurationMacros.elements,
         composition = composition))
-      
+
       astObjects = astObjects ++ otherAstObjects
 
       { // generate sb type library cmake
@@ -188,7 +196,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         for (sc <- c.subComponents) {
           gen(sc)
         }
-        camkesConnections = camkesConnections ++ processConnections(c)
+
+        if(platform == ActPlatform.SeL4_TB) {
+          val (connections, configs) = processTBConnections(c)
+          camkesConnections = camkesConnections ++ connections
+          camkesConfiguration = camkesConfiguration ++ configs
+        }
 
       case ir.ComponentCategory.Process =>
         val aadlProcess = symbolTable.getProcess(CommonUtil.getName(c.identifier))
@@ -218,349 +231,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     }
   }
 
-  def createConnection(connectionType: Sel4ConnectorTypes.Type,
-                       srcComponent: String, srcFeature: String,
-                       dstComponent: String, dstFeature: String): ast.Connection = {
-    val name = Util.getConnectionName(connectionCounter.increment())
-    return Util.createConnection(name, connectionType, srcComponent, srcFeature, dstComponent, dstFeature)
-  }
-
-  def processConnections(c: ir.Component): ISZ[ast.Connection] = {
-
-    def createSeL4GlobalAsynchConnection(srcComponent: String, srcFeature: String,
-                                         dstComponent: String, dstFeature: String): ast.Connection = {
-      return createConnection(
-        Sel4ConnectorTypes.seL4GlobalAsynch,
-        srcComponent, srcFeature,
-        dstComponent, dstFeature)
-    }
-
-    def createSeL4NotificationConnection(srcComponent: String, srcFeature: String,
-                                         dstComponent: String, dstFeature: String): ast.Connection = {
-      return createConnection(
-        Sel4ConnectorTypes.seL4Notification,
-        srcComponent, srcFeature,
-        dstComponent, dstFeature)
-    }
-
-    def createRPCConnection(srcComponent: String, srcFeature: String,
-                            dstComponent: String, dstFeature: String) : ast.Connection = {
-      return createConnection(
-        Sel4ConnectorTypes.seL4RPCCall,
-        srcComponent, srcFeature,
-        dstComponent, dstFeature)
-    }
-
-    def createSharedDataCounterConnection(conn: ir.ConnectionInstance) : ast.Connection = {
-      val srcComponent = CommonUtil.getLastName(conn.src.component)
-      val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
-
-      val dstComponent = CommonUtil.getLastName(conn.dst.component)
-      val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(srcFeature.identifier))
-      val dstFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(dstFeature.identifier))
-
-      camkesConfiguration = camkesConfiguration :+ st"""${srcComponent}.${srcFeatureName}_access = "W";"""
-      camkesConfiguration = camkesConfiguration :+ st"""${dstComponent}.${dstFeatureName}_access = "R";"""
-
-      return createConnection(Sel4ConnectorTypes.seL4SharedData,
-        srcComponent, srcFeatureName,
-        dstComponent, dstFeatureName
-      )
-    }
-
-    def createSharedDataConnection(conn: ir.ConnectionInstance) : ast.Connection = {
-      val srcComponent = CommonUtil.getLastName(conn.src.component)
-      val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
-
-      val dstComponent = CommonUtil.getLastName(conn.dst.component)
-      val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
-      val dstFeatureName = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
-
-      return createConnection(Sel4ConnectorTypes.seL4SharedData,
-        srcComponent, srcFeatureName,
-        dstComponent, dstFeatureName
-      )
-    }
-
-    def createDataConnection(conn: ir.ConnectionInstance) : ISZ[ast.Connection] = {
-      val monitor = getMonitorForConnectionInstance(conn).get.asInstanceOf[TB_Monitor]
-
-      val srcComponent = CommonUtil.getLastName(conn.src.component)
-      val dstComponent = CommonUtil.getLastName(conn.dst.component)
-
-      val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
-      val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
-      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
-
-      var ret: ISZ[ast.Connection] = ISZ()
-
-      // rpc src to mon
-      ret = ret :+ createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, monitor.providesVarName)
-
-      // rpc mon to dst
-      ret = ret :+ createRPCConnection(dstComponent, dstFeatureName, monitor.i.name, monitor.providesVarName)
-
-      // notification monsig to dst
-      return ret :+ createSeL4NotificationConnection(
-        monitor.i.name, "monsig",
-        dstComponent, Util.genSeL4NotificationName(dstFeature, T)
-      )
-    }
-
-    def createDataConnection_Ihor(conn: ir.ConnectionInstance) :ISZ[ast.Connection] = {
-      val monitor = getMonitorForConnectionInstance(conn).get.asInstanceOf[Ihor_Monitor]
-
-      val srcComponent = CommonUtil.getLastName(conn.src.component)
-      val dstComponent = CommonUtil.getLastName(conn.dst.component)
-
-      val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
-      val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
-
-      val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
-      val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
-
-      var ret: ISZ[ast.Connection] = ISZ()
-
-      // rpc src to mon
-      ret = ret :+ createRPCConnection(srcComponent, srcFeatureName, monitor.i.name, monitor.providesSenderVarName)
-
-      // rpc mon to dst
-      ret = ret :+ createRPCConnection(dstComponent, dstFeatureName, monitor.i.name, monitor.providesReceiverVarName)
-
-      // notification monsig to dst
-      return ret :+ createSeL4NotificationConnection(
-        monitor.i.name, "monsig",
-        dstComponent, Util.genSeL4NotificationName(dstFeature, T)
-      )
-    }
-
-    var connections: ISZ[ast.Connection] = ISZ()
-
-    val handledConns = c.connectionInstances.filter(conn => isHandledConnection(conn))
-    val unhandledConns = c.connectionInstances.filter(conn => !isHandledConnection(conn))
-
-    resolveSharedDataFeatures(handledConns)
-    val missingFeatures = sharedData.values.filter((f: SharedData) => f.ownerFeature.isEmpty)
-    if(missingFeatures.nonEmpty) {
-      reporter.error(None(), Util.toolName, s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
-    }
-
-    for(conn <- handledConns) {
-      val dstPath: String = CommonUtil.getName(conn.dst.feature.get)
-      val fdst: ir.Feature = symbolTable.airFeatureMap.get(dstPath).get
-
-      val srcComponentName: String = CommonUtil.getLastName(conn.src.component)
-
-      val dstComponentName: String = CommonUtil.getLastName(conn.dst.component)
-      val dstFeatureName: String = CommonUtil.getLastName(conn.dst.feature.get)
-
-      conn.kind match {
-        case ir.ConnectionKind.Port =>
-          fdst.category match {
-
-            case ir.FeatureCategory.DataPort => {
-
-              def handleDataPort_TB_Connection(): Unit = {
-                connections = connections ++ createDataConnection(conn)
-              }
-
-              def handleDataPort_SB_Connection(): Unit = {
-                val srcAadlThread: AadlThread = symbolTable.getThreadByName(conn.src.component)
-                val dstAadlThread: AadlThread = symbolTable.getThreadByName(conn.dst.component)
-
-                val srcToVM = srcAadlThread.toVirtualMachine(symbolTable)
-                val dstToVM = dstAadlThread.toVirtualMachine(symbolTable)
-
-                val srcComponentId: String = Util.getThreadIdentifier(srcAadlThread, symbolTable)
-                val dstComponentId: String = Util.getThreadIdentifier(dstAadlThread, symbolTable)
-
-                val srcFeature: ir.Feature = symbolTable.getFeatureFromName(conn.src.feature.get)
-                val dstFeature: ir.Feature = symbolTable.getFeatureFromName(conn.dst.feature.get)
-
-                { // dataport connection
-                  val queueConnectorType: Sel4ConnectorTypes.Type =
-                    if(srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
-                    else Sel4ConnectorTypes.seL4SharedData
-
-                  val srcFeatureQueueName: String = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
-
-                  val dstFeatureQueueName: String = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
-
-                  connections = connections :+ createConnection(
-                    queueConnectorType,
-                    srcComponentId, srcFeatureQueueName,
-                    dstComponentId, dstFeatureQueueName
-                  )
-
-                  if (aadlTypes.rawConnections) {
-                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
-                      case Some(z) =>
-                        if (z % z"4096" == z"0") z
-                        else (z / z"4096" + 1) * z"4096"
-                      case _ => z"4096" // TODO or throw error?
-                    }
-
-                    val connectionName = Util.getConnectionName(connectionCounter.count)
-                    camkesConfiguration = camkesConfiguration :+
-                      st"""${connectionName}.size = ${size};"""
-                  }
-                }
-              }
-
-              platform match {
-                case ActPlatform.SeL4_TB => handleDataPort_TB_Connection()
-                case ActPlatform.SeL4_Only => handleDataPort_SB_Connection()
-                case ActPlatform.SeL4 => handleDataPort_SB_Connection()
-              }
-            }
-
-            case ir.FeatureCategory.EventDataPort => {
-
-              def eventDataPort_SB_Connection_Profile(): Unit = {
-                // sel4 notification plus shared queue
-
-                val srcAadlThread: AadlThread = symbolTable.getThreadByName(conn.src.component)
-                val dstAadlThread: AadlThread = symbolTable.getThreadByName(conn.dst.component)
-
-                val srcToVM = srcAadlThread.toVirtualMachine(symbolTable)
-                val dstToVM = dstAadlThread.toVirtualMachine(symbolTable)
-
-                val srcComponentId: String = Util.getThreadIdentifier(srcAadlThread, symbolTable)
-                val dstComponentId: String = Util.getThreadIdentifier(dstAadlThread, symbolTable)
-
-                val srcPath: String = CommonUtil.getName(conn.src.feature.get)
-
-                val srcFeature: ir.Feature = symbolTable.getFeatureFromName(conn.src.feature.get)
-                val dstFeature: ir.Feature = symbolTable.getFeatureFromName(conn.dst.feature.get)
-
-                val queueSize: Z = srcQueues.get(srcPath).get.get(dstPath).get.queueSize
-
-                { // Notification connection
-                  val _srcFeature = Util.genSeL4NotificationQueueName(srcFeature, queueSize)
-                  val _dstFeature = Util.genSeL4NotificationName(fdst, T)
-
-                  val notificationConnectorType: Sel4ConnectorTypes.Type =
-                    if (dstToVM) Sel4ConnectorTypes.seL4GlobalAsynch
-                    else Sel4ConnectorTypes.seL4Notification
-
-                  connections = connections :+ createConnection(
-                    notificationConnectorType,
-                    srcComponentId, _srcFeature,
-                    dstComponentId, _dstFeature)
-                }
-
-                { // Queue dataport connection
-                  val queueConnectorType: Sel4ConnectorTypes.Type =
-                    if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
-                    else Sel4ConnectorTypes.seL4SharedData
-
-                  val srcFeatureQueueName: String = Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
-
-                  val dstFeatureQueueName: String = Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
-
-                  connections = connections :+ createConnection(
-                    queueConnectorType,
-                    srcComponentId, srcFeatureQueueName,
-                    dstComponentId, dstFeatureQueueName
-                  )
-
-                  if (aadlTypes.rawConnections) {
-                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
-                      case Some(z) =>
-                        if (z % z"4096" == z"0") z
-                        else (z / z"4096" + 1) * z"4096"
-                      case _ => z"4096" // TODO or throw error?
-                    }
-
-                    val connectionName = Util.getConnectionName(connectionCounter.count)
-                    camkesConfiguration = camkesConfiguration :+
-                      st"""${connectionName}.size = ${size};"""
-                  }
-
-                  camkesConfiguration = camkesConfiguration :+ st"""${srcComponentId}.${srcFeatureQueueName}_access = "W";"""
-                  camkesConfiguration = camkesConfiguration :+ st"""${dstComponentId}.${dstFeatureQueueName}_access = "R";"""
-                }
-              }
-
-              platform match {
-                case ActPlatform.SeL4_TB => connections = connections ++ createDataConnection(conn)
-                case ActPlatform.SeL4 => eventDataPort_SB_Connection_Profile()
-                case ActPlatform.SeL4_Only => eventDataPort_SB_Connection_Profile()
-              }
-            }
-
-            case ir.FeatureCategory.EventPort => {
-
-              def eventPort_TB_Connection_Profile(): Unit = {
-                // monitor
-                connections = connections ++ createDataConnection_Ihor(conn)
-              }
-
-              def eventPort_SB_Connection_Profile(): Unit = {
-                // sel4 notification plus shared counter
-                val srcFeature = CommonUtil.getLastName(conn.src.feature.get)
-
-
-                connections = connections :+ createSeL4NotificationConnection(
-                  srcComponentName, Util.brand(srcFeature),
-                  dstComponentName, Util.brand(dstFeatureName))
-
-                connections = connections :+ createSharedDataCounterConnection(conn)
-              }
-
-              platform match {
-                case ActPlatform.SeL4_TB => eventPort_TB_Connection_Profile()
-
-                //case ActPlatform.SeL4 => eventPort_TB_Connection_Profile()
-                case ActPlatform.SeL4 => eventPort_SB_Connection_Profile()
-                case ActPlatform.SeL4_Only => eventPort_SB_Connection_Profile()
-              }
-            }
-
-            case _ => halt (s"not expecting ${fdst.category}")
-          }
-
-        case ir.ConnectionKind.Access => {
-
-          fdst.category match {
-            case ir.FeatureCategory.SubprogramAccess =>
-              val srcFeature = CommonUtil.getLastName(conn.src.feature.get)
-              connections = connections :+ createRPCConnection(srcComponentName, srcFeature, dstComponentName, dstFeatureName)
-            case ir.FeatureCategory.SubprogramAccessGroup =>
-              val srcFeature = CommonUtil.getLastName(conn.src.feature.get)
-              connections = connections :+ createRPCConnection(srcComponentName, srcFeature, dstComponentName, dstFeatureName)
-
-            case ir.FeatureCategory.DataAccess =>
-              val sd = sharedData.get(CommonUtil.getName(conn.src.component)).get
-              val dstComp = symbolTable.airComponentMap.get(CommonUtil.getName(conn.dst.component)).get
-              val ownerId = CommonUtil.getName(sd.owner.identifier)
-              val dstId = CommonUtil.getName(dstComp.identifier)
-
-              if (ownerId != dstId) {
-                connections = connections :+ createConnection(Sel4ConnectorTypes.seL4SharedData,
-                  dstComponentName, dstFeatureName,
-                  CommonUtil.getLastName(sd.owner.identifier), CommonUtil.getLastName(sd.ownerFeature.get.identifier)
-                )
-              } else {
-                // Ignore connection to the owner component
-              }
-            case _ => halt(s"not expecting ${fdst.category}")
-          }
-        }
-
-        case _ => halt(s"not expecting ${conn.kind}")
-      }
-    }
-
-    return connections
-  }
-
   def genProcess(aadlProcess : AadlProcess) : Composition = {
 
     val c = aadlProcess.component
@@ -571,10 +241,10 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
     for(sc <- c.subComponents) {
       sc.category match {
-        case ir.ComponentCategory.Thread =>
+        case ir.ComponentCategory.Thread => {
           val aadlThread = symbolTable.getThread(sc)
 
-          if(aadlThread.toVirtualMachine(symbolTable)) {
+          if (aadlThread.toVirtualMachine(symbolTable)) {
             val processId = Util.getThreadIdentifier(aadlThread, symbolTable)
             val (component, auxResources) =
               VMGen(symbolTable, typeMap, samplingPorts, srcQueues, actOptions, reporter).genThread(aadlThread)
@@ -587,7 +257,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
             auxResourceFiles = auxResourceFiles ++ auxResources
 
-            connections = connections :+ createConnection(
+            connections = connections :+ Connections.createConnection(
+              connectionCounter,
               Sel4ConnectorTypes.seL4VMDTBPassthrough,
               processId, "dtb_self",
               processId, "dtb"
@@ -624,13 +295,13 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(aadlThread.identifier, bytes)
             case _ =>
           }
-          
-        case ir.ComponentCategory.Subprogram =>
+        }
+        case ir.ComponentCategory.Subprogram => {
           var params: ISZ[Parameter] = ISZ()
-          for(f <- sc.features) {
+          for (f <- sc.features) {
             val fend = f.asInstanceOf[ir.FeatureEnd]
             params = params :+ Parameter(array = F,
-              direction = if(fend.direction == ir.Direction.In) Direction.In else Direction.Out,
+              direction = if (fend.direction == ir.Direction.In) Direction.In else Direction.Out,
               name = CommonUtil.getLastName(f.identifier),
               typ = Util.getClassifier(fend.classifier.get))
           }
@@ -643,20 +314,20 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
           val procName = Util.getClassifier(sc.classifier.get)
           astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
-
-        case ir.ComponentCategory.SubprogramGroup =>
+        }
+        case ir.ComponentCategory.SubprogramGroup => {
           var methods: ISZ[Method] = ISZ()
 
-          for(m <- sc.features) {
+          for (m <- sc.features) {
             m match {
               case spa: ir.FeatureAccess =>
-                if(spa.classifier.nonEmpty) {
+                if (spa.classifier.nonEmpty) {
                   val spComp = symbolTable.airClassifierMap.get(spa.classifier.get.name).get
                   assert(spComp.category == ir.ComponentCategory.Subprogram)
 
                   val methodName = CommonUtil.getLastName(spa.identifier)
                   var params: ISZ[Parameter] = ISZ()
-                  for(param <- spComp.features) {
+                  for (param <- spComp.features) {
                     param match {
                       case p: ir.FeatureEnd =>
                         assert(param.category == ir.FeatureCategory.Parameter)
@@ -675,19 +346,21 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   }
 
                   methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String]())
-                } else{
+                } else {
                   reporter.error(None(), Util.toolName, s"Could not resolve feature ${CommonUtil.getName(spa.identifier)} from ${CommonUtil.getName(sc.identifier)}")
                 }
               case _ =>
             }
           }
 
-          if(sc.subComponents.nonEmpty) { halt(s"Subprogram group subcomponents not currently handled: ${sc}")}
+          if (sc.subComponents.nonEmpty) {
+            halt(s"Subprogram group subcomponents not currently handled: ${sc}")
+          }
 
           val procName = Util.getClassifier(sc.classifier.get)
           astObjects = astObjects :+ Procedure(name = procName, methods = methods, includes = ISZ())
-
-        case ir.ComponentCategory.Data =>
+        }
+        case ir.ComponentCategory.Data => {
           val typeName = Util.getClassifierFullyQualified(sc.classifier.get)
 
           val readMethod = Method(
@@ -704,48 +377,29 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
           val procName = Util.getSharedDataInterfaceName(sc.classifier.get)
           astObjects = astObjects :+ Procedure(
-            name = procName, 
-            methods = ISZ(readMethod, writeMethod), 
+            name = procName,
+            methods = ISZ(readMethod, writeMethod),
             includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
           )
-
-          Util.getCamkesOwnerThread(sc.properties) match {
-            case Some(owner) =>
-              val threads = symbolTable.airComponentMap.values.filter(f => f.category == ir.ComponentCategory.Thread)
-              val thread = threads.filter(f => f.classifier.get.name == owner || Util.getClassifier(f.classifier.get) == owner)
-
-              if(thread.nonEmpty) {
-                val theOwner = thread(0)
-                if(thread.size > 1) {
-                  reporter.warn(None(), Util.toolName, s"Found multiple matches for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property: ${owner}")
-                }
-                if(Util.getClassifier(theOwner.classifier.get) == owner){
-                  reporter.warn(None(), Util.toolName, s"Fully qualified name '${theOwner.classifier.get.name}' should be used for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property")
-                }
-
-                val subcomponentId = CommonUtil.getLastName(sc.identifier)
-                sharedData = sharedData +
-                  (CommonUtil.getName(sc.identifier) ~> SharedData(theOwner, None[ir.FeatureAccess](), sc.classifier.get, subcomponentId))
-
-              } else {
-                reporter.error(None(), Util.toolName, st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread}:  Could not locate component '${owner}'.  Please use one of the following:
-                             |  ${(threads.map((m: ir.Component) => m.classifier.get.name), "\n")}""".render)
-              }
-            case _ =>
-              reporter.error(None(), Util.toolName, st"""${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property missing""".render)
-          }
-
+        }
         case _ =>
           halt(s"Not handling: subcomponent of type '${sc.category}'.  ${CommonUtil.getName(sc.identifier)}")
       }
     }
 
     val monInstances = monitors.values.map((m: Monitor) => m.i)
+
+    if(platform == ActPlatform.SeL4_TB) {
+      val (_connections, configs) = processTBConnections(c)
+      connections = connections ++ _connections
+      camkesConfiguration = camkesConfiguration ++ configs
+    }
+
     return Composition(
       groups = ISZ(),
       exports = ISZ(),
       instances = instances ++ monInstances,
-      connections = connections ++ processConnections(c),
+      connections = connections,
       externalEntities = compositionMacros
     )
   }
@@ -776,7 +430,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
     var cmakeSOURCES: ISZ[String] = ISZ()
     var cmakeINCLUDES: ISZ[String] = ISZ()
-    
+
     var imports : Set[String] = Set.empty
 
     var gcInterfaceStatements: ISZ[ST] = ISZ()
@@ -787,7 +441,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     var gcImplDrainQueues: ISZ[(ST, ST)] = ISZ()
 
     for(f <- aadlThread.getFeatureAccesses()) {
-      
+
       def handleSubprogramAccess(): Unit = {
         val fid = CommonUtil.getLastName(f.identifier)
 
@@ -877,7 +531,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
             // uses monitor
             // consumes notification
             if (symbolTable.inConnections.get(fpath).nonEmpty) {
-              val monitor = getMonitorForInPort(f).get.asInstanceOf[TB_Monitor]
+              val monitor = Monitors.getMonitorForInPort(f, monitors).get.asInstanceOf[TB_Monitor]
               imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
               uses = uses :+ Uses(
@@ -1130,9 +784,9 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         }
 
     }// end processing thread's features
-    
+
     // Build camkes component and glue code files
-    
+
     var binarySemaphores: ISZ[BinarySemaphore] = ISZ()
     var semaphores: ISZ[Semaphore] = ISZ()
 
@@ -1141,30 +795,30 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         binarySemaphores = binarySemaphores :+ BinarySemaphore(v.value)
       case _ =>
     }
-    
-    
+
+
     var gcRunInitStmts: ISZ[ST] = gcImplDrainQueues.map(x => x._1)
     var gcRunPreLoopStmts: ISZ[ST] = ISZ()
     var gcRunLoopStartStmts: ISZ[ST] = ISZ()
     var gcRunLoopMidStmts: ISZ[ST] = gcImplDrainQueues.map(x => x._2)
     var gcRunLoopEndStmts: ISZ[ST] = ISZ()
-    
+
     if(!PeriodicUtil.requiresPacerArtifacts(c, symbolTable, actOptions.platform)) {
       semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH)
-            
+
       val semWait: ST = st"MUTEXOP(${StringTemplate.SEM_WAIT}())"
-      
+
       gcRunPreLoopStmts = gcRunPreLoopStmts :+ semWait
-      
+
       gcRunLoopStartStmts = gcRunLoopStartStmts :+ semWait
     }
 
     PropertyUtil.getDispatchProtocol(c) match {
       case Some(Dispatch_Protocol.Periodic) =>
 
-        val (componentContributions, glueCodeContributions) = 
+        val (componentContributions, glueCodeContributions) =
           Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread, reporter)
-        
+
         binarySemaphores = binarySemaphores ++ componentContributions.shell.binarySemaphores
         semaphores = semaphores ++ componentContributions.shell.semaphores
         imports = imports ++ componentContributions.shell.imports
@@ -1179,9 +833,9 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         gcRunLoopStartStmts = gcRunLoopStartStmts ++ glueCodeContributions.impl.mainLoopStartStatements
         gcRunLoopMidStmts = gcRunLoopMidStmts ++ glueCodeContributions.impl.mainLoopStatements
         gcRunLoopEndStmts = gcRunLoopEndStmts ++ glueCodeContributions.impl.mainLoopEndStatements
-        
+
         gcInterfaceStatements = gcInterfaceStatements ++ glueCodeContributions.header.methods
-       
+
       case Some(Dispatch_Protocol.Sporadic) =>
 
       case x =>
@@ -1193,7 +847,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     }
 
     val names: Names = Names(c, hamrBasePackageName.get)
-    
+
     if(!performHamrIntegration) {
       PropertyUtil.getInitializeEntryPoint(c.properties) match {
         case Some(methodName) =>
@@ -1204,46 +858,48 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         case _ =>
       }
     }
-        
+
+    val uri = PathUtil.getComponentGlueCodeImplementationFilename(aadlThread)
+
     if(performHamrIntegration) {
-      
+
       gcImplIncludes = gcImplIncludes :+ st"#include <${Util.genCHeaderFilename(names.cEntryPointAdapterName)}>"
 
       gcImplPreInits = st"""printf("Entering pre-init of ${cid}\n");""" +: gcImplPreInits
 
-      gcImplPreInits = gcImplPreInits :+ StringTemplate.hamrIntialiseArchitecture(names.cEntryPointAdapterQualifiedName)
-      
-      gcImplPreInits = gcImplPreInits :+ StringTemplate.hamrInitialiseEntrypoint(names.cEntryPointAdapterQualifiedName)
+      gcImplPreInits = gcImplPreInits :+ SlangEmbeddedTemplate.hamrIntialiseArchitecture(names.cEntryPointAdapterQualifiedName)
+
+      gcImplPreInits = gcImplPreInits :+ SlangEmbeddedTemplate.hamrInitialiseEntrypoint(names.cEntryPointAdapterQualifiedName)
 
       gcImplPreInits = gcImplPreInits :+ st"""printf("Leaving pre-init of ${cid}\n");"""
 
       val outgoingPorts: ISZ[ir.FeatureEnd] = CommonUtil.getOutPorts(c).filter(f =>
         symbolTable.outConnections.contains(CommonUtil.getName(f.identifier)))
 
-      gcImplMethods = gcImplMethods ++ outgoingPorts.map((f: ir.FeatureEnd) => hamrSendOutgoingPort(c, names, f, typeMap))
+      gcImplMethods = gcImplMethods ++ outgoingPorts.map((f: ir.FeatureEnd) => hamrSendOutgoingPort(c, names, f, typeMap, uri))
 
       val unconnectedOutgoingPorts: ISZ[ir.FeatureEnd] = CommonUtil.getOutPorts(c).filter(f =>
         !symbolTable.outConnections.contains(CommonUtil.getName(f.identifier)))
 
-      gcImplMethods = gcImplMethods ++ unconnectedOutgoingPorts.map((f: ir.FeatureEnd) => hamrSendUnconnectedOutgoingPort(c, names, f, typeMap))
-      
+      gcImplMethods = gcImplMethods ++ unconnectedOutgoingPorts.map((f: ir.FeatureEnd) => hamrSendUnconnectedOutgoingPort(c, names, f, typeMap, uri))
+
       val inPorts: ISZ[ir.FeatureEnd] = CommonUtil.getInPorts(c).filter(f =>
         symbolTable.inConnections.contains(CommonUtil.getName(f.identifier)))
 
-      gcImplMethods = gcImplMethods ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(c, names, f, typeMap))
+      gcImplMethods = gcImplMethods ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(c, names, f, typeMap, uri))
 
       val unconnectedInPorts: ISZ[ir.FeatureEnd] = CommonUtil.getInPorts(c).filter(f =>
         !symbolTable.inConnections.contains(CommonUtil.getName(f.identifier)))
 
-      val freezeInEventPorts = 
+      val freezeInEventPorts =
         inPorts.filter((p : ir.FeatureEnd) => p.category == ir.FeatureCategory.EventPort)
           .map((eventPort : ir.FeatureEnd) =>
           st"${StringTemplate.samplingPortFreezeMethodName(eventPort)}();")
-        
-      // remove any mid loop statements and replace with sel4 specific ones
-      gcRunLoopMidStmts = freezeInEventPorts ++ StringTemplate.hamrRunLoopEntries(names.cEntryPointAdapterQualifiedName)
 
-      gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(c, names, f, typeMap))
+      // remove any mid loop statements and replace with sel4 specific ones
+      gcRunLoopMidStmts = freezeInEventPorts ++ SlangEmbeddedTemplate.hamrRunLoopEntries(names.cEntryPointAdapterQualifiedName)
+
+      gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(c, names, f, typeMap, uri))
     }
 
     var cSources: ISZ[Resource] = ISZ()
@@ -1306,66 +962,88 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     )
   }
 
-  def hamrSendUnconnectedOutgoingPort(c: ir.Component, names: Names, srcPort: ir.FeatureEnd, typeMap: HashSMap[String, ir.Component]): ST = {
+  def hamrSendUnconnectedOutgoingPort(c: ir.Component,
+                                      names: Names,
+                                      srcPort: ir.FeatureEnd,
+                                      typeMap: HashSMap[String, ir.Component],
+                                      uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
     val sel4ExtName = names.sel4SlangExtensionQualifiedNameC
 
     val methodName = s"${sel4ExtName}_${portName}_Send"
-    
-    return StringTemplate.hamrSendUnconnectedOutgoingDataPort(methodName)
+
+    val declNewStackFrame: ST = StackFrameTemplate.DeclNewStackFrame(T, uri,"", methodName, 0)
+
+    return SlangEmbeddedTemplate.hamrSendUnconnectedOutgoingDataPort(methodName, declNewStackFrame)
   }
-  
-  def hamrSendOutgoingPort(c: ir.Component, names: Names, srcPort: ir.FeatureEnd, typeMap: HashSMap[String, ir.Component]): ST = {
+
+  def hamrSendOutgoingPort(c: ir.Component,
+                           names: Names,
+                           srcPort: ir.FeatureEnd,
+                           typeMap: HashSMap[String, ir.Component],
+                           uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
     val sel4ExtName = names.sel4SlangExtensionQualifiedNameC
 
     val methodName = s"${sel4ExtName}_${portName}_Send"
-    
+
+    val declNewStackFrame: ST = StackFrameTemplate.DeclNewStackFrame(T, uri, "", methodName, 0)
+
     def handleOutDataPort(): ST = {
       val suffix: String = if(srcPort.category == ir.FeatureCategory.DataPort) "write" else "enqueue"
       val srcEnqueue = Util.brand(s"${CommonUtil.getLastName(srcPort.identifier)}_${suffix}")
       val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
       val sel4Type = Util.getSel4TypeName(typeMap.get(camkesType).get, performHamrIntegration)
-      val slangPayloadType = StringTemplate.hamrSlangPayloadType(srcPort.classifier.get, hamrBasePackageName.get)
+      val slangPayloadType = SlangEmbeddedTemplate.hamrSlangPayloadType(srcPort.classifier.get, hamrBasePackageName.get)
 
       val comment = st"// send ${portName}: ${srcPort.direction.name} ${srcPort.category.name} ${camkesType}"
-      return StringTemplate.hamrSendOutgoingDataPort(comment, methodName, sel4Type, slangPayloadType, srcEnqueue)
+      return SlangEmbeddedTemplate.hamrSendOutgoingDataPort(comment, methodName, sel4Type, slangPayloadType, srcEnqueue, declNewStackFrame)
     }
-    
+
     def handleOutEventPort(): ST = {
       val srcEnqueue = Util.getEventPortSendReceiveMethodName(srcPort)
       val comment = st"// send ${portName}: ${srcPort.direction.name} ${srcPort.category.name}"
-      return StringTemplate.hamrSendOutgoingEventPort(comment, methodName, srcEnqueue)
+      return SlangEmbeddedTemplate.hamrSendOutgoingEventPort(comment, methodName, srcEnqueue, declNewStackFrame)
     }
-    
+
     val ret: ST = srcPort.category match {
       case ir.FeatureCategory.DataPort => handleOutDataPort()
       case ir.FeatureCategory.EventDataPort => handleOutDataPort()
       case ir.FeatureCategory.EventPort => handleOutEventPort()
       case x => halt(s"Not handling ${x}")
     }
-    
+
     return ret
   }
 
-  def hamrReceiveUnconnectedIncomingPort(c: ir.Component, names: Names, srcPort: ir.FeatureEnd, typeMap: HashSMap[String, ir.Component]): ST = {
+  def hamrReceiveUnconnectedIncomingPort(c: ir.Component,
+                                         names: Names,
+                                         srcPort: ir.FeatureEnd,
+                                         typeMap: HashSMap[String, ir.Component],
+                                         uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
     val sel4ExtName = names.sel4SlangExtensionQualifiedNameC
 
     val methodName = s"${sel4ExtName}_${portName}_Receive"
 
-    val receiveMethod = StringTemplate.hamrReceiveUnconnectedIncomingEventPort(methodName)
-    
+    val declNewStackFrame: ST = StackFrameTemplate.DeclNewStackFrame(T, uri, "", methodName, 0)
+
+    val receiveMethod = SlangEmbeddedTemplate.hamrReceiveUnconnectedIncomingEventPort(methodName, declNewStackFrame)
+
     val isEmptyMethodName = s"${sel4ExtName}_${portName}_IsEmpty"
     val sel4IsEmptyMethodName = Util.brand(s"${portName}_is_empty")
-    val isEmptyMethod = StringTemplate.hamrIsEmptyUnconnected(isEmptyMethodName, sel4IsEmptyMethodName)
-    
+    val isEmptyMethod = SlangEmbeddedTemplate.hamrIsEmptyUnconnected(isEmptyMethodName, sel4IsEmptyMethodName)
+
     return st"""${isEmptyMethod}
                |
                |${receiveMethod}"""
   }
-  
-  def hamrReceiveIncomingPort(c: ir.Component, names: Names, srcPort: ir.FeatureEnd, typeMap: HashSMap[String, ir.Component]): ST = {
+
+  def hamrReceiveIncomingPort(c: ir.Component,
+                              names: Names,
+                              srcPort: ir.FeatureEnd,
+                              typeMap: HashSMap[String, ir.Component],
+                              uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
     val sel4ExtName = names.sel4SlangExtensionQualifiedNameC
 
@@ -1376,40 +1054,41 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     val isEmptyMethodName = s"${sel4ExtName}_${portName}_IsEmpty"
     val sel4IsEmptyMethodName = Util.brand(s"${portName}_is_empty")
 
-    
+    val declNewStackFrame: ST = StackFrameTemplate.DeclNewStackFrame(T, uri, "", methodName, 0)
+
     def handleInDataPort(): ST = {
       val camkesType = Util.getClassifierFullyQualified(srcPort.classifier.get)
       val sel4Type = Util.getSel4TypeName(typeMap.get(camkesType).get, performHamrIntegration)
-      val slangPayloadType = StringTemplate.hamrSlangPayloadType(srcPort.classifier.get, hamrBasePackageName.get)
-      val isEmptyMethod = StringTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName, srcPort)
-      
+      val slangPayloadType = SlangEmbeddedTemplate.hamrSlangPayloadType(srcPort.classifier.get, hamrBasePackageName.get)
+      val isEmptyMethod = SlangEmbeddedTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName, srcPort)
+
       val comment = st"// receive ${portName}: ${srcPort.direction.name} ${srcPort.category.name} ${sel4Type}"
-      val receiveMethod = StringTemplate.hamrReceiveIncomingDataPort(
-        comment, methodName, sel4Type, slangPayloadType, sel4ReadMethod)
+      val receiveMethod = SlangEmbeddedTemplate.hamrReceiveIncomingDataPort(
+        comment, methodName, sel4Type, slangPayloadType, sel4ReadMethod, declNewStackFrame)
 
       return st"""${isEmptyMethod}
                  |
                  |${receiveMethod}"""
     }
-    
+
     def handleInEventPort(): ST = {
       val comment = st"// receive ${portName}: ${srcPort.direction.name} ${srcPort.category.name}"
-      val receiveMethod = StringTemplate.hamrReceiveIncomingEventPort(comment, methodName, sel4ReadMethod)
+      val receiveMethod = SlangEmbeddedTemplate.hamrReceiveIncomingEventPort(comment, methodName, sel4ReadMethod, declNewStackFrame)
 
-      val isEmptyMethod = StringTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName, srcPort)
-      
+      val isEmptyMethod = SlangEmbeddedTemplate.hamrIsEmpty(isEmptyMethodName, sel4IsEmptyMethodName, srcPort)
+
       return st"""${isEmptyMethod}
                  |
                  |${receiveMethod}"""
     }
-    
+
     val ret: ST = srcPort.category match {
       case ir.FeatureCategory.DataPort => handleInDataPort()
       case ir.FeatureCategory.EventDataPort => handleInDataPort()
       case ir.FeatureCategory.EventPort => handleInEventPort()
       case x => halt(s"Not handling ${x}")
     }
-    
+
     return ret
   }
 
@@ -1437,7 +1116,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                 val name = s"sp_${sel4PortType}"
                 val structName = s"${name}_t"
-                
+
                 val spi = SamplingPortInterface(
                   name = name,
                   structName = structName,
@@ -1455,7 +1134,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       }
     }
   }
-  
+
   def buildSBQueues(): Unit = {
     platform match {
       case ActPlatform.SeL4_TB => return
@@ -1474,11 +1153,11 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         val src: ir.Component = symbolTable.airComponentMap.get(CommonUtil.getName(connInst.src.component)).get
         val srcFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.src.feature.get)).get
         val srcId: String = CommonUtil.getName(srcFeature.identifier)
-          
+
         val dst: ir.Component = symbolTable.airComponentMap.get(CommonUtil.getName(connInst.dst.component)).get
         val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.dst.feature.get)).get
         val dstId: String = CommonUtil.getName(dstFeature.identifier)
-        
+
         if (dstFeature.category == ir.FeatureCategory.EventDataPort) {
           val dstFend = dstFeature.asInstanceOf[ir.FeatureEnd]
 
@@ -1502,23 +1181,23 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       }
     }
   }
-  
+
   def buildMonitors(): Unit = {
     platform match {
-      case ActPlatform.SeL4_TB => // 
+      case ActPlatform.SeL4_TB => //
 
-      //case ActPlatform.SeL4 => // 
-      case ActPlatform.SeL4 => return 
-      case ActPlatform.SeL4_Only => return  
+      //case ActPlatform.SeL4 => //
+      case ActPlatform.SeL4 => return
+      case ActPlatform.SeL4_Only => return
     }
-    
+
     for (portPath <- symbolTable.outConnections.keys.filter(p => symbolTable.outConnections.get(p).get.size > 0)) {
       var i: Z = 0
       for (connInst <- symbolTable.outConnections.get(portPath).get()) {
 
         val dst: ir.Component = symbolTable.airComponentMap.get(CommonUtil.getName(connInst.dst.component)).get
         val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.dst.feature.get)).get
-        
+
         def handleDataPort(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, f)
           val interfaceName = Util.getInterfaceName(f)
@@ -1526,7 +1205,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
           val typeName = Util.getClassifierFullyQualified(f.classifier.get)
 
           val providesVarName = "mon"
-          
+
           val monitor = Component(
             control = F,
             hardware = F,
@@ -1549,8 +1228,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
           )
 
           val inst: Instance = Instance(
-            address_space = "", 
-            name = StringUtil.toLowerCase(monitorName), 
+            address_space = "",
+            name = StringUtil.toLowerCase(monitorName),
             component = monitor)
 
           val paramType: ir.Component = typeMap.get(typeName).get
@@ -1586,8 +1265,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
           val contents = StringTemplate.cHeaderFile(headerFilename, ISZ(), ISZ())
           val cincludes = Util.createResource(headerFilePath, contents, T)
 
-          monitors = monitors + (connInstName ~> 
-            TB_Monitor(inst, interface, 
+          monitors = monitors + (connInstName ~>
+            TB_Monitor(inst, interface,
               providesVarName,
               cimplementation, cincludes, i, connInst))
         }
@@ -1682,7 +1361,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
         def buildIhorEventMonitor(f: ir.FeatureEnd): Unit = {
           assert(f.category == ir.FeatureCategory.EventPort)
-          
+
           val monitorName = Util.getMonitorName(dst, f)
           val interfaceNameReceiver = Util.getInterfaceNameIhor(f, F)
           val interfaceNameSender = Util.getInterfaceNameIhor(f, T)
@@ -1722,7 +1401,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
             name = "is_empty",
             parameters = ISZ(),
             returnType = Some("bool"))
-          
+
           val receiveMethod = Method(
             name = "dequeue",
             parameters = ISZ(),
@@ -1764,7 +1443,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               providesReceiverVarName, providesSenderVarName,
               cimplementation, cincludes, i, connInst))
         }
-        
+
         connInst.kind match {
           case ir.ConnectionKind.Port =>
             dstFeature.category match {
@@ -1776,16 +1455,16 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   case ActPlatform.SeL4 => // use new mappings
                   case ActPlatform.SeL4_Only => // use new mappings
                 }
-                
+
               case ir.FeatureCategory.EventDataPort =>
                 platform match {
                   case ActPlatform.SeL4_TB => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
-                  
+
                   //case ActPlatform.SeL4 => handleDataPort(dstFeature.asInstanceOf[ir.FeatureEnd])
                   case ActPlatform.SeL4 => buildIhorMonitor(dstFeature.asInstanceOf[ir.FeatureEnd])
                   case ActPlatform.SeL4_Only => buildIhorMonitor(dstFeature.asInstanceOf[ir.FeatureEnd])
                 }
-                
+
               case ir.FeatureCategory.EventPort =>
                 def evenPort_Sel4_TB_Profile(): Unit = {
                   buildIhorEventMonitor(dstFeature.asInstanceOf[ir.FeatureEnd])
@@ -1794,8 +1473,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   case ActPlatform.SeL4_TB => evenPort_Sel4_TB_Profile()
 
                   //case ActPlatform.SeL4 => evenPort_Sel4_TB_Profile()
-                  case ActPlatform.SeL4 => // not using monitors   
-                  case ActPlatform.SeL4_Only => // not using monitors   
+                  case ActPlatform.SeL4 => // not using monitors
+                  case ActPlatform.SeL4_Only => // not using monitors
                 }
 
               case _ =>
@@ -1813,7 +1492,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
   def createReadWriteMethods(typeName: String): ISZ[Method] = {
     return ISZ(
-      Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool")),      
+      Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool")),
       Method(name = "read", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")),
       Method(name = "write", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")))
   }
@@ -1823,21 +1502,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool")),
       Method(name = "enqueue", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")),
       Method(name = "dequeue", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")))
-  }
-
-  def getMonitorForConnectionInstance(instance: ir.ConnectionInstance): Option[Monitor] = {
-    for(m <- monitors.values if m.ci == instance){
-      return Some(m)
-    }
-    return None[Monitor]()
-  }
-
-  def getMonitorForInPort(end: ir.FeatureEnd): Option[Monitor] = {
-    val n = CommonUtil.getName(end.identifier)
-    for(m <- monitors.values if CommonUtil.getName(m.ci.dst.feature.get) == n) {
-      return Some(m)
-    }
-    return None[Monitor]()
   }
 
   def processDataTypes(values: ISZ[ir.Component]): ST = {
@@ -1927,7 +1591,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
   def generateGlueCodePortInterfaceMethod(aadlThread: AadlThread, feature: ir.FeatureEnd): Option[C_SimpleContainer] = {
 
     val component = aadlThread.component
-    
+
     def handleDataPort(): Option[C_SimpleContainer] = {
 
       def dataport_TB_Profile() : Option[C_SimpleContainer] = {
@@ -1983,11 +1647,11 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
           cIncludes = ISZ(),
           cInterface = inter,
           cImplementation = impl,
-          preInits = None(), 
-          postInits = None(), 
+          preInits = None(),
+          postInits = None(),
           drainQueues = None()))
-      } 
-      
+      }
+
       def dataport_SB_Profile() : Option[C_SimpleContainer] = {
         val samplingPort: SamplingPortInterface = getSamplingPort(feature)
 
@@ -1995,10 +1659,10 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         var implementations: ISZ[ST] = ISZ()
         var preInits: ISZ[ST] = ISZ()
         var postInits: ISZ[ST] = ISZ()
-        
+
         preInits = preInits :+
           StringTemplate.sbSamplingPortInitialise(samplingPort, feature)
-        
+
         feature.direction match {
           case ir.Direction.In =>
             interfaces = interfaces :+
@@ -2006,38 +1670,38 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
             implementations = implementations :+
               StringTemplate.sbSamplingPortGetterImplementation(samplingPort, feature)
-            
+
           case ir.Direction.Out =>
             interfaces = interfaces :+
               StringTemplate.sbSamplingPortSetterInterface(samplingPort, feature)
 
-            
+
             implementations = implementations :+
               StringTemplate.sbSamplingPortSetterImplementation(samplingPort, feature)
-            
+
           case _ => halt(s"Unexpected direction ${feature}")
         }
-        
+
         val interface: Option[ST] = if(interfaces.isEmpty) None() else Some(st"${(interfaces, "\n")}")
         val implementation: Option[ST] = if(implementations.isEmpty) None() else Some(st"${(implementations, "\n")}")
         val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n")}")
         val postInit: Option[ST] = if(postInits.isEmpty) None() else Some(st"${(postInits, "\n")}")
-          
+
         return Some(C_SimpleContainer(
-          cIncludes = ISZ(), 
-          cInterface = interface, 
-          cImplementation = implementation, 
+          cIncludes = ISZ(),
+          cInterface = interface,
+          cImplementation = implementation,
           preInits = preInit,
           postInits = postInit,
           drainQueues= None()))
       }
-      
+
       val ret: Option[C_SimpleContainer] = platform match {
         case ActPlatform.SeL4_TB => dataport_TB_Profile()
         case ActPlatform.SeL4 => dataport_SB_Profile()
         case ActPlatform.SeL4_Only => dataport_SB_Profile()
       }
-      
+
       return ret
     }
 
@@ -2046,21 +1710,21 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         val featurePath = CommonUtil.getName(feature.identifier)
         val fid = CommonUtil.getLastName(feature.identifier)
         val featureName = Util.brand(fid)
-  
+
         val aadlPortType = typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get
         val sel4TypeName = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
-          
+
         val ret: Option[C_SimpleContainer] = feature.direction match {
           case ir.Direction.In =>
-            
+
             if(symbolTable.getInConnections(featurePath).isEmpty){
               return None()
             }
-  
+
             val queueSize = PropertyUtil.getQueueSize(feature, Util.DEFAULT_QUEUE_SIZE)
             val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
             val queueName = Util.getEventDataSBQueueName(sel4TypeName, queueSize)
-  
+
             val featureQueueName = Util.getEventDataSBQueueDestFeatureName(fid)
             val featureNotificationName = Util.genSeL4NotificationName(feature, T)
 
@@ -2072,7 +1736,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
             val counterVar = "numDropped"
             val counterType = Util.SB_EVENT_COUNTER_TYPE
-            
+
             val recvQueueFeatureName = Util.getEventData_SB_RecvQueueFeatureName(fid)
             val recvQueueName = Util.getEventData_SB_RecvQueueName(sel4TypeName, queueSize)
             val recvQueueType = Util.getEventData_SB_RecvQueueTypeName(sel4TypeName, queueSize)
@@ -2080,12 +1744,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
             val dequeuePollMethodName = s"${featureName}_dequeue_poll"
             val dequeueMethodName = s"${featureName}_dequeue"
             val dequeueInfrastructureMethodName = s"${queueName}_dequeue"
-            
+
             val isEmptyMethodName = s"${featureName}_is_empty"
             val isEmptyInfrastructureMethodName = s"${queueName}_is_empty"
-            
+
             cInterfaces = cInterfaces :+ st"bool ${dequeueMethodName}(${sel4TypeName} *);"
-            
+
             val baseCimpl = st"""${recvQueueType} ${recvQueueFeatureName};
                                  |
                                  |/************************************************************************
@@ -2094,7 +1758,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                                  |bool ${dequeuePollMethodName}(${counterType} *${counterVar}, ${sel4TypeName} *data) {
                                  |  return ${dequeueInfrastructureMethodName}(&${recvQueueFeatureName}, ${counterVar}, data);
                                  |}
-                                 |                     
+                                 |
                                  |/************************************************************************
                                  | * ${dequeueMethodName}:
                                  | ************************************************************************/
@@ -2112,26 +1776,26 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                                  |bool ${isEmptyMethodName}(){
                                  |  return ${isEmptyInfrastructureMethodName}(&${recvQueueFeatureName});
                                  |}"""
-            
+
             cImplementations = cImplementations :+ baseCimpl
-            
+
             if(aadlThread.isSporadic()) {
               val handlerName = s"${featureNotificationName}_handler"
               val regCallback = s"${featureNotificationName}_reg_callback"
-              
+
               cImplementations = cImplementations :+
                 StringTemplate.cEventNotificationHandler(handlerName, regCallback, featureName)
-              
+
               postInits = postInits :+ StringTemplate.cRegCallback(handlerName, regCallback, feature)
-              
+
               if(!performHamrIntegration) {
                 Util.getComputeEntrypointSourceText(feature.properties) match {
                   case Some(userEntrypointMethodName) =>
-    
+
                     val varName = featureName
-    
+
                     val userEntrypointName = Util.getUserEventEntrypointMethodName(component, feature)
-                    
+
                     drainQueue = Some((
                       st"",
                       st"""{
@@ -2140,9 +1804,9 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                           |    ${userEntrypointName}(&${varName});
                           |  }
                           |}"""))
-    
+
                     cInterfaces = cInterfaces :+ st"void ${userEntrypointMethodName}(const ${sel4TypeName} *);"
-      
+
                     val invokeHandler = s"${userEntrypointMethodName}((${sel4TypeName} *) in_arg);"
                     val entrypoint = st"""/************************************************************************
                                       | * ${userEntrypointName}:
@@ -2156,108 +1820,108 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                                       |  ${invokeHandler}
                                       |}
                                       |"""
-    
+
                     cImplementations = cImplementations :+ entrypoint
-                    
+
                   case _ =>
                 }
               }
             }
-            
+
             val cIncludes: ISZ[ST] = ISZ(st"""#include <${queueHeaderName}>
                                              |#include <${Util.SB_COUNTER_HEADER_FILENAME}>""")
-            
+
             preInits = preInits :+ st"""// initialise data structure for incoming event data port ${fid}
                                        |${recvQueueName}_init(&${recvQueueFeatureName}, ${featureQueueName});"""
-            
+
             val cInterface: Option[ST] = if(cInterfaces.isEmpty) None() else Some(st"${(cInterfaces, "\n\n")}")
             val cImplementation: Option[ST] = if(cImplementations.isEmpty) None() else Some(st"${(cImplementations, "\n\n")}")
             val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n\n")}")
             val postInit: Option[ST] = if(postInits.isEmpty) None() else Some(st"${(postInits, "\n\n")}")
-            
+
             Some(C_SimpleContainer(
-              cIncludes = cIncludes, 
-              cInterface = cInterface, 
-              cImplementation = cImplementation, 
+              cIncludes = cIncludes,
+              cInterface = cInterface,
+              cImplementation = cImplementation,
               preInits = preInit,
-              postInits = postInit, 
+              postInits = postInit,
               drainQueues = drainQueue))
-            
+
           case ir.Direction.Out =>
-            
+
             val dsts: Map[String, QueueObject] = srcQueues.get(featurePath).get
-  
+
             var cIncludes: ISZ[ST] = ISZ()
-  
+
             var preInits: ISZ[ST] = ISZ()
             var postInits: ISZ[ST] = ISZ()
-            
+
             val enqueueEntries: ISZ[ST] = dsts.valueSet.elements.map(qo => {
-  
+
               val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, qo.queueSize)
               val queueName = Util.getEventDataSBQueueName(sel4TypeName, qo.queueSize)
-  
+
               val featureQueueName = Util.getEventDataSBQueueSrcFeatureName(fid, qo.queueSize)
               val featureNotificationName = Util.genSeL4NotificationQueueName(feature, qo.queueSize)
-              
+
               cIncludes = cIncludes :+ st"#include <${queueHeaderName}>"
               preInits = preInits :+ st"""// initialise data structure for outgoing event data port ${fid}
                                          |${queueName}_init(${featureQueueName});"""
-              
+
               st"""${queueName}_enqueue(${featureQueueName}, (${sel4TypeName}*) data);
                   |${featureNotificationName}_emit();
                   |"""
             })
-            
+
             val methodName = s"${featureName}_enqueue"
-  
+
             val interface = st"""bool ${methodName}(const ${sel4TypeName} *);"""
-  
+
             val st = st"""bool ${methodName}(const ${sel4TypeName} *data) {
                          |  ${(enqueueEntries, "\n")}
                          |  return true;
                          |}"""
-            
+
             val cInterface: Option[ST] = Some(interface)
             val cImplementation: Option[ST] = Some(st)
             val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n\n")}")
             val postInit: Option[ST]= if(postInits.isEmpty) None() else Some(st"${(postInits, "\n\n")}")
             val drainQueues: Option[(ST,ST)] = None()
-  
+
             Some(C_SimpleContainer(
               cIncludes = cIncludes,
               cInterface = cInterface,
               cImplementation = cImplementation,
-              preInits = preInit, 
+              preInits = preInit,
               postInits = postInit,
               drainQueues = drainQueues))
-              
+
           case x => halt(s"Unexpected direction: ${x}")
         }
         return ret
       }
-      
+
       def handleEventData_TB_GlueCode_Profile(): Option[C_SimpleContainer] = {
-       
+
         val interfaceId = Util.genMonitorFeatureName(feature, None[Z]())
         val paramType = Util.getSel4TypeName(typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get, performHamrIntegration)
-        
+
         var interfaces: ISZ[ST] = ISZ()
         var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
-          
+
         val impl: Option[ST] = feature.direction match {
           case ir.Direction.Out =>
             symbolTable.outConnections.get(CommonUtil.getName(feature.identifier)) match {
               case Some(conns) =>
-                
+
                 // create an enqueue method for user that handles fan outs
-                
+
                 val genMethodName = s"${interfaceId}_enqueue"
-  
+
                 val methodSig = st"bool ${genMethodName}(const ${paramType} * ${interfaceId})"
-  
+
                 interfaces = interfaces :+ st"${methodSig};"
-  
+
                 var fanOuts: ISZ[ST] = ISZ()
                 var i = 0
                 val result = Util.brand("result")
@@ -2265,7 +1929,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   fanOuts = fanOuts :+ st"""${result} &= ${interfaceId}${i}_enqueue((${paramType} *) ${interfaceId});"""
                   i = i + 1
                 }
-  
+
                 Some(st"""/************************************************************************
                          | * ${genMethodName}:
                          | * Invoked from user code in the local thread.
@@ -2284,30 +1948,30 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                          |  ${(fanOuts, "\n")}
                          |  return ${result};
                          |}""")
-                
+
               case _ => None[ST]()
             }
           case ir.Direction.In =>
             val monitorDequeueMethodName = s"${interfaceId}_dequeue"
-  
+
             val methodSig = st"bool ${monitorDequeueMethodName}(${paramType} * ${interfaceId})"
-  
+
             interfaces = interfaces :+ st"${methodSig};"
-  
+
             if(aadlThread.isSporadic() && !performHamrIntegration) {
               val eventDataEntryPointCode: Option[ST] = Util.getComputeEntrypointSourceText(feature.properties) match {
                 case Some(userEventHandlerMethodName) =>
                   val simpleName = CommonUtil.getLastName(feature.identifier)
                   val varName = Util.brand(simpleName)
                   val userEntrypointName = Util.getUserEventEntrypointMethodName(component, feature)
-  
+
                   drainQueue = Some((st"""${paramType} ${varName};""",
                     st"""while (${monitorDequeueMethodName}((${paramType} *) &${varName})) {
                         |  ${userEntrypointName}(&${varName});
                         |}"""))
-  
+
                   interfaces = interfaces :+ st"void ${userEventHandlerMethodName}(const ${paramType} * in_arg);"
-  
+
                   Some(st"""/************************************************************************
                            | * ${userEntrypointName}:
                            | *
@@ -2319,20 +1983,20 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                            |void ${userEntrypointName}(const ${paramType} * in_arg) {
                            |  ${userEventHandlerMethodName}((${paramType} *) in_arg);
                            |}""")
-  
+
                 case _ => None()
               }
-  
+
               eventDataEntryPointCode
-  
+
             } else {
               None()
             }
-          case x => halt(s"Unexpected direction: ${x}")  
+          case x => halt(s"Unexpected direction: ${x}")
         }
-  
+
         val inter: Option[ST] = if(interfaces.isEmpty) None() else Some(st"${(interfaces, "\n\n")}")
-        
+
         return Some(C_SimpleContainer(cIncludes = ISZ(), cInterface = inter, cImplementation = impl,
           preInits = None(), postInits = None(), drainQueues = drainQueue))
       }
@@ -2347,11 +2011,11 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       }
       return ret
     }
-    
+
     def handleEventPort() : Option[C_SimpleContainer] = {
-      
+
       def handleEventPort_TB_Profile(): Option[C_SimpleContainer] = {
-        
+
         val featureName = CommonUtil.getLastName(feature.identifier)
         val monitorEnqueueDequeueMethodName = Util.getEventPortSendReceiveMethodName(feature)
 
@@ -2359,14 +2023,14 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         var implementations: ISZ[ST] = ISZ()
         var preInit: Option[ST] = None[ST]()
         var drainQueue: Option[(ST, ST)] = None[(ST, ST)]()
-        
+
         feature.direction match {
           case ir.Direction.In =>
-            
+
             interfaces = interfaces :+ st"bool ${monitorEnqueueDequeueMethodName}(void);"
-            
+
             if(aadlThread.isSporadic()) {
-              
+
               val callback = s"${Util.genSeL4NotificationName(feature, F)}_handler"
               val callback_reg = Util.brand(s"${featureName}_notification_reg_callback")
               val regCallback = st"CALLBACKOP(${callback_reg}(${callback}, NULL));"
@@ -2378,8 +2042,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                     | * ${callback}:
                     | * Invoked by: seL4 notification callback
                     | *
-                    | * This is the function invoked by an seL4 notification callback that  
-                    | * dispatches the active-thread due to the arrival of an event on 
+                    | * This is the function invoked by an seL4 notification callback that
+                    | * dispatches the active-thread due to the arrival of an event on
                     | * its ${featureName} event port
                     | *
                     | ************************************************************************/
@@ -2387,25 +2051,25 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                     |  MUTEXOP(${StringTemplate.SEM_POST}());
                     |  ${regCallback}
                     |}"""
-              
+
               if(!performHamrIntegration) {
                 Util.getComputeEntrypointSourceText(feature.properties) match {
-  
+
                   case Some(computeEntryPointSourceText) =>
                     val simpleName = CommonUtil.getLastName(feature.identifier)
                     val entrypointMethodName = s"${Util.brand("entrypoint")}_${Util.getClassifier(component.classifier.get)}_${simpleName}"
-  
+
                     drainQueue = Some(
                       (st"",
                         st"""while(${monitorEnqueueDequeueMethodName}()){
                             |  ${entrypointMethodName}();
                             |}""")
                     )
-  
+
                     interfaces = interfaces :+ st"void ${computeEntryPointSourceText}(void);"
-  
+
                     val invokeHandler: String = s"${computeEntryPointSourceText}();"
-  
+
                     implementations = implementations :+
                       st"""/************************************************************************
                           | *  ${entrypointMethodName}
@@ -2418,18 +2082,18 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                           |void ${entrypointMethodName}(void){
                           |  ${invokeHandler}
                           |}"""
-                
-                  case _ => 
+
+                  case _ =>
                 }
               }
             }
-            
+
           case ir.Direction.Out =>
 
             var fanOuts = ISZ[ST]()
 
             interfaces = interfaces :+ st"bool ${monitorEnqueueDequeueMethodName}(void);"
-            
+
             symbolTable.outConnections.get(CommonUtil.getName(feature.identifier)) match {
               case Some(conns) =>
                 var i = 0
@@ -2441,7 +2105,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               case _ =>
             }
 
-            implementations = implementations :+ 
+            implementations = implementations :+
               st"""/************************************************************************
                   | * ${monitorEnqueueDequeueMethodName}
                   | * Invoked from user code in the local thread.
@@ -2455,41 +2119,41 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   |  return true;
                   |}
                   |"""
-              
-          case x => halt(s"Not handling direction ${x}")    
+
+          case x => halt(s"Not handling direction ${x}")
         }
-        
+
         val interface: Option[ST] = if(interfaces.isEmpty) None() else Some(st"${(interfaces, "\n\n")}")
         val implementation: Option[ST] = if(implementations.isEmpty) None() else Some(st"${(implementations, "\n\n")}")
-        
-        return Some(C_SimpleContainer(cIncludes = ISZ(), cInterface = interface, cImplementation = implementation, 
+
+        return Some(C_SimpleContainer(cIncludes = ISZ(), cInterface = interface, cImplementation = implementation,
           preInits = preInit, postInits = None(), drainQueues = drainQueue))
       }
-      
+
       def handleEventPort_SB_Profile(): Option[C_SimpleContainer] = {
         val featureName = CommonUtil.getLastName(feature.identifier)
         val compName = Util.getClassifier(component.classifier.get)
         val counterName = Util.getEventSBCounterName(featureName)
-                
+
         var preInits: ISZ[ST] = ISZ()
         var postInits: ISZ[ST] = ISZ()
         var interfaces: ISZ[ST] = ISZ()
         var implementations: ISZ[ST] = ISZ()
         var drainQueues: ISZ[ST] = ISZ()
-        
+
         feature.direction match {
           case ir.Direction.In =>
-            
+
             val receivedEventsVarName = Util.brand(s"${featureName}_received_events")
             val lastCounterVarName = Util.brand(s"${featureName}_last_counter")
 
             val userPortInterfaceMethodName = Util.getEventPortSendReceiveMethodName(feature)
 
             interfaces = interfaces :+ st"""bool ${userPortInterfaceMethodName}(void);"""
-            
+
             val isEmptyMethodName: String = Util.brand(s"${featureName}_is_empty")
-            
-            implementations = implementations :+ 
+
+            implementations = implementations :+
               st"""/************************************************************************
                   | *
                   | * Static variables and queue management functions for event port:
@@ -2518,8 +2182,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   |
                   |/************************************************************************
                   | * ${isEmptyMethodName};
-                  | * 
-                  | * Helper method to determine if infrastructure port has received 
+                  | *
+                  | * Helper method to determine if infrastructure port has received
                   | * new events
                   | *
                   | ************************************************************************/
@@ -2529,7 +2193,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
             val freezeEventsMethodName: String = StringTemplate.samplingPortFreezeMethodName(feature)
             drainQueues = drainQueues :+ st"${freezeEventsMethodName}();"
-            
+
             val currentCounter = s"current_${counterName}"
             val queueSize = PropertyUtil.getQueueSize(feature, Util.DEFAULT_QUEUE_SIZE)
 
@@ -2552,47 +2216,47 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   |  }
                   |
                   |  if(${receivedEventsVarName} > 0) {
-                  |  
+                  |
                   |    // ${featureName}'s queue size is ${queueSize}
                   |    if(${receivedEventsVarName} > ${queueSize}) {
                   |      //printf("${compName}: dropping %i event(s) from incoming event port ${featureName}\n", (${receivedEventsVarName} - ${queueSize}));
-                  |    
+                  |
                   |      // drop events
                   |      ${receivedEventsVarName} = ${queueSize};
                   |    }
                   |  }
                   |}"""
-            
+
             implementations = implementations :+ freezeEvents
-            
+
             if(aadlThread.isSporadic()) {
-              
+
               val entrypointMethodName = s"${Util.brand("entrypoint")}_${Util.getClassifier(component.classifier.get)}_${featureName}"
-              
+
               val callback = s"${Util.genSeL4NotificationName(feature, F)}_handler"
               val callback_reg = Util.brand(s"${featureName}_reg_callback")
-  
+
               implementations = implementations :+
                 StringTemplate.cEventNotificationHandler(callback, callback_reg, featureName)
-  
+
               postInits = postInits :+ StringTemplate.cRegCallback(callback, callback_reg, feature)
-              
+
               if(!performHamrIntegration){
                 Util.getComputeEntrypointSourceText(feature.properties) match {
                   case Some(computeEntrypointSourceText) =>
-  
-                    drainQueues = drainQueues :+ 
-                        st"""{ 
+
+                    drainQueues = drainQueues :+
+                        st"""{
                             |  if(${receivedEventsVarName} > 0) {
                             |    // dequeue one event and call the event handler
                             |    ${userPortInterfaceMethodName}();
                             |    ${entrypointMethodName}();
                             |  }
                             |}"""
-    
+
                     interfaces = interfaces :+ st"void ${computeEntrypointSourceText}(void);"
-    
-                    implementations = implementations :+ 
+
+                    implementations = implementations :+
                       st"""
                           |/************************************************************************
                           | *  ${entrypointMethodName}
@@ -2605,8 +2269,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                           |void ${entrypointMethodName}(void){
                           |  ${computeEntrypointSourceText}();
                           |}"""
-                    
-                  case _ => 
+
+                  case _ =>
                 }
               }
             }
@@ -2616,11 +2280,11 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
             val emit = Util.brand(s"${featureName}_emit()")
 
             interfaces = interfaces :+ st"bool ${sendMethodName}(void);"
-            
+
             preInits = preInits :+ st"""// initialise shared counter for event port ${featureName}
-                                       |*${counterName} = 0;""" 
-            
-            implementations = implementations :+ 
+                                       |*${counterName} = 0;"""
+
+            implementations = implementations :+
               st"""/************************************************************************
                   | * ${sendMethodName}
                   | * Invoked from user code in the local thread.
@@ -2630,20 +2294,20 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   | *
                   | ************************************************************************/
                   |bool ${sendMethodName}(void) {
-                  |  // ${counterName} is a dataport (shared memory) that is written by the sender 
-                  |  // and read by the receiver(s). This counter is monotonicly increasing, 
+                  |  // ${counterName} is a dataport (shared memory) that is written by the sender
+                  |  // and read by the receiver(s). This counter is monotonicly increasing,
                   |  // but can wrap.
                   |  (*${counterName})++;
-                  |  
+                  |
                   |  // Release memory fence - ensure subsequent write occurs after any preceeding read or write
                   |  ${counterName}_release();
-                  |  
+                  |
                   |  ${emit};
-                  |  
+                  |
                   |  return true;
                   |}
                   |"""
-            
+
           case _ => halt(s"Unexpected direction ${feature.direction}")
         }
 
@@ -2662,7 +2326,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
           postInits = postInit,
           drainQueues = drainQueue))
       }
-      
+
       val ret: Option[C_SimpleContainer] = platform match {
         case ActPlatform.SeL4_TB => handleEventPort_TB_Profile()
 
@@ -2672,7 +2336,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       }
       return ret
     }
-    
+
     val ret: Option[C_SimpleContainer] = feature.category match {
       case ir.FeatureCategory.DataPort => handleDataPort()
       case ir.FeatureCategory.EventPort => handleEventPort()
@@ -2699,10 +2363,10 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
   }
 
   def genComponentTypeImplementationFile(aadlThread: AadlThread,
-                                        
-                                         localCIncludes: ISZ[ST], 
-                                         blocks: ISZ[ST], 
-                                         preInits: ISZ[ST], 
+
+                                         localCIncludes: ISZ[ST],
+                                         blocks: ISZ[ST],
+                                         preInits: ISZ[ST],
                                          postInits: ISZ[ST],
 
                                          gcRunInitStmts: ISZ[ST],
@@ -2714,26 +2378,32 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                                          containsFFIs: B): Resource = {
 
     val path = PathUtil.getComponentSourcePath(aadlThread)
-    val name = Util.getClassifier(aadlThread.component.classifier.get)
-    val componentHeaderFilename = Util.genCHeaderFilename(Util.brand(name))
-    val componentImplFilename = Util.genCImplFilename(Util.brand(name))
+    val componentHeaderFilename = PathUtil.getComponentGlueCodeHeaderFilename(aadlThread)
+    val componentImplFilename = PathUtil.getComponentGlueCodeImplementationFilename(aadlThread)
+
+    val isSeL4: B = platform == ActPlatform.SeL4
+
+    val preInit: Option[ST] = StringTemplate.componentPreInitGlueCode(preInits, isSeL4, componentImplFilename)
+    val postInit: Option[ST] = StringTemplate.componentPostInitGlueCode(postInits, isSeL4, componentImplFilename)
 
     val runMethod: ST = StringTemplate.runMethod(
-          locals = ISZ(),
-          initStmts = gcRunInitStmts,
-          preLoopStmts = gcRunPreLoopStmts,
-          loopStartStmts = gcRunLoopStartStmts,
-          loopBodyStmts = gcRunLoopMidStmts,
-          loopEndStmts = gcRunLoopEndStmts,
-          postLoopStmts = ISZ(),
-          containsFFIs = containsFFIs)
+      locals = ISZ(),
+      initStmts = gcRunInitStmts,
+      preLoopStmts = gcRunPreLoopStmts,
+      loopStartStmts = gcRunLoopStartStmts,
+      loopBodyStmts = gcRunLoopMidStmts,
+      loopEndStmts = gcRunLoopEndStmts,
+      postLoopStmts = ISZ(),
+      containsFFIs = containsFFIs,
+      isSeL4 = isSeL4,
+      fileUri = componentImplFilename)
 
     val glueCodeImpl: ST =  StringTemplate.componentTypeImpl(
       componentHeaderFilename = componentHeaderFilename,
       includes = localCIncludes,
       blocks = blocks,
-      preInits = preInits,
-      postInits = postInits,
+      preInit = preInit,
+      postInit = postInit,
       runMethod = runMethod)
 
     return Util.createResource(
@@ -2743,58 +2413,26 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
   }
 
   def buildTransportMechanisms(sys : ir.Component): B = {
-   
+
     if(!hasErrors()) {
       buildMonitors()
     }
-    
+
     if(!hasErrors()){
-      buildSBQueues()  
+      buildSBQueues()
     }
-    
+
     if(!hasErrors()) {
       buildSamplingPortInterfaces()
     }
-    
+
+    if(!hasErrors()) {
+      sharedData = SharedDataUtil.buildSharedData(symbolTable, reporter)
+    }
+
     return !hasErrors()
   }
 
-
-  def resolveSharedDataFeatures(conns: ISZ[ir.ConnectionInstance]): Unit = {
-    val dataConnections = conns.filter(f => f.kind == ir.ConnectionKind.Access).filter(
-      f => symbolTable.airFeatureMap.get(CommonUtil.getName(f.dst.feature.get)).get.category == ir.FeatureCategory.DataAccess)
-
-    for(conn <- dataConnections) {
-      val srcComp = symbolTable.airComponentMap.get(CommonUtil.getName(conn.src.component)).get
-
-      if(srcComp.category != ir.ComponentCategory.Data) {
-        reporter.error(None(), Util.toolName, s"${CommonUtil.getLastName(conn.src.component)} is not a data component")
-      }
-
-      val (dataKey, dstFeatureName) = getPortConnectionNames(conn)
-      sharedData.get(dataKey) match {
-        case Some(sd) =>
-          val dstComp = symbolTable.airComponentMap.get(CommonUtil.getName(conn.dst.component)).get
-          val ownerId = CommonUtil.getName(sd.owner.identifier)
-          val dstId = CommonUtil.getName(dstComp.identifier)
-
-          if(ownerId == dstId) {
-            val _f = dstComp.features.filter(f => CommonUtil.getName(f.identifier) == CommonUtil.getName(conn.dst.feature.get))
-            if(_f.size != 1) {
-              reporter.error(None(), Util.toolName, s"There are ${_f.size} matching features for ${CommonUtil.getName(conn.dst.feature.get)}, expecting only 1.")
-            } else if(!_f(0).isInstanceOf[ir.FeatureAccess]) {
-              reporter.error(None(), Util.toolName, s"${CommonUtil.getName(conn.dst.feature.get)} is not a FeatureAccess.")
-            } else {
-              // add the owner's feature
-              sharedData = sharedData + (dataKey ~> SharedData(sd.owner, Some(_f(0).asInstanceOf[ir.FeatureAccess]), sd.typ, sd.subcomponentId))
-            }
-          }
-        case _ =>
-          reporter.error(None(), Util.toolName, s"Could not find data subcomponent: ${dataKey}")
-      }
-    }
-  }
- 
   def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {
     def u(_c:ir.Component): String = { return Util.getClassifierFullyQualified(_c.classifier.get) }
 
@@ -2843,70 +2481,17 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     }
     return sorted
   }
-  
-  def getPortConnectionNames(c: ir.ConnectionInstance): (String, String) = {
-    val src = symbolTable.airComponentMap.get(CommonUtil.getName(c.src.component)).get
-    val dst = symbolTable.airComponentMap.get(CommonUtil.getName(c.dst.component)).get
 
-    val ret: (String, String) = (src.category, dst.category) match {
-      case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
-        (CommonUtil.getName(c.src.feature.get), CommonUtil.getName(c.dst.feature.get))
-      case (ir.ComponentCategory.Data, ir.ComponentCategory.Thread) =>
-        (CommonUtil.getName(c.src.component), CommonUtil.getName(c.dst.feature.get))
-
-      case _ => halt(s"Unexpected connection: ${c}")
-    }
-    return ret
+  def processTBConnections(c: ir.Component): (ISZ[ast.Connection], ISZ[ST]) = {
+    assert(platform == ActPlatform.SeL4_TB)
+    val conn = TBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions, reporter)
+    return conn.processConnections(c, connectionCounter)
   }
-  
-  def isHandledConnection(c: ir.ConnectionInstance): B = {
 
-    def validFeature(f: ir.Feature): B = {
-      var ret: B = f match {
-        case fend: ir.FeatureEnd =>
-          fend.category match {
-            case ir.FeatureCategory.DataAccess => T
-            case ir.FeatureCategory.DataPort => T
-            case ir.FeatureCategory.EventPort => T
-            case ir.FeatureCategory.EventDataPort => T
-            case ir.FeatureCategory.SubprogramAccessGroup => T
-
-            case ir.FeatureCategory.AbstractFeature => F
-            case ir.FeatureCategory.BusAccess => F
-            case ir.FeatureCategory.FeatureGroup => F
-            case ir.FeatureCategory.Parameter => F
-            case ir.FeatureCategory.SubprogramAccess => F
-          }
-        case faccess: ir.FeatureAccess =>
-          faccess.accessCategory match {
-            case ir.AccessCategory.Data => T
-            case ir.AccessCategory.SubprogramGroup => T
-            case _ => F
-          }
-        case _ => F
-      }
-      return ret
-    }
-    val src = symbolTable.airComponentMap.get(CommonUtil.getName(c.src.component)).get
-    val dst = symbolTable.airComponentMap.get(CommonUtil.getName(c.dst.component)).get
-
-    val ret : B = (src.category, dst.category) match {
-      case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
-
-        val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(c.src.feature.get)).get
-        val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(c.dst.feature.get)).get
-
-        validFeature(srcFeature) && validFeature(dstFeature)
-
-      case (ir.ComponentCategory.Data, ir.ComponentCategory.Thread) =>
-        val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(c.dst.feature.get)).get
-        validFeature(dstFeature)
-
-      case _ =>
-        F
-    }
-
-    return ret
+  def processSBConnections(): (ISZ[ast.Connection], ISZ[ST]) = {
+    assert(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)
+    val conn = SBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions, reporter)
+    return conn.processConnectionInstances(connectionCounter)
   }
 }
 

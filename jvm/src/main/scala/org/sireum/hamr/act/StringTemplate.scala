@@ -7,6 +7,7 @@ import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits, Provides, Uses}
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
 import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate}
 import org.sireum.hamr.act.vm.VM_Template
+import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Component
@@ -476,64 +477,111 @@ object StringTemplate {
   def runCamkesScript(hasVM: B): ST = {
     val camkesDir: String = if(hasVM) { "camkes-arm-vm" } else { "camkes" }
     val camkesGitLoc: String = if(hasVM) { "https://github.com/SEL4PROJ/camkes-arm-vm" } else { "https://docs.sel4.systems/projects/camkes" }
+
+    val CAMKES_DIR: String = "CAMKES_DIR"
+    val NON_INTERACTIVE: String = "NON_INTERACTIVE"
+    val SIMULATE: String = "SIMULATE"
+    val CAMKES_OPTIONS: String = "CAMKES_OPTIONS"
+
     val buildSim: ST = if(hasVM) {
-      st"""../init-build.sh \
+      st"""../init-build.sh $${${CAMKES_OPTIONS}} \
           |    -D${VM_Template.USE_PRECONFIGURED_ROOTFS}=ON \
           |    -DPLATFORM=qemu-arm-virt \
           |    -DARM_HYP=ON \
           |    -DCAMKES_APP=$$HAMR_CAMKES_PROJ
           |
-          |#../init-build.sh \
+          |#../init-build.sh $${${CAMKES_OPTIONS}} \
           |#    -DPLATFORM=qemu-arm-virt \
           |#    -DARM_HYP=ON \
           |#    -DCAMKES_APP=$$HAMR_CAMKES_PROJ
           |
-          |ninja
+          |ninja"""
+    } else {
+      st"""../init-build.sh $${${CAMKES_OPTIONS}} -DCAMKES_APP=$$HAMR_CAMKES_PROJ
           |
-          |########################
-          |# simulate via QEMU
-          |########################
-          |
-          |qemu-system-aarch64 \
+          |ninja"""
+    }
+    val simulate: ST = if(hasVM) {
+      st"""qemu-system-aarch64 \
           |    -machine virt,virtualization=on,highmem=off,secure=off \
           |    -cpu cortex-a53 \
           |    -nographic \
           |    -m size=1024 \
           |    -kernel images/capdl-loader-image-arm-qemu-arm-virt"""
     } else {
-      st"""../init-build.sh -DCAMKES_APP=$$HAMR_CAMKES_PROJ
-          |
-          |ninja
-          |
-          |########################
-          |# simulate via QEMU
-          |########################
-          |
-          |./simulate"""
+      st"""./simulate"""
     }
 
     val ret: ST = st"""#!/usr/bin/env bash
                       |
-                      |set -e
+                      |set -o errexit -o pipefail -o noclobber -o nounset
                       |
                       |export SCRIPT_HOME=$$( cd "$$( dirname "$$0" )" &> /dev/null && pwd )
                       |export PROJECT_HOME=$$( cd "$$( dirname "$$0" )/.." &> /dev/null && pwd )
                       |cd $${PROJECT_HOME}
                       |
-                      |
-                      |# location of camkes-projects directory
-                      |if [ -n "$$1" ]; then
-                      |    CAMKES_DIR=$$1
-                      |elif [ -d "/host/camkes-project" ]; then
-                      |    CAMKES_DIR="/host/camkes-project"
-                      |elif [ -d "$${HOME}/CASE/${camkesDir}" ]; then
-                      |    CAMKES_DIR="$${HOME}/CASE/${camkesDir}"
+                      |! getopt --test > /dev/null
+                      |if [[ $${PIPESTATUS[0]} -ne 4 ]]; then
+                      |  echo '`getopt --test` failed in this environment.'
+                      |  exit 1
                       |fi
                       |
-                      |if [[ -z "$$CAMKES_DIR" || ! -d "$${CAMKES_DIR}" ]]; then
-                      |    echo "Directory '$${CAMKES_DIR}' does not exist.  Please specify the location of your ${camkesDir} project directory."
-                      |    echo "See ${camkesGitLoc}"
-                      |    exit -1
+                      |${NON_INTERACTIVE}=false
+                      |${CAMKES_DIR}=""
+                      |${SIMULATE}=false
+                      |${CAMKES_OPTIONS}=""
+                      |
+                      |OPTIONS=c:no:s
+                      |LONGOPTS=camkes-dir:,non-interactive,camkes-options:,simulate
+                      |
+                      |function usage {
+                      |  echo ""
+                      |  echo "Usage: <option>*"
+                      |  echo ""
+                      |  echo "Available Options:"
+                      |  echo "  -c, --camkes-dir      Location of CAmkES project"
+                      |  echo "  -n, --non-interactive Non-interactive mode.  Will not prompt before deleting apps and build directories"
+                      |  echo "  -o, --camkes-options  CAmkES options (e.g -o \"-DWITH_LOC=ON -DCapDLLoaderMaxObjects=40000\")"
+                      |  echo "  -s, --simulate        Simulate via QEMU"
+                      |  exit 2
+                      |}
+                      |
+                      |! PARSED=$$(getopt --options=$$OPTIONS --longoptions=$$LONGOPTS --name "$$0" -- "$$@")
+                      |if [[ $${PIPESTATUS[0]} -ne 0 ]]; then
+                      |    usage
+                      |fi
+                      |
+                      |eval set -- "$$PARSED"
+                      |
+                      |while true; do
+                      |  case "$$1" in
+                      |    -c|--camkes-dir) ${CAMKES_DIR}="$$2"; shift 2 ;;
+                      |    -n|--non-interactive) ${NON_INTERACTIVE}=true; shift ;;
+                      |    -o|--camkes-options) ${CAMKES_OPTIONS}="$$2"; shift 2 ;;
+                      |    -s|--simulate) ${SIMULATE}=true; shift ;;
+                      |    --) shift; break ;;
+                      |  esac
+                      |done
+                      |
+                      |# handle non-option arguments
+                      |if [[ $$# -ne 0 ]]; then
+                      |  echo "$$0: Unexpected non-option arguments"
+                      |  usage
+                      |fi
+                      |
+                      |# if CAMKES_DIR option not set then look in some common locations
+                      |if [[ -z "$${${CAMKES_DIR}}" && -d "/host/camkes-project" ]]; then
+                      |  # docker location
+                      |  ${CAMKES_DIR}="/host/camkes-project"
+                      |elif [[ -z "$$${CAMKES_DIR}" && -d "$${HOME}/CASE/${camkesDir}" ]]; then
+                      |  # CASE Vagrant VM location
+                      |  ${CAMKES_DIR}="$${HOME}/CASE/${camkesDir}"
+                      |fi
+                      |
+                      |if [[ -z "$${${CAMKES_DIR}}" || ! -d "$${${CAMKES_DIR}}" ]]; then
+                      |  echo "Directory '$${${CAMKES_DIR}}' does not exist.  Please specify the location of your ${camkesDir} project directory."
+                      |  echo "See ${camkesGitLoc}"
+                      |  exit -1
                       |fi
                       |
                       |
@@ -541,16 +589,19 @@ object StringTemplate {
                       |HAMR_CAMKES_PROJ=$${PWD##*/}
                       |
                       |
-                      |CAMKES_APPS_DIR=$$CAMKES_DIR/projects/camkes/apps/$$HAMR_CAMKES_PROJ
+                      |CAMKES_APPS_DIR=$${${CAMKES_DIR}}/projects/camkes/apps/$$HAMR_CAMKES_PROJ
                       |
                       |# create a sym-link to the project in the CAmkES app directory
-                      |
                       |if [ -e "$${CAMKES_APPS_DIR}" ]; then
-                      |  read -p "The following app directory already exists, replace $${CAMKES_APPS_DIR} [Y|y]? " -n 1 -r; echo
-                      |  if [[ $$REPLY =~ ^[Yy]$$ ]]; then
+                      |  if [ "$${${NON_INTERACTIVE}}" = true ]; then
                       |    rm -rf $${CAMKES_APPS_DIR}
                       |  else
-                      |    exit -1
+                      |    read -p "The following app directory already exists, replace $${CAMKES_APPS_DIR} [Y|y]? " -n 1 -r; echo
+                      |    if [[ $$REPLY =~ ^[Yy]$$ ]]; then
+                      |      rm -rf $${CAMKES_APPS_DIR}
+                      |    else
+                      |      exit -1
+                      |    fi
                       |  fi
                       |fi
                       |
@@ -560,13 +611,18 @@ object StringTemplate {
                       |# run CAmkES/seL4 build
                       |########################
                       |
-                      |BUILD_DIR=$$CAMKES_DIR/build_$$HAMR_CAMKES_PROJ
+                      |BUILD_DIR=$${${CAMKES_DIR}}/build_$$HAMR_CAMKES_PROJ
                       |
                       |if [ -e "$${BUILD_DIR}" ]; then
-                      |  read -p "The following build directory already exists, replace $${BUILD_DIR} [Y|y]? " -n 1 -r; echo
-                      |  if [[ $$REPLY =~ ^[Yy]$$ ]]; then
+                      |  if [ "$${${NON_INTERACTIVE}}" = true ];then
                       |    rm -rf $${BUILD_DIR}
                       |    mkdir $${BUILD_DIR}
+                      |  else
+                      |    read -p "The following build directory already exists, replace $${BUILD_DIR} [Y|y]? " -n 1 -r; echo
+                      |    if [[ $$REPLY =~ ^[Yy]$$ ]]; then
+                      |      rm -rf $${BUILD_DIR}
+                      |      mkdir $${BUILD_DIR}
+                      |    fi
                       |  fi
                       |else
                       |  mkdir $${BUILD_DIR}
@@ -574,7 +630,16 @@ object StringTemplate {
                       |
                       |cd $${BUILD_DIR}
                       |
-                      |${buildSim}"""
+                      |${buildSim}
+                      |
+                      |########################
+                      |# simulate via QEMU
+                      |########################
+                      |
+                      |if [ "$${${SIMULATE}}" = true ]; then
+                      |  ${simulate}
+                      |fi
+                      |"""
     return ret
   }
 
@@ -593,44 +658,45 @@ object StringTemplate {
   val SEM_WAIT: String = Util.brand("dispatch_sem_wait")
   val SEM_POST: String = Util.brand("dispatch_sem_post")
 
-  def componentTypeImpl(componentHeaderFilename: String,
-                        includes: ISZ[ST], 
-                       
-                        blocks: ISZ[ST],
-                        preInits: ISZ[ST],
-                        postInits: ISZ[ST],
+  def componentPreInitGlueCode(preInits: ISZ[ST], isSeL4: B, fileUri: String): Option[ST] = {
 
-                        runMethod: ST): ST = {
-    val preInit: Option[ST] = if(preInits.nonEmpty) {
+  val preInit: Option[ST] = if(preInits.nonEmpty) {
+    val methodName = "pre_init"
+
+    val declNewStackFrame: Option[ST] = if(isSeL4) {
+      val d = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+      Some(st"""${d};
+               |""")
+    } else { None() }
+
       Some(st"""
-               |void pre_init(void) {
+               |void ${methodName}(void) {
+               |  ${declNewStackFrame}
                |  ${(preInits, "\n\n")}
                |}""")
     } else { None() }
-    
+    return preInit
+  }
+
+  def componentPostInitGlueCode(postInits: ISZ[ST], isSeL4: B, fileUri: String): Option[ST] = {
+    val methodName = "post_init"
+
+    val declNewStackFrame: Option[ST] = if(isSeL4) {
+      val d = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+      Some(st"""${d};
+               |""")
+    } else { None() }
+
     val postInit: Option[ST] = if(postInits.nonEmpty) {
       Some(st"""
-               |void post_init(void){
+               |void ${methodName}(void) {
+               |  ${declNewStackFrame}
                |  ${(postInits, "\n\n")}
                |}""")
     } else { None() }
-
-    val filteredIncludes: Set[String] = Set.empty[String] ++ includes.map((s: ST) => s.render)
-
-    val ret:ST = st"""#include <${componentHeaderFilename}>
-                     |${(filteredIncludes.elements, "\n")}
-                     |#include <string.h>
-                     |#include <camkes.h>
-                     |
-                     |${(blocks, "\n\n")}
-                     |${preInit}
-                     |${postInit}
-                     |
-                     |${runMethod}
-                     |"""
-    return ret
+    return postInit
   }
-  
+
   def runMethod(locals: ISZ[ST],
                 initStmts: ISZ[ST],
                 preLoopStmts: ISZ[ST],
@@ -638,15 +704,26 @@ object StringTemplate {
                 loopBodyStmts: ISZ[ST],
                 loopEndStmts: ISZ[ST],
                 postLoopStmts: ISZ[ST],
-                containsFFIs: B): ST = {
+                containsFFIs: B,
+                isSeL4: B,
+                fileUri: String): ST = {
     
     def flatten(i: ISZ[ST]): Option[ST] = { return if(i.nonEmpty) Some(st"""${(i, "\n")}""") else None() }
 
-    val ret: ST = st"""/************************************************************************
+    val methodName = "run"
+
+    val declNewStackFrame: Option[ST] = if(isSeL4) {
+      val d = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+      Some(st"""${d};
+               |""")
+    } else { None() }
+
+      val ret: ST = st"""/************************************************************************
                       | * int run(void)
                       | * Main active thread function.
                       | ************************************************************************/
-                      |int run(void) {
+                      |int ${methodName}(void) {
+                      |  ${declNewStackFrame}
                       |  ${flatten(locals)}
                       |  ${flatten(initStmts)}
                       |  ${flatten(preLoopStmts)}
@@ -666,6 +743,31 @@ object StringTemplate {
     } else {
       return ret
     }
+  }
+
+  def componentTypeImpl(componentHeaderFilename: String,
+                        includes: ISZ[ST],
+
+                        blocks: ISZ[ST],
+                        preInit: Option[ST],
+                        postInit: Option[ST],
+
+                        runMethod: ST): ST = {
+
+    val filteredIncludes: Set[String] = Set.empty[String] ++ includes.map((s: ST) => s.render)
+
+    val ret:ST = st"""#include <${componentHeaderFilename}>
+                     |${(filteredIncludes.elements, "\n")}
+                     |#include <string.h>
+                     |#include <camkes.h>
+                     |
+                     |${(blocks, "\n\n")}
+                     |${preInit}
+                     |${postInit}
+                     |
+                     |${runMethod}
+                     |"""
+    return ret
   }
 
   def componentInitializeEntryPoint(componentName: String, methodName: String): (ST, ST) = {
@@ -716,154 +818,6 @@ object StringTemplate {
     return ret
   }
 
-  def hamrGetInstanceName(basePackageName: String, c: Component): ST = {
-    return st"${basePackageName}_${CommonUtil.getName(c.identifier)}"
-  }
-  
-  def hamrIntialiseArchitecture(appName: String): ST = {
-    return st"""// initialise slang-embedded components/ports
-               |${appName}_initialiseArchitecture(SF_LAST);"""
-  }
-
-  def hamrInitialiseEntrypoint(appName: String): ST = {
-    return st"""// call the component's initialise entrypoint
-               |${appName}_initialiseEntryPoint(SF_LAST);"""
-  }
-
-  def hamrRunLoopEntries(appName: String): ISZ[ST] = {
-    return ISZ(st"""// call the component's compute entrypoint
-                   |${appName}_computeEntryPoint(SF_LAST);""")
-  }
-
-  def hamrSlangType(c : ir.Classifier, base: String) : String = {
-    val r = StringUtil.replaceAll(StringUtil.replaceAll(c.name, "::", "_"), ".", "_")
-    return s"${base}_${r}"
-  }
-  
-  def hamrSlangPayloadType(c : ir.Classifier, base: String) : String = {
-    val r = StringUtil.replaceAll(StringUtil.replaceAll(c.name, "::", "_"), ".", "_")
-    return s"${base}_${r}_Payload"
-  }
-
-  def hamrIsEmptyUnconnected(methodName: String,
-                             sel4IsEmptyMethodName: String): ST = {
-    val ret: ST = st"""// FIXME: dummy implementation for unconnected incoming port
-                      |B ${methodName}(STACK_FRAME_ONLY) {
-                      |  return T;
-                      |}"""
-    return ret
-  }
-
-  def hamrIsEmpty(methodName: String,
-                  sel4IsEmptyMethodName: String,
-                  srcPort: ir.FeatureEnd): ST = {
-    val ret: ST = st"""// is_empty ${CommonUtil.getLastName(srcPort.identifier)}: ${srcPort.direction.name} ${srcPort.category.name}
-                      |B ${methodName}(STACK_FRAME_ONLY) {
-                      |  return ${sel4IsEmptyMethodName}();
-                      |}"""
-    return ret
-  }
-  
-  def hamrReceiveUnconnectedIncomingEventPort(methodName: String): ST = {
-    val ret: ST = st"""// FIXME: dummy implementation for unconnected incoming port
-                      |Unit ${methodName}(STACK_FRAME
-                      |  Option_8E9F45 result) {
-                      |  // FIXME: dummy implementation
-                      | 
-                      |  // put None in result
-                      |  DeclNewNone_964667(none);
-                      |  Type_assign(result, &none, sizeof(union Option_8E9F45));
-                      |}"""
-    return ret
-  }
-
-  def hamrReceiveIncomingEventPort(comment: ST,
-                                   methodName: String,
-                                   sel4ReadMethod: String): ST = {
-    val ret: ST = st"""${comment}
-                      |Unit ${methodName}(STACK_FRAME
-                      |  Option_8E9F45 result) {
-                      |  if(${sel4ReadMethod}()) {
-                      |    // event port - ART requires an Empty payload be sent
-                      |    DeclNewart_Empty(payload);
-                      | 
-                      |    // wrap it in Some and place in result
-                      |    DeclNewSome_D29615(some);
-                      |    Some_D29615_apply(STACK_FRAME &some, (art_DataContent) &payload);
-                      |    Type_assign(result, &some, sizeof(union Option_8E9F45));
-                      |  } else {
-                      |    // put None in result
-                      |    DeclNewNone_964667(none);
-                      |    Type_assign(result, &none, sizeof(union Option_8E9F45));
-                      |  }
-                      |} """
-    return ret
-  }
-
-  def hamrReceiveIncomingDataPort(comment: ST,
-                                  methodName: String,
-                                  sel4Type: String,
-                                  slangPayloadType: String,
-                                  sel4ReadMethod: String): ST = {
-    val ret: ST = st"""${comment}
-                      |Unit ${methodName}(STACK_FRAME
-                      |  Option_8E9F45 result) {
-                      |  ${sel4Type} val;
-                      |  if(${sel4ReadMethod}((${sel4Type} *) &val)) {
-                      |    // wrap payload in Some and place in result
-                      |    DeclNewSome_D29615(some);
-                      |    Some_D29615_apply(STACK_FRAME &some, (art_DataContent) &val);
-                      |    Type_assign(result, &some, sizeof(union Option_8E9F45));
-                      |  } else {
-                      |    // put None in result
-                      |    DeclNewNone_964667(none);
-                      |    Type_assign(result, &none, sizeof(union Option_8E9F45));
-                      |  }
-                      |}
-                      |"""
-    return ret
-  }
-
-  def hamrSendUnconnectedOutgoingDataPort(methodName: String): ST = {
-    val ret: ST = st"""// FIXME: dummy implementation for unconnected outgoing port
-                      |Unit ${methodName}(STACK_FRAME 
-                      |  art_DataContent d) {
-                      |  // FIXME: dummy implementation
-                      |}"""
-    return ret
-  }
-
-  def hamrSendOutgoingDataPort(comment: ST,
-                               methodName: String,
-                               sel4Type: String,
-                               slangPayloadType: String,
-                               srcEnqueue: String
-                              ): ST = {
-    val ret: ST = st"""${comment}
-                      |Unit ${methodName}(STACK_FRAME 
-                      |  art_DataContent d) {
-                      |  ${srcEnqueue}(d);
-                      |}"""
-    return ret
-  }
-
-  def hamrSendOutgoingEventPort(comment: ST,
-                                methodName: String,
-                                srcEnqueue: String
-                              ): ST = {
-    val ret: ST = st"""${comment}
-                      |Unit ${methodName}(STACK_FRAME 
-                      |  art_DataContent d) {
-                      |
-                      |  // event port - can ignore the Slang Empty payload
-                      |  art_Empty payload = (art_Empty) d;
-                      |
-                      |  // send event via CAmkES
-                      |  ${srcEnqueue}();
-                      |}"""
-    return ret
-  }
-  
   def samplingPortFreezeMethodName(feature: ir.FeatureEnd): String = {
     return Util.brand(s"freeze_event_port_${CommonUtil.getLastName(feature.identifier)}")
   }
