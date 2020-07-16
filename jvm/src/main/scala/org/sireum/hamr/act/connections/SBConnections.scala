@@ -85,9 +85,11 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
                   val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
 
-                  val holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
 
-                  holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+
+                  //holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
 
                   if (aadlTypes.rawConnections) {
                     val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
@@ -97,8 +99,10 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                       case _ => z"4096" // TODO or throw error?
                     }
 
-                    holder.configurationEntries = holder.configurationEntries :+
-                      st"""${holder.connectionName}.size = ${size};""".render
+                    //holder.configurationEntries = holder.configurationEntries :+
+                    //  st"""${holder.connectionName}.size = ${size};""".render
+                    holder = holder(configurationEntries = holder.configurationEntries :+
+                      st"""${holder.connectionName}.size = ${size};""".render)
                   }
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -120,9 +124,10 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureName)
                   val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureName)
 
-                  val holder = getConnectionHolder(srcConnectionEnd, notificationConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd, notificationConnectorType)
 
-                  holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
+                  //holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -138,9 +143,10 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                   val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
                   val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
 
-                  val holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
 
-                  holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
+                  //holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
                   if (aadlTypes.rawConnections) {
                     val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
@@ -150,15 +156,15 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                       case _ => z"4096" // TODO or throw error?
                     }
 
-                    holder.configurationEntries = holder.configurationEntries :+
-                      st"""${holder.connectionName}.size = ${size};""".render
+                    holder = holder(configurationEntries = holder.configurationEntries :+
+                      st"""${holder.connectionName}.size = ${size};""".render)
                   }
 
-                  holder.configurationEntries = holder.configurationEntries :+
-                    st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName}_access = "W";""".render
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName}_access = "W";""".render)
 
-                  holder.configurationEntries = holder.configurationEntries :+
-                    st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render)
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -176,9 +182,9 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                   val connectionType = Sel4ConnectorTypes.seL4Notification
 
-                  val holder = getConnectionHolder(srcConnectionEnd, connectionType)
+                  var holder = getConnectionHolder(srcConnectionEnd, connectionType)
 
-                  holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -192,15 +198,15 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                   val connectionType = Sel4ConnectorTypes.seL4SharedData
 
-                  val holder = getConnectionHolder(srcConnectionEnd, connectionType)
+                  var holder = getConnectionHolder(srcConnectionEnd, connectionType)
 
-                  holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
-                  holder.configurationEntries = holder.configurationEntries :+
-                    st"""${srcCamkesComponentId}.${srcCamkesFeatureName}_access = "W";""".render
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    st"""${srcCamkesComponentId}.${srcCamkesFeatureName}_access = "W";""".render)
 
-                  holder.configurationEntries = holder.configurationEntries :+
-                    st"""${dstCamkesComponentId}.${dstCamkesFeatureName}_access = "R";""".render
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    st"""${dstCamkesComponentId}.${dstCamkesFeatureName}_access = "R";""".render)
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -228,7 +234,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         holder.toConnectionEnds.toIS)
 
       val filtered = Set.empty[String] ++ holder.configurationEntries.toIS
-      camkesConfiguration = camkesConfiguration ++ filtered.elements.map(m => st"$m")
+      camkesConfiguration = camkesConfiguration ++ filtered.elements.map((m: String) => st"$m")
     }
 
     return (connections, camkesConfiguration)

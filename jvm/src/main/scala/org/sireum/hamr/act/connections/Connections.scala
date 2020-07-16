@@ -8,10 +8,10 @@ import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.ir
 
-@record class ConnectionHolder(connectionName: String,
-                               connectionType: Sel4ConnectorTypes.Type,
-                               var toConnectionEnds: MSZ[ast.ConnectionEnd],
-                               var configurationEntries: MSZ[String])
+@datatype class ConnectionHolder(connectionName: String,
+                                 connectionType: Sel4ConnectorTypes.Type,
+                                 toConnectionEnds: MSZ[ast.ConnectionEnd],
+                                 configurationEntries: MSZ[String])
 
 object Connections {
 

@@ -274,8 +274,8 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     }
 
     for(c <- o.connections) {
-      val froms = c.from_ends.map(m => st"from ${m.component}.${m.end}")
-      val tos = c.to_ends.map(m => st"to ${m.component}.${m.end}")
+      val froms = c.from_ends.map((m: ast.ConnectionEnd) => st"from ${m.component}.${m.end}")
+      val tos = c.to_ends.map((m: ast.ConnectionEnd) => st"to ${m.component}.${m.end}")
 
       connections = connections :+
         st"""connection ${c.connectionType} ${c.name}(${(froms, ", ")}, ${(tos, ", ")});"""
