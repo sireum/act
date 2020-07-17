@@ -2,6 +2,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
+import org.sireum.hamr.act.StringTemplate
 import org.sireum.hamr.act.utils.{CMakeOption, CMakePreprocessorOption}
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 
@@ -278,6 +279,13 @@ object CakeMLTemplate {
                       |  #endif
                       |  exit(arg);
                       |}"""
+    return ret
+  }
+
+  def emptyAssemblyFile(): ST = {
+    val ret: ST = st"""${StringTemplate.safeToEditComment()}
+                      |
+                      |// placeholder for CakeML assembly"""
     return ret
   }
 }

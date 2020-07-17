@@ -31,7 +31,7 @@ object CakeML {
 
   def processThread(aadlThread: AadlThread,
                     basePackageName: String,
-                    symbolTable: SymbolTable): Resource = {
+                    symbolTable: SymbolTable): ISZ[Resource] = {
 
     val names = Names(aadlThread.component, basePackageName)
 
@@ -87,10 +87,18 @@ object CakeML {
                           |${(methods, "\n\n")}
                           |"""
 
-    val ret: Resource = Resource(
+    var ret: ISZ[Resource] = ISZ(Resource(
       path = s"${path}/${filename}",
       content = content,
       overwrite = T,
+      makeExecutable = F))
+
+    val assemblyFilename: String = Util.brand(s"${classifierName}.S")
+
+    ret = ret :+ Resource(
+      path = s"${path}/${assemblyFilename}",
+      content = CakeMLTemplate.emptyAssemblyFile(),
+      overwrite = F,
       makeExecutable = F)
 
     return ret
