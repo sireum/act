@@ -905,7 +905,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     var cSources: ISZ[Resource] = ISZ()
 
     if(CakeML.requiresFFIs(aadlThread)) {
-      val ffis: Resource = CakeML.processThread(aadlThread, hamrBasePackageName.get)
+      val ffis: Resource = CakeML.processThread(aadlThread, hamrBasePackageName.get, symbolTable)
       cSources = cSources :+ ffis
     }
 

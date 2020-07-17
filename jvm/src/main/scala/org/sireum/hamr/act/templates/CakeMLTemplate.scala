@@ -150,9 +150,9 @@ object CakeMLTemplate {
     return ret
   }
 
-  def ffi_getterMethodName(port: String): String = { return s"ffiapi_get_${port}_in" }
+  def ffi_getterMethodName(port: String): String = { return s"ffiapi_get_${port}" }
 
-  def ffi_setterMethodName(port: String): String = { return s"ffiapi_send_${port}_out" }
+  def ffi_setterMethodName(port: String): String = { return s"ffiapi_send_${port}" }
 
   def ffi_get(ffiMethodName: String, slangMethodName: String, fileUri: String): ST = {
     val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", ffiMethodName, 0)
@@ -244,9 +244,22 @@ object CakeMLTemplate {
     return st"extern ${methodSignature}"
   }
 
-  def postlude(): ST = {
+  def postlude(selfPacing: B): ST = {
+    val notifName: String =
+      if(selfPacing) { "sb_self_pacer_tock_wait();" }
+      else { "sb_pacer_notification_wait();" }
+
+    val emitName: String =
+      if(selfPacing) { "sb_self_pacer_tick_emit();" }
+      else { "// non self-pacing so do nothing" }
+
     val ret: ST = st"""void ffisb_pacer_notification_wait(${defaultArgs2}) {
-                      |  sb_pacer_notification_wait();
+                      |  ${notifName}
+                      |  output[0] = 1;
+                      |}
+                      |
+                      |void ffisb_pacer_notification_emit(${defaultArgs2}) {
+                      |  ${emitName}
                       |  output[0] = 1;
                       |}
                       |

@@ -30,7 +30,8 @@ object CakeML {
   }
 
   def processThread(aadlThread: AadlThread,
-                    basePackageName: String): Resource = {
+                    basePackageName: String,
+                    symbolTable: SymbolTable): Resource = {
 
     val names = Names(aadlThread.component, basePackageName)
 
@@ -77,7 +78,7 @@ object CakeML {
 
     methods = methods ++ processPorts(aadlThread, basePackageName, filename)
 
-    methods = methods :+ CakeMLTemplate.postlude()
+    methods = methods :+ CakeMLTemplate.postlude(!symbolTable.hasVM())
 
     val content: ST = st"""${(_includes, "\n")}
                           |
