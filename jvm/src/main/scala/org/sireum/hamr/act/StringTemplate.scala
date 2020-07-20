@@ -36,7 +36,9 @@ object StringTemplate {
       Some(st"${(entries, "\n\n")}")
     } else { None() }
 
-    val ret: ST = st"""#ifndef ${macroName}
+    val ret: ST = st"""${StringTemplate.doNotEditComment()}
+                      |
+                      |#ifndef ${macroName}
                       |#define ${macroName}
                       |
                       |${_includes}
@@ -756,7 +758,9 @@ object StringTemplate {
 
     val filteredIncludes: Set[String] = Set.empty[String] ++ includes.map((s: ST) => s.render)
 
-    val ret:ST = st"""#include <${componentHeaderFilename}>
+    val ret:ST = st"""${StringTemplate.doNotEditComment()}
+                     |
+                     |#include <${componentHeaderFilename}>
                      |${(filteredIncludes.elements, "\n")}
                      |#include <string.h>
                      |#include <camkes.h>

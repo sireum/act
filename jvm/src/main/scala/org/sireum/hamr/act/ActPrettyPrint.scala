@@ -163,7 +163,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
     var preludes: ISZ[ST] = ISZ(CMakeTemplate.cmake_add_definitions(ISZ("CAMKES")))
 
-    if(CakeML.modelRequiresFFIs(symbolTable)) {
+    if(symbolTable.hasCakeMLComponents()) {
       val filename = "CMake_CakeMlOptions.cmake"
       add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")

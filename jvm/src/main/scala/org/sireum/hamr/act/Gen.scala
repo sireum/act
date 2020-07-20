@@ -904,7 +904,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
     var cSources: ISZ[Resource] = ISZ()
 
-    if(CakeML.requiresFFIs(aadlThread)) {
+    if(aadlThread.isCakeMLComponent()) {
       val ffis: ISZ[Resource] = CakeML.processThread(aadlThread, hamrBasePackageName.get, symbolTable)
       cSources = cSources ++ ffis
     }
@@ -920,7 +920,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       gcRunLoopStartStmts = gcRunLoopStartStmts,
       gcRunLoopMidStmts = gcRunLoopMidStmts,
       gcRunLoopEndStmts = gcRunLoopEndStmts,
-      containsFFIs = CakeML.requiresFFIs(aadlThread))
+      containsFFIs = aadlThread.isCakeMLComponent())
 
     cSources = cSources :+ gcImpl
 

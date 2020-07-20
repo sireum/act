@@ -14,20 +14,6 @@ import org.sireum.hamr.ir
 import org.sireum.ops.ISZOps
 
 object CakeML {
-  val PROP__CASE_PROPERTIES__COMPONENT_TYPE: String = "CASE_Properties::Component_Type"
-
-  def requiresFFIs(aadlThread: AadlThread): B = {
-    val ret: B = PropertyUtil.getDiscreetPropertyValue(aadlThread.component.properties, PROP__CASE_PROPERTIES__COMPONENT_TYPE) match {
-      case Some(ir.ValueProp("MONITOR")) => T
-      case Some(ir.ValueProp("FILTER")) => T
-      case _ => F
-    }
-    return ret
-  }
-
-  def modelRequiresFFIs(symbolTable: SymbolTable): B = {
-    return ISZOps(symbolTable.getThreads()).exists(t => requiresFFIs(t))
-  }
 
   def processThread(aadlThread: AadlThread,
                     basePackageName: String,
@@ -35,7 +21,7 @@ object CakeML {
 
     val names = Names(aadlThread.component, basePackageName)
 
-    assert(requiresFFIs(aadlThread))
+    assert(aadlThread.isCakeMLComponent(), s"${aadlThread.identifier} is not a CakeML component")
     val path: String = PathUtil.getComponentSourcePath(aadlThread)
     val classifierName = Util.getClassifier(aadlThread.component.classifier.get)
     val filename: String = Util.genCImplFilename(Util.brand(s"${classifierName}_ffi"))
@@ -53,7 +39,7 @@ object CakeML {
     globals = globals ++ CakeMLTemplate.portIdsGlobalVars()
     globals = globals :+ CakeMLTemplate.initializedGlobalVar()
 
-    val _includes = includes.map((m : String) => s"#include <${m}>")
+    val _includes: ISZ[String] = includes.map((m : String) => s"#include <${m}>")
 
     { // initialization
       val statements: ISZ[ST] = ISZ(
@@ -80,12 +66,7 @@ object CakeML {
 
     methods = methods :+ CakeMLTemplate.postlude(!symbolTable.hasVM())
 
-    val content: ST = st"""${(_includes, "\n")}
-                          |
-                          |${(globals, "\n")}
-                          |
-                          |${(methods, "\n\n")}
-                          |"""
+    val content: ST = CakeMLTemplate.ffiTemplate(_includes, globals, methods)
 
     var ret: ISZ[Resource] = ISZ(Resource(
       path = s"${path}/${filename}",

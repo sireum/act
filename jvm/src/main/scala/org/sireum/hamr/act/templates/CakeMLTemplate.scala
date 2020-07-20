@@ -282,6 +282,20 @@ object CakeMLTemplate {
     return ret
   }
 
+  def ffiTemplate(includes: ISZ[String],
+                  globals: ISZ[ST],
+                  methods: ISZ[ST]): ST = {
+    val ret: ST = st"""${StringTemplate.doNotEditComment()}
+                      |
+                      |${(includes, "\n")}
+                      |
+                      |${(globals, "\n")}
+                      |
+                      |${(methods, "\n\n")}
+                      |"""
+    return ret
+  }
+
   def emptyAssemblyFile(): ST = {
     val ret: ST = st"""${StringTemplate.safeToEditComment()}
                       |
