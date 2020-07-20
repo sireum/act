@@ -278,7 +278,22 @@ object CakeMLTemplate {
                       |  }
                       |  #endif
                       |  exit(arg);
-                      |}"""
+                      |}
+                      |
+                      |// convert big-endian 32-bit float to little-endian 64 bit double
+                      |void ffifloat2double(unsigned char *parameter, long parameterSizeBytes,
+                      |                     unsigned char *output,    long outputSizeBytes) {
+                      |  char bytes [4];
+                      |  assert (4 == parameterSizeBytes);
+                      |  bytes[3] = parameter[0];
+                      |  bytes[2] = parameter[1];
+                      |  bytes[1] = parameter[2];
+                      |  bytes[0] = parameter[3];
+                      |
+                      |  double result = *((float*)bytes);
+                      |  memcpy(output, (unsigned char*) &result, sizeof(double));
+                      |}
+                      |"""
     return ret
   }
 
