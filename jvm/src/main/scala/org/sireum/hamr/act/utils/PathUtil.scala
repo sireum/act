@@ -7,6 +7,8 @@ import org.sireum.hamr.act.Util
 import org.sireum.hamr.codegen.common.symbols.AadlThread
 
 object PathUtil {
+  val DIR_BIN: String = "bin"
+
   def getComponentSourcePath(aadlThread: AadlThread): String = {
     val componentDirName = Util.getClassifier(aadlThread.component.classifier.get)
     return s"${Util.DIR_COMPONENTS}/${componentDirName}/src"

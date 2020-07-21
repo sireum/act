@@ -9,6 +9,7 @@ import org.sireum.hamr.act.Util.reporter
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
 import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate}
+import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
@@ -37,7 +38,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       val assembly = container.models(0).asInstanceOf[Assembly]
       val dot = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, F)
       add(s"graph.dot", dot)
-      
+
       val dotSimple = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, T)
       add(s"graph_simple.dot", dotSimple)
     }
@@ -61,7 +62,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
               sourcePaths = sourcePaths :+ fname
 
-            } 
+            }
             else if(StringOps(st).endsWith(".h")) {
               val fname = s"${rootDestDir}/includes/${p.name}"
               add(fname, st"""${p.read}""")
@@ -76,11 +77,11 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       }
 
       sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.cmakeSOURCES
-      includePaths = includePaths ++ c.cIncludes.map((r: Resource) => 
+      includePaths = includePaths ++ c.cIncludes.map((r: Resource) =>
         Util.getDirectory(r.path)) ++ c.cmakeINCLUDES
 
       val slangLib: Option[String] = getSlangLibrary(c.instanceName, platform)
-      
+
       val hasAux = cFiles.nonEmpty && c.componentId != PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER
 
       CMakeTemplate.cmake_DeclareCamkesComponent(
@@ -99,7 +100,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       }
 
       val slangLib: Option[String] = if(platform == ActPlatform.SeL4) Some(Util.SlangTypeLibrary) else None()
-      
+
       cmakeComponents = cmakeComponents :+ CMakeTemplate.cmake_DeclareCamkesComponent(
         componentName = m.i.component.name,
         sources = ISZ(m.cimplementation.path),
@@ -114,10 +115,10 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     }
 
     if(container.samplingPorts.nonEmpty) {
-      
+
       val seqNumFile = s"${Util.getTypeRootPath()}/includes/${Util.genCHeaderFilename(StringTemplate.SeqNumName)}"
       add(seqNumFile, StringTemplate.seqNumHeader())
-      
+
       for (spi <- container.samplingPorts) {
         val header = StringTemplate.samplingPortHeader(spi)
         val impl = StringTemplate.samplingPortImpl(spi)
@@ -126,7 +127,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
         add(spi.implPath, impl)
       }
     }
-        
+
     var cmakeEntries: ISZ[ST] = ISZ()
 
     if(actContainer.get.requiresTimeServer) {
@@ -179,21 +180,21 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
     add("CMakeLists.txt", cmakelist)
 
-    
+
     val c: ISZ[Resource] = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)
     val auxResources: ISZ[Resource] = container.auxFiles
 
-    
-    addExeResource("bin/run-camkes.sh", StringTemplate.runCamkesScript(symbolTable.hasVM()))
-    
+
+    addExeResource(s"${PathUtil.DIR_BIN}/run-camkes.sh", StringTemplate.runCamkesScript(symbolTable.hasVM()))
+
     // add dest dir to path
     val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
-      path = s"${destDir}/${o.path}", 
+      path = s"${destDir}/${o.path}",
       content = o.content,
       overwrite = o.overwrite,
       makeExecutable = o.makeExecutable
     ))
-    
+
     return ret
   }
 
@@ -221,7 +222,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     val preprocessorIncludes = actContainer.get.globalPreprocessorIncludes.map((m: String) => s"#include ${m}")
 
     var imports = Set.empty[String] ++ actContainer.get.globalImports.map((m: String) => s"import ${m};")
-    
+
     imports = imports ++ resources.map((o: Resource) => s"""import "${o.path}";""")
 
     val connectors: ISZ[ST] = actContainer.get.connectors.map(c => {
@@ -295,7 +296,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
     println(st.render)
     println("--------")
     */
-    
+
     return Some(st)
   }
 

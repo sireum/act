@@ -7,6 +7,7 @@ import org.sireum.hamr.ir
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
+import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlProcess, AadlThread, Dispatch_Protocol, SymbolTable}
@@ -367,6 +368,12 @@ object VMGen {
       imports = imports,
 
       externalEntities = externalEntities
+    )
+
+    auxResources = auxResources :+ Util.createExeResource(
+      path = s"${PathUtil.DIR_BIN}/${VM_Template.setup_camkes_vm_script_filename}",
+      contents = VM_Template.setup_camkes_vm_Script(),
+      overwrite = T
     )
 
     return (c, auxResources)

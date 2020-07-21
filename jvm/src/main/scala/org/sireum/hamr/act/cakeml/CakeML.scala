@@ -2,7 +2,6 @@
 
 package org.sireum.hamr.act.cakeml
 
-import com.sun.source.tree.CaseTree.CaseKind
 import org.sireum._
 import org.sireum.hamr.act.templates.CakeMLTemplate
 import org.sireum.hamr.act.{Resource, Util, templates}
