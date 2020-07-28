@@ -3,9 +3,10 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
-import org.sireum.hamr.act.{Counter, Sel4ConnectorTypes,Util, ast}
+import org.sireum.hamr.act.{Counter, Sel4ConnectorTypes, Util, ast}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 import org.sireum.hamr.ir
 
 @datatype class ConnectionHolder(connectionName: String,
@@ -13,7 +14,24 @@ import org.sireum.hamr.ir
                                  toConnectionEnds: MSZ[ast.ConnectionEnd],
                                  configurationEntries: MSZ[String])
 
+
+@datatype class ConnectionContainer(connections: ISZ[ast.Connection],
+                                    configurationEntries: ISZ[ST],
+                                    optConnectorHolder: ISZ[ConnectorContainer])
+
+@datatype class ConnectorContainer(connectorName: String,
+                                   assemblyEntry: ast.Connector,
+                                   connectorTemplate: ConnectorTemplate)
+
+@datatype class ConnectorTemplate(fromTemplateName: String,
+                                  fromTemplate: Option[ST],
+                                  toTemplateName: String,
+                                  toTemplate: Option[ST])
+
 object Connections {
+  def useCaseEventDataPortConnector(experimentalOptions: IS[Z, String]): B = {
+    return ExperimentalOptions.useCaseConnectors(experimentalOptions)
+  }
 
   def isHandledConnection(c: ir.ConnectionInstance,
                           symbolTable: SymbolTable): B = {

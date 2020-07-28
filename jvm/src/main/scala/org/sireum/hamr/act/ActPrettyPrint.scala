@@ -6,12 +6,13 @@ import org.sireum._
 import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Composition, Consumes, Dataport, Direction, Emits, Instance, Method, Mutex, Procedure, Provides, Semaphore, Uses}
 import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
-import org.sireum.hamr.act.cakeml.CakeML
+import org.sireum.hamr.act.connections.{ConnectorContainer, ConnectorTemplate}
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
 import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
+import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 
 @record class ActPrettyPrint {
 
@@ -25,16 +26,18 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
                 cHeaderDirectories: ISZ[String],
                 aadlRootDir: String,
                 slangLibInstanceNames: ISZ[String],
-                platform: ActPlatform.Type,
-                symbolTable: SymbolTable
+                symbolTable: SymbolTable,
+                options: ActOptions
                ): ISZ[Resource] = {
+
+    val platform = options.platform
 
     rootServer = container.rootServer
     actContainer = Some(container)
 
     prettyPrint(container.models)
 
-    if(Os.env("DOTTY").nonEmpty){
+    if(ExperimentalOptions.generateDotGraphs(options.experimentalOptions)){
       val assembly = container.models(0).asInstanceOf[Assembly]
       val dot = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, F)
       add(s"graph.dot", dot)
@@ -149,11 +152,38 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
       cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_VM()
     }
 
+    var auxResources: ISZ[Resource] = ISZ()
+
     if(container.connectors.nonEmpty) {
-      cmakeEntries = cmakeEntries :+
-        st"""# add path to connector templates
-            |CAmkESAddTemplatesPath(../../../../components/templates/)
-            |"""
+
+      cmakeEntries = cmakeEntries :+ st"""# add path to connector templates
+                                         |CAmkESAddTemplatesPath($${CMAKE_CURRENT_LIST_DIR}/templates)"""
+
+      for(conn <- container.connectors) {
+        val connTemplate: ConnectorTemplate = conn.connectorTemplate
+        cmakeEntries = cmakeEntries :+ st"""DeclareCAmkESConnector(${conn.connectorName}
+                                           |  FROM ${connTemplate.fromTemplateName}
+                                           |  FROM_LIBS SB_Type_Library
+                                           |  TO ${connTemplate.toTemplateName}
+                                           |  TO_LIBS SB_Type_Library
+                                           |)"""
+
+        if(connTemplate.fromTemplate.nonEmpty) {
+          auxResources = auxResources :+ Resource(
+            path = s"templates/${connTemplate.fromTemplateName}",
+            content = connTemplate.fromTemplate.get,
+            overwrite = T,
+            makeExecutable = F)
+        }
+
+        if(connTemplate.toTemplate.nonEmpty) {
+          auxResources = auxResources :+ Resource(
+            path = s"templates/${connTemplate.toTemplateName}",
+            content = connTemplate.toTemplate.get,
+            overwrite = T,
+            makeExecutable = F)
+        }
+      }
     }
 
     if(cFiles.nonEmpty) {
@@ -182,7 +212,7 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
 
     val c: ISZ[Resource] = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)
-    val auxResources: ISZ[Resource] = container.auxFiles
+    auxResources = auxResources ++ container.auxFiles
 
 
     addExeResource(s"${PathUtil.DIR_BIN}/run-camkes.sh", StringTemplate.runCamkesScript(symbolTable.hasVM()))
@@ -225,12 +255,24 @@ import org.sireum.hamr.codegen.common.symbols.SymbolTable
 
     imports = imports ++ resources.map((o: Resource) => s"""import "${o.path}";""")
 
-    val connectors: ISZ[ST] = actContainer.get.connectors.map(c => {
-      val fromType: ST = if(c.from_template.nonEmpty) st"""template "${c.from_template.get}"""" else st"""TODO"""
-      val toType: ST = if(c.from_template.nonEmpty) st"""template "${c.to_template.get}"""" else st"""TODO"""
-      st"""connector ${c.name} {
-          |  from ${c.from_type.name} ${fromType};
-          |  to ${c.to_type.name} ${toType};
+    val connectors: ISZ[ST] = actContainer.get.connectors.map((c: ConnectorContainer) => {
+      val conn = c.assemblyEntry
+
+      val srcWithThreads: Option[ST] = if(conn.from_threads >= 0) Some(st" with ${conn.from_threads} threads") else None()
+      val dstWithThreads: Option[ST] = if(conn.to_threads >= 0) Some(st" with ${conn.to_threads} threads") else None()
+
+      val fromType: Option[ST] = if(conn.from_template.nonEmpty) Some(st""" template "${conn.from_template.get}"""") else None()
+      val toType: Option[ST] = if(conn.from_template.nonEmpty) Some(st""" template "${conn.to_template.get}"""") else None()
+
+      val attributes: Option[ST] = if(conn.attributes.nonEmpty) {
+        val i = conn.attributes.map((m: ast.Attribute) => st"attribute ${m.typ} ${m.name} = ${m.value};")
+        Some(st"${(i, "\n")}")
+      } else { None() }
+
+      st"""connector ${conn.name} {
+          |  from ${conn.from_type.name}${fromType}${srcWithThreads};
+          |  to ${conn.to_type.name}${toType}${dstWithThreads};
+          |  ${attributes}
           |}
           |"""
     })

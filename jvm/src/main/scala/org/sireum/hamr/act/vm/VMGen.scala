@@ -5,6 +5,7 @@ import org.sireum._
 import org.sireum.hamr.act.{ActOptions, ActPlatform, ActPrettyPrint, QueueObject, Resource, SamplingPortInterface, Util}
 import org.sireum.hamr.ir
 import org.sireum.hamr.act.ast._
+import org.sireum.hamr.act.connections.Connections
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.utils.PathUtil
@@ -263,6 +264,8 @@ object VMGen {
   var crossConnGCMethods: ISZ[ST] = ISZ()
   var crossConnConnections: ISZ[ST] = ISZ()
 
+  val useCaseConnectors: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
+
   def genThread(aadlThread: AadlThread): (Component, ISZ[Resource]) = {
 
     assert(aadlThread.toVirtualMachine(symbolTable), s"Thread is not in a vm bound process ${aadlThread.identifier}")
@@ -281,7 +284,7 @@ object VMGen {
     // TODO: will we ever process models where a sporadic thread is isolated in the vm
     // or we're not using the pacer
     assert(PeriodicUtil.requiresPacerArtifacts(aadlThread.component, symbolTable, platform),
-      s"Expecting a periodic thread that will be triggered via a Pacer ${aadlThread.identifier}"
+      s"Expecting a periodic thread that will be triggered via a Pacer: ${aadlThread.identifier}"
     )
 
     includes = includes + Util.getSbTypeHeaderFilenameForIncludes()
@@ -290,7 +293,7 @@ object VMGen {
       val fid = CommonUtil.getLastName(featureEnd.identifier)
 
       featureEnd.category match {
-        case ir.FeatureCategory.EventDataPort =>
+        case ir.FeatureCategory.EventDataPort if !useCaseConnectors => {
           actOptions.platform match {
             case ActPlatform.SeL4_Only =>
               handleEventDataPort(featureEnd, aadlThread)
@@ -301,7 +304,19 @@ object VMGen {
               // TODO
               halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${fid}")
           }
+        }
+        case ir.FeatureCategory.EventDataPort if useCaseConnectors => {
+          actOptions.platform match {
+            case ActPlatform.SeL4_Only =>
+              handleEventDataPort_CASE_Connectors(featureEnd, aadlThread)
+            case ActPlatform.SeL4 =>
+              handleEventDataPort_CASE_Connectors(featureEnd, aadlThread)
 
+            case notyet =>
+              // TODO
+              halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${fid}")
+          }
+        }
         case ir.FeatureCategory.DataPort =>
           handleDataPort(featureEnd, aadlThread)
 
@@ -324,16 +339,20 @@ object VMGen {
         crossConnGCMethods = crossConnGCMethods :+
           VM_Template.vm_cross_conn_extern_dataport_method(PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
 
+        val notificationPrefix: String =
+          if(useCaseConnectors) PacerTemplate.pacerVM_ClientPeriodDataportIdentifier()
+          else PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier()
+
         // extern method name for pacer notification
         crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_notification_methods(PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier())
+          VM_Template.vm_cross_conn_extern_notification_methods(notificationPrefix)
 
         // connection creation for pacer dataport/notification
         crossConnConnections = crossConnConnections :+
           VM_Template.vm_cross_conn_Connections(
             methodNamePrefix = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(),
             emitMethodNamePrefix = None(),
-            notificationNamePrefix = Some(PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier()),
+            notificationNamePrefix = Some(notificationPrefix),
             counter = crossConnConnections.size)
 
       case x =>
@@ -409,6 +428,7 @@ object VMGen {
   }
 
   def handleEventDataPort(f: FeatureEnd, parent: AadlThread): Unit = {
+    assert(!useCaseConnectors)
 
     val fid = CommonUtil.getLastName(f.identifier)
 
@@ -421,25 +441,27 @@ object VMGen {
     includes = includes + s"<${Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)}>"
 
     f.direction match {
-      case ir.Direction.In =>
+      case ir.Direction.In => {
 
         val connections = symbolTable.inConnections.get(CommonUtil.getName(f.identifier)).get
         // TODO: fan ins ????
-        if(connections.size != 1) {
+        if (connections.size != 1) {
           // this would probably be bad if sender is fan-outing to a mix of
           // native and VM components.  Perhaps okay if broadcasting to
           // all native though?
           halt(s"Not currently supporting fan-ins for vm isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
         }
 
-        val notificationName = Util.genSeL4NotificationName(f, T)
-
-        consumes = consumes :+ Consumes(
-          name = notificationName,
-          typ = Util.EVENT_NOTIFICATION_TYPE,
-          optional = F)
-
         val dataportName = Util.getEventDataSBQueueDestFeatureName(fid)
+
+        val notificationName: String = {
+          val name = Util.genSeL4NotificationName(f, T)
+          consumes = consumes :+ Consumes(
+            name = name,
+            typ = Util.EVENT_NOTIFICATION_TYPE,
+            optional = F)
+          name
+        }
 
         dataports = dataports :+ Dataport(
           name = dataportName,
@@ -458,12 +480,12 @@ object VMGen {
             emitMethodNamePrefix = None(),
             notificationNamePrefix = Some(notificationName),
             counter = crossConnConnections.size)
-
-      case ir.Direction.Out =>
+      }
+      case ir.Direction.Out => {
 
         val connections = symbolTable.outConnections.get(CommonUtil.getName(f.identifier)).get
         // TODO: what to do about fan outs?
-        if(connections.size != 1) {
+        if (connections.size != 1) {
           // what if receivers have different queue sizes?  Would need to
           // broadcast.  Need examples
           halt(s"Not currently supporting fan-outs for VM isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
@@ -494,7 +516,90 @@ object VMGen {
             emitMethodNamePrefix = Some(emitsName),
             notificationNamePrefix = None(),
             counter = crossConnConnections.size)
+      }
+      case x => halt(s"Not expecting direction ${x}: ${parent.identifier}.{fid}")
+    }
+  }
 
+  def handleEventDataPort_CASE_Connectors(f: FeatureEnd, parent: AadlThread): Unit = {
+    assert(useCaseConnectors)
+
+    val fid = CommonUtil.getLastName(f.identifier)
+
+    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.classifier.get)).get
+    val sel4TypeName: String = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
+
+    val queueSize = PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE)
+    val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
+
+    includes = includes + s"<${Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)}>"
+
+    f.direction match {
+      case ir.Direction.In => {
+
+        val connections = symbolTable.inConnections.get(CommonUtil.getName(f.identifier)).get
+        // TODO: fan ins ????
+        if (connections.size != 1) {
+          // this would probably be bad if sender is fan-outing to a mix of
+          // native and VM components.  Perhaps okay if broadcasting to
+          // all native though?
+          halt(s"Not currently supporting fan-ins for vm isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
+        }
+
+        val dataportName = Util.getEventDataSBQueueDestFeatureName(fid)
+
+        val notificationName: String = dataportName
+
+        dataports = dataports :+ Dataport(
+          name = dataportName,
+          typ = queueType,
+          optional = F)
+
+        crossConnGCMethods = crossConnGCMethods :+
+          VM_Template.vm_cross_conn_extern_dataport_method(dataportName)
+
+        crossConnGCMethods = crossConnGCMethods :+
+          VM_Template.vm_cross_conn_extern_notification_methods(notificationName)
+
+        crossConnConnections = crossConnConnections :+
+          VM_Template.vm_cross_conn_Connections(
+            methodNamePrefix = dataportName,
+            emitMethodNamePrefix = None(),
+            notificationNamePrefix = Some(notificationName),
+            counter = crossConnConnections.size)
+      }
+      case ir.Direction.Out => {
+
+        val connections = symbolTable.outConnections.get(CommonUtil.getName(f.identifier)).get
+        // TODO: what to do about fan outs?
+        if (connections.size != 1 && !useCaseConnectors) {
+          // what if receivers have different queue sizes?  Would need to
+          // broadcast.  Need examples
+          halt(s"Not currently supporting fan-outs for VM isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
+        }
+
+        val dataPortName = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize)
+
+        val emitsName = dataPortName //Util.genSeL4NotificationQueueName(f, queueSize)
+
+        dataports = dataports :+ Dataport(
+          name = dataPortName,
+          typ = queueType,
+          optional = F)
+
+        crossConnGCMethods = crossConnGCMethods :+
+          VM_Template.vm_cross_conn_extern_dataport_method(dataPortName)
+
+        crossConnGCMethods = crossConnGCMethods :+
+          VM_Template.vm_cross_conn_extern_emit_method(emitsName)
+
+        crossConnConnections = crossConnConnections :+
+          VM_Template.vm_cross_conn_Connections(
+            methodNamePrefix = dataPortName,
+            emitMethodNamePrefix = Some(emitsName),
+            notificationNamePrefix = None(),
+            counter = crossConnConnections.size)
+      }
       case x => halt(s"Not expecting direction ${x}: ${parent.identifier}.{fid}")
     }
   }

@@ -4,15 +4,19 @@ package org.sireum.hamr.act.periodic
 
 import org.sireum._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits}
+import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
 import org.sireum.hamr.act.{ActOptions, C_Container, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, CamkesGlueCodeHeaderContributions, CamkesGlueCodeImplContributions, Counter, Resource, Sel4ConnectorTypes, StringTemplate, Util, ast}
 import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
 import org.sireum.hamr.codegen.common.symbols._
+import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 import org.sireum.message.Reporter
 
 @datatype class Pacer(val symbolTable: SymbolTable,
                       val actOptions: ActOptions) extends PeriodicImpl {
 
   val performHamrIntegration: B = Util.hamrIntegration(actOptions.platform)
+
+  val useCaseConnectors: B = ExperimentalOptions.useCaseConnectors(actOptions.experimentalOptions)
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
@@ -40,7 +44,7 @@ import org.sireum.message.Reporter
 
       var gcPacerIncludes: ISZ[String] = ISZ()
       var gcPacerImplEntries: ISZ[ST] = ISZ()
-      var gcPacerMethods: ISZ[ST] = ISZ()
+      var gcPacerMethods: ISZ[ST] = ISZ(CAmkESTemplate.externGetInstanceName())
       var gcPacerInitEntries: ISZ[ST] = ISZ()
 
       // add pacer domain configuration
@@ -66,7 +70,6 @@ import org.sireum.message.Reporter
 
         configurations = configurations :+ PacerTemplate.pacerDomainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
 
-
         if(isVM) {
 
           val pacerDataportName = PacerTemplate.pacerVM_PacerPeriodDataportIdentifier(componentId)
@@ -74,14 +77,26 @@ import org.sireum.message.Reporter
 
           dataports = dataports :+ dataportPeriod(pacerDataportName)
 
-          emits = emits :+ emitPeriodVM(pacerEmitName)
+          if(!useCaseConnectors) {
+            emits = emits :+ emitPeriodVM(pacerEmitName)
+          }
 
           gcPacerImplEntries = gcPacerImplEntries :+ gcSendPeriodToVM(componentId)
+
+          val pacerNotificationName: String =
+            if(useCaseConnectors) {
+              val sig = s"${pacerDataportName}_emit_underlying"
+              gcPacerMethods = gcPacerMethods :+ st"extern void ${sig}(void);"
+              sig
+            } else {
+              PacerTemplate.pacerVM_PacerEmitPeriodToVMMethodName(componentId)
+            }
 
           gcPacerMethods = gcPacerMethods :+ PacerTemplate.pacerVM_PacerGcSendPeriodMethod(
             componentId,
             PacerTemplate.pacerDataportQueueElemType(),
-            PacerTemplate.pacerDataportQueueSize())
+            PacerTemplate.pacerDataportQueueSize(),
+            pacerNotificationName)
 
           gcPacerInitEntries = gcPacerInitEntries :+
             PacerTemplate.pacerVM_PacerGcInitMethodEntry(
@@ -89,24 +104,42 @@ import org.sireum.message.Reporter
               PacerTemplate.pacerDataportQueueElemType(),
               PacerTemplate.pacerDataportQueueSize())
 
-          // connect notification to client
-          connections = connections :+ Util.createConnection(
-            connectionName = Util.getConnectionName(connectionCounter.increment()),
-            connectionType = Sel4ConnectorTypes.seL4GlobalAsynch,
-            srcComponent = PacerTemplate.PACER_IDENTIFIER,
-            srcFeature = pacerEmitName,
-            dstComponent = componentId,
-            dstFeature = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier())
+          if(!useCaseConnectors) {
+            // connect notification to client
+            connections = connections :+ Util.createConnection(
+              connectionName = Util.getConnectionName(connectionCounter.increment()),
+              connectionType = Sel4ConnectorTypes.seL4GlobalAsynch,
+              srcComponent = PacerTemplate.PACER_IDENTIFIER,
+              srcFeature = pacerEmitName,
+              dstComponent = componentId,
+              dstFeature = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier())
+          }
+
+          val dataportConnectorType: Sel4ConnectorTypes.Type =
+            if(useCaseConnectors) Sel4ConnectorTypes.CASE_AADL_EventDataport
+            else Sel4ConnectorTypes.seL4SharedDataWithCaps
+
+          val connectionName: String = Util.getConnectionName(connectionCounter.increment())
 
           // connect queue to client
           connections = connections :+ Util.createConnection(
-            connectionName = Util.getConnectionName(connectionCounter.increment()),
-            connectionType = Sel4ConnectorTypes.seL4SharedDataWithCaps,
+            connectionName = connectionName,
+            connectionType = dataportConnectorType,
             srcComponent = PacerTemplate.PACER_IDENTIFIER,
             srcFeature = pacerDataportName,
             dstComponent = componentId,
             dstFeature = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
 
+          if(useCaseConnectors) {
+            configurations = configurations :+
+              ConnectionsSbTemplate.caseConnectorConfig_with_signalling(connectionName)
+
+            configurations = configurations :+
+              ConnectionsSbTemplate.caseConnectorConfig_connection_type(PacerTemplate.PACER_IDENTIFIER, pacerDataportName, F)
+
+            configurations = configurations :+
+              ConnectionsSbTemplate.caseConnectorConfig_connection_type(componentId, PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(), T)
+          }
         } else {
 
           // connect period notification to client
@@ -208,10 +241,12 @@ import org.sireum.message.Reporter
         PacerTemplate.pacerDataportQueueElemType(),
         PacerTemplate.pacerDataportQueueSize())
 
-      consumes = consumes :+ ast.Consumes(
-        name = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier(),
-        typ = PacerTemplate.PACER_PERIOD_VM_TYPE,
-        optional = F)
+      if(!useCaseConnectors) {
+        consumes = consumes :+ ast.Consumes(
+          name = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier(),
+          typ = PacerTemplate.PACER_PERIOD_VM_TYPE,
+          optional = F)
+      }
 
       dataports = dataports :+ ast.Dataport(
         name = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(),

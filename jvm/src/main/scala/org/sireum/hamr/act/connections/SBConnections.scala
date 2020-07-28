@@ -3,6 +3,8 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
+import org.sireum.hamr.act.ast.{Attribute, ConnectorType}
+import org.sireum.hamr.act.templates.ConnectionsSbTemplate
 import org.sireum.hamr.act.{ActOptions, ActPlatform, Counter, Monitor, QueueObject, Sel4ConnectorTypes, SharedData, Util, ast}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
@@ -21,11 +23,13 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
   val platform: ActPlatform.Type = actOptions.platform
 
-  var camkesConfiguration: ISZ[ST] = ISZ()
+  var configurationEntries: ISZ[ST] = ISZ()
 
   var connections: ISZ[ast.Connection] = ISZ()
 
-  def processConnectionInstances(connectionCounter: Counter): (ISZ[ast.Connection], ISZ[ST]) = {
+  val useCaseConnections: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
+
+  def processConnectionInstances(connectionCounter: Counter): ConnectionContainer = {
     assert(platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only)
 
     var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
@@ -89,8 +93,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
-                  //holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
-
                   if (aadlTypes.rawConnections) {
                     val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
                       case Some(z) =>
@@ -108,7 +110,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                 }
               }
 
-              case ir.FeatureCategory.EventDataPort => {
+              case ir.FeatureCategory.EventDataPort if !useCaseConnections => {
                 // sel4 notification plus shared queue
 
                 val queueSize: Z = srcQueues.get(srcFeaturePath).get.get(dstFeaturePath).get.queueSize
@@ -165,6 +167,49 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
                     st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render)
+
+                  updateHolder(srcConnectionEnd, holder)
+                }
+              }
+
+              case ir.FeatureCategory.EventDataPort if useCaseConnections => {
+                // shared queue -- custom CAmkES template handles notification
+
+                val queueSize: Z = srcQueues.get(srcFeaturePath).get.get(dstFeaturePath).get.queueSize
+
+                { // queue dataport connection
+                  val queueConnectorType: Sel4ConnectorTypes.Type = Sel4ConnectorTypes.CASE_AADL_EventDataport
+
+                  val srcCamkesFeatureQueueName: String = Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
+                  val dstCamkesFeatureQueueName: String = Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
+
+                  val srcConnectionEnd: ast.ConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
+                  val dstConnectionEnd: ast.ConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
+
+                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+
+                  if (aadlTypes.rawConnections) {
+                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
+                      case Some(z) =>
+                        if (z % z"4096" == z"0") z
+                        else (z / z"4096" + 1) * z"4096"
+                      case _ => z"4096" // TODO or throw error?
+                    }
+
+                    holder = holder(configurationEntries = holder.configurationEntries :+
+                      st"""${holder.connectionName}.size = ${size};""".render)
+                  }
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName).render)
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName, srcToVM).render)
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, dstToVM).render)
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -234,10 +279,42 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         holder.toConnectionEnds.toIS)
 
       val filtered = Set.empty[String] ++ holder.configurationEntries.toIS
-      camkesConfiguration = camkesConfiguration ++ filtered.elements.map((m: String) => st"$m")
+      configurationEntries = configurationEntries ++ filtered.elements.map((m: String) => st"$m")
     }
 
-    return (connections, camkesConfiguration)
+    var connectors: ISZ[ConnectorContainer] = ISZ()
+    if(useCaseConnections) {
+      val connectorName: String = ConnectionsSbTemplate.CASE_AADL_EventDataport
+      val assemblyEntry: ast.Connector = ast.Connector(
+        name = connectorName,
+
+        from_type = ConnectorType.Dataport,
+        from_template = None(),
+        from_threads = z"0",
+        from_hardware = F,
+
+        to_type = ConnectorType.Dataports,
+        to_template = None(),
+        to_threads = z"-1",
+        to_hardware = F,
+
+        attributes = ISZ(Attribute(typ = "bool", name = "to_global_endpoint", value = "True"))
+      )
+
+      val connectorTemplate: ConnectorTemplate = ConnectorTemplate(
+        fromTemplateName = ConnectionsSbTemplate.getCASE_AADL_EventDataport_From_TemplateFilename(),
+        fromTemplate = Some(ConnectionsSbTemplate.getCASE_AADL_EventDataport_From_Template()),
+        toTemplateName = ConnectionsSbTemplate.getCASE_AADL_EventDataport_To_TemplateFilename(),
+        toTemplate = Some(ConnectionsSbTemplate.getCASE_AADL_EventDataport_To_Template())
+      )
+
+      connectors = connectors :+ ConnectorContainer(
+        connectorName = connectorName,
+        assemblyEntry = assemblyEntry,
+        connectorTemplate = connectorTemplate)
+    }
+
+    return ConnectionContainer(connections, configurationEntries, connectors)
   }
 
 }

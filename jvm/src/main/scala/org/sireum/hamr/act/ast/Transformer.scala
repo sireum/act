@@ -218,6 +218,10 @@ object Transformer {
       return PreResult(ctx, T, None())
     }
 
+    @pure def preAttribute(ctx: Context, o: Attribute): PreResult[Context, Attribute] = {
+      return PreResult(ctx, T, None())
+    }
+
     @pure def preTODO(ctx: Context, o: TODO): PreResult[Context, TODO] = {
       return PreResult(ctx, T, None())
     }
@@ -397,6 +401,10 @@ object Transformer {
       return TPostResult(ctx, None())
     }
 
+    @pure def postAttribute(ctx: Context, o: Attribute): TPostResult[Context, Attribute] = {
+      return TPostResult(ctx, None())
+    }
+
     @pure def postTODO(ctx: Context, o: TODO): TPostResult[Context, TODO] = {
       return TPostResult(ctx, None())
     }
@@ -481,10 +489,11 @@ import Transformer._
           else
             TPostResult(preR.ctx, None())
         case o2: Connector =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, Attribute]] = transformISZ(preR.ctx, o2.attributes, transformAttribute _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(attributes = r0.resultOpt.getOrElse(o2.attributes))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Procedure =>
           val r0: TPostResult[Context, IS[Z, Method]] = transformISZ(preR.ctx, o2.methods, transformMethod _)
           if (hasChanged || r0.resultOpt.nonEmpty)
@@ -849,10 +858,11 @@ import Transformer._
     val r: TPostResult[Context, Connector] = if (preR.continu) {
       val o2: Connector = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, Attribute]] = transformISZ(preR.ctx, o2.attributes, transformAttribute _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(attributes = r0.resultOpt.getOrElse(o2.attributes))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1019,6 +1029,32 @@ import Transformer._
     val hasChanged: B = r.resultOpt.nonEmpty
     val o2: Mutex = r.resultOpt.getOrElse(o)
     val postR: TPostResult[Context, Mutex] = pp.postMutex(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformAttribute(ctx: Context, o: Attribute): TPostResult[Context, Attribute] = {
+    val preR: PreResult[Context, Attribute] = pp.preAttribute(ctx, o)
+    val r: TPostResult[Context, Attribute] = if (preR.continu) {
+      val o2: Attribute = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        TPostResult(preR.ctx, Some(o2))
+      else
+        TPostResult(preR.ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: Attribute = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, Attribute] = pp.postAttribute(r.ctx, o2)
     if (postR.resultOpt.nonEmpty) {
       return postR
     } else if (hasChanged) {

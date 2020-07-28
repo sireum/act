@@ -242,12 +242,13 @@ object PacerTemplate {
 
   def pacerVM_PacerGcSendPeriodMethod(vmID: String,
                                       queueElementTypeName: String,
-                                      queueSize: Z): ST = {
+                                      queueSize: Z,
+                                      notificationName: String): ST = {
     val enqueueMethodName = EventDataQueueTemplate.getQueueEnqueueMethodName(queueElementTypeName, queueSize)
-    val periodForVmMethodName = PacerTemplate.pacerVM_PacerEmitPeriodToVMMethodName(vmID)
+
     val ret: ST = st"""void ${pacerVM_PacerSendPeriodToVmMethodName(vmID)}(${pacerDataportQueueElemType()} *data) {
                       |  ${enqueueMethodName}(${pacerVM_PacerPeriodDataportIdentifier(vmID)}, data);
-                      |  ${periodForVmMethodName}();
+                      |  ${notificationName}();
                       |}"""
     return ret
   }

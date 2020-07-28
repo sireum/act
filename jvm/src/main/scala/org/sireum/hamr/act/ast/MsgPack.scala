@@ -72,7 +72,9 @@ object MsgPack {
 
     val Mutex: Z = -15
 
-    val TODO: Z = -14
+    val Attribute: Z = -14
+
+    val TODO: Z = -13
 
   }
 
@@ -211,6 +213,7 @@ object MsgPack {
       writer.writeOption(o.to_template, writer.writeString _)
       writer.writeZ(o.to_threads)
       writer.writeB(o.to_hardware)
+      writer.writeISZ(o.attributes, writeAttribute _)
     }
 
     def writeProcedure(o: Procedure): Unit = {
@@ -252,6 +255,13 @@ object MsgPack {
     def writeMutex(o: Mutex): Unit = {
       writer.writeZ(Constants.Mutex)
       writer.writeString(o.name)
+    }
+
+    def writeAttribute(o: Attribute): Unit = {
+      writer.writeZ(Constants.Attribute)
+      writer.writeString(o.typ)
+      writer.writeString(o.name)
+      writer.writeString(o.value)
     }
 
     def writeTODO(o: TODO): Unit = {
@@ -505,7 +515,8 @@ object MsgPack {
       val to_template = reader.readOption(reader.readString _)
       val to_threads = reader.readZ()
       val to_hardware = reader.readB()
-      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware)
+      val attributes = reader.readISZ(readAttribute _)
+      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware, attributes)
     }
 
     def readProcedure(): Procedure = {
@@ -596,6 +607,21 @@ object MsgPack {
       }
       val name = reader.readString()
       return Mutex(name)
+    }
+
+    def readAttribute(): Attribute = {
+      val r = readAttributeT(F)
+      return r
+    }
+
+    def readAttributeT(typeParsed: B): Attribute = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.Attribute)
+      }
+      val typ = reader.readString()
+      val name = reader.readString()
+      val value = reader.readString()
+      return Attribute(typ, name, value)
     }
 
     def readTODO(): TODO = {
@@ -904,6 +930,21 @@ object MsgPack {
       return r
     }
     val r = to(data, fMutex _)
+    return r
+  }
+
+  def fromAttribute(o: Attribute, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeAttribute(o)
+    return w.result
+  }
+
+  def toAttribute(data: ISZ[U8]): Either[Attribute, MessagePack.ErrorMsg] = {
+    def fAttribute(reader: Reader): Attribute = {
+      val r = reader.readAttribute()
+      return r
+    }
+    val r = to(data, fAttribute _)
     return r
   }
 

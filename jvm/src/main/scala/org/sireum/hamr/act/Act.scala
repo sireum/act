@@ -9,6 +9,7 @@ import org.sireum.hamr.act.Util.reporter
 import org.sireum.hamr.codegen.common.symbols.SymbolResolver
 import org.sireum.hamr.codegen.common.types.TypeResolver
 import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
+import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 
 object Act {
 
@@ -39,8 +40,9 @@ object Act {
     val m2 = if(result.resultOpt.nonEmpty) result.resultOpt.get else m1
 
     if(!result.ctx.hasErrors) {
-      
-      val symbolTable = SymbolResolver.resolve(m2, options.hamrBasePackageName, reporter)
+
+      val useCaseConnectors: B = ExperimentalOptions.useCaseConnectors(options.experimentalOptions)
+      val symbolTable = SymbolResolver.resolve(m2, options.hamrBasePackageName, useCaseConnectors, reporter)
 
       val basePackageName: String = options.hamrBasePackageName match {
         case Some(b) => b
@@ -85,8 +87,9 @@ object Act {
             cHeaderDirectories = auxHeaderDirectories,
             aadlRootDir = rootDir,
             slangLibInstanceNames: ISZ[String],
-            platform = options.platform,
-            symbolTable = symbolTable)
+            symbolTable = symbolTable,
+            options = options
+          )
         case _ =>
       }
     }

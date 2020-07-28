@@ -93,7 +93,9 @@ import org.sireum._
                           to_type: ConnectorType.Type,
                           to_template: Option[String],
                           to_threads: Z,
-                          to_hardware: B) extends ASTObject
+                          to_hardware: B,
+
+                          attributes: ISZ[Attribute]) extends ASTObject
 
 @datatype class Procedure(name: String,
                           methods: ISZ[Method],
@@ -119,5 +121,9 @@ import org.sireum._
 @datatype class Semaphore(name: String) extends ASTObject
 
 @datatype class Mutex(name: String) extends ASTObject
+
+@datatype class Attribute(typ: String,
+                          name: String,
+                          value: String)
 
 @datatype class TODO () extends ASTObject

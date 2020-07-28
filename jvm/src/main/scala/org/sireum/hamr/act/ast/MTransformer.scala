@@ -125,6 +125,10 @@ object MTransformer {
 
   val PostResultMutex: MOption[Mutex] = MNone()
 
+  val PreResultAttribute: PreResult[Attribute] = PreResult(T, MNone())
+
+  val PostResultAttribute: MOption[Attribute] = MNone()
+
   val PreResultTODO: PreResult[TODO] = PreResult(T, MNone())
 
   val PostResultTODO: MOption[TODO] = MNone()
@@ -310,6 +314,10 @@ import MTransformer._
     return PreResultMutex
   }
 
+  def preAttribute(o: Attribute): PreResult[Attribute] = {
+    return PreResultAttribute
+  }
+
   def preTODO(o: TODO): PreResult[TODO] = {
     return PreResultTODO
   }
@@ -489,6 +497,10 @@ import MTransformer._
     return PostResultMutex
   }
 
+  def postAttribute(o: Attribute): MOption[Attribute] = {
+    return PostResultAttribute
+  }
+
   def postTODO(o: TODO): MOption[TODO] = {
     return PostResultTODO
   }
@@ -547,8 +559,9 @@ import MTransformer._
           else
             MNone()
         case o2: Connector =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, Attribute]] = transformISZ(o2.attributes, transformAttribute _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(attributes = r0.getOrElse(o2.attributes)))
           else
             MNone()
         case o2: Procedure =>
@@ -915,8 +928,9 @@ import MTransformer._
     val r: MOption[Connector] = if (preR.continu) {
       val o2: Connector = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, Attribute]] = transformISZ(o2.attributes, transformAttribute _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(attributes = r0.getOrElse(o2.attributes)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1085,6 +1099,32 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Mutex = r.getOrElse(o)
     val postR: MOption[Mutex] = postMutex(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformAttribute(o: Attribute): MOption[Attribute] = {
+    val preR: PreResult[Attribute] = preAttribute(o)
+    val r: MOption[Attribute] = if (preR.continu) {
+      val o2: Attribute = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: Attribute = r.getOrElse(o)
+    val postR: MOption[Attribute] = postAttribute(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {

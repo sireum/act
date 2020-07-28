@@ -195,7 +195,8 @@ object JSON {
         ("to_type", printConnectorTypeType(o.to_type)),
         ("to_template", printOption(T, o.to_template, printString _)),
         ("to_threads", printZ(o.to_threads)),
-        ("to_hardware", printB(o.to_hardware))
+        ("to_hardware", printB(o.to_hardware)),
+        ("attributes", printISZ(F, o.attributes, printAttribute _))
       ))
     }
 
@@ -257,6 +258,15 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Mutex""""),
         ("name", printString(o.name))
+      ))
+    }
+
+    @pure def printAttribute(o: Attribute): ST = {
+      return printObject(ISZ(
+        ("type", st""""Attribute""""),
+        ("typ", printString(o.typ)),
+        ("name", printString(o.name)),
+        ("value", printString(o.value))
       ))
     }
 
@@ -626,7 +636,10 @@ object JSON {
       parser.parseObjectKey("to_hardware")
       val to_hardware = parser.parseB()
       parser.parseObjectNext()
-      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware)
+      parser.parseObjectKey("attributes")
+      val attributes = parser.parseISZ(parseAttribute _)
+      parser.parseObjectNext()
+      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware, attributes)
     }
 
     def parseProcedure(): Procedure = {
@@ -759,6 +772,27 @@ object JSON {
       val name = parser.parseString()
       parser.parseObjectNext()
       return Mutex(name)
+    }
+
+    def parseAttribute(): Attribute = {
+      val r = parseAttributeT(F)
+      return r
+    }
+
+    def parseAttributeT(typeParsed: B): Attribute = {
+      if (!typeParsed) {
+        parser.parseObjectType("Attribute")
+      }
+      parser.parseObjectKey("typ")
+      val typ = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("value")
+      val value = parser.parseString()
+      parser.parseObjectNext()
+      return Attribute(typ, name, value)
     }
 
     def parseTODO(): TODO = {
@@ -1129,6 +1163,24 @@ object JSON {
       return r
     }
     val r = to(s, fMutex _)
+    return r
+  }
+
+  def fromAttribute(o: Attribute, isCompact: B): String = {
+    val st = Printer.printAttribute(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toAttribute(s: String): Either[Attribute, Json.ErrorMsg] = {
+    def fAttribute(parser: Parser): Attribute = {
+      val r = parser.parseAttribute()
+      return r
+    }
+    val r = to(s, fAttribute _)
     return r
   }
 

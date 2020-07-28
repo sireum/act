@@ -3,6 +3,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
+import org.sireum.hamr.act.connections.ConnectorContainer
 import org.sireum.hamr.act.vm.VMGen
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
@@ -574,7 +575,7 @@ object TypeUtil {
 
 
 @datatype class ActContainer(rootServer: String,
-                             connectors: ISZ[ast.Connector],
+                             connectors: ISZ[ConnectorContainer],
                              models: ISZ[ast.ASTObject],
                              monitors: ISZ[Monitor],
                              samplingPorts: ISZ[SamplingPortInterface],
@@ -612,6 +613,7 @@ object TypeUtil {
                               index: Z,                  // fan-out index
                               ci: ir.ConnectionInstance // aadl connection 
                              ) extends Monitor
+
 
 @datatype class C_Container(instanceName: String,
                             componentId: String,
@@ -694,6 +696,8 @@ object TypeUtil {
   'seL4SharedDataWithCaps
   'seL4TimeServer
   'seL4VMDTBPassthrough
+
+  'CASE_AADL_EventDataport
 }
 
 object Transformers {
@@ -831,7 +835,8 @@ object Transformers {
                            auxFiles: Map[String, String],
                            aadlRootDirectory: Option[String],
                            platform: ActPlatform.Type,
-                           hamrBasePackageName: Option[String])
+                           hamrBasePackageName: Option[String],
+                           experimentalOptions: ISZ[String])
 
 @record class Counter() {
   var count: Z = 0 // start at 0 so first is 1 which prevents capability conflict issues

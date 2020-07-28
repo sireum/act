@@ -7,7 +7,7 @@ import org.sireum.ops.ISZOps
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
 import org.sireum.hamr.act.cakeml.CakeML
-import org.sireum.hamr.act.connections.{Connections, Monitors, SBConnections, SharedDataUtil, TBConnections}
+import org.sireum.hamr.act.connections.{ConnectionContainer, Connections, ConnectorContainer, Monitors, SBConnections, SharedDataUtil, TBConnections}
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
@@ -20,7 +20,6 @@ import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
 import org.sireum.message.Reporter
-import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
 @record class Gen(model: Aadl,
                   symbolTable: SymbolTable,
@@ -37,7 +36,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
   var samplingPorts: HashMap[String, SamplingPortInterface] = HashMap.empty
   var srcQueues: Map[String, Map[String, QueueObject]] = Map.empty // {dstFeatureId -> {srcFeatureId -> queueobj}}
   
-  var connectors: ISZ[ast.Connector] = ISZ()
   var astObjects: ISZ[ASTObject] = ISZ()
   var monitors: HashSMap[String, Monitor] = HashSMap.empty // conn instname -> monitor
   var containers: ISZ[C_Container] = ISZ()
@@ -45,6 +43,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
   var camkesComponents: ISZ[ast.Component] = ISZ()
   var camkesConnections: ISZ[ast.Connection] = ISZ()
+  var camkesConnectorContainers: ISZ[ConnectorContainer] = ISZ()
 
   var camkesConfiguration: ISZ[ST] = ISZ()
   var camkesConfigurationMacros: Set[String] = Set.empty // same idea, just can't end with a semi-colon
@@ -61,6 +60,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
   
   val connectionCounter: Counter = Counter()
   val timerAttributeCounter: Counter = Counter()
+
+  val useCaseConnectors: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
 
   def hasErrors(): B = {
     return reporter.hasError
@@ -87,13 +88,18 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       gen(symbolTable.rootSystem.component)
     }
 
+    // build connections
     if(!hasErrors() && platform != ActPlatform.SeL4_TB) {
-      val (connections, configEntries) = processSBConnections()
-      camkesConnections = camkesConnections ++ connections
-      camkesConfiguration = camkesConfiguration ++ configEntries
+      val connContainer: ConnectionContainer = processSBConnections()
+      camkesConnections = camkesConnections ++ connContainer.connections
+      camkesConfiguration = camkesConfiguration ++ connContainer.configurationEntries
+      camkesConnectorContainers = camkesConnectorContainers ++ connContainer.optConnectorHolder
     }
 
     if(!hasErrors()) {
+      // filter??
+      camkesConnectorContainers = (Set.empty[ConnectorContainer] ++ camkesConnectorContainers).elements
+
       // merge assemblies
       val assemblies: ISZ[Assembly] = astObjects.filter(f => f.isInstanceOf[Assembly]).map(m => m.asInstanceOf[Assembly])
       val otherAstObjects: ISZ[ASTObject] =  astObjects.filter(f => !f.isInstanceOf[Assembly])
@@ -175,7 +181,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
       return (Some(ActContainer(
         rootServer = CommonUtil.getLastName(symbolTable.rootSystem.component.identifier),
-        connectors = connectors,
+        connectors = camkesConnectorContainers,
         models = astObjects,
         monitors = monitors.values,
         samplingPorts = samplingPorts.values,
@@ -211,7 +217,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
           // sanity check: currently expecting exactly one thread pre process when virtualizing
           // TODO: move this to common sym resolver?
-          assert(threads.size == 1)
+          assert(threads.size == 1, s"Only expecting one thread per process going to VM: ${aadlProcess.identifier}")
         }
 
         val g: Composition = genProcess(aadlProcess)
@@ -616,10 +622,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
             val isOptional = symbolTable.getInConnections(fpath).isEmpty
 
-            consumes = consumes :+ Consumes(
-              name = Util.genSeL4NotificationName(f, T),
-              typ = Util.EVENT_NOTIFICATION_TYPE,
-              optional = isOptional)
+            if(!useCaseConnectors) {
+              consumes = consumes :+ Consumes(
+                name = Util.genSeL4NotificationName(f, T),
+                typ = Util.EVENT_NOTIFICATION_TYPE,
+                optional = isOptional)
+            }
 
             dataports = dataports :+ Dataport(
               name = Util.getEventDataSBQueueDestFeatureName(fid),
@@ -639,9 +647,11 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               cmakeSOURCES = cmakeSOURCES :+ s"${Util.getTypeSrcPath()}/${queueImplName}"
               camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
 
-              emits = emits :+ Emits(
-                name = Util.genSeL4NotificationQueueName(f, queueSize),
-                typ = Util.EVENT_NOTIFICATION_TYPE)
+              if(!useCaseConnectors) {
+                emits = emits :+ Emits(
+                  name = Util.genSeL4NotificationQueueName(f, queueSize),
+                  typ = Util.EVENT_NOTIFICATION_TYPE)
+              }
 
               dataports = dataports :+ Dataport(
                 name = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize),
@@ -1706,7 +1716,10 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     }
 
     def handleEventDataPort(): Option[C_SimpleContainer] = {
+
       def handleEventData_SB_GlueCode_Profile(): Option[C_SimpleContainer] = {
+        assert(!useCaseConnectors)
+
         val featurePath = CommonUtil.getName(feature.identifier)
         val fid = CommonUtil.getLastName(feature.identifier)
         val featureName = Util.brand(fid)
@@ -1715,7 +1728,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         val sel4TypeName = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
 
         val ret: Option[C_SimpleContainer] = feature.direction match {
-          case ir.Direction.In =>
+          case ir.Direction.In => {
 
             if(symbolTable.getInConnections(featurePath).isEmpty){
               return None()
@@ -1751,31 +1764,31 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
             cInterfaces = cInterfaces :+ st"bool ${dequeueMethodName}(${sel4TypeName} *);"
 
             val baseCimpl = st"""${recvQueueType} ${recvQueueFeatureName};
-                                 |
-                                 |/************************************************************************
-                                 | * ${dequeuePollMethodName}:
-                                 | ************************************************************************/
-                                 |bool ${dequeuePollMethodName}(${counterType} *${counterVar}, ${sel4TypeName} *data) {
-                                 |  return ${dequeueInfrastructureMethodName}(&${recvQueueFeatureName}, ${counterVar}, data);
-                                 |}
-                                 |
-                                 |/************************************************************************
-                                 | * ${dequeueMethodName}:
-                                 | ************************************************************************/
-                                 |bool ${dequeueMethodName}(${sel4TypeName} *data) {
-                                 |  ${counterType} ${counterVar};
-                                 |  return ${dequeuePollMethodName}(&${counterVar}, data);
-                                 |}
-                                 |
-                                 |/************************************************************************
-                                 | * ${isEmptyMethodName}:
-                                 | *
-                                 | * Helper method to determine if infrastructure port has received new
-                                 | * events
-                                 | ************************************************************************/
-                                 |bool ${isEmptyMethodName}(){
-                                 |  return ${isEmptyInfrastructureMethodName}(&${recvQueueFeatureName});
-                                 |}"""
+                                |
+                                |/************************************************************************
+                                | * ${dequeuePollMethodName}:
+                                | ************************************************************************/
+                                |bool ${dequeuePollMethodName}(${counterType} *${counterVar}, ${sel4TypeName} *data) {
+                                |  return ${dequeueInfrastructureMethodName}(&${recvQueueFeatureName}, ${counterVar}, data);
+                                |}
+                                |
+                                |/************************************************************************
+                                | * ${dequeueMethodName}:
+                                | ************************************************************************/
+                                |bool ${dequeueMethodName}(${sel4TypeName} *data) {
+                                |  ${counterType} ${counterVar};
+                                |  return ${dequeuePollMethodName}(&${counterVar}, data);
+                                |}
+                                |
+                                |/************************************************************************
+                                | * ${isEmptyMethodName}:
+                                | *
+                                | * Helper method to determine if infrastructure port has received new
+                                | * events
+                                | ************************************************************************/
+                                |bool ${isEmptyMethodName}(){
+                                |  return ${isEmptyInfrastructureMethodName}(&${recvQueueFeatureName});
+                                |}"""
 
             cImplementations = cImplementations :+ baseCimpl
 
@@ -1809,17 +1822,17 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                     val invokeHandler = s"${userEntrypointMethodName}((${sel4TypeName} *) in_arg);"
                     val entrypoint = st"""/************************************************************************
-                                      | * ${userEntrypointName}:
-                                      | *
-                                      | * This is the function invoked by an active thread dispatcher to
-                                      | * call to a user-defined entrypoint function.  It sets up the dispatch
-                                      | * context for the user-defined entrypoint, then calls it.
-                                      | *
-                                      | ************************************************************************/
-                                      |void ${userEntrypointName}(const ${sel4TypeName} * in_arg) {
-                                      |  ${invokeHandler}
-                                      |}
-                                      |"""
+                                         | * ${userEntrypointName}:
+                                         | *
+                                         | * This is the function invoked by an active thread dispatcher to
+                                         | * call to a user-defined entrypoint function.  It sets up the dispatch
+                                         | * context for the user-defined entrypoint, then calls it.
+                                         | *
+                                         | ************************************************************************/
+                                         |void ${userEntrypointName}(const ${sel4TypeName} * in_arg) {
+                                         |  ${invokeHandler}
+                                         |}
+                                         |"""
 
                     cImplementations = cImplementations :+ entrypoint
 
@@ -1846,8 +1859,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               preInits = preInit,
               postInits = postInit,
               drainQueues = drainQueue))
-
-          case ir.Direction.Out =>
+          }
+          case ir.Direction.Out => {
 
             val dsts: Map[String, QueueObject] = srcQueues.get(featurePath).get
 
@@ -1868,8 +1881,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               preInits = preInits :+ st"""// initialise data structure for outgoing event data port ${fid}
                                          |${queueName}_init(${featureQueueName});"""
 
+              val notification: Option[ST] =
+                if(!useCaseConnectors) Some(st"${featureNotificationName}_emit();")
+                else None()
+
               st"""${queueName}_enqueue(${featureQueueName}, (${sel4TypeName}*) data);
-                  |${featureNotificationName}_emit();
+                  |${notification}
                   |"""
             })
 
@@ -1895,7 +1912,210 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
               preInits = preInit,
               postInits = postInit,
               drainQueues = drainQueues))
+          }
+          case x => halt(s"Unexpected direction: ${x}")
+        }
+        return ret
+      }
 
+      def handleEventData_CASE_Conenctors_SB_GlueCode_Profile(): Option[C_SimpleContainer] = {
+        assert(useCaseConnectors)
+
+        val featurePath = CommonUtil.getName(feature.identifier)
+        val fid = CommonUtil.getLastName(feature.identifier)
+        val featureName = Util.brand(fid)
+
+        val aadlPortType = typeMap.get(Util.getClassifierFullyQualified(feature.classifier.get)).get
+        val sel4TypeName = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
+
+        val ret: Option[C_SimpleContainer] = feature.direction match {
+          case ir.Direction.In => {
+
+            if(symbolTable.getInConnections(featurePath).isEmpty){
+              return None()
+            }
+
+            val queueSize = PropertyUtil.getQueueSize(feature, Util.DEFAULT_QUEUE_SIZE)
+            val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
+            val queueName = Util.getEventDataSBQueueName(sel4TypeName, queueSize)
+
+            val featureQueueName = Util.getEventDataSBQueueDestFeatureName(fid)
+            val featureNotificationName = featureQueueName
+
+            var preInits: ISZ[ST] = ISZ()
+            var postInits: ISZ[ST] = ISZ()
+            var drainQueue: Option[(ST,ST)] = None()
+            var cInterfaces: ISZ[ST] = ISZ()
+            var cImplementations: ISZ[ST] = ISZ()
+
+            val counterVar = "numDropped"
+            val counterType = Util.SB_EVENT_COUNTER_TYPE
+
+            val recvQueueFeatureName = Util.getEventData_SB_RecvQueueFeatureName(fid)
+            val recvQueueName = Util.getEventData_SB_RecvQueueName(sel4TypeName, queueSize)
+            val recvQueueType = Util.getEventData_SB_RecvQueueTypeName(sel4TypeName, queueSize)
+
+            val dequeuePollMethodName = s"${featureName}_dequeue_poll"
+            val dequeueMethodName = s"${featureName}_dequeue"
+            val dequeueInfrastructureMethodName = s"${queueName}_dequeue"
+
+            val isEmptyMethodName = s"${featureName}_is_empty"
+            val isEmptyInfrastructureMethodName = s"${queueName}_is_empty"
+
+            cInterfaces = cInterfaces :+ st"bool ${dequeueMethodName}(${sel4TypeName} *);"
+
+            val baseCimpl = st"""${recvQueueType} ${recvQueueFeatureName};
+                                |
+                                |/************************************************************************
+                                | * ${dequeuePollMethodName}:
+                                | ************************************************************************/
+                                |bool ${dequeuePollMethodName}(${counterType} *${counterVar}, ${sel4TypeName} *data) {
+                                |  return ${dequeueInfrastructureMethodName}(&${recvQueueFeatureName}, ${counterVar}, data);
+                                |}
+                                |
+                                |/************************************************************************
+                                | * ${dequeueMethodName}:
+                                | ************************************************************************/
+                                |bool ${dequeueMethodName}(${sel4TypeName} *data) {
+                                |  ${counterType} ${counterVar};
+                                |  return ${dequeuePollMethodName}(&${counterVar}, data);
+                                |}
+                                |
+                                |/************************************************************************
+                                | * ${isEmptyMethodName}:
+                                | *
+                                | * Helper method to determine if infrastructure port has received new
+                                | * events
+                                | ************************************************************************/
+                                |bool ${isEmptyMethodName}(){
+                                |  return ${isEmptyInfrastructureMethodName}(&${recvQueueFeatureName});
+                                |}"""
+
+            cImplementations = cImplementations :+ baseCimpl
+
+            if(aadlThread.isSporadic()) {
+              val handlerName = s"${featureNotificationName}_handler"
+              val regCallback = s"${featureNotificationName}_reg_callback"
+
+              cImplementations = cImplementations :+ st"extern int ${regCallback}(void (*cb)(void*), void *arg);"
+
+              cImplementations = cImplementations :+
+                StringTemplate.cEventNotificationHandler(handlerName, regCallback, featureName)
+
+              postInits = postInits :+ StringTemplate.cRegCallback(handlerName, regCallback, feature)
+
+              if(!performHamrIntegration) {
+                Util.getComputeEntrypointSourceText(feature.properties) match {
+                  case Some(userEntrypointMethodName) =>
+
+                    val varName = featureName
+
+                    val userEntrypointName = Util.getUserEventEntrypointMethodName(component, feature)
+
+                    drainQueue = Some((
+                      st"",
+                      st"""{
+                          |  ${sel4TypeName} ${varName};
+                          |  while (${dequeueMethodName}((${sel4TypeName} *) &${varName})) {
+                          |    ${userEntrypointName}(&${varName});
+                          |  }
+                          |}"""))
+
+                    cInterfaces = cInterfaces :+ st"void ${userEntrypointMethodName}(const ${sel4TypeName} *);"
+
+                    val invokeHandler = s"${userEntrypointMethodName}((${sel4TypeName} *) in_arg);"
+                    val entrypoint = st"""/************************************************************************
+                                         | * ${userEntrypointName}:
+                                         | *
+                                         | * This is the function invoked by an active thread dispatcher to
+                                         | * call to a user-defined entrypoint function.  It sets up the dispatch
+                                         | * context for the user-defined entrypoint, then calls it.
+                                         | *
+                                         | ************************************************************************/
+                                         |void ${userEntrypointName}(const ${sel4TypeName} * in_arg) {
+                                         |  ${invokeHandler}
+                                         |}
+                                         |"""
+
+                    cImplementations = cImplementations :+ entrypoint
+
+                  case _ =>
+                }
+              }
+            }
+
+            val cIncludes: ISZ[ST] = ISZ(st"""#include <${queueHeaderName}>
+                                             |#include <${Util.SB_COUNTER_HEADER_FILENAME}>""")
+
+            preInits = preInits :+ st"""// initialise data structure for incoming event data port ${fid}
+                                       |${recvQueueName}_init(&${recvQueueFeatureName}, ${featureQueueName});"""
+
+            val cInterface: Option[ST] = if(cInterfaces.isEmpty) None() else Some(st"${(cInterfaces, "\n\n")}")
+            val cImplementation: Option[ST] = if(cImplementations.isEmpty) None() else Some(st"${(cImplementations, "\n\n")}")
+            val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n\n")}")
+            val postInit: Option[ST] = if(postInits.isEmpty) None() else Some(st"${(postInits, "\n\n")}")
+
+            Some(C_SimpleContainer(
+              cIncludes = cIncludes,
+              cInterface = cInterface,
+              cImplementation = cImplementation,
+              preInits = preInit,
+              postInits = postInit,
+              drainQueues = drainQueue))
+          }
+          case ir.Direction.Out => {
+
+            val dsts: Map[String, QueueObject] = srcQueues.get(featurePath).get
+
+            var cIncludes: ISZ[ST] = ISZ()
+
+            var preInits: ISZ[ST] = ISZ()
+            var postInits: ISZ[ST] = ISZ()
+
+            var externMethods: ISZ[ST] = ISZ()
+            val enqueueEntries: ISZ[ST] = dsts.valueSet.elements.map(qo => {
+
+              val queueHeaderName = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, qo.queueSize)
+              val queueName = Util.getEventDataSBQueueName(sel4TypeName, qo.queueSize)
+
+              val featureQueueName = Util.getEventDataSBQueueSrcFeatureName(fid, qo.queueSize)
+              val featureNotificationName = s"${featureQueueName}_emit_underlying"
+
+              cIncludes = cIncludes :+ st"#include <${queueHeaderName}>"
+              preInits = preInits :+ st"""// initialise data structure for outgoing event data port ${fid}
+                                         |${queueName}_init(${featureQueueName});"""
+
+              externMethods = externMethods :+ st"extern void ${featureNotificationName}(void);"
+
+              st"""${queueName}_enqueue(${featureQueueName}, (${sel4TypeName}*) data);
+                  |${featureNotificationName}();"""
+            })
+
+            val methodName = s"${featureName}_enqueue"
+
+            val interface = st"""bool ${methodName}(const ${sel4TypeName} *);"""
+
+            val st = st"""${(externMethods, "\n")}
+                         |
+                         |bool ${methodName}(const ${sel4TypeName} *data) {
+                         |  ${(enqueueEntries, "\n")}
+                         |  return true;
+                         |}"""
+
+            val cInterface: Option[ST] = Some(interface)
+            val cImplementation: Option[ST] = Some(st)
+            val preInit: Option[ST] = if(preInits.isEmpty) None() else Some(st"${(preInits, "\n\n")}")
+            val postInit: Option[ST]= if(postInits.isEmpty) None() else Some(st"${(postInits, "\n\n")}")
+            val drainQueues: Option[(ST,ST)] = None()
+
+            Some(C_SimpleContainer(
+              cIncludes = cIncludes,
+              cInterface = cInterface,
+              cImplementation = cImplementation,
+              preInits = preInit,
+              postInits = postInit,
+              drainQueues = drainQueues))
+          }
           case x => halt(s"Unexpected direction: ${x}")
         }
         return ret
@@ -2004,9 +2224,12 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
       val ret: Option[C_SimpleContainer] = platform match {
         case ActPlatform.SeL4_TB => handleEventData_TB_GlueCode_Profile()
 
-        //case ActPlatform.SeL4 => handleEventData_TB_GlueCode_Profile()
-        case ActPlatform.SeL4 => handleEventData_SB_GlueCode_Profile()
-        case ActPlatform.SeL4_Only => handleEventData_SB_GlueCode_Profile()
+        case ActPlatform.SeL4 if !useCaseConnectors => handleEventData_SB_GlueCode_Profile()
+        case ActPlatform.SeL4 if useCaseConnectors => handleEventData_CASE_Conenctors_SB_GlueCode_Profile()
+
+        case ActPlatform.SeL4_Only if !useCaseConnectors => handleEventData_SB_GlueCode_Profile()
+        case ActPlatform.SeL4_Only if useCaseConnectors => handleEventData_CASE_Conenctors_SB_GlueCode_Profile()
+
         case _ => None()
       }
       return ret
@@ -2488,7 +2711,7 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
     return conn.processConnections(c, connectionCounter)
   }
 
-  def processSBConnections(): (ISZ[ast.Connection], ISZ[ST]) = {
+  def processSBConnections(): ConnectionContainer = {
     assert(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)
     val conn = SBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions, reporter)
     return conn.processConnectionInstances(connectionCounter)
