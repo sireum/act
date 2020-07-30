@@ -96,7 +96,8 @@ object VM_Template {
       st"""connections[${counter}] = (struct camkes_crossvm_connection) {
           |  .handle = &${methodNamePrefix}_handle,
           |  .emit_fn = ${emit_fn},
-          |  .consume_badge = ${consume_badge}
+          |  .consume_badge = ${consume_badge},
+          |  .connection_name = "${methodNamePrefix}"
           |}"""
 
     return ret
