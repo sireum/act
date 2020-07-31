@@ -17,7 +17,6 @@ object PacerTemplate {
   val PACER_PERIOD_VM_TYPE: String = "Period_VM"
   val PACER_PERIOD_VM_EMIT_IDENTIFIER: String = "period_to"
 
-  val PACER_DOMAIN_FIELD: String = "_domain"
   val PACER_DOMAIN: Z = z"1" // pacer has to be in domain 1
 
   val PACER_TICK_TOCK_TYPE: String = "TickTock"
@@ -201,6 +200,10 @@ object PacerTemplate {
     return s"${PACER_PERIOD_VM_EMIT_IDENTIFIER}_${vmID}"
   }
 
+  def pacerVM_CaseConnectorDataportIdentifier(): String = {
+    return s"${PACER_PERIOD_VM_EMIT_IDENTIFIER}_vm_queue"
+  }
+
   def pacerVM_PacerPeriodDataportIdentifier(vmID: String): String = {
     return s"${pacerVM_PacerPeriodPrefix(vmID)}_queue"
   }
@@ -226,6 +229,13 @@ object PacerTemplate {
     return Util.brand("pacer_period_queue")
   }
 
+  def pacerVM_PacerGcInitMethodEntry_Case_Connector(dataportName: String,
+                                                    queueElementTypeName: String,
+                                                    queueSize: Z): ST = {
+    val queueInitMethodName = EventDataQueueTemplate.getQueueInitMethodName(queueElementTypeName, queueSize)
+    return st"${queueInitMethodName}(${dataportName});"
+  }
+
   def pacerVM_PacerGcInitMethodEntry(vmProcessId: String,
                                      queueElementTypeName: String,
                                      queueSize: Z): ST = {
@@ -236,6 +246,31 @@ object PacerTemplate {
   def pacerVM_PacerGcInitMethod(entries: ISZ[ST]): ST = {
     val ret: ST = st"""void pre_init(void) {
                       |  ${(entries, "\n")}
+                      |}"""
+    return ret
+  }
+
+  def pacerVM_PacerGCSendPeriod_Case_Connector(emitMethodName: String,
+                                               dataportName: String,
+                                               payloadName: String,
+                                               queueElementTypeName: String,
+                                               queueSize: Z): ST = {
+    val enqueueMethodName = EventDataQueueTemplate.getQueueEnqueueMethodName(queueElementTypeName, queueSize)
+
+    val ret: ST = st"""${enqueueMethodName}(${dataportName}, &${payloadName});
+                      |${emitMethodName}();"""
+    return ret
+  }
+
+  def pacerVM_PacerGcSendPeriodMethod_Case_Connector(methodName: String,
+                                                     dataportName: String,
+                                                     queueElementTypeName: String,
+                                                     queueSize: Z): ST = {
+    val enqueueMethodName = EventDataQueueTemplate.getQueueEnqueueMethodName(queueElementTypeName, queueSize)
+
+    val ret: ST = st"""void ${methodName}(${pacerDataportQueueElemType()} *data) {
+                      |  ${enqueueMethodName}(${dataportName}, data);
+                      |                      |  ${dataportName}_emit_underlying();
                       |}"""
     return ret
   }
@@ -253,10 +288,6 @@ object PacerTemplate {
     return ret
   }
 
-
-  def pacerDomainConfiguration(identifier: String, domain: Z): ST = {
-    return st"${identifier}.${PACER_DOMAIN_FIELD} = ${domain};"
-  }
 
   def settings_cmake_entries(numDomains: Z): ST = {
     val ret: ST = st"""set(KernelDomainSchedule "$${CMAKE_CURRENT_LIST_DIR}/kernel/domain_schedule.c" CACHE INTERNAL "")

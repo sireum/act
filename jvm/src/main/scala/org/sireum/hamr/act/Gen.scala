@@ -9,7 +9,7 @@ import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Compositi
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.connections.{ConnectionContainer, Connections, ConnectorContainer, Monitors, SBConnections, SharedDataUtil, TBConnections}
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUtil}
-import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
+import org.sireum.hamr.act.templates.{CAmkESTemplate, CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.act.vm.{VMGen, VM_Template}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
@@ -300,6 +300,15 @@ import org.sireum.message.Reporter
             case Some(bytes) =>
               camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(aadlThread.identifier, bytes)
             case _ =>
+          }
+
+          if(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4) {
+            aadlThread.getDomain(symbolTable) match {
+              case Some(domain) =>
+                val id = Util.getThreadIdentifier(aadlThread, symbolTable)
+                camkesConfiguration = camkesConfiguration :+ CAmkESTemplate.domainConfiguration(id, domain)
+              case _ =>
+            }
           }
         }
         case ir.ComponentCategory.Subprogram => {

@@ -6,6 +6,7 @@ import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Transformer
 import org.sireum.message.Reporter
 import org.sireum.hamr.act.Util.reporter
+import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolResolver
 import org.sireum.hamr.codegen.common.types.TypeResolver
 import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
@@ -40,15 +41,23 @@ object Act {
     val m2 = if(result.resultOpt.nonEmpty) result.resultOpt.get else m1
 
     if(!result.ctx.hasErrors) {
-
-      val useCaseConnectors: B = ExperimentalOptions.useCaseConnectors(options.experimentalOptions)
-      val symbolTable = SymbolResolver.resolve(m2, options.hamrBasePackageName, useCaseConnectors, reporter)
+      assert(m2.components.size == 1, "Expecting a single root component")
 
       val basePackageName: String = options.hamrBasePackageName match {
         case Some(b) => b
         case _ => ""
       }
-      val aadlTypes = TypeResolver.processDataTypes(m2, symbolTable, basePackageName)
+
+      val rawConnections: B = PropertyUtil.getUseRawConnection(m2.components(0).properties)
+      val aadlTypes = TypeResolver.processDataTypes(m2, rawConnections, basePackageName)
+
+      val useCaseConnectors: B = ExperimentalOptions.useCaseConnectors(options.experimentalOptions)
+      val symbolTable = SymbolResolver.resolve(
+        model = m2,
+        basePackageName = options.hamrBasePackageName,
+        useCaseConnectors = useCaseConnectors,
+        aadlTypes = aadlTypes,
+        reporter = reporter)
 
       if(!CommonTypeUtil.verifyBitCodec(aadlTypes, symbolTable, reporter)){
         return ActResult(resources)

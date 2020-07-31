@@ -4,6 +4,7 @@ package org.sireum.hamr.act.periodic
 
 import org.sireum._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits}
+import org.sireum.hamr.act.connections.ConnectionHolder
 import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
 import org.sireum.hamr.act.{ActOptions, C_Container, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, CamkesGlueCodeHeaderContributions, CamkesGlueCodeImplContributions, Counter, Resource, Sel4ConnectorTypes, StringTemplate, Util, ast}
 import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
@@ -22,6 +23,12 @@ import org.sireum.message.Reporter
                                timerAttributeCounter: Counter,
                                headerInclude: String,
                                reporter: Reporter): CamkesAssemblyContribution = {
+    if(useCaseConnectors) {
+      return handlePeriodicComponents_CASE_Connector(connectionCounter, timerAttributeCounter, headerInclude, reporter)
+    }
+
+    assert(!useCaseConnectors)
+
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
@@ -48,7 +55,7 @@ import org.sireum.message.Reporter
       var gcPacerInitEntries: ISZ[ST] = ISZ()
 
       // add pacer domain configuration
-      configurations = configurations :+ PacerTemplate.pacerDomainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
+      configurations = configurations :+ CAmkESTemplate.domainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
       
       // tick/tock connection
       connections = connections :+ Util.createConnection(
@@ -67,8 +74,6 @@ import org.sireum.message.Reporter
 
         requiresDataportVMs = requiresDataportVMs | isVM
         requiresEmits = requiresEmits | !aadlThread.toVirtualMachine(symbolTable)
-
-        configurations = configurations :+ PacerTemplate.pacerDomainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
 
         if(isVM) {
 
@@ -194,6 +199,203 @@ import org.sireum.message.Reporter
       settingCmakeEntries, auxResources)
   }
 
+  def handlePeriodicComponents_CASE_Connector(connectionCounter: Counter,
+                               timerAttributeCounter: Counter,
+                               headerInclude: String,
+                               reporter: Reporter): CamkesAssemblyContribution = {
+    assert(useCaseConnectors)
+
+    var imports: ISZ[String] = ISZ()
+    var instances: ISZ[ast.Instance] = ISZ()
+    var connections: ISZ[ast.Connection] = ISZ()
+    var configurations: ISZ[ST]= ISZ()
+    var cContainers: ISZ[C_Container] = ISZ()
+    var auxResources: ISZ[Resource] = ISZ()
+
+    imports = imports :+ PacerTemplate.pacerImport()
+
+    val periodicComponents = symbolTable.getPeriodicThreads()
+
+    var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
+
+    def getConnectionHolder(connectionEnd: ast.ConnectionEnd, connectionType: Sel4ConnectorTypes.Type): ConnectionHolder = {
+      if (!map.contains(connectionEnd)) {
+        val connectionName = Util.getConnectionName(connectionCounter.increment())
+        map = map + (connectionEnd ~> ConnectionHolder(connectionName, connectionType, MSZ(), MSZ()))
+      }
+
+      return map.get(connectionEnd).get
+    }
+
+    def updateHolder(end: ast.ConnectionEnd, holder: ConnectionHolder): Unit = {
+      map = map + (end ~> holder)
+    }
+
+    if(periodicComponents.nonEmpty) {
+
+      auxResources = auxResources ++ getSchedule(periodicComponents)
+
+      // TODO handle components with different periods
+      var emits: ISZ[ast.Emits] = ISZ()
+      var dataports: Set[ast.Dataport] = Set.empty
+      var includes: ISZ[String] = ISZ()
+
+      var gcPacerIncludes: ISZ[String] = ISZ()
+      var gcPacerImplEntries: ISZ[ST] = ISZ()
+      var gcPacerMethods: ISZ[ST] = ISZ(CAmkESTemplate.externGetInstanceName())
+      var gcPacerInitEntries: ISZ[ST] = ISZ()
+
+      // add pacer domain configuration
+      configurations = configurations :+ CAmkESTemplate.domainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
+
+      // tick/tock connection
+      connections = connections :+ Util.createConnection(
+        Util.getConnectionName(connectionCounter.increment()),
+        Sel4ConnectorTypes.seL4Notification,
+        PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_TICK_IDENTIFIER,
+        PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_TOCK_IDENTIFIER)
+
+      var requiresEmits = F
+      var requiresDataportVMs = F
+
+      val srcCamkesComponentId = PacerTemplate.PACER_IDENTIFIER
+      val srcCamkesVMFeatureQueueName = PacerTemplate.pacerVM_CaseConnectorDataportIdentifier()
+
+      var hasPeriodicVMComponents: B = F
+
+      for (aadlThread <- periodicComponents) {
+
+        val dstCamkesComponentId = Util.getThreadIdentifier(aadlThread, symbolTable)
+
+        val isVM = aadlThread.toVirtualMachine(symbolTable)
+
+        requiresDataportVMs = requiresDataportVMs | isVM
+        requiresEmits = requiresEmits | !aadlThread.toVirtualMachine(symbolTable)
+
+        if(isVM) {
+          // CASE eventdata port connector
+          hasPeriodicVMComponents = T
+
+          val dstCamkesFeatureQueueName = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier()
+
+          val queueConnectorType: Sel4ConnectorTypes.Type =
+            Sel4ConnectorTypes.CASE_AADL_EventDataport
+
+          val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesVMFeatureQueueName)
+          val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
+
+          var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+
+          holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+
+          holder = holder(configurationEntries = holder.configurationEntries :+
+            ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName).render)
+
+          holder = holder(configurationEntries = holder.configurationEntries :+
+            ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesVMFeatureQueueName, F).render)
+
+          holder = holder(configurationEntries = holder.configurationEntries :+
+            ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, T).render)
+
+          updateHolder(srcConnectionEnd, holder)
+
+        } else {
+          // sel4 connection
+
+          val connectionType = Sel4ConnectorTypes.seL4Notification
+          val srcFeatureName = PacerTemplate.pacerPeriodEmitIdentifier()
+          val dstFeatureName = PacerTemplate.pacerClientNotificationIdentifier()
+
+          val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcFeatureName)
+          val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstFeatureName)
+
+          var holder = getConnectionHolder(srcConnectionEnd, connectionType)
+
+          holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+
+          updateHolder(srcConnectionEnd, holder)
+
+        }
+      }
+
+      if(hasPeriodicVMComponents) {
+        dataports = dataports + dataportPeriod(srcCamkesVMFeatureQueueName)
+
+        val sendMethodName = s"send_${srcCamkesVMFeatureQueueName}"
+
+        val emitMethodName = s"${srcCamkesVMFeatureQueueName}_emit_underlying"
+
+        gcPacerMethods = gcPacerMethods :+ st"extern void ${emitMethodName}(void);"
+
+        gcPacerImplEntries = gcPacerImplEntries :+ PacerTemplate.pacerVM_PacerGCSendPeriod_Case_Connector(
+          emitMethodName,
+          srcCamkesVMFeatureQueueName,
+          PacerTemplate.PACER_TICK_COUNT_IDENTIFIER,
+          PacerTemplate.pacerDataportQueueElemType(),
+          PacerTemplate.pacerDataportQueueSize())
+
+        gcPacerInitEntries = gcPacerInitEntries :+
+          PacerTemplate.pacerVM_PacerGcInitMethodEntry_Case_Connector(
+            srcCamkesVMFeatureQueueName,
+            PacerTemplate.pacerDataportQueueElemType(),
+            PacerTemplate.pacerDataportQueueSize())
+      }
+
+      gcPacerMethods = gcPacerMethods :+ PacerTemplate.pacerVM_PacerGcInitMethod(gcPacerInitEntries)
+
+      if(requiresEmits) {
+        emits = emits :+ emitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
+        gcPacerImplEntries = gcPacerImplEntries :+ gcEmitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
+      }
+
+      if(requiresDataportVMs) {
+
+        includes = includes :+ PacerTemplate.pacerDataportFilenameForIncludes()
+
+        gcPacerIncludes = gcPacerIncludes :+ PacerTemplate.pacerDataportFilenameForIncludes()
+      }
+
+      val pacerComponent: ast.Instance = genPacerCamkesComponent(includes, emits, dataports.elements)
+
+      instances = instances :+ pacerComponent
+
+      val pacerCCode: Resource = genPacerGlueCode(gcPacerIncludes, gcPacerMethods, gcPacerImplEntries)
+
+      val externalLibs: ISZ[String] = ISZ(Util.SBTypeLibrary)
+
+      cContainers = cContainers :+ C_Container(
+        instanceName = pacerComponent.component.name,
+        componentId = pacerComponent.component.name,
+        cSources = ISZ(pacerCCode),
+        cIncludes = ISZ(),
+        sourceText = ISZ(),
+        cmakeSOURCES = ISZ(),
+        cmakeINCLUDES = ISZ(),
+        cmakeLIBS = externalLibs
+      )
+    }
+
+    val maxDomain: Z = symbolTable.getMaxDomain()
+    val settingCmakeEntries: ISZ[ST] = ISZ(PacerTemplate.settings_cmake_entries(maxDomain))
+
+    for (connectionHolderEntry <- map.entries) {
+      val fromEnd = connectionHolderEntry._1
+      val holder = connectionHolderEntry._2
+
+      connections = connections :+ Util.createConnections(
+        holder.connectionName,
+        holder.connectionType,
+        ISZ(fromEnd),
+        holder.toConnectionEnds.toIS)
+
+      val filtered = Set.empty[String] ++ holder.configurationEntries.toIS
+      configurations = configurations ++ filtered.elements.map((m: String) => st"$m")
+    }
+
+    return CamkesAssemblyContribution(imports, instances, connections, configurations, cContainers,
+      settingCmakeEntries, auxResources)
+  }
+
   def handlePeriodicComponent(aadlThread: AadlThread,
                               reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
     assert(aadlThread.isPeriodic())
@@ -306,6 +508,11 @@ import org.sireum.message.Reporter
   }
 
   def gcEmitPeriod(id: String): ST = { return st"${id}_emit()" }
+
+  def gcSendPeriodToVM_Case_Connector(sendMethodName: String): ST = {
+    return st"${sendMethodName}(&${PacerTemplate.PACER_TICK_COUNT_IDENTIFIER})"
+  }
+
 
   def gcSendPeriodToVM(vmProcessId: String): ST = {
     return st"${PacerTemplate.pacerVM_PacerSendPeriodToVmMethodName(vmProcessId)}(&${PacerTemplate.PACER_TICK_COUNT_IDENTIFIER})"
