@@ -51,7 +51,7 @@ import org.sireum._
 
 def usage(): Unit = {
   println("ACT /build")
-  println("Usage: ( compile | test | test-js | m2 | jitpack | cleanup )+")
+  println("Usage: ( compile | test | test-js | m2 | jitpack | clean )+")
 }
 
 
@@ -109,7 +109,7 @@ def compile(): Unit = {
       didM2 = F
       (home / "out").removeAll()
     }
-    //tipe()
+    tipe()
     println("Compiling ...")
     mill.call(ISZ("all", "act.jvm.tests.compile",
       "act.js.tests.compile")).at(home).console.runCheck()
@@ -186,7 +186,7 @@ def m2(): Unit = {
   println()
 }
 
-def cleanup(): Unit = {
+def clean(): Unit = {
   val dirsToScrub: ISZ[Os.Path] = ISZ("air", "common", "hamr_codegen", "lib", "out", "runtime").map(m => home / m)
   dirsToScrub.foreach((m: Os.Path) => {
     println(s"Deleting ${m}")
@@ -196,7 +196,7 @@ def cleanup(): Unit = {
 
 downloadMill()
 
-/* Also clone hamr-codgen in order to get the 'common object.  Kind of
+/* Also clone hamr-codgen in order to get the 'common' object.  Kind of
  * strange as hamr-codgen has ACT as a sub-module, though it isn't
  * recursively cloned
  */
@@ -211,7 +211,7 @@ lnCommon.mklink(common)
 
 for (i <- 0 until Os.cliArgs.size) {
   Os.cliArgs(i) match {
-    case string"cleanup" => cleanup()
+    case string"clean" => clean()
     case string"compile" => compile()
     case string"test" => test()
     case string"test-js" => testJs()
