@@ -16,7 +16,9 @@ target
 /bin/win
 /bin/scala
 /lib
-/runtime
 /air
+/common
+/hamr_codegen
+/runtime
 *.cmd.jar
 *.cmd.com

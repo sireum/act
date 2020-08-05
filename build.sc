@@ -25,9 +25,10 @@
 
 import mill._
 import ammonite.ops._
-import $file.runtime.Runtime
-import $file.air.Air
 import $file.Act
+import $file.air.Air
+import $file.hamr_codegen.Codegen
+import $file.runtime.Runtime
 
 import mill.scalalib.ScalaModule
 import org.sireum.mill.SireumModule
@@ -54,11 +55,17 @@ object air extends Air.Module with runtime.testProvider {
   final override def libraryObject = runtime.library
 }
 
+object common extends Codegen.Module.Common {
+  final override def airObject = air
+}
 
 object act extends Act.Module {
   final override def millSourcePath = super.millSourcePath / up
 
   final override def airObject = air
+
+  final override def commonObject = common
+
 }
 
 

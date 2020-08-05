@@ -8,16 +8,20 @@ fi                                                                              
 if [ -n "$COMSPEC" -a -x "$COMSPEC" ]; then                                                                 #
   export SIREUM_HOME=$(cygpath -C OEM -w -a ${SIREUM_HOME})                                                 #
   if [ -z ${SIREUM_PROVIDED_JAVA++} ]; then                                                                 #
-    export PATH="${SIREUM_HOME}/bin/win/java":"${SIREUM_HOME}/bin/win/z3":$PATH                             #
-    export PATH="$(cygpath -C OEM -w -a ${JAVA_HOME}/bin)":"$(cygpath -C OEM -w -a ${Z3_HOME}/bin)":$PATH   #
+    export PATH="${SIREUM_HOME}/bin/win/java":"${SIREUM_HOME}/bin/win/z3":"$PATH"                           #
+    export PATH="$(cygpath -C OEM -w -a ${JAVA_HOME}/bin)":"$(cygpath -C OEM -w -a ${Z3_HOME}/bin)":"$PATH" #
   fi                                                                                                        #
 elif [ "$(uname)" = "Darwin" ]; then                                                                        #
   if [ -z ${SIREUM_PROVIDED_JAVA++} ]; then                                                                 #
-    export PATH="${SIREUM_HOME}/bin/mac/java/bin":"${SIREUM_HOME}/bin/mac/z3/bin":$PATH                     #
+    export PATH="${SIREUM_HOME}/bin/mac/java/bin":"${SIREUM_HOME}/bin/mac/z3/bin":"$PATH"                   #
   fi                                                                                                        #
 elif [ "$(expr substr $(uname -s) 1 5)" = "Linux" ]; then                                                   #
   if [ -z ${SIREUM_PROVIDED_JAVA++} ]; then                                                                 #
-    export PATH="${SIREUM_HOME}/bin/linux/java/bin":"${SIREUM_HOME}/bin/linux/z3/bin":$PATH                 #
+    if [ "$(uname -m)" = "aarch64" ]; then                                                                  #
+      export PATH="${SIREUM_HOME}/bin/linux/arm/java/bin":"$PATH"                                           #
+    else                                                                                                    #
+      export PATH="${SIREUM_HOME}/bin/linux/java/bin":"${SIREUM_HOME}/bin/linux/z3/bin":"$PATH"             #
+    fi                                                                                                      #
   fi                                                                                                        #
 fi                                                                                                          #
 if [ -f "$0.com" ] && [ "$0.com" -nt "$0" ]; then                                                           #
@@ -28,13 +32,14 @@ else                                                                            
 fi                                                                                                          #
 :BOF
 setlocal
+set SIREUM_HOME=%~dp0../
 call "%~dp0init.bat"
+if defined SIREUM_PROVIDED_SCALA set SIREUM_PROVIDED_JAVA=true
+if not defined SIREUM_PROVIDED_JAVA set PATH=%~dp0win\java\bin;%~dp0win\z3\bin;%PATH%
 set NEWER=False
 if exist %~dpnx0.com for /f %%i in ('powershell -noprofile -executionpolicy bypass -command "(Get-Item %~dpnx0.com).LastWriteTime -gt (Get-Item %~dpnx0).LastWriteTime"') do @set NEWER=%%i
 if "%NEWER%" == "True" goto native
 del "%~dpnx0.com" > nul 2>&1
-if defined SIREUM_PROVIDED_SCALA set SIREUM_PROVIDED_JAVA=true
-if not defined SIREUM_PROVIDED_JAVA set PATH=%~dp0win\java\bin;%~dp0win\z3\bin;%PATH%
 "%~dp0sireum.bat" slang run -s -n "%0" %*
 exit /B %errorlevel%
 :native
@@ -44,10 +49,9 @@ exit /B %errorlevel%
 // #Sireum
 import org.sireum._
 
-
 def usage(): Unit = {
   println("ACT /build")
-  println("Usage: ( compile | test | test-js | m2 | jitpack )+")
+  println("Usage: ( compile | test | test-js | m2 | jitpack | cleanup )+")
 }
 
 
@@ -77,10 +81,11 @@ def downloadMill(): Unit = {
 
 
 def clone(repo: String): Unit = {
-  if (!(home / repo).exists) {
-    Os.proc(ISZ("git", "clone", "--depth=1", s"https://github.com/sireum/$repo")).at(home).console.runCheck()
+  val clean = ops.StringOps(repo).replaceAllChars('-', '_')
+  if (!(home / clean).exists) {
+    Os.proc(ISZ("git", "clone", "--depth=1", s"https://github.com/sireum/$repo", clean)).at(home).console.runCheck()
   } else {
-    Os.proc(ISZ("git", "pull")).at(home / repo).console.runCheck()
+    Os.proc(ISZ("git", "pull")).at(home / clean).console.runCheck()
   }
   println()
 }
@@ -104,7 +109,7 @@ def compile(): Unit = {
       didM2 = F
       (home / "out").removeAll()
     }
-    tipe()
+    //tipe()
     println("Compiling ...")
     mill.call(ISZ("all", "act.jvm.tests.compile",
       "act.js.tests.compile")).at(home).console.runCheck()
@@ -181,14 +186,32 @@ def m2(): Unit = {
   println()
 }
 
+def cleanup(): Unit = {
+  val dirsToScrub: ISZ[Os.Path] = ISZ("air", "common", "hamr_codegen", "lib", "out", "runtime").map(m => home / m)
+  dirsToScrub.foreach((m: Os.Path) => {
+    println(s"Deleting ${m}")
+    m.removeAll()
+  })
+}
 
 downloadMill()
 
-clone("runtime")
-clone("air")
+/* Also clone hamr-codgen in order to get the 'common object.  Kind of
+ * strange as hamr-codgen has ACT as a sub-module, though it isn't
+ * recursively cloned
+ */
+for (m <- ISZ("air", "hamr-codegen", "runtime")) {
+  clone(m)
+}
+
+// sym-link the common folder to match structure in build.sc
+val common = home / "hamr_codegen" / "common"
+val lnCommon = home / "common"
+lnCommon.mklink(common)
 
 for (i <- 0 until Os.cliArgs.size) {
   Os.cliArgs(i) match {
+    case string"cleanup" => cleanup()
     case string"compile" => compile()
     case string"test" => test()
     case string"test-js" => testJs()
