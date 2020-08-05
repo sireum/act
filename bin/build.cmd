@@ -204,10 +204,6 @@ for (m <- ISZ("air", "hamr-codegen", "runtime")) {
   clone(m)
 }
 
-// sym-link the common folder to match structure in build.sc
-val common = home / "hamr_codegen" / "common"
-val lnCommon = home / "common"
-lnCommon.mklink(common)
 
 for (i <- 0 until Os.cliArgs.size) {
   Os.cliArgs(i) match {

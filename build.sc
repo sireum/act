@@ -55,8 +55,12 @@ object air extends Air.Module with runtime.testProvider {
   final override def libraryObject = runtime.library
 }
 
-object common extends Codegen.Module.Common {
-  final override def airObject = air
+object hamr_codegen extends Module {
+
+  object common extends Codegen.Module.Common {
+    final override def airObject = air
+  }
+
 }
 
 object act extends Act.Module {
@@ -64,7 +68,7 @@ object act extends Act.Module {
 
   final override def airObject = air
 
-  final override def commonObject = common
+  final override def commonObject = hamr_codegen.common
 
 }
 
