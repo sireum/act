@@ -1,16 +1,15 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.Os
+import org.sireum.hamr.act.Util.reporter
+import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.properties.PropertyUtil
+import org.sireum.hamr.codegen.common.symbols.SymbolResolver
+import org.sireum.hamr.codegen.common.types.{TypeResolver, TypeUtil => CommonTypeUtil}
+import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.Transformer
 import org.sireum.message.Reporter
-import org.sireum.hamr.act.Util.reporter
-import org.sireum.hamr.codegen.common.properties.PropertyUtil
-import org.sireum.hamr.codegen.common.symbols.SymbolResolver
-import org.sireum.hamr.codegen.common.types.TypeResolver
-import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
-import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 
 object Act {
 

@@ -3,8 +3,9 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
-import org.sireum.hamr.act.{Resource, StringTemplate, Util}
+import org.sireum.hamr.act.{StringTemplate, Util}
 import org.sireum.hamr.codegen.common.CommonUtil
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.ir
 
 object PeriodicDispatcherTemplate {

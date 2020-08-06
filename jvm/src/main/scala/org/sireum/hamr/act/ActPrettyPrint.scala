@@ -11,6 +11,7 @@ import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
 import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.codegen.common.DirectoryUtil
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 

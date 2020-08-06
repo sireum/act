@@ -6,7 +6,8 @@ import org.sireum._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits}
 import org.sireum.hamr.act.connections.ConnectionHolder
 import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
-import org.sireum.hamr.act.{ActOptions, C_Container, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, CamkesGlueCodeHeaderContributions, CamkesGlueCodeImplContributions, Counter, Resource, Sel4ConnectorTypes, StringTemplate, Util, ast}
+import org.sireum.hamr.act._
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ExperimentalOptions

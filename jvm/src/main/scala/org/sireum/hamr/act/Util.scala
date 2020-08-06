@@ -5,6 +5,7 @@ package org.sireum.hamr.act
 import org.sireum._
 import org.sireum.hamr.act.connections.ConnectorContainer
 import org.sireum.hamr.act.vm.VMGen
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
@@ -812,11 +813,6 @@ object Transformers {
     }
   }
 }
-
-@datatype class Resource(path: String,
-                         content: ST,
-                         overwrite: B,
-                         makeExecutable: B)
 
 @datatype class ActResult(val resources: ISZ[Resource])
 

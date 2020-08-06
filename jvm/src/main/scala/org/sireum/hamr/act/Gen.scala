@@ -12,6 +12,7 @@ import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUti
 import org.sireum.hamr.act.templates.{CAmkESTemplate, CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.act.vm.{VMGen, VM_Template}
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._

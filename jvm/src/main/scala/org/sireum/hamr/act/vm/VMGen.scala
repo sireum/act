@@ -2,16 +2,17 @@
 package org.sireum.hamr.act.vm
 
 import org.sireum._
-import org.sireum.hamr.act.{ActOptions, ActPlatform, ActPrettyPrint, QueueObject, Resource, SamplingPortInterface, Util}
-import org.sireum.hamr.ir
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.Connections
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.utils.PathUtil
-import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
+import org.sireum.hamr.act._
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlProcess, AadlThread, Dispatch_Protocol, SymbolTable}
+import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
+import org.sireum.hamr.ir
 import org.sireum.hamr.ir.FeatureEnd
 import org.sireum.message.Reporter
 

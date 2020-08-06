@@ -3,14 +3,13 @@
 package org.sireum.hamr.act.cakeml
 
 import org.sireum._
+import org.sireum.hamr.act.Util
 import org.sireum.hamr.act.templates.CakeMLTemplate
-import org.sireum.hamr.act.{Resource, Util, templates}
 import org.sireum.hamr.act.utils.PathUtil
-import org.sireum.hamr.codegen.common.{CommonUtil, Names, SeL4NixNamesUtil}
-import org.sireum.hamr.codegen.common.properties.PropertyUtil
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.{CommonUtil, Names, SeL4NixNamesUtil}
 import org.sireum.hamr.ir
-import org.sireum.ops.ISZOps
 
 object CakeML {
 

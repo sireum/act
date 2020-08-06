@@ -3,7 +3,8 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
-import org.sireum.hamr.act.{ActOptions, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, CamkesGlueCodeHeaderContributions, CamkesGlueCodeImplContributions, Counter, Resource, Sel4ConnectorTypes, Util, ast}
+import org.sireum.hamr.act._
+import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
 import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, SymbolTable}
 import org.sireum.message.Reporter
