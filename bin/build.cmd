@@ -90,6 +90,15 @@ def clone(repo: String): Unit = {
   println()
 }
 
+def cloneProjects(): Unit = {
+  /* Also clone hamr-codgen in order to get the 'common' object.  Kind of
+ * strange as hamr-codgen has ACT as a sub-module, though it isn't
+ * recursively cloned
+ */
+  for (m <- ISZ("air", "hamr-codegen", "runtime")) {
+    clone(m)
+  }
+}
 
 def tipe(): Unit = {
   if (!didTipe) {
@@ -196,23 +205,25 @@ def clean(): Unit = {
 
 downloadMill()
 
-/* Also clone hamr-codgen in order to get the 'common' object.  Kind of
- * strange as hamr-codgen has ACT as a sub-module, though it isn't
- * recursively cloned
- */
-for (m <- ISZ("air", "hamr-codegen", "runtime")) {
-  clone(m)
-}
-
 
 for (i <- 0 until Os.cliArgs.size) {
   Os.cliArgs(i) match {
     case string"clean" => clean()
-    case string"compile" => compile()
-    case string"test" => test()
-    case string"test-js" => testJs()
-    case string"m2" => m2()
-    case string"jitpack" => jitpack()
+    case string"compile" =>
+      cloneProjects()
+      compile()
+    case string"test" =>
+      cloneProjects()
+      test()
+    case string"test-js" =>
+      cloneProjects()
+      testJs()
+    case string"m2" =>
+      cloneProjects()
+      m2()
+    case string"jitpack" =>
+      cloneProjects()
+      jitpack()
     case cmd =>
       usage()
       eprintln(s"Unrecognized command: $cmd")
