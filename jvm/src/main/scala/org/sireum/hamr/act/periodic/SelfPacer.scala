@@ -143,7 +143,7 @@ import org.sireum.message.Reporter
     val aadlProcessors: ISZ[AadlProcessor] = symbolTable.getAllBoundProcessors()
     if(aadlProcessors.isEmpty || aadlProcessors.size > 1) {
       // TODO: ??
-      halt(s"Unexpected: Expecting exactly one bound processor but found ${aadlProcessors.size}")
+      halt(st"Unexpected: Expecting exactly one bound processor but found ${(aadlProcessors.map(m => m.path), ", ")}".render)
     }
     val aadlProcessor = aadlProcessors(0)
 
