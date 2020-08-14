@@ -3,24 +3,24 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.ops.ISZOps
-import org.sireum.hamr.act.ast._
-import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, ConnectionEnd, ConnectorType, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses}
+import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses, _}
 import org.sireum.hamr.act.cakeml.CakeML
-import org.sireum.hamr.act.connections.{ConnectionContainer, Connections, ConnectorContainer, Monitors, SBConnections, SharedDataUtil, TBConnections}
-import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicDispatcher, PeriodicUtil}
+import org.sireum.hamr.act.connections._
+import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CAmkESTemplate, CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
 import org.sireum.hamr.act.vm.{VMGen, VM_Template}
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.types.AadlTypes
+import org.sireum.hamr.codegen.common.util.{PathUtil => CommonPathUtil}
+import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
 import org.sireum.message.Reporter
+import org.sireum.ops.ISZOps
 
 @record class Gen(model: Aadl,
                   symbolTable: SymbolTable,
@@ -526,7 +526,7 @@ import org.sireum.message.Reporter
         camkesIncludes = camkesIncludes + s"<${Os.path(samplingPort.headerPath).name}>"
 
         cmakeSOURCES = cmakeSOURCES :+ samplingPort.implPath
-        cmakeINCLUDES = cmakeINCLUDES :+ Os.path(samplingPort.headerPath).up.value
+        cmakeINCLUDES = cmakeINCLUDES :+ CommonPathUtil.value(Os.path(samplingPort.headerPath).up.value)
 
         gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, f) +: gcImplMethods
 
