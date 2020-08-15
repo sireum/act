@@ -3,7 +3,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.ast.{ASTObject, BinarySemaphore, Component, Composition, Connection, Consumes, Dataport, Direction, Emits, Instance, Method, Parameter, Procedure, Provides, Semaphore, Uses, _}
+import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.connections._
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicUtil}
