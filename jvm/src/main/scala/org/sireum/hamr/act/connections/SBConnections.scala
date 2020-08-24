@@ -101,8 +101,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                       case _ => z"4096" // TODO or throw error?
                     }
 
-                    //holder.configurationEntries = holder.configurationEntries :+
-                    //  st"""${holder.connectionName}.size = ${size};""".render
                     holder = holder(configurationEntries = holder.configurationEntries :+
                       st"""${holder.connectionName}.size = ${size};""".render)
                   }
@@ -115,20 +113,19 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                 val queueSize: Z = srcQueues.get(srcFeaturePath).get.get(dstFeaturePath).get.queueSize
 
-                { // notification connections
-                  val srcCamkesFeatureName = Util.genSeL4NotificationQueueName(srcFeature, queueSize)
-                  val dstCamkesFeatureName = Util.genSeL4NotificationName(dstFeature, T)
+                val srcCamkesFeatureNotificationName = Util.genSeL4NotificationQueueName(srcFeature, queueSize)
+                val dstCamkesFeatureNotificationName = Util.genSeL4NotificationName(dstFeature, T)
 
+                { // notification connections
                   val notificationConnectorType: Sel4ConnectorTypes.Type =
                     if (dstToVM) Sel4ConnectorTypes.seL4GlobalAsynch
                     else Sel4ConnectorTypes.seL4Notification
 
-                  val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureName)
-                  val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureName)
+                  val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureNotificationName)
+                  val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureNotificationName)
 
                   var holder = getConnectionHolder(srcConnectionEnd, notificationConnectorType)
 
-                  //holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
                   updateHolder(srcConnectionEnd, holder)
@@ -147,7 +144,6 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
                   var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
 
-                  //holder.toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
                   if (aadlTypes.rawConnections) {
@@ -162,11 +158,33 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
                       st"""${holder.connectionName}.size = ${size};""".render)
                   }
 
-                  holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName}_access = "W";""".render)
+                  if(!srcToVM) {
+                    holder = holder(configurationEntries = holder.configurationEntries :+
+                      st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName}_access = "W";""".render)
+                  } else {
+                    // don't add access restrictions when component is in a vm, otherwise get errors like
+                    //
+                    // default_error_fault_callback@guest_memory_helpers.c:19 Failed to handle fault addr: 0xdf001000
+                    // --------
+                    // Pagefault from [Linux]: write fault @ PC: 0x4008a4 IPA: 0xdf001000, FSR:
+                  }
 
-                  holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render)
+                  if(!dstToVM) {
+                    holder = holder(configurationEntries = holder.configurationEntries :+
+                      st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render)
+                  } else {
+                    // don't add access restrictions since in a vm
+
+                    dstAadlThread.getDomain(symbolTable) match {
+                      case Some(d) =>
+                        // add the notification to the same domain as the component or will get an error like
+                        // 'handle_event_bar_fault@cross_vm_connection.c:126 Connection is not configured with an emit function'
+                        holder = holder(configurationEntries = holder.configurationEntries :+
+                          st"""${dstCamkesComponentId}.${dstCamkesFeatureNotificationName}_domain = ${d};""".render)
+                      case _ =>
+                    }
+                  }
+
 
                   updateHolder(srcConnectionEnd, holder)
                 }
