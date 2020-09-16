@@ -44,37 +44,39 @@ object MsgPack {
 
     val Component: Z = -29
 
-    val Uses: Z = -28
+    val LibraryComponent: Z = -28
 
-    val Provides: Z = -27
+    val Uses: Z = -27
 
-    val Emits: Z = -26
+    val Provides: Z = -26
 
-    val Consumes: Z = -25
+    val Emits: Z = -25
 
-    val Dataport: Z = -24
+    val Consumes: Z = -24
 
-    val Connection: Z = -23
+    val Dataport: Z = -23
 
-    val ConnectionEnd: Z = -22
+    val Connection: Z = -22
 
-    val Connector: Z = -21
+    val ConnectionEnd: Z = -21
 
-    val Procedure: Z = -20
+    val Connector: Z = -20
 
-    val Method: Z = -19
+    val Procedure: Z = -19
 
-    val Parameter: Z = -18
+    val Method: Z = -18
 
-    val BinarySemaphore: Z = -17
+    val Parameter: Z = -17
 
-    val Semaphore: Z = -16
+    val BinarySemaphore: Z = -16
 
-    val Mutex: Z = -15
+    val Semaphore: Z = -15
 
-    val Attribute: Z = -14
+    val Mutex: Z = -14
 
-    val TODO: Z = -13
+    val Attribute: Z = -13
+
+    val TODO: Z = -12
 
   }
 
@@ -94,6 +96,7 @@ object MsgPack {
         case o: Composition => writeComposition(o)
         case o: Instance => writeInstance(o)
         case o: Component => writeComponent(o)
+        case o: LibraryComponent => writeLibraryComponent(o)
         case o: Connection => writeConnection(o)
         case o: ConnectionEnd => writeConnectionEnd(o)
         case o: Connector => writeConnector(o)
@@ -127,7 +130,14 @@ object MsgPack {
       writer.writeZ(Constants.Instance)
       writer.writeString(o.address_space)
       writer.writeString(o.name)
-      writeComponent(o.component)
+      writeCamkesComponent(o.component)
+    }
+
+    def writeCamkesComponent(o: CamkesComponent): Unit = {
+      o match {
+        case o: Component => writeComponent(o)
+        case o: LibraryComponent => writeLibraryComponent(o)
+      }
     }
 
     def writeComponent(o: Component): Unit = {
@@ -148,6 +158,11 @@ object MsgPack {
       writer.writeISZ(o.imports, writer.writeString _)
       writer.writeISZ(o.preprocessorIncludes, writer.writeString _)
       writer.writeISZ(o.externalEntities, writer.writeString _)
+    }
+
+    def writeLibraryComponent(o: LibraryComponent): Unit = {
+      writer.writeZ(Constants.LibraryComponent)
+      writer.writeString(o.name)
     }
 
     def writeUses(o: Uses): Unit = {
@@ -296,6 +311,7 @@ object MsgPack {
         case Constants.Composition => val r = readCompositionT(T); return r
         case Constants.Instance => val r = readInstanceT(T); return r
         case Constants.Component => val r = readComponentT(T); return r
+        case Constants.LibraryComponent => val r = readLibraryComponentT(T); return r
         case Constants.Connection => val r = readConnectionT(T); return r
         case Constants.ConnectionEnd => val r = readConnectionEndT(T); return r
         case Constants.Connector => val r = readConnectorT(T); return r
@@ -356,8 +372,21 @@ object MsgPack {
       }
       val address_space = reader.readString()
       val name = reader.readString()
-      val component = readComponent()
+      val component = readCamkesComponent()
       return Instance(address_space, name, component)
+    }
+
+    def readCamkesComponent(): CamkesComponent = {
+      val i = reader.curr
+      val t = reader.readZ()
+      t match {
+        case Constants.Component => val r = readComponentT(T); return r
+        case Constants.LibraryComponent => val r = readLibraryComponentT(T); return r
+        case _ =>
+          reader.error(i, s"$t is not a valid type of CamkesComponent.")
+          val r = readLibraryComponentT(T)
+          return r
+      }
     }
 
     def readComponent(): Component = {
@@ -386,6 +415,19 @@ object MsgPack {
       val preprocessorIncludes = reader.readISZ(reader.readString _)
       val externalEntities = reader.readISZ(reader.readString _)
       return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities)
+    }
+
+    def readLibraryComponent(): LibraryComponent = {
+      val r = readLibraryComponentT(F)
+      return r
+    }
+
+    def readLibraryComponentT(typeParsed: B): LibraryComponent = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.LibraryComponent)
+      }
+      val name = reader.readString()
+      return LibraryComponent(name)
     }
 
     def readUses(): Uses = {
@@ -708,6 +750,21 @@ object MsgPack {
     return r
   }
 
+  def fromCamkesComponent(o: CamkesComponent, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeCamkesComponent(o)
+    return w.result
+  }
+
+  def toCamkesComponent(data: ISZ[U8]): Either[CamkesComponent, MessagePack.ErrorMsg] = {
+    def fCamkesComponent(reader: Reader): CamkesComponent = {
+      val r = reader.readCamkesComponent()
+      return r
+    }
+    val r = to(data, fCamkesComponent _)
+    return r
+  }
+
   def fromComponent(o: Component, pooling: B): ISZ[U8] = {
     val w = Writer.Default(MessagePack.writer(pooling))
     w.writeComponent(o)
@@ -720,6 +777,21 @@ object MsgPack {
       return r
     }
     val r = to(data, fComponent _)
+    return r
+  }
+
+  def fromLibraryComponent(o: LibraryComponent, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeLibraryComponent(o)
+    return w.result
+  }
+
+  def toLibraryComponent(data: ISZ[U8]): Either[LibraryComponent, MessagePack.ErrorMsg] = {
+    def fLibraryComponent(reader: Reader): LibraryComponent = {
+      val r = reader.readLibraryComponent()
+      return r
+    }
+    val r = to(data, fLibraryComponent _)
     return r
   }
 

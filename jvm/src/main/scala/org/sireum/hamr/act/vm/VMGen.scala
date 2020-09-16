@@ -2,12 +2,12 @@
 package org.sireum.hamr.act.vm
 
 import org.sireum._
+import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.Connections
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.utils.PathUtil
-import org.sireum.hamr.act._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlProcess, AadlThread, Dispatch_Protocol, SymbolTable}
@@ -17,6 +17,7 @@ import org.sireum.hamr.ir.FeatureEnd
 import org.sireum.message.Reporter
 
 object VMGen {
+
   val VM_COMPONENT_TYPE_NAME: String = "VM"
   val VM_ID_PREFIX: String = "vm" // has to be 'vm' as per data61 macros in https://github.com/SEL4PROJ/camkes-arm-vm/blob/6c77a2734ea4c77035f2c3cca5ca7fa72f1f2890/components/VM/configurations/vm.h#L93
 
@@ -29,8 +30,6 @@ object VMGen {
   val DIR_VM_SRC: String =                       "src"
 
   val CAMKES_PREPROCESSOR_INCLUDES: String = "<configurations/vm.h>" // see https://github.com/SEL4PROJ/camkes-arm-vm/blob/6c77a2734ea4c77035f2c3cca5ca7fa72f1f2890/components/VM/configurations/vm.h
-
-  val VM_INIT_DEF: String = "VM_INIT_DEF()" // see https://github.com/SEL4PROJ/camkes-arm-vm/blob/6c77a2734ea4c77035f2c3cca5ca7fa72f1f2890/components/VM/configurations/vm.h#L52
 
   def getRootVMDir() : String= {
     return s"${Util.DIR_COMPONENTS}/${DIR_VM}"
@@ -160,26 +159,30 @@ object VMGen {
       val componentA = assemblyA.composition.instances(0).component
       val componentB = assemblyB.composition.instances(0).component
 
-      val mergedComponent: Component = Component(
-        control = componentA.control,
-        hardware = componentA.hardware,
+      val mergedComponent: CamkesComponent = (componentA, componentB) match {
+        case (a: Component, b: Component) =>
+          Component(
+            control = a.control,
+            hardware = a.hardware,
 
-        name = VM_COMPONENT_TYPE_NAME,
+            name = VM_COMPONENT_TYPE_NAME,
 
-        mutexes = mergeISZs(componentA.mutexes, componentB.mutexes),
-        binarySemaphores = mergeISZs(componentA.binarySemaphores, componentB.binarySemaphores),
-        semaphores = mergeISZs(componentA.semaphores, componentB.semaphores),
-        dataports = mergeISZs(componentA.dataports, componentB.dataports),
-        emits = mergeISZs(componentA.emits, componentB.emits),
-        uses = mergeISZs(componentA.uses, componentB.uses),
-        consumes = mergeISZs(componentA.consumes, componentB.consumes),
-        provides = mergeISZs(componentA.provides, componentB.provides),
-        includes = mergeISZs(componentA.includes, componentB.includes),
-        attributes = mergeISZs(componentA.attributes, componentB.attributes),
-        imports = mergeISZs(componentA.imports, componentB.imports),
-        preprocessorIncludes = mergeISZs(componentA.preprocessorIncludes, componentB.preprocessorIncludes),
-        externalEntities = mergeISZs(componentA.externalEntities, componentB.externalEntities)
-      )
+            mutexes = mergeISZs(a.mutexes, b.mutexes),
+            binarySemaphores = mergeISZs(a.binarySemaphores, b.binarySemaphores),
+            semaphores = mergeISZs(a.semaphores, b.semaphores),
+            dataports = mergeISZs(a.dataports, b.dataports),
+            emits = mergeISZs(a.emits, b.emits),
+            uses = mergeISZs(a.uses, b.uses),
+            consumes = mergeISZs(a.consumes, b.consumes),
+            provides = mergeISZs(a.provides, b.provides),
+            includes = mergeISZs(a.includes, b.includes),
+            attributes = mergeISZs(a.attributes, b.attributes),
+            imports = mergeISZs(a.imports, b.imports),
+            preprocessorIncludes = mergeISZs(a.preprocessorIncludes, b.preprocessorIncludes),
+            externalEntities = mergeISZs(a.externalEntities, b.externalEntities)
+          )
+        case _ => halt("Unexpected")
+      }
 
 
       // two new assemblies, one with the merged components, the other with
@@ -246,19 +249,23 @@ object VMGen {
   val platform: ActPlatform.Type = actOptions.platform
   val performHamrIntegration: B = Util.hamrIntegration(platform)
 
-  var dataports: ISZ[Dataport] = ISZ()
-  var emits: ISZ[Emits]= ISZ()
-  var uses: ISZ[Uses] = ISZ()
-  var consumes: ISZ[Consumes] = ISZ()
-  var provides: ISZ[Provides] = ISZ()
+  val TK1DEVICEFWD: B = F
+  val KERNELARMPLATFORM_EXYNOS5410: B = F
+
+  var dataports: ISZ[Dataport] = VM_INIT_DEF.dataports(KERNELARMPLATFORM_EXYNOS5410)
+  var emits: ISZ[Emits]= VM_INIT_DEF.emits()
+  var uses: ISZ[Uses] = VM_INIT_DEF.uses(TK1DEVICEFWD, KERNELARMPLATFORM_EXYNOS5410)
+  var consumes: ISZ[Consumes] = VM_INIT_DEF.consumes()
+  var provides: ISZ[Provides] = VM_INIT_DEF.provides()
   var includes: Set[String] = Set.empty[String]
   var imports: ISZ[String] = ISZ()
+  var semaphores: ISZ[Semaphore] = VM_INIT_DEF.semaphores()
 
   var externalCSources: ISZ[String] = ISZ()
   var externalCIncludeDirs: ISZ[String] = ISZ()
 
-  var preprocessorIncludes: ISZ[String] = ISZ(VMGen.CAMKES_PREPROCESSOR_INCLUDES)
-  var externalEntities: ISZ[String] = ISZ(VMGen.VM_INIT_DEF)
+  var preprocessorIncludes: ISZ[String] = ISZ() //ISZ(VMGen.CAMKES_PREPROCESSOR_INCLUDES)
+  var externalEntities: ISZ[String] = ISZ(VM_Template.vm_init_macro_expansion().render)
 
   var auxResources: ISZ[Resource] = ISZ()
 
@@ -370,12 +377,12 @@ object VMGen {
     includes = includes + PacerTemplate.pacerDataportFilenameForIncludes()
 
     val c = Component(
-      control = F,
+      control = T,
       hardware = F,
       name = Util.getCamkesComponentName(aadlThread, symbolTable),
       mutexes = ISZ(),
       binarySemaphores = ISZ(),
-      semaphores = ISZ(),
+      semaphores = semaphores,
       dataports = dataports,
       emits = emits,
       uses = uses,

@@ -9,7 +9,7 @@ import org.sireum.hamr.act.connections._
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicUtil}
 import org.sireum.hamr.act.templates.{CAmkESTemplate, CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
 import org.sireum.hamr.act.utils.PathUtil
-import org.sireum.hamr.act.vm.{VMGen, VM_Template}
+import org.sireum.hamr.act.vm._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
@@ -216,7 +216,7 @@ import org.sireum.ops.ISZOps
         if(aadlProcess.toVirtualMachine()) {
           val threads = aadlProcess.subComponents.filter(c => CommonUtil.isThread(c.component))
 
-          // sanity check: currently expecting exactly one thread pre process when virtualizing
+          // sanity check: currently expecting exactly one thread per process when virtualizing
           // TODO: move this to common sym resolver?
           assert(threads.size == 1, s"Only expecting one thread per process going to VM: ${aadlProcess.identifier}")
         }
@@ -253,6 +253,7 @@ import org.sireum.ops.ISZOps
 
           if (aadlThread.toVirtualMachine(symbolTable)) {
             val processId = Util.getThreadIdentifier(aadlThread, symbolTable)
+
             val (component, auxResources) =
               VMGen(symbolTable, typeMap, samplingPorts, srcQueues, actOptions, reporter).genThread(aadlThread)
 
@@ -261,6 +262,9 @@ import org.sireum.ops.ISZOps
                 name = processId,
                 component = component
               )
+
+            instances = instances ++ VM_GENERAL_COMPOSITION_DEF.instances()
+            instances = instances ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.instances()
 
             auxResourceFiles = auxResourceFiles ++ auxResources
 
@@ -271,19 +275,21 @@ import org.sireum.ops.ISZOps
               processId, "dtb"
             )
 
-            globalPreprocessorIncludes = globalPreprocessorIncludes ++
-              VM_Template.vm_assembly_preprocessor_includes()
+            connections = connections ++ VM_COMPONENT_CONNECTIONS_DEF.connections(processId)
+            connections = connections ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.connections()
+            connections = connections ++ PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF.connections(processId)
 
             globalImports = globalImports ++ VM_Template.vm_assembly_imports()
-
-            compositionMacros = compositionMacros ++
-              VM_Template.vm_composition_macros(aadlProcess.identifier)
 
             camkesConfiguration = camkesConfiguration ++
               VM_Template.vm_assembly_configuration_entries(processId)
 
             camkesConfigurationMacros = camkesConfigurationMacros ++
-              VM_Template.vm_assembly_configuration_macros(aadlProcess.identifier)
+              VM_GENERAL_CONFIGURATION_DEF.entries() ++
+              VM_CONFIGURATION_DEF.entries(processId) ++
+              VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF.entries() ++
+              PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF.entries(processId)
+
 
             settingsCmakeEntries = settingsCmakeEntries ++ VM_Template.settings_cmake_entries()
 

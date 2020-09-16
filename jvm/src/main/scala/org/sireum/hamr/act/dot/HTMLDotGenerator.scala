@@ -86,13 +86,17 @@ object HTMLDotGenerator {
       }
 
       portNames = portNames :+ st"<TR><TD><B>${name}</B></TD></TR>"
-      
-      portNames = portNames ++ comp.dataports.map((d : Dataport) => row(d.name, d.typ, EntityType.dataport))
-      portNames = portNames ++ comp.emits.map((d : Emits) => row(d.name, d.typ, EntityType.emits))
-      portNames = portNames ++ comp.uses.map((d : Uses) => row(d.name, d.typ, EntityType.uses))
-      portNames = portNames ++ comp.consumes.map((d : Consumes) => row(d.name, d.typ, EntityType.consumes))
-      portNames = portNames ++ comp.provides.map((d : Provides) => row(d.name, d.typ, EntityType.provides))
-      
+
+      comp match {
+        case c: Component =>
+          portNames = portNames ++ c.dataports.map((d : Dataport) => row(d.name, d.typ, EntityType.dataport))
+          portNames = portNames ++ c.emits.map((d : Emits) => row(d.name, d.typ, EntityType.emits))
+          portNames = portNames ++ c.uses.map((d : Uses) => row(d.name, d.typ, EntityType.uses))
+          portNames = portNames ++ c.consumes.map((d : Consumes) => row(d.name, d.typ, EntityType.consumes))
+          portNames = portNames ++ c.provides.map((d : Provides) => row(d.name, d.typ, EntityType.provides))
+        case _ =>
+      }
+
       st"""${name} [
            |  label=<
            |    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0">

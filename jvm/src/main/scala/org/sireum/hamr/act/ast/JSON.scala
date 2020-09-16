@@ -43,6 +43,7 @@ object JSON {
         case o: Composition => return printComposition(o)
         case o: Instance => return printInstance(o)
         case o: Component => return printComponent(o)
+        case o: LibraryComponent => return printLibraryComponent(o)
         case o: Connection => return printConnection(o)
         case o: ConnectionEnd => return printConnectionEnd(o)
         case o: Connector => return printConnector(o)
@@ -81,8 +82,15 @@ object JSON {
         ("type", st""""Instance""""),
         ("address_space", printString(o.address_space)),
         ("name", printString(o.name)),
-        ("component", printComponent(o.component))
+        ("component", printCamkesComponent(o.component))
       ))
+    }
+
+    @pure def printCamkesComponent(o: CamkesComponent): ST = {
+      o match {
+        case o: Component => return printComponent(o)
+        case o: LibraryComponent => return printLibraryComponent(o)
+      }
     }
 
     @pure def printComponent(o: Component): ST = {
@@ -104,6 +112,13 @@ object JSON {
         ("imports", printISZ(T, o.imports, printString _)),
         ("preprocessorIncludes", printISZ(T, o.preprocessorIncludes, printString _)),
         ("externalEntities", printISZ(T, o.externalEntities, printString _))
+      ))
+    }
+
+    @pure def printLibraryComponent(o: LibraryComponent): ST = {
+      return printObject(ISZ(
+        ("type", st""""LibraryComponent""""),
+        ("name", printString(o.name))
       ))
     }
 
@@ -286,12 +301,13 @@ object JSON {
     }
 
     def parseASTObject(): ASTObject = {
-      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "BinarySemaphore", "Semaphore", "Mutex", "TODO"))
+      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "LibraryComponent", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "BinarySemaphore", "Semaphore", "Mutex", "TODO"))
       t.native match {
         case "Assembly" => val r = parseAssemblyT(T); return r
         case "Composition" => val r = parseCompositionT(T); return r
         case "Instance" => val r = parseInstanceT(T); return r
         case "Component" => val r = parseComponentT(T); return r
+        case "LibraryComponent" => val r = parseLibraryComponentT(T); return r
         case "Connection" => val r = parseConnectionT(T); return r
         case "ConnectionEnd" => val r = parseConnectionEndT(T); return r
         case "Connector" => val r = parseConnectorT(T); return r
@@ -370,9 +386,18 @@ object JSON {
       val name = parser.parseString()
       parser.parseObjectNext()
       parser.parseObjectKey("component")
-      val component = parseComponent()
+      val component = parseCamkesComponent()
       parser.parseObjectNext()
       return Instance(address_space, name, component)
+    }
+
+    def parseCamkesComponent(): CamkesComponent = {
+      val t = parser.parseObjectTypes(ISZ("Component", "LibraryComponent"))
+      t.native match {
+        case "Component" => val r = parseComponentT(T); return r
+        case "LibraryComponent" => val r = parseLibraryComponentT(T); return r
+        case _ => val r = parseLibraryComponentT(T); return r
+      }
     }
 
     def parseComponent(): Component = {
@@ -433,6 +458,21 @@ object JSON {
       val externalEntities = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
       return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities)
+    }
+
+    def parseLibraryComponent(): LibraryComponent = {
+      val r = parseLibraryComponentT(F)
+      return r
+    }
+
+    def parseLibraryComponentT(typeParsed: B): LibraryComponent = {
+      if (!typeParsed) {
+        parser.parseObjectType("LibraryComponent")
+      }
+      parser.parseObjectKey("name")
+      val name = parser.parseString()
+      parser.parseObjectNext()
+      return LibraryComponent(name)
     }
 
     def parseUses(): Uses = {
@@ -896,6 +936,24 @@ object JSON {
     return r
   }
 
+  def fromCamkesComponent(o: CamkesComponent, isCompact: B): String = {
+    val st = Printer.printCamkesComponent(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toCamkesComponent(s: String): Either[CamkesComponent, Json.ErrorMsg] = {
+    def fCamkesComponent(parser: Parser): CamkesComponent = {
+      val r = parser.parseCamkesComponent()
+      return r
+    }
+    val r = to(s, fCamkesComponent _)
+    return r
+  }
+
   def fromComponent(o: Component, isCompact: B): String = {
     val st = Printer.printComponent(o)
     if (isCompact) {
@@ -911,6 +969,24 @@ object JSON {
       return r
     }
     val r = to(s, fComponent _)
+    return r
+  }
+
+  def fromLibraryComponent(o: LibraryComponent, isCompact: B): String = {
+    val st = Printer.printLibraryComponent(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toLibraryComponent(s: String): Either[LibraryComponent, Json.ErrorMsg] = {
+    def fLibraryComponent(parser: Parser): LibraryComponent = {
+      val r = parser.parseLibraryComponent()
+      return r
+    }
+    val r = to(s, fLibraryComponent _)
     return r
   }
 

@@ -21,11 +21,15 @@ import org.sireum._
 
 @datatype class Instance(address_space: String,
                          name: String,
-                         component: Component) extends ASTObject
+                         component: CamkesComponent) extends ASTObject
+
+@sig trait CamkesComponent extends ASTObject {
+  def name: String
+}
 
 @datatype class Component(control: B,
                           hardware: B,
-                          name: String,
+                          val name: String,
 
                           mutexes: ISZ[Mutex],
                           binarySemaphores: ISZ[BinarySemaphore],
@@ -44,8 +48,10 @@ import org.sireum._
 
                           // inserted at end of component definition
                           externalEntities: ISZ[String]
-                         ) extends ASTObject
+                         ) extends CamkesComponent
 
+
+@datatype class LibraryComponent(val name: String) extends CamkesComponent
 
 @datatype class Uses(name: String,
                      typ: String,
@@ -83,6 +89,7 @@ import org.sireum._
   'Dataport
   'Dataports
 }
+
 @datatype class Connector(name: String,
 
                           from_type: ConnectorType.Type,

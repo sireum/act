@@ -3,14 +3,12 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits, Provides, Uses}
-import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate
-import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate}
+import org.sireum.hamr.act.ast._
+import org.sireum.hamr.act.templates.CakeMLTemplate
 import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
-import org.sireum.hamr.ir.Component
 
 object StringTemplate {
   val SEM_DISPATCH: String = Util.brand("dispatch_sem")

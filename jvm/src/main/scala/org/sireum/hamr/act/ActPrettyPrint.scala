@@ -3,9 +3,8 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.ast.{ASTObject, Assembly, BinarySemaphore, Composition, Consumes, Dataport, Direction, Emits, Instance, Method, Mutex, Procedure, Provides, Semaphore, Uses}
-import org.sireum.ops.StringOps
 import org.sireum.hamr.act.Util.reporter
+import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.{ConnectorContainer, ConnectorTemplate}
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
 import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate}
@@ -14,6 +13,7 @@ import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 import org.sireum.hamr.codegen.common.util.ExperimentalOptions
+import org.sireum.ops.StringOps
 
 @record class ActPrettyPrint {
 
@@ -309,7 +309,7 @@ import org.sireum.hamr.codegen.common.util.ExperimentalOptions
     var connections: ISZ[ST] = ISZ()
 
     for(i <- o.instances) {
-      visitInstance(i)
+      visitCamkesComponent(i.component)
       instances = instances :+ st"""component ${i.component.name} ${i.name};"""
     }
 
@@ -343,34 +343,39 @@ import org.sireum.hamr.codegen.common.util.ExperimentalOptions
     return Some(st)
   }
 
-  def visitInstance(i: Instance): Option[ST] = {
-    var name = i.component.name
+  def visitCamkesComponent(component: CamkesComponent): Option[ST] = {
+    val ret: Option[ST] = component match {
+      case c: Component => {
+        var name = c.name
 
-    val st =
-      st"""${(i.component.imports.map((i: String) => s"import ${i};"), "\n")}
-          |${(i.component.preprocessorIncludes.map((i: String) => s"#include ${i}"), "\n")}
-          |component ${name} {
-          |  ${(i.component.includes.map((i: String) => s"include ${i};"), "\n")}
-          |  ${if(i.component.control) "control;" else ""}
-          |  ${(i.component.provides.map((p: Provides) => StringTemplate.provides(p)), "\n")}
-          |  ${(i.component.uses.map((u: Uses) => StringTemplate.uses(u)), "\n")}
-          |  ${(i.component.emits.map((e: Emits) => StringTemplate.emits(e)), "\n")}
-          |  ${(i.component.consumes.map((c: Consumes) => StringTemplate.consumes(c)), "\n")}
-          |  ${(i.component.dataports.map((d: Dataport) => StringTemplate.dataport(d)), "\n")}
-          |  ${(i.component.binarySemaphores.map((b: BinarySemaphore) => s"has binary_semaphore ${b.name};"), "\n")}
-          |  ${(i.component.semaphores.map((b: Semaphore) => s"has semaphore ${b.name};"), "\n")}
-          |  ${(i.component.mutexes.map((m: Mutex) => s"has mutex ${m.name};"), "\n")}
-          |  ${(i.component.externalEntities.map((s: String) => s), "\n")}
-          |}
-          """
+        val st =
+          st"""${(c.imports.map((i: String) => s"import ${i};"), "\n")}
+              |${(c.preprocessorIncludes.map((i: String) => s"#include ${i}"), "\n")}
+              |component ${name} {
+              |  ${(c.includes.map((i: String) => s"include ${i};"), "\n")}
+              |  ${if(c.control) "control;" else ""}
+              |  ${(c.provides.map((p: Provides) => StringTemplate.provides(p)), "\n")}
+              |  ${(c.uses.map((u: Uses) => StringTemplate.uses(u)), "\n")}
+              |  ${(c.emits.map((e: Emits) => StringTemplate.emits(e)), "\n")}
+              |  ${(c.consumes.map((c: Consumes) => StringTemplate.consumes(c)), "\n")}
+              |  ${(c.dataports.map((d: Dataport) => StringTemplate.dataport(d)), "\n")}
+              |  ${(c.binarySemaphores.map((b: BinarySemaphore) => s"has binary_semaphore ${b.name};"), "\n")}
+              |  ${(c.semaphores.map((b: Semaphore) => s"has semaphore ${b.name};"), "\n")}
+              |  ${(c.mutexes.map((m: Mutex) => s"has mutex ${m.name};"), "\n")}
+              |  ${(c.externalEntities.map((s: String) => s), "\n")}
+              |}
+              |"""
 
-    if(Util.isMonitor(name)) {
-      add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st)
-    } else {
-      add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st)
+        if(Util.isMonitor(name)) {
+          add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st)
+        } else {
+          add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st)
+        }
+        None()
+      }
+      case c: LibraryComponent => None()
     }
-
-    return None()
+    return ret
   }
 
   def visitProcedure(o: Procedure): Option[ST] = {

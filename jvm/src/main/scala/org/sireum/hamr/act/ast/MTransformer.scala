@@ -69,6 +69,10 @@ object MTransformer {
 
   val PostResultComponent: MOption[Component] = MNone()
 
+  val PreResultLibraryComponent: PreResult[LibraryComponent] = PreResult(T, MNone())
+
+  val PostResultLibraryComponent: MOption[LibraryComponent] = MNone()
+
   val PreResultUses: PreResult[Uses] = PreResult(T, MNone())
 
   val PostResultUses: MOption[Uses] = MNone()
@@ -169,6 +173,13 @@ import MTransformer._
          case PreResult(continu, _) => PreResult(continu, MNone[ASTObject]())
         }
         return r
+      case o: LibraryComponent =>
+        val r: PreResult[ASTObject] = preLibraryComponent(o) match {
+         case PreResult(continu, MSome(r: ASTObject)) => PreResult(continu, MSome[ASTObject](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type ASTObject")
+         case PreResult(continu, _) => PreResult(continu, MNone[ASTObject]())
+        }
+        return r
       case o: Connection =>
         val r: PreResult[ASTObject] = preConnection(o) match {
          case PreResult(continu, MSome(r: ASTObject)) => PreResult(continu, MSome[ASTObject](r))
@@ -254,8 +265,31 @@ import MTransformer._
     return PreResultInstance
   }
 
+  def preCamkesComponent(o: CamkesComponent): PreResult[CamkesComponent] = {
+    o match {
+      case o: Component =>
+        val r: PreResult[CamkesComponent] = preComponent(o) match {
+         case PreResult(continu, MSome(r: CamkesComponent)) => PreResult(continu, MSome[CamkesComponent](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CamkesComponent")
+         case PreResult(continu, _) => PreResult(continu, MNone[CamkesComponent]())
+        }
+        return r
+      case o: LibraryComponent =>
+        val r: PreResult[CamkesComponent] = preLibraryComponent(o) match {
+         case PreResult(continu, MSome(r: CamkesComponent)) => PreResult(continu, MSome[CamkesComponent](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CamkesComponent")
+         case PreResult(continu, _) => PreResult(continu, MNone[CamkesComponent]())
+        }
+        return r
+    }
+  }
+
   def preComponent(o: Component): PreResult[Component] = {
     return PreResultComponent
+  }
+
+  def preLibraryComponent(o: LibraryComponent): PreResult[LibraryComponent] = {
+    return PreResultLibraryComponent
   }
 
   def preUses(o: Uses): PreResult[Uses] = {
@@ -352,6 +386,13 @@ import MTransformer._
          case _ => MNone[ASTObject]()
         }
         return r
+      case o: LibraryComponent =>
+        val r: MOption[ASTObject] = postLibraryComponent(o) match {
+         case MSome(result: ASTObject) => MSome[ASTObject](result)
+         case MSome(_) => halt("Can only produce object of type ASTObject")
+         case _ => MNone[ASTObject]()
+        }
+        return r
       case o: Connection =>
         val r: MOption[ASTObject] = postConnection(o) match {
          case MSome(result: ASTObject) => MSome[ASTObject](result)
@@ -437,8 +478,31 @@ import MTransformer._
     return PostResultInstance
   }
 
+  def postCamkesComponent(o: CamkesComponent): MOption[CamkesComponent] = {
+    o match {
+      case o: Component =>
+        val r: MOption[CamkesComponent] = postComponent(o) match {
+         case MSome(result: CamkesComponent) => MSome[CamkesComponent](result)
+         case MSome(_) => halt("Can only produce object of type CamkesComponent")
+         case _ => MNone[CamkesComponent]()
+        }
+        return r
+      case o: LibraryComponent =>
+        val r: MOption[CamkesComponent] = postLibraryComponent(o) match {
+         case MSome(result: CamkesComponent) => MSome[CamkesComponent](result)
+         case MSome(_) => halt("Can only produce object of type CamkesComponent")
+         case _ => MNone[CamkesComponent]()
+        }
+        return r
+    }
+  }
+
   def postComponent(o: Component): MOption[Component] = {
     return PostResultComponent
+  }
+
+  def postLibraryComponent(o: LibraryComponent): MOption[LibraryComponent] = {
+    return PostResultLibraryComponent
   }
 
   def postUses(o: Uses): MOption[Uses] = {
@@ -527,7 +591,7 @@ import MTransformer._
           else
             MNone()
         case o2: Instance =>
-          val r0: MOption[Component] = transformComponent(o2.component)
+          val r0: MOption[CamkesComponent] = transformCamkesComponent(o2.component)
           if (hasChanged || r0.nonEmpty)
             MSome(o2(component = r0.getOrElse(o2.component)))
           else
@@ -544,6 +608,11 @@ import MTransformer._
           val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
           if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty)
             MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes)))
+          else
+            MNone()
+        case o2: LibraryComponent =>
+          if (hasChanged)
+            MSome(o2)
           else
             MNone()
         case o2: Connection =>
@@ -682,7 +751,7 @@ import MTransformer._
     val r: MOption[Instance] = if (preR.continu) {
       val o2: Instance = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: MOption[Component] = transformComponent(o2.component)
+      val r0: MOption[CamkesComponent] = transformCamkesComponent(o2.component)
       if (hasChanged || r0.nonEmpty)
         MSome(o2(component = r0.getOrElse(o2.component)))
       else
@@ -695,6 +764,50 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Instance = r.getOrElse(o)
     val postR: MOption[Instance] = postInstance(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformCamkesComponent(o: CamkesComponent): MOption[CamkesComponent] = {
+    val preR: PreResult[CamkesComponent] = preCamkesComponent(o)
+    val r: MOption[CamkesComponent] = if (preR.continu) {
+      val o2: CamkesComponent = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: MOption[CamkesComponent] = o2 match {
+        case o2: Component =>
+          val r0: MOption[IS[Z, Mutex]] = transformISZ(o2.mutexes, transformMutex _)
+          val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
+          val r2: MOption[IS[Z, Semaphore]] = transformISZ(o2.semaphores, transformSemaphore _)
+          val r3: MOption[IS[Z, Dataport]] = transformISZ(o2.dataports, transformDataport _)
+          val r4: MOption[IS[Z, Emits]] = transformISZ(o2.emits, transformEmits _)
+          val r5: MOption[IS[Z, Uses]] = transformISZ(o2.uses, transformUses _)
+          val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
+          val r7: MOption[IS[Z, Provides]] = transformISZ(o2.provides, transformProvides _)
+          val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty)
+            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes)))
+          else
+            MNone()
+        case o2: LibraryComponent =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: CamkesComponent = r.getOrElse(o)
+    val postR: MOption[CamkesComponent] = postCamkesComponent(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {
@@ -730,6 +843,32 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Component = r.getOrElse(o)
     val postR: MOption[Component] = postComponent(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformLibraryComponent(o: LibraryComponent): MOption[LibraryComponent] = {
+    val preR: PreResult[LibraryComponent] = preLibraryComponent(o)
+    val r: MOption[LibraryComponent] = if (preR.continu) {
+      val o2: LibraryComponent = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: LibraryComponent = r.getOrElse(o)
+    val postR: MOption[LibraryComponent] = postLibraryComponent(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {
