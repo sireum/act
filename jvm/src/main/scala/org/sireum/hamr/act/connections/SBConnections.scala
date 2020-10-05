@@ -67,8 +67,8 @@ import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
         val srcToVM: B = srcAadlThread.toVirtualMachine(symbolTable)
         val dstToVM: B = dstAadlThread.toVirtualMachine(symbolTable)
 
-        val srcCamkesComponentId: String = Util.getThreadIdentifier(srcAadlThread, symbolTable)
-        val dstCamkesComponentId: String = Util.getThreadIdentifier(dstAadlThread, symbolTable)
+        val srcCamkesComponentId: String = Util.getCamkesComponentIdentifier(srcAadlThread, symbolTable)
+        val dstCamkesComponentId: String = Util.getCamkesComponentIdentifier(dstAadlThread, symbolTable)
 
         conn.kind match {
           case ir.ConnectionKind.Port => {

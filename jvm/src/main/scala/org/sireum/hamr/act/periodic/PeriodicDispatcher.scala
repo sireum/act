@@ -23,7 +23,7 @@ import org.sireum.message.Reporter
                                headerInclude: String,
                                reporter: Reporter): CamkesAssemblyContribution = {
 
-    val components = symbolTable.airComponentMap.values
+    val components: ISZ[AadlComponent] = symbolTable.componentMap.values
     
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
@@ -32,31 +32,31 @@ import org.sireum.message.Reporter
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
     
-    val periodicComponents = components.filter(c => CommonUtil.isPeriodic(c) && CommonUtil.isThread(c))
+    val periodicComponents: ISZ[AadlThread] = components.filter(c => CommonUtil.isPeriodic(c.component) && CommonUtil.isThread(c.component)).map(m => m.asInstanceOf[AadlThread])
 
     if(periodicComponents.nonEmpty) {
       var periodicDispatcherNotifications: ISZ[ast.Emits] = ISZ()
       var periodicDispatcherCalendars: ISZ[ST] = ISZ()
 
-      for(c <- periodicComponents) {
-        val componentId = CommonUtil.getLastName(c.identifier)
-        val classifier = Util.getClassifier(c.classifier.get)
+      for(aadlThread <- periodicComponents) {
+        val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+        val classifier = Util.getClassifier(aadlThread.component.classifier.get)
 
         if(hookupPeriodicComponentsToTimeServer) {
           // connect camkes component to time server
           connections = connections :+ Util.createConnection(
             Util.getConnectionName(connectionCounter.increment()),
             Sel4ConnectorTypes.seL4TimeServer,
-            componentId, PeriodicDispatcherTemplate.TIMER_ID,
+            camkesComponentId, PeriodicDispatcherTemplate.TIMER_ID,
             PeriodicDispatcherTemplate.TIMER_INSTANCE, PeriodicDispatcherTemplate.TIMER_SERVER_TIMER_ID)
 
           // timer attribute
           configurations = configurations :+
-            PeriodicDispatcherTemplate.configurationTimerAttribute(componentId, timerAttributeCounter.increment(), F)
+            PeriodicDispatcherTemplate.configurationTimerAttribute(camkesComponentId, timerAttributeCounter.increment(), F)
         }
 
         val componentNotificationName = PeriodicDispatcherTemplate.componentNotificationName(None())
-        val dispatcherNotificationName = PeriodicDispatcherTemplate.componentNotificationName(Some(c))
+        val dispatcherNotificationName = PeriodicDispatcherTemplate.componentNotificationName(Some(camkesComponentId))
 
         // emit notification when component's period occurs
         periodicDispatcherNotifications = periodicDispatcherNotifications :+ Emits(
@@ -68,15 +68,16 @@ import org.sireum.message.Reporter
           Util.getConnectionName(connectionCounter.increment()),
           Sel4ConnectorTypes.seL4Notification,
           PeriodicDispatcherTemplate.DISPATCH_PERIODIC_INSTANCE, dispatcherNotificationName,
-          componentId, componentNotificationName)
+          camkesComponentId, componentNotificationName)
 
-        val period: Z = PropertyUtil.getPeriod(c) match {
+        val period: Z = PropertyUtil.getPeriod(aadlThread.component) match {
           case Some(_period) => _period
           case _ =>
             reporter.warn(None(), Util.toolName, s"Period not provided for periodic component ${classifier}, using ${Util.DEFAULT_PERIOD}")
             Util.DEFAULT_PERIOD
         }
-        periodicDispatcherCalendars = periodicDispatcherCalendars :+ PeriodicDispatcherTemplate.calendar(c, period)
+
+        periodicDispatcherCalendars = periodicDispatcherCalendars :+ PeriodicDispatcherTemplate.calendar(camkesComponentId, period)
       }
 
       // add the dispatcher component
@@ -164,7 +165,7 @@ import org.sireum.message.Reporter
       typ = Util.NOTIFICATION_TYPE,
       optional = F)
 
-    gcMethods = gcMethods :+ PeriodicDispatcherTemplate.periodicDispatchElems(classifier, hookupPeriodicComponentsToTimeServer)
+    gcMethods = gcMethods :+ PeriodicDispatcherTemplate.periodicDispatchElems(hookupPeriodicComponentsToTimeServer)
 
     gcMainPreInitStatements = gcMainPreInitStatements :+ PeriodicDispatcherTemplate.registerPeriodicCallback()
 

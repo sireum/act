@@ -2,6 +2,7 @@ package org.sireum.hamr.act
 
 import org.sireum._
 import org.sireum.hamr.act.Util.reporter
+import org.sireum.hamr.codegen.common.{CommonUtil, Names}
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolResolver
@@ -78,7 +79,8 @@ object Act {
       reporter.reports(r.messages)
 
       val slangLibInstanceNames: ISZ[String] = options.platform match {
-        case ActPlatform.SeL4 => symbolTable.getThreads().map(m => m.path) :+ Util.SlangTypeLibrary
+        case ActPlatform.SeL4 =>
+          symbolTable.getThreads().map(m => Names(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
         case _ => ISZ()
       }
 

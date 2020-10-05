@@ -69,7 +69,7 @@ import org.sireum.message.Reporter
       var requiresDataportVMs = F
 
       for (aadlThread <- periodicComponents) {
-        val componentId = Util.getThreadIdentifier(aadlThread, symbolTable)
+        val componentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
         val isVM = aadlThread.toVirtualMachine(symbolTable)
 
@@ -266,7 +266,7 @@ import org.sireum.message.Reporter
 
       for (aadlThread <- periodicComponents) {
 
-        val dstCamkesComponentId = Util.getThreadIdentifier(aadlThread, symbolTable)
+        val dstCamkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
         val isVM = aadlThread.toVirtualMachine(symbolTable)
 

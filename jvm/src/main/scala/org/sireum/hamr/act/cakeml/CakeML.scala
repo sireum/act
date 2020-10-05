@@ -20,7 +20,7 @@ object CakeML {
     val names = Names(aadlThread.component, basePackageName)
 
     assert(aadlThread.isCakeMLComponent(), s"${aadlThread.identifier} is not a CakeML component")
-    val path: String = PathUtil.getComponentSourcePath(aadlThread)
+    val path: String = PathUtil.getComponentSourcePath(aadlThread, symbolTable)
     val classifierName = Util.getClassifier(aadlThread.component.classifier.get)
     val filename: String = Util.genCImplFilename(Util.brand(s"${classifierName}_ffi"))
 
@@ -33,16 +33,16 @@ object CakeML {
     includes = includes :+ Util.genCHeaderFilename(names.cEntryPointAdapterName)
 
     globals = globals :+ CakeMLTemplate.entryPointGlobalVar(names.cBridgeEntryPoints, names.cEntryPointAdapterQualifiedName)
-    globals = globals :+ CakeMLTemplate.thisGlobalVar(names.cComponentImpl)
     globals = globals ++ CakeMLTemplate.portIdsGlobalVars()
     globals = globals :+ CakeMLTemplate.initializedGlobalVar()
 
     val _includes: ISZ[String] = includes.map((m : String) => s"#include <${m}>")
 
+    val logInfo = SeL4NixNamesUtil.apiHelperLoggerMethodName("logInfo", names.componentSingletonType)
+
     { // initialization
       val statements: ISZ[ST] = ISZ(
         CakeMLTemplate.ffi_initializeEntryPoints(names.cBridgeEntryPoints, names.cEntryPointAdapterQualifiedName),
-        CakeMLTemplate.ffi_initializeThis(names.cComponentImpl),
         CakeMLTemplate.initializePortIds(names.cBridgeEntryPoints)
       )
 
@@ -50,15 +50,15 @@ object CakeML {
       methods = methods :+ CakeMLTemplate.ffi_initialization(statements, filename)
     }
 
-    methods = methods :+ CakeMLTemplate.checkAndReportBufferOverrun(names.cBridgeApi, names.cThisApi, filename)
+    methods = methods :+ CakeMLTemplate.checkAndReportBufferOverrun(logInfo, filename)
 
-    methods = methods :+ CakeMLTemplate.dumpBuffer(names.cBridgeApi, names.cThisApi, filename)
+    methods = methods :+ CakeMLTemplate.dumpBuffer(logInfo, filename)
 
     methods = methods :+ CakeMLTemplate.ffi_artReceiveInput(names.cBridgeEntryPoints, filename)
 
     methods = methods :+ CakeMLTemplate.ffi_artSendOutput(names.cBridgeEntryPoints, filename)
 
-    methods = methods ++ CakeMLTemplate.ffi_artLoggers(names.cBridgeApi, names.cThisApi, filename)
+    methods = methods ++ CakeMLTemplate.ffi_artLoggers(names.cComponentType, filename)
 
     methods = methods ++ processPorts(aadlThread, basePackageName, filename)
 

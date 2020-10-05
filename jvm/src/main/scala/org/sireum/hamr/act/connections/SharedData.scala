@@ -34,7 +34,8 @@ object SharedDataUtil {
                 reporter.warn(None(), Util.toolName, s"Fully qualified name '${theOwner.classifier.get.name}' should be used for ${Util.PROP_TB_SYS__CAmkES_Owner_Thread} property")
               }
 
-              val subcomponentId = CommonUtil.getLastName(sc.identifier)
+              val subcomponentId = st"${(ops.ISZOps(sc.identifier.name).tail, "_")}".render
+
               sharedData = sharedData +
                 (CommonUtil.getName(sc.identifier) ~> SharedData(theOwner, None[ir.FeatureAccess](), sc.classifier.get, subcomponentId))
 

@@ -120,19 +120,27 @@ object Util {
     return StringUtil.replaceAll(s.s, ".", "_")
   }
 
-  def getCamkesComponentName(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
-    val name = Util.getClassifier(aadlThread.component.classifier.get)
-    return if(aadlThread.toVirtualMachine(symbolTable)) s"VM_${name}"
-    else name
-
+  def getShortPath(aadlThread: AadlThread): String = {
+    val componentName= aadlThread.component.identifier.name
+    assert(ops.StringOps(componentName(0)).endsWith("Instance"))
+    val p = ops.ISZOps(componentName).tail
+    return st"${(p, "_")}".render
   }
 
-  def getThreadIdentifier(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
+  def getCamkesComponentName(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
+    val shortPath = getShortPath(aadlThread)
+    val name = s"${Util.getClassifier(aadlThread.component.classifier.get)}_${shortPath}"
+
+    return if(aadlThread.toVirtualMachine(symbolTable)) s"VM_${name}"
+    else name
+  }
+
+  def getCamkesComponentIdentifier(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
     val ret: String = if(aadlThread.toVirtualMachine(symbolTable)) {
       val parentProcess = aadlThread.getParent(symbolTable)
       s"vm${parentProcess.identifier}"
     } else {
-      aadlThread.identifier
+      getShortPath(aadlThread)
     }
     return ret
   }

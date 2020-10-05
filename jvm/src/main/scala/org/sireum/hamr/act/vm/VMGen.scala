@@ -66,7 +66,7 @@ object VMGen {
           s"${projectRoot}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${Util.SlangTypeLibrary}") +: vmVars
     }
 
-    val vmThreadIds = threadsToVMs.map((m: AadlThread) => Util.getThreadIdentifier(m, symbolTable))
+    val vmThreadIds = threadsToVMs.map((m: AadlThread) => Util.getCamkesComponentIdentifier(m, symbolTable))
 
     val declareCamkesArmVMs: ISZ[ST] = threadsToVMs.map(m => {
       val id = Util.getCamkesComponentName(m, symbolTable)
@@ -119,7 +119,7 @@ object VMGen {
   }
 
   def getCrossVMConnectionsFilename(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
-    val vid = Util.getThreadIdentifier(aadlThread, symbolTable)
+    val vid = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
     return Util.genCImplFilename(s"cross_vm_connections_${vid}")
   }
 

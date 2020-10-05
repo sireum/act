@@ -250,9 +250,10 @@ import org.sireum.ops.ISZOps
       sc.category match {
         case ir.ComponentCategory.Thread => {
           val aadlThread = symbolTable.getThread(sc)
+          val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
           if (aadlThread.toVirtualMachine(symbolTable)) {
-            val processId = Util.getThreadIdentifier(aadlThread, symbolTable)
+            val processId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
             val (component, auxResources) =
               VMGen(symbolTable, typeMap, samplingPorts, srcQueues, actOptions, reporter).genThread(aadlThread)
@@ -298,22 +299,21 @@ import org.sireum.ops.ISZOps
           } else {
             instances = instances :+
               Instance(address_space = "",
-                name = aadlThread.identifier,
+                name = camkesComponentId,
                 component = genThread(aadlThread)
               )
           }
 
           PropertyUtil.getStackSizeInBytes(sc) match {
             case Some(bytes) =>
-              camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(aadlThread.identifier, bytes)
+              camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(camkesComponentId, bytes)
             case _ =>
           }
 
           if(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4) {
             aadlThread.getDomain(symbolTable) match {
               case Some(domain) =>
-                val id = Util.getThreadIdentifier(aadlThread, symbolTable)
-                camkesConfiguration = camkesConfiguration :+ CAmkESTemplate.domainConfiguration(id, domain)
+                camkesConfiguration = camkesConfiguration :+ CAmkESTemplate.domainConfiguration(camkesComponentId, domain)
               case _ =>
             }
           }
@@ -536,9 +536,11 @@ import org.sireum.ops.ISZOps
 
         gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, f) +: gcImplMethods
 
+        val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+
         camkesConfiguration = camkesConfiguration :+
           StringTemplate.sbSamplingPortConfigurationEntry(
-            CommonUtil.getLastName(c.identifier), samplingPort, f)
+            camkesComponentId, samplingPort, f)
 
         dataports = dataports :+ Dataport(
           name = Util.brand(fid),
@@ -951,11 +953,11 @@ import org.sireum.ops.ISZOps
     cSources = cSources :+ gcImpl
 
     containers = containers :+ C_Container(
-      instanceName = names.instanceName,
+      instanceName = "UNNEEDED_VAR", //names.instanceName,
       componentId = cid,
 
       cSources = cSources,
-      cIncludes = ISZ(genComponentTypeInterfaceFile(c, gcInterfaceStatements)),
+      cIncludes = ISZ(genComponentTypeInterfaceFile(aadlThread, gcInterfaceStatements)),
 
       sourceText = if(performHamrIntegration) ISZ() else PropertyUtil.getSourceText(c.properties),
 
@@ -2585,8 +2587,8 @@ import org.sireum.ops.ISZOps
     return ret
   }
 
-  def genComponentTypeInterfaceFile(component: ir.Component, sts: ISZ[ST]): Resource = {
-    val name = Util.getClassifier(component.classifier.get)
+  def genComponentTypeInterfaceFile(aadlThread: AadlThread, sts: ISZ[ST]): Resource = {
+    val name = Util.getClassifier(aadlThread.component.classifier.get)
     val compTypeHeaderFilename = Util.genCHeaderFilename(Util.brand(name))
 
     val contents = StringTemplate.cHeaderFile(
@@ -2596,7 +2598,7 @@ import org.sireum.ops.ISZOps
     )
 
     return Util.createResource(
-      path = s"${Util.DIR_COMPONENTS}/${name}/includes/${compTypeHeaderFilename}",
+      path = s"${PathUtil.getComponentHeaderPath(aadlThread, symbolTable)}/${compTypeHeaderFilename}",
       contents = contents,
       overwrite = T)
   }
@@ -2616,7 +2618,7 @@ import org.sireum.ops.ISZOps
 
                                          containsFFIs: B): Resource = {
 
-    val path = PathUtil.getComponentSourcePath(aadlThread)
+    val path = PathUtil.getComponentSourcePath(aadlThread, symbolTable)
     val componentHeaderFilename = PathUtil.getComponentGlueCodeHeaderFilename(aadlThread)
     val componentImplFilename = PathUtil.getComponentGlueCodeImplementationFilename(aadlThread)
 

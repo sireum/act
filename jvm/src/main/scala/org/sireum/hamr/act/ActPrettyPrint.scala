@@ -84,7 +84,7 @@ import org.sireum.ops.StringOps
       includePaths = includePaths ++ c.cIncludes.map((r: Resource) =>
         Util.getDirectory(r.path)) ++ c.cmakeINCLUDES
 
-      val slangLib: Option[String] = getSlangLibrary(c.instanceName, platform)
+      val slangLib: Option[String] = getSlangLibrary(c.componentId, platform)
 
       val hasAux = cFiles.nonEmpty && c.componentId != PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER
 

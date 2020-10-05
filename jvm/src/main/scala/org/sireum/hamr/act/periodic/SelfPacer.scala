@@ -30,7 +30,7 @@ import org.sireum.message.Reporter
     }
 
     for(aadlThread <- periodicComponents) {
-      val componentId = Util.getThreadIdentifier(aadlThread, symbolTable)
+      val componentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
       configurations = configurations :+ SelfPacerTemplate.selfPacerDomainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
 

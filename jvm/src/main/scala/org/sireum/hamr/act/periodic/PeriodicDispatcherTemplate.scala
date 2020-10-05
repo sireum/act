@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.{StringTemplate, Util}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.ir
 
 object PeriodicDispatcherTemplate {
@@ -30,8 +31,8 @@ object PeriodicDispatcherTemplate {
   val DISPATCH_TIMER_ID: String = "timer"
 
 
-  def calendar(c: ir.Component, period: Z): ST = {
-    val notifName = componentNotificationName(Some(c))
+  def calendar(camkesComponentId: String, period: Z): ST = {
+    val notifName = componentNotificationName(Some(camkesComponentId))
     val st = st"""if ((aadl_calendar_counter % (${period} / aadl_tick_interval)) == 0) {
                  |  ${notifName}_emit();
                  |}"""
@@ -93,8 +94,13 @@ object PeriodicDispatcherTemplate {
     return Util.createResource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
   }
 
-  def componentNotificationName(c: Option[ir.Component]): String = {
-    val prefix: String = if(c.nonEmpty) s"${CommonUtil.getLastName(c.get.identifier)}_" else ""
+  def componentNotificationName(camkesComponentId: Option[String]): String = {
+    val prefix: String = {
+      camkesComponentId match {
+        case Some(c) => s"${c}_"
+        case _ => ""
+      }
+    }
     return Util.brand(s"${prefix}periodic_dispatch_notification")
   }
 
@@ -112,7 +118,7 @@ object PeriodicDispatcherTemplate {
   val VAR_PERIODIC_TIME : String = Util.brand("time_periodic_dispatcher")
   val METHOD_PERIODIC_CALLBACK : String = s"${PeriodicDispatcherTemplate.componentNotificationName(None())}_callback"
 
-  def periodicDispatchElems(componentId: String, timerHookedUp: B) : ST = {
+  def periodicDispatchElems(timerHookedUp: B) : ST = {
     var h: String = s"${Util.brand("timer_time()")} / 1000LL"
     if(!timerHookedUp) {
       h = s"0; // ${h} -- timer connection disabled"
