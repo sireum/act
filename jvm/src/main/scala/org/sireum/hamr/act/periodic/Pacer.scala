@@ -3,10 +3,11 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
+import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits}
 import org.sireum.hamr.act.connections.ConnectionHolder
 import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
-import org.sireum.hamr.act._
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
 import org.sireum.hamr.codegen.common.symbols._

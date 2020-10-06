@@ -4,11 +4,12 @@ package org.sireum.hamr.act
 
 import org.sireum._
 import org.sireum.hamr.act.ast._
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.connections._
 import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicUtil}
-import org.sireum.hamr.act.templates.{CAmkESTemplate, CMakeTemplate, EventDataQueueTemplate, SlangEmbeddedTemplate}
-import org.sireum.hamr.act.utils.PathUtil
+import org.sireum.hamr.act.templates._
+import org.sireum.hamr.act.util.PathUtil
 import org.sireum.hamr.act.vm._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}

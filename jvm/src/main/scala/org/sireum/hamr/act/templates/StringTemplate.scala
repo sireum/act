@@ -1,10 +1,11 @@
 // #Sireum
 
-package org.sireum.hamr.act
+package org.sireum.hamr.act.templates
 
 import org.sireum._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.templates.CakeMLTemplate
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}

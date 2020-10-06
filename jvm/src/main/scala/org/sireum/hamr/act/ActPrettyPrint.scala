@@ -3,12 +3,12 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.Util.reporter
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.{ConnectorContainer, ConnectorTemplate}
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
-import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate}
-import org.sireum.hamr.act.utils.PathUtil
+import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate, StringTemplate}
+import org.sireum.hamr.act.util.Util.reporter
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.SymbolTable

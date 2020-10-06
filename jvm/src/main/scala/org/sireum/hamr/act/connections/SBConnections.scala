@@ -3,15 +3,15 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
+import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.ast.{Attribute, ConnectorType}
 import org.sireum.hamr.act.templates.ConnectionsSbTemplate
-import org.sireum.hamr.act.{ActOptions, ActPlatform, Counter, Monitor, QueueObject, Sel4ConnectorTypes, SharedData, Util, ast}
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
-import org.sireum.hamr.codegen.common.types.AadlTypes
+import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil => CommonTypeUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
-import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
 @record class SBConnections(monitors: HashSMap[String, Monitor],
                           sharedData: HashMap[String, SharedData],

@@ -1,18 +1,16 @@
 // #Sireum
 
-package org.sireum.hamr.act
+package org.sireum.hamr.act.util
 
 import org.sireum._
-import org.sireum.hamr.act.connections.ConnectorContainer
-import org.sireum.hamr.act.vm.VMGen
+import org.sireum.hamr.act.ast
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
-import org.sireum.ops._
 import org.sireum.hamr.ir
-import org.sireum.hamr.ir.{Aadl, Component, FeatureEnd, Transformer}
-import org.sireum.message.{Position, Reporter}
+import org.sireum.hamr.ir.FeatureEnd
+import org.sireum.message.Reporter
 
 object Util {
   var reporter: Reporter = Reporter.create
@@ -33,7 +31,7 @@ object Util {
   val MONITOR_COMP_SUFFIX: String  = "Monitor"
 
   val EVENT_NOTIFICATION_TYPE: String = "ReceiveEvent"
-  
+
   val MONITOR_EVENT_DATA_NOTIFICATION_TYPE: String =  "ReceiveEvent"
   val MONITOR_EVENT_NOTIFICATION_TYPE: String =  "QueuedData"
   val MONITOR_DATA_NOTIFICATION_TYPE: String  = "DataportWrite"
@@ -48,7 +46,7 @@ object Util {
 
   val PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "TB_SYS::Compute_Entrypoint_Source_Text"
   val PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT: String = "SB_SYS::Compute_Entrypoint_Source_Text"
-    
+
   val PROP_SB_SYS__CAmkES_Owner_Thread: String = "SB_SYS::CAmkES_Owner_Thread"
   val PROP_TB_SYS__CAmkES_Owner_Thread: String = "TB_SYS::CAmkES_Owner_Thread"
 
@@ -81,7 +79,7 @@ object Util {
 
   val camkesStdConnectors: String = "<std_connector.camkes>"
   val camkesGlobalConnectors: String = "<global-connectors.camkes>"
-  
+
   @pure def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
   }
@@ -114,9 +112,9 @@ object Util {
   }
 
   def getClassifier(c : ir.Classifier) : String = {
-    var s = StringOps(c.name)
+    var s = ops.StringOps(c.name)
     val index = s.lastIndexOf(':') + 1
-    s = StringOps(s.substring(index, c.name.size))
+    s = ops.StringOps(s.substring(index, c.name.size))
     return StringUtil.replaceAll(s.s, ".", "_")
   }
 
@@ -151,12 +149,12 @@ object Util {
       case ir.Direction.In => "dequeue"
       case ir.Direction.Out => "enqueue"
       case x => halt(s"Unexpected direction ${x}")
-    } 
+    }
     return Util.brand(s"${featureName}_${direction}")
   }
 
   def isMonitor(s: String) : B = {
-    val ss = StringOps(s)
+    val ss = ops.StringOps(s)
     return ss.startsWith(GEN_ARTIFACT_PREFIX) && ss.endsWith(MONITOR_COMP_SUFFIX)
   }
 
@@ -189,7 +187,7 @@ object Util {
     val name = s"${CommonUtil.getLastName(f.identifier)}_${queueSize}_notification"
     return brand(name)
   }
-  
+
   def getMonitorWriterName(f: ir.FeatureEnd): String = {
     return s"${getClassifierFullyQualified(f.classifier.get)}_writer"
   }
@@ -259,11 +257,11 @@ object Util {
     val PROP_sb = PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
     val PROP_tb = PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
     val PROP_pp = OsateProperties.PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT
-    
+
     val sbcest = PropertyUtil.getProperty(properties, PROP_sb)
     val tbcest = PropertyUtil.getProperty(properties, PROP_tb)
     val ppcest = PropertyUtil.getProperty(properties, PROP_pp)
-    
+
     if((sbcest.nonEmpty && tbcest.nonEmpty) || (sbcest.nonEmpty && ppcest.nonEmpty) || (tbcest.nonEmpty && ppcest.nonEmpty)){
       val props = st"${PROP_sb}, ${PROP_tb}, ${PROP_pp}"
       reporter.warn(sbcest.get.name.pos, Util.toolName, s"Only one of the following properties should be set for a component: ${props}")
@@ -291,7 +289,7 @@ object Util {
     } else {
       None()
     }
-    
+
     return ret
   }
 
@@ -335,7 +333,7 @@ object Util {
           seps = s"${pathSep}..${seps}"
         }
       }
-      val r = StringOps(toRel)
+      val r = ops.StringOps(toRel)
       val ret = s"${anchorResource}${seps}${r.substring(commonPrefix - offset, r.size)}"
 
       /*
@@ -392,7 +390,7 @@ object Util {
     val cid = Util.getClassifier(component.classifier.get)
     return Util.brand(s"entrypoint_${cid}_${fid}")
   }
-  
+
   def getEventDataSBQueueName(typeName: String, queueSize: Z): String = {
     return brand(s"queue_${typeName}_${queueSize}")
   }
@@ -426,7 +424,7 @@ object Util {
   def getEventDataSBQueueDestFeatureName(featureId: String): String = {
     return brand(s"${featureId}_queue")
   }
-  
+
   def getEventSBCounterName(featureId: String): String = {
     return brand(s"${featureId}_counter")
   }
@@ -463,7 +461,7 @@ object Util {
       to_ends = toEnds)
   }
 
-  def createConnection(connectionName: String, 
+  def createConnection(connectionName: String,
                        connectionType: Sel4ConnectorTypes.Type,
                        srcComponent: String, srcFeature: String,
                        dstComponent: String, dstFeature: String): ast.Connection = {
@@ -488,366 +486,12 @@ object Util {
   }
 
   def getDirectory(path: String): String = {
-    val so = StringOps(path)
+    val so = ops.StringOps(path)
     val index = so.lastIndexOf('/')
     if(index >= 0) {
       return so.substring(0, index + 1)
     } else {
       return path
     }
-  }
-}
-
-object TypeUtil {
-
-  def isMissingType(c: ir.Component) : B = {
-    return isMissingTypeClassifier(c.classifier.get)
-  }
-
-  def isMissingTypeClassifier(c: ir.Classifier) : B = {
-    return c.name == Util.MISSING_AADL_TYPE
-  }
-
-  def isBaseType(c: ir.Component): B = {
-    return isBaseTypeString(c.classifier.get.name)
-  }
-
-  def isBaseTypeString(c: String): B = {
-    return translateBaseType(c).nonEmpty
-  }
-
-  def isRecordType(c: ir.Component): B = {
-    return c.category == ir.ComponentCategory.Data && c.subComponents.size > 0
-  }
-
-  def isEnumDef(c: ir.Component): B = {
-    val ret: B = PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__DATA_REPRESENTATION) match {
-      case Some(ir.ValueProp("Enum")) => T
-      case _ => F
-    }
-    return ret
-  }
-
-  def isArrayDef(c: ir.Component): B = {
-    val ret: B = PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__DATA_REPRESENTATION) match {
-      case Some(ir.ValueProp("Array")) => T
-      case _ => F
-    }
-    return ret
-  }
-
-  def getArrayBaseType(c: ir.Component): Option[String] = {
-    PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__BASE_TYPE) match {
-      case Some(i: ir.ClassifierProp) =>
-        if(isBaseTypeString(i.name)) {
-          return translateBaseType(i.name)
-        } else {
-          return Some(Util.getClassifierFullyQualified(ir.Classifier(i.name)))
-        }
-      case _ => return None[String]()
-    }
-  }
-
-  def getArrayDimension(c: ir.Component): Option[Z] = {
-    return PropertyUtil.getUnitPropZ(c.properties, OsateProperties.DATA_MODEL__DIMENSION)
-  }
-
-  def translateBaseType(c: String): Option[String] = {
-    c match {
-      case "Base_Types::Boolean" => Some("bool")
-
-      case "Base_Types::Integer_8"  => Some(s"int8_t")
-      case "Base_Types::Integer_16" => Some(s"int16_t")
-      case "Base_Types::Integer_32" => Some(s"int32_t")
-      case "Base_Types::Integer_64" => Some(s"int64_t")
-
-      case "Base_Types::Unsigned_8"  => Some(s"uint8_t")
-      case "Base_Types::Unsigned_16" => Some(s"uint16_t")
-      case "Base_Types::Unsigned_32" => Some(s"uint32_t")
-      case "Base_Types::Unsigned_64" => Some(s"uint64_t")
-
-      case "Base_Types::Float"    => Some("float")
-      case "Base_Types::Float_32" => Some("double")
-      case "Base_Types::Float_64" => Some("double")
-
-      case "Base_Types::Character" => Some("char")
-      case "Base_Types::String" => Some("char*")
-
-      case "Base_Types::Integer" =>
-        Util.reporter.error(None(), Util.toolName, "Unbounded Base_Types::Integer is not supported")
-        None[String]()
-
-      case _ => None[String]()
-    }
-  }
-}
-
-
-@datatype class ActContainer(rootServer: String,
-                             connectors: ISZ[ConnectorContainer],
-                             models: ISZ[ast.ASTObject],
-                             monitors: ISZ[Monitor],
-                             samplingPorts: ISZ[SamplingPortInterface],
-                             cContainers: ISZ[C_Container],
-                             auxFiles: ISZ[Resource],
-                             globalImports: ISZ[String],
-                             globalPreprocessorIncludes: ISZ[String],
-                             requiresTimeServer: B
-                            )
-
-@sig trait Monitor {
-  def i: ast.Instance
-  def cimplementation: Resource
-  def cinclude: Resource
-  def index: Z
-  def ci: ir.ConnectionInstance
-}
-
-@datatype class TB_Monitor (i: ast.Instance,           // camkes monitor
-                            interface: ast.Procedure,  // camkes interface
-                            providesVarName: String,
-                            cimplementation: Resource,
-                            cinclude: Resource,
-                            index: Z,                  // fan-out index
-                            ci: ir.ConnectionInstance  // aadl connection
-                           ) extends Monitor
-
-@datatype class Ihor_Monitor (i: ast.Instance,           // camkes monitor
-                              interfaceReceiver: ast.Procedure,  // camkes interface
-                              interfaceSender: ast.Procedure,  // camkes interface
-                              providesReceiverVarName: String,
-                              providesSenderVarName: String,
-                              cimplementation: Resource,
-                              cinclude: Resource,
-                              index: Z,                  // fan-out index
-                              ci: ir.ConnectionInstance // aadl connection 
-                             ) extends Monitor
-
-
-@datatype class C_Container(instanceName: String,
-                            componentId: String,
-
-                            cSources: ISZ[Resource],
-                            cIncludes: ISZ[Resource],
-
-                            sourceText: ISZ[String],
-
-                            cmakeSOURCES: ISZ[String], // for CMakeLists SOURCES
-                            cmakeINCLUDES: ISZ[String], // for CMakeLists INCLUDES
-                            cmakeLIBS: ISZ[String] // for CMakeLists LIBS
-                           )
-
-@datatype class C_SimpleContainer(cIncludes: ISZ[ST],
-                                  cInterface: Option[ST],
-                                  cImplementation: Option[ST],
-                                  preInits: Option[ST],
-                                  postInits: Option[ST],
-                                  drainQueues: Option[(ST, ST)])
-
-@datatype class CamkesAssemblyContribution(imports: ISZ[String],
-                                           instances: ISZ[ast.Instance],
-                                           connections: ISZ[ast.Connection],
-                                           configurations: ISZ[ST],
-                                           cContainers: ISZ[C_Container],
-                                           settingCmakeEntries: ISZ[ST],
-                                           auxResourceFiles: ISZ[Resource])
-
-@datatype class CamkesComponentContributions(shell: ast.Component)
-
-@datatype class CamkesGlueCodeContributions(header: CamkesGlueCodeHeaderContributions,
-                                            impl: CamkesGlueCodeImplContributions)
-
-@datatype class CamkesGlueCodeHeaderContributions(includes: ISZ[String],
-                                                  methods: ISZ[ST])
-
-@datatype class CamkesGlueCodeImplContributions(includes: ISZ[String],
-                                                globals: ISZ[ST],
-                                                         
-                                                methods: ISZ[ST],
-                                                        
-                                                preInitStatements: ISZ[ST],
-                                                postInitStatements: ISZ[ST],
-                                               
-                                                mainPreLoopStatements: ISZ[ST],
-
-                                                mainLoopStartStatements: ISZ[ST],
-                                                mainLoopStatements: ISZ[ST],
-                                                mainLoopEndStatements: ISZ[ST],
-
-                                                mainPostLoopStatements: ISZ[ST]
-                                               )
-
-@datatype class SamplingPortInterface(name: String,
-                                      structName: String,
-                                      sel4TypeName: String,
-                                      headerFilename: String,
-                                      implFilename: String) {
-
-  def headerPath: String = { return s"${Util.getTypeRootPath()}/includes/${headerFilename}" }
-
-  def implPath: String = { return s"${Util.getTypeRootPath()}/src/${implFilename}" }
-}
-
-@datatype class SharedData(owner: ir.Component,
-                           ownerFeature: Option[ir.FeatureAccess],
-                           typ: ir.Classifier,
-                           subcomponentId: String)
-
-@datatype class QueueObject(queueName: String,
-                            queueSize: Z)
-
-@enum object Sel4ConnectorTypes {
-  'seL4GlobalAsynch
-  'seL4GlobalAsynchCallback
-  'seL4Notification
-  'seL4RPCCall
-  'seL4SharedData
-  'seL4SharedDataWithCaps
-  'seL4TimeServer
-  'seL4VMDTBPassthrough
-
-  'CASE_AADL_EventDataport
-}
-
-object Transformers {
-
-  @datatype class UnboundedIntegerRewriter extends ir.Transformer.PrePost[B] {
-    val unboundInt: String = "Base_Types::Integer"
-    val int32: String = "Base_Types::Integer_32"
-
-    override def postClassifier(ctx: B, o: ir.Classifier): ir.Transformer.TPostResult[B, ir.Classifier] = {
-      if(o.name == unboundInt) {
-        Util.reporter.warn(None(), Util.toolName, s"Replacing classifier ${unboundInt} with ${int32}")
-        return ir.Transformer.TPostResult(T, Some(ir.Classifier(int32)))
-      } else {
-        return ir.Transformer.TPostResult(ctx, None())
-      }
-    }
-
-    override def postClassifierProp(ctx: B, o: ir.ClassifierProp): ir.Transformer.TPostResult[B, ir.PropertyValue] = {
-      if(o.name == unboundInt) {
-        Util.reporter.warn(None(), Util.toolName, s"Replacing classifier ${unboundInt} with ${int32}")
-        return ir.Transformer.TPostResult(T, Some(ir.ClassifierProp(int32)))
-      } else {
-        return ir.Transformer.TPostResult(ctx, None())
-      }
-    }
-  }
-
-
-
-  @datatype class CTX(requiresMissingType: B,
-                      hasErrors: B)
-
-  @datatype class MissingTypeRewriter extends ir.Transformer.PrePost[CTX] {
-
-    val missingType: ir.Component = ir.Component(
-      identifier = ir.Name(ISZ(), None()),
-      category = ir.ComponentCategory.Data,
-      classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)),
-      features = ISZ(),
-      subComponents = ISZ(),
-      connections = ISZ(),
-      connectionInstances = ISZ(),
-      properties = ISZ(),
-      flows = ISZ(),
-      modes = ISZ(),
-      annexes = ISZ(),
-      uriFrag = ""
-    )
-
-    val missingArrayBaseType: ir.Property = ir.Property(
-      name = ir.Name(ISZ(OsateProperties.DATA_MODEL__BASE_TYPE), None()),
-      propertyValues = ISZ(ir.ClassifierProp(Util.MISSING_AADL_TYPE)),
-      appliesTo = ISZ())
-
-    val sporadicProp: ir.Property = ir.Property(
-      name = ir.Name(ISZ(OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL), None()),
-      propertyValues = ISZ(ir.ValueProp("Sporadic")),
-      appliesTo = ISZ())
-
-
-    override def postAadl(ctx: CTX, o: Aadl): Transformer.TPostResult[CTX, Aadl] = {
-      if(ctx.requiresMissingType) {
-        ir.Transformer.TPostResult(ctx, Some(o(dataComponents = o.dataComponents :+ missingType)))
-      } else {
-        ir.Transformer.TPostResult(ctx, None[ir.Aadl]())
-      }
-    }
-
-    override def postComponent(ctx: CTX, o: Component): Transformer.TPostResult[CTX, Component] = {
-
-      o.category match {
-        case ir.ComponentCategory.Data =>
-          if(o.classifier.isEmpty) {
-            Util.reporter.warn(None(), Util.toolName, s"Classifier not specified for ${CommonUtil.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE}")
-
-            ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
-          } else if (TypeUtil.isArrayDef(o) && TypeUtil.getArrayBaseType(o).isEmpty) {
-            Util.reporter.warn(None(), Util.toolName, s"Base type not specified for ${o.classifier.get.name}.  Substituting ${Util.MISSING_AADL_TYPE}")
-
-            ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(properties = o.properties :+ missingArrayBaseType)))
-          } else {
-            ir.Transformer.TPostResult(ctx, None[ir.Component]())
-          }
-
-        case ir.ComponentCategory.Thread =>
-          PropertyUtil.getDiscreetPropertyValue(o.properties, OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL) match {
-            case Some(ir.ValueProp(x)) =>
-              if(x != "Periodic" && x != "Sporadic") {
-                Util.reporter.error(None(), Util.toolName, s"${o.classifier.get.name} has unsupported dispatch protocol ${x}.")
-
-                ir.Transformer.TPostResult(ctx(hasErrors = T), None[ir.Component]())
-              } else {
-                ir.Transformer.TPostResult(ctx, None[ir.Component]())
-              }
-            case _ =>
-              Util.reporter.warn(None(), Util.toolName, s"${OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL} not specified for thread ${o.classifier.get.name}.  Treating it as sporadic.")
-
-              ir.Transformer.TPostResult(ctx, Some(o(properties =  o.properties :+ sporadicProp)))
-          }
-        case _ => ir.Transformer.TPostResult(ctx, None[ir.Component]())
-      }
-    }
-
-    override def postFeatureEnd(ctx: CTX, o: FeatureEnd): Transformer.TPostResult[CTX, FeatureEnd] = {
-      if (CommonUtil.isDataPort(o) && o.classifier.isEmpty) {
-        Util.reporter.warn(None(), Util.toolName, s"No datatype specified for data port ${CommonUtil.getName(o.identifier)}.  Substituting ${Util.MISSING_AADL_TYPE} ")
-
-        ir.Transformer.TPostResult(ctx(requiresMissingType = T), Some(o(classifier = Some(ir.Classifier(Util.MISSING_AADL_TYPE)))))
-      } else {
-        ir.Transformer.TPostResult(ctx, None[ir.FeatureEnd]())
-      }
-    }
-  }
-}
-
-@datatype class ActResult(val resources: ISZ[Resource])
-
-@enum object ReportKind{
-  'Info
-  'Warning
-  'Error
-}
-
-@enum object ActPlatform {
-  'SeL4
-  'SeL4_Only
-  'SeL4_TB
-}
-
-@datatype class ActOptions(outputDir: String,
-                           auxFiles: Map[String, String],
-                           aadlRootDirectory: Option[String],
-                           platform: ActPlatform.Type,
-                           hamrBasePackageName: Option[String],
-                           experimentalOptions: ISZ[String])
-
-@record class Counter() {
-  var count: Z = 0 // start at 0 so first is 1 which prevents capability conflict issues
-
-  def increment(): Z = {
-    count = count + 1
-    return count
   }
 }

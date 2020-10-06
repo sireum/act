@@ -1,8 +1,9 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.Util.reporter
-import org.sireum.hamr.codegen.common.{CommonUtil, Names}
+import org.sireum.hamr.act.util.Util.reporter
+import org.sireum.hamr.act.util._
+import org.sireum.hamr.codegen.common.Names
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolResolver

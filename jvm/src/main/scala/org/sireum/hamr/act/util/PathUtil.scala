@@ -1,9 +1,8 @@
 // #Sireum
 
-package org.sireum.hamr.act.utils
+package org.sireum.hamr.act.util
 
 import org.sireum._
-import org.sireum.hamr.act.Util
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 
 object PathUtil {

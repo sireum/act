@@ -2,9 +2,8 @@
 package org.sireum.hamr.act.vm
 
 import org.sireum._
-import org.sireum.hamr.act.StringTemplate
-import org.sireum.hamr.act.templates.CMakeTemplate
-import org.sireum.hamr.act.utils.{CMakeOption, CMakeStandardOption}
+import org.sireum.hamr.act.templates._
+import org.sireum.hamr.act.util.{CMakeOption, CMakeStandardOption}
 
 object VM_Template {
 

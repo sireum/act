@@ -3,7 +3,7 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
-import org.sireum.hamr.act.Monitor
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.ir
 

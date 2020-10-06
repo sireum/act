@@ -3,9 +3,8 @@
 package org.sireum.hamr.act.cakeml
 
 import org.sireum._
-import org.sireum.hamr.act.Util
 import org.sireum.hamr.act.templates.CakeMLTemplate
-import org.sireum.hamr.act.utils.PathUtil
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, SeL4NixNamesUtil}

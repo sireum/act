@@ -6,11 +6,12 @@ import org.sireum._
 import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate._
+import org.sireum.hamr.act.templates.StringTemplate
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
-import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
 @datatype class PeriodicDispatcher(val symbolTable: SymbolTable,

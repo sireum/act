@@ -3,8 +3,8 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
-import org.sireum.hamr.act.{Sel4ConnectorTypes, Util}
 import org.sireum.hamr.act.templates.EventDataQueueTemplate
+import org.sireum.hamr.act.util._
 
 object PacerTemplate {
 

@@ -3,8 +3,8 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
-import org.sireum.hamr.act.Util
 import org.sireum.hamr.act.periodic.PacerTemplate.periodicEntrypointMethodName
+import org.sireum.hamr.act.util._
 
 object SelfPacerTemplate {
 

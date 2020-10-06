@@ -3,8 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
-import org.sireum.hamr.act.utils.{CMakeOption, CMakePreprocessorOption, CMakeStandardOption}
-import org.sireum.hamr.act.{StringTemplate, Util}
+import org.sireum.hamr.act.util.{CMakeOption, CMakePreprocessorOption, Util}
 import org.sireum.hamr.act.vm.VMGen
 
 object CMakeTemplate {

@@ -2,14 +2,13 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
-import org.sireum.hamr.act.{ActOptions, ActPlatform, Counter, Ihor_Monitor, Monitor, QueueObject, Sel4ConnectorTypes, SharedData, TB_Monitor, Util, ast}
+import org.sireum.hamr.act.ast
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
-
-import org.sireum.hamr.codegen.common.types.{TypeUtil => CommonTypeUtil}
 
 @record class TBConnections(monitors: HashSMap[String, Monitor],
                           sharedData: HashMap[String, SharedData],

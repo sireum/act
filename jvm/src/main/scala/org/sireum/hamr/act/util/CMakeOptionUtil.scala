@@ -1,6 +1,6 @@
 // #Sireum
 
-package org.sireum.hamr.act.utils
+package org.sireum.hamr.act.util
 
 import org.sireum._
 

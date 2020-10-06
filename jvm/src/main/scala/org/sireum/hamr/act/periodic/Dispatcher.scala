@@ -3,9 +3,8 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
-import org.sireum.hamr.act.{ActOptions, CamkesAssemblyContribution, CamkesComponentContributions, CamkesGlueCodeContributions, Counter}
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.symbols._
-import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
 object Dispatcher {
