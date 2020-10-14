@@ -2425,12 +2425,12 @@ import org.sireum.ops.ISZOps
                   |/************************************************************************
                   | * ${isEmptyMethodName};
                   | *
-                  | * Helper method to determine if infrastructure port has received
-                  | * new events
+                  | * Helper method to determine if infrastructure port has not received
+                  | * any new events since the last dispatch
                   | *
                   | ************************************************************************/
                   |bool ${isEmptyMethodName}() {
-                  |  return *${counterName} == ${lastCounterVarName};
+                  |  return ${receivedEventsVarName} == 0;
                   |}"""
 
             val freezeEventsMethodName: String = StringTemplate.samplingPortFreezeMethodName(feature)
