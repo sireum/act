@@ -40,11 +40,11 @@ import org.sireum.message.Reporter
 
     imports = imports :+ PacerTemplate.pacerImport()
 
-    val periodicComponents = symbolTable.getPeriodicThreads()
+    val threads = symbolTable.getThreads()
     
-    if(periodicComponents.nonEmpty) {
+    if(threads.nonEmpty) {
 
-      auxResources = auxResources ++ getSchedule(periodicComponents)
+      auxResources = auxResources ++ getSchedule(threads)
       
       // TODO handle components with different periods
       var emits: ISZ[ast.Emits] = ISZ()
@@ -69,7 +69,7 @@ import org.sireum.message.Reporter
       var requiresEmits = F
       var requiresDataportVMs = F
 
-      for (aadlThread <- periodicComponents) {
+      for (aadlThread <- threads) {
         val componentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
         val isVM = aadlThread.toVirtualMachine(symbolTable)
@@ -216,7 +216,7 @@ import org.sireum.message.Reporter
 
     imports = imports :+ PacerTemplate.pacerImport()
 
-    val periodicComponents = symbolTable.getPeriodicThreads()
+    val threads = symbolTable.getThreads()
 
     var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
 
@@ -233,9 +233,9 @@ import org.sireum.message.Reporter
       map = map + (end ~> holder)
     }
 
-    if(periodicComponents.nonEmpty) {
+    if(threads.nonEmpty) {
 
-      auxResources = auxResources ++ getSchedule(periodicComponents)
+      auxResources = auxResources ++ getSchedule(threads)
 
       // TODO handle components with different periods
       var emits: ISZ[ast.Emits] = ISZ()
@@ -265,7 +265,7 @@ import org.sireum.message.Reporter
 
       var hasPeriodicVMComponents: B = F
 
-      for (aadlThread <- periodicComponents) {
+      for (aadlThread <- threads) {
 
         val dstCamkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 

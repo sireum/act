@@ -20,17 +20,19 @@ import org.sireum.message.Reporter
                                headerInclude: String,
                                reporter: Reporter): CamkesAssemblyContribution = {
 
-    val periodicComponents = symbolTable.getPeriodicThreads()
+    val threads = symbolTable.getThreads()
 
     var configurations: ISZ[ST] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
 
-    if(periodicComponents.nonEmpty) {
-      auxResources = auxResources ++ getSchedule(periodicComponents)
+    if(threads.nonEmpty) {
+      auxResources = auxResources ++ getSchedule(threads)
     }
 
-    for(aadlThread <- periodicComponents) {
+    val periodicThreads = symbolTable.getPeriodicThreads()
+
+    for(aadlThread <- periodicThreads) {
       val componentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
       configurations = configurations :+ SelfPacerTemplate.selfPacerDomainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
@@ -139,7 +141,7 @@ import org.sireum.message.Reporter
     return (componentContributions, glueCodeContributions)
   }
 
-  def getSchedule(periodicComponents: ISZ[AadlThread]): ISZ[Resource] = {
+  def getSchedule(threads: ISZ[AadlThread]): ISZ[Resource] = {
 
     val aadlProcessors: ISZ[AadlProcessor] = symbolTable.getAllBoundProcessors()
     if(aadlProcessors.isEmpty || aadlProcessors.size > 1) {
@@ -188,7 +190,7 @@ import org.sireum.message.Reporter
 
         var threadComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(p <- periodicComponents) {
+        for(p <- threads) {
           val domain = p.getDomain(symbolTable).get
           val computeExecutionTime = p.getMaxComputeExecutionTime()
           val period = p.period

@@ -7,6 +7,7 @@ import org.sireum.hamr.codegen.common.Names
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolResolver
+import org.sireum.hamr.codegen.common.transformers.Transformers
 import org.sireum.hamr.codegen.common.types.{TypeResolver, TypeUtil => CommonTypeUtil}
 import org.sireum.hamr.codegen.common.util.ExperimentalOptions
 import org.sireum.hamr.ir
@@ -30,7 +31,7 @@ object Act {
     }
     
     val m1 = if(Util.DEVELOPER_MODE) {
-      Transformer(Transformers.UnboundedIntegerRewriter()).transformAadl(F, m).resultOpt match {
+      Transformer(Transformers.UnboundedIntegerRewriter(reporter)).transformAadl(F, m).resultOpt match {
         case Some(mod) => mod
         case _ => m
       }
@@ -38,7 +39,7 @@ object Act {
       m
     }
 
-    val result = ir.Transformer(Transformers.MissingTypeRewriter()).transformAadl(Transformers.CTX(F, F), m1)
+    val result = ir.Transformer(Transformers.MissingTypeRewriter(reporter)).transformAadl(Transformers.CTX(F, F), m1)
     val m2 = if(result.resultOpt.nonEmpty) result.resultOpt.get else m1
 
     if(!result.ctx.hasErrors) {
