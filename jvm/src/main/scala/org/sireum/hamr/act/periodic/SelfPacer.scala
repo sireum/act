@@ -35,7 +35,7 @@ import org.sireum.message.Reporter
     for(aadlThread <- periodicThreads) {
       val componentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
-      configurations = configurations :+ SelfPacerTemplate.selfPacerDomainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
+      configurations = configurations :+ PacerTemplate.domainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
 
       connections = connections :+ Util.createConnection(
         connectionName = Util.getConnectionName(connectionCounter.increment()),
@@ -48,7 +48,7 @@ import org.sireum.message.Reporter
     }
 
     val maxDomain: Z = symbolTable.getMaxDomain()
-    val settingCmakeEntries: ISZ[ST] = ISZ(SelfPacerTemplate.settings_cmake_entries(maxDomain))
+    val settingCmakeEntries: ISZ[ST] = ISZ(PacerTemplate.settings_cmake_entries(maxDomain))
 
     return CamkesAssemblyContribution(
       connections = connections,
@@ -141,7 +141,7 @@ import org.sireum.message.Reporter
     return (componentContributions, glueCodeContributions)
   }
 
-  def getSchedule(threads: ISZ[AadlThread]): ISZ[Resource] = {
+  def getSchedule(allThreads: ISZ[AadlThread]): ISZ[Resource] = {
 
     val aadlProcessors: ISZ[AadlProcessor] = symbolTable.getAllBoundProcessors()
     if(aadlProcessors.isEmpty || aadlProcessors.size > 1) {
@@ -183,34 +183,31 @@ import org.sireum.message.Reporter
         }
 
         val otherLen = z"200"
-        entries = entries :+ SelfPacerTemplate.selfPacerScheduleEntry(z"0", otherLen / clockPeriod,
+        entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", otherLen / clockPeriod,
           Some(st" // all other seL4 threads, init, ${otherLen}ms"))
 
         val pacerLen = z"10"
 
         var threadComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(p <- threads) {
+        for(p <- allThreads) {
           val domain = p.getDomain(symbolTable).get
           val computeExecutionTime = p.getMaxComputeExecutionTime()
-          val period = p.period
           val comment = Some(st" // ${p.identifier}  ${computeExecutionTime}ms")
 
           threadComments = threadComments :+
-            SelfPacerTemplate.selfPacerScheduleThreadPropertyComment(p.identifier,
-              ISZ(st"${CaseSchedulingProperties.DOMAIN} : ${domain}",
-                st"${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime} ms",
-                st"${OsateProperties.TIMING_PROPERTIES__PERIOD} : ${period} ms"))
+            PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier,
+              domain, p.dispatchProtocol, computeExecutionTime, p.period)
 
-          entries = entries :+ SelfPacerTemplate.selfPacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
+          entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
 
           sumExecutionTime = sumExecutionTime + computeExecutionTime
         }
 
         val pad: Z = (framePeriod - (otherLen + pacerLen + sumExecutionTime)) / clockPeriod
-        entries = entries :+ SelfPacerTemplate.selfPacerScheduleEntry(z"0", pad, Some(st" // pad rest of frame period"))
+        entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", pad, Some(st" // pad rest of frame period"))
 
-        SelfPacerTemplate.selfPacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
+        PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
     }
 
     return ISZ(Util.createResource(path, contents, F))

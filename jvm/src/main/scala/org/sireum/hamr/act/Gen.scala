@@ -7,7 +7,7 @@ import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.connections._
-import org.sireum.hamr.act.periodic.{Dispatcher, PeriodicUtil}
+import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.templates._
 import org.sireum.hamr.act.util.PathUtil
 import org.sireum.hamr.act.vm._
@@ -314,7 +314,7 @@ import org.sireum.ops.ISZOps
           if(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4) {
             aadlThread.getDomain(symbolTable) match {
               case Some(domain) =>
-                camkesConfiguration = camkesConfiguration :+ CAmkESTemplate.domainConfiguration(camkesComponentId, domain)
+                camkesConfiguration = camkesConfiguration :+ PacerTemplate.domainConfiguration(camkesComponentId, domain)
               case _ =>
             }
           }
@@ -536,12 +536,6 @@ import org.sireum.ops.ISZOps
         cmakeINCLUDES = cmakeINCLUDES :+ CommonPathUtil.value(Os.path(samplingPort.headerPath).up.value)
 
         gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, f) +: gcImplMethods
-
-        val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
-
-        camkesConfiguration = camkesConfiguration :+
-          StringTemplate.sbSamplingPortConfigurationEntry(
-            camkesComponentId, samplingPort, f)
 
         dataports = dataports :+ Dataport(
           name = Util.brand(fid),
@@ -1689,11 +1683,10 @@ import org.sireum.ops.ISZOps
         var preInits: ISZ[ST] = ISZ()
         var postInits: ISZ[ST] = ISZ()
 
-        preInits = preInits :+
-          StringTemplate.sbSamplingPortInitialise(samplingPort, feature)
-
         feature.direction match {
           case ir.Direction.In =>
+            // don't init data structure since consumers don't have the correct perms
+
             interfaces = interfaces :+
               StringTemplate.sbSamplingPortGetterInterface(samplingPort, feature)
 
@@ -1701,9 +1694,12 @@ import org.sireum.ops.ISZOps
               StringTemplate.sbSamplingPortGetterImplementation(samplingPort, feature)
 
           case ir.Direction.Out =>
+
+            preInits = preInits :+
+              StringTemplate.sbSamplingPortInitialise(samplingPort, feature)
+
             interfaces = interfaces :+
               StringTemplate.sbSamplingPortSetterInterface(samplingPort, feature)
-
 
             implementations = implementations :+
               StringTemplate.sbSamplingPortSetterImplementation(samplingPort, feature)
@@ -1863,6 +1859,7 @@ import org.sireum.ops.ISZOps
             val cIncludes: ISZ[ST] = ISZ(st"""#include <${queueHeaderName}>
                                              |#include <${Util.SB_COUNTER_HEADER_FILENAME}>""")
 
+            // init the consumer's receive queue, declared locally so access permitted
             preInits = preInits :+ st"""// initialise data structure for incoming event data port ${fid}
                                        |${recvQueueName}_init(&${recvQueueFeatureName}, ${featureQueueName});"""
 

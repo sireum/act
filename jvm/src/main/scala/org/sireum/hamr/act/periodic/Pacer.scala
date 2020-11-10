@@ -40,7 +40,7 @@ import org.sireum.message.Reporter
 
     imports = imports :+ PacerTemplate.pacerImport()
 
-    val threads = symbolTable.getThreads()
+    val threads = symbolTable.getPeriodicThreads()
     
     if(threads.nonEmpty) {
 
@@ -57,7 +57,7 @@ import org.sireum.message.Reporter
       var gcPacerInitEntries: ISZ[ST] = ISZ()
 
       // add pacer domain configuration
-      configurations = configurations :+ CAmkESTemplate.domainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
+      configurations = configurations :+ PacerTemplate.domainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
       
       // tick/tock connection
       connections = connections :+ Util.createConnection(
@@ -75,7 +75,7 @@ import org.sireum.message.Reporter
         val isVM = aadlThread.toVirtualMachine(symbolTable)
 
         requiresDataportVMs = requiresDataportVMs | isVM
-        requiresEmits = requiresEmits | !aadlThread.toVirtualMachine(symbolTable)
+        requiresEmits = requiresEmits | !isVM
 
         if(isVM) {
 
@@ -139,7 +139,7 @@ import org.sireum.message.Reporter
 
           if(useCaseConnectors) {
             configurations = configurations :+
-              ConnectionsSbTemplate.caseConnectorConfig_with_signalling(connectionName)
+              ConnectionsSbTemplate.caseConnectorConfig_with_signalling(connectionName, T)
 
             configurations = configurations :+
               ConnectionsSbTemplate.caseConnectorConfig_connection_type(PacerTemplate.PACER_IDENTIFIER, pacerDataportName, F)
@@ -216,7 +216,7 @@ import org.sireum.message.Reporter
 
     imports = imports :+ PacerTemplate.pacerImport()
 
-    val threads = symbolTable.getThreads()
+    val threads = symbolTable.getPeriodicThreads()
 
     var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
 
@@ -248,7 +248,7 @@ import org.sireum.message.Reporter
       var gcPacerInitEntries: ISZ[ST] = ISZ()
 
       // add pacer domain configuration
-      configurations = configurations :+ CAmkESTemplate.domainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
+      configurations = configurations :+ PacerTemplate.domainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
 
       // tick/tock connection
       connections = connections :+ Util.createConnection(
@@ -291,7 +291,7 @@ import org.sireum.message.Reporter
           holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
           holder = holder(configurationEntries = holder.configurationEntries :+
-            ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName).render)
+            ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, T).render)
 
           holder = holder(configurationEntries = holder.configurationEntries :+
             ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesVMFeatureQueueName, F).render)
@@ -565,7 +565,7 @@ import org.sireum.message.Reporter
     return Util.createResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
   }
   
-  def getSchedule(periodicComponents: ISZ[AadlThread]): ISZ[Resource] = {
+  def getSchedule(allThreads: ISZ[AadlThread]): ISZ[Resource] = {
 
     val aadlProcessors: ISZ[AadlProcessor] = symbolTable.getAllBoundProcessors()
     if(aadlProcessors.isEmpty || aadlProcessors.size > 1) {
@@ -617,18 +617,15 @@ import org.sireum.message.Reporter
         
         var threadComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(p <- periodicComponents) {
+        for(p <- allThreads) {
           val domain = p.getDomain(symbolTable).get
           val computeExecutionTime = p.getMaxComputeExecutionTime()
-          val period = p.period
           val comment = Some(st" // ${p.identifier}  ${computeExecutionTime}ms")
 
           threadComments = threadComments :+ 
             PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier,
-              ISZ(st"${CaseSchedulingProperties.DOMAIN} : ${domain}",
-                st"${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime} ms",
-                st"${OsateProperties.TIMING_PROPERTIES__PERIOD} : ${period} ms"))
-          
+              domain, p.dispatchProtocol, computeExecutionTime, p.period)
+
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
           
           sumExecutionTime = sumExecutionTime + computeExecutionTime

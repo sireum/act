@@ -458,18 +458,7 @@ object StringTemplate {
     
     return ret
   }
-  
-  def sbSamplingPortConfigurationEntry(componentVarName: String, spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    val portName = CommonUtil.getLastName(f.identifier)
-    
-    val ret: ST = f.direction match {
-      case ir.Direction.In => st"""${componentVarName}.${portName}_access = "R";"""
-      case ir.Direction.Out => st"""${componentVarName}.${portName}_access = "W";"""
-      case _ => halt(s"Unexpected direction ${f.direction}")
-    }
-    return ret
-  }
-  
+
   def sbAccessRestrictionEntry(componentName: String, varName: String, permission: String): ST = {
     return st"""${componentName}.${varName}_access = "${permission}";"""
   }

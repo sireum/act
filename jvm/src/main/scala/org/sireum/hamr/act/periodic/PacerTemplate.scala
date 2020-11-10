@@ -3,8 +3,11 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
+import org.sireum.hamr.act.templates.CAmkESTemplate.DOMAIN_FIELD
 import org.sireum.hamr.act.templates.EventDataQueueTemplate
 import org.sireum.hamr.act.util._
+import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
+import org.sireum.hamr.codegen.common.symbols.Dispatch_Protocol
 
 object PacerTemplate {
 
@@ -109,6 +112,11 @@ object PacerTemplate {
     return ret
   }
 
+
+  def domainConfiguration(identifier: String, domain: Z): ST = {
+    return st"${identifier}.${DOMAIN_FIELD} = ${domain};"
+  }
+
   def pacerScheduleEntry(domain: Z,
                          length: Z,
                          comment: Option[ST]): ST = {
@@ -154,14 +162,26 @@ object PacerTemplate {
   }
 
   def pacerScheduleThreadPropertyComment(componentId: String,
-                                         entries: ISZ[ST]): ST = {
+                                         domain: Z,
+                                         dispatchProtocol: Dispatch_Protocol.Type,
+                                         computeExecutionTime: Z,
+                                         period: Option[Z]): ST = {
     var dashes: String = s""
     for(x <- 0 until componentId.size){ dashes = s"${dashes}-" }
+
+    val _period: Option[ST] =
+      period match {
+        case Some(p) => Some(st"${OsateProperties.TIMING_PROPERTIES__PERIOD} : ${p} ms")
+        case _ => None()
+      }
 
     val ret: ST = st"""${componentId}
                       |${dashes}
                       |
-                      |  ${(entries, "\n")}"""
+                      |  ${CaseSchedulingProperties.DOMAIN} : ${domain}
+                      |  ${OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL} : ${dispatchProtocol}
+                      |  ${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime} ms
+                      |  ${_period}"""
     return ret
   }
 

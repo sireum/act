@@ -15,7 +15,6 @@ import org.sireum.hamr.ir
                                  toConnectionEnds: MSZ[ast.ConnectionEnd],
                                  configurationEntries: MSZ[String])
 
-
 @datatype class ConnectionContainer(connections: ISZ[ast.Connection],
                                     configurationEntries: ISZ[ST],
                                     optConnectorHolder: ISZ[ConnectorContainer])

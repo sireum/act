@@ -75,19 +75,18 @@ import org.sireum.message.Reporter
             assert(srcFeature.category == dstFeature.category,
               s"Not currently handling mixed feature types: Source is ${srcFeature.category}, destination is ${dstFeature.category} for ${conn}")
 
+            val srcCamkesFeatureQueueName: String = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
+            val dstCamkesFeatureQueueName: String = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
+
+            val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
+            val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
+
             dstFeature.category match {
               case ir.FeatureCategory.DataPort => {
+                // dataport connection
 
-                { // dataport connection
-                  val queueConnectorType: Sel4ConnectorTypes.Type =
-                    if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
-                    else Sel4ConnectorTypes.seL4SharedData
-
-                  val srcCamkesFeatureQueueName: String = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
-                  val dstCamkesFeatureQueueName: String = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
-
-                  val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
-                  val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
+                if(useCaseConnections) {
+                  val queueConnectorType = Sel4ConnectorTypes.CASE_AADL_EventDataport
 
                   var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
 
@@ -104,6 +103,48 @@ import org.sireum.message.Reporter
                     holder = holder(configurationEntries = holder.configurationEntries :+
                       st"""${holder.connectionName}.size = ${size};""".render)
                   }
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, F).render)
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName, srcToVM).render)
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, dstToVM).render)
+
+                  updateHolder(srcConnectionEnd, holder)
+
+                }
+                else {
+                  val queueConnectorType: Sel4ConnectorTypes.Type =
+                    if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
+                    else Sel4ConnectorTypes.seL4SharedData
+
+                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+
+                  if (aadlTypes.rawConnections) {
+                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
+                      case Some(z) =>
+                        if (z % z"4096" == z"0") z
+                        else (z / z"4096" + 1) * z"4096"
+                      case _ => z"4096" // TODO or throw error?
+                    }
+
+                    holder = holder(configurationEntries = holder.configurationEntries :+
+                      st"""${holder.connectionName}.size = ${size};""".render)
+                  }
+
+                  val producerPerms: String = if(srcToVM) "RW" else "W"
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName}_access = "${producerPerms}";""".render)
+
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render)
+
                   updateHolder(srcConnectionEnd, holder)
                 }
               }
@@ -221,7 +262,7 @@ import org.sireum.message.Reporter
                   }
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, T).render)
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
                     ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName, srcToVM).render)

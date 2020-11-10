@@ -16,8 +16,9 @@ object ConnectionsSbTemplate {
     return "CASE_AADL_EventDataport-to.template.c"
   }
 
-  def caseConnectorConfig_with_signalling(connectionName: String): ST = {
-    return st"${connectionName}.with_signalling = true;"
+  def caseConnectorConfig_with_signalling(connectionName: String, shouldSignal: B): ST = {
+    val text: String = if(shouldSignal) "true" else "false"
+    return st"${connectionName}.with_signalling = ${shouldSignal};"
   }
 
   def caseConnectorConfig_connection_type(componentName: String, featureName: String, isVMComponent: B) : ST = {
@@ -39,6 +40,9 @@ object ConnectionsSbTemplate {
                       | */
                       |
                       |/*- do configuration[me.instance.name].update({"%s_access" % me.interface.name: "RW"}) -*/
+                      |
+                      |// https://docs.sel4.systems/projects/camkes/seL4SharedDataWithCaps.html
+                      |// https://github.com/SEL4PROJ/global-components/blob/master/templates/seL4SharedDataWithCaps.template.c
                       |/*- include 'seL4SharedDataWithCaps.template.c' -*/
                       |
                       |/*- set generate_notifications = configuration[me.parent.name].get("with_signalling", false) -*/
