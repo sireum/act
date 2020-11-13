@@ -75,22 +75,22 @@ import org.sireum.message.Reporter
             assert(srcFeature.category == dstFeature.category,
               s"Not currently handling mixed feature types: Source is ${srcFeature.category}, destination is ${dstFeature.category} for ${conn}")
 
-            val srcCamkesFeatureQueueName: String = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
-            val dstCamkesFeatureQueueName: String = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
-
-            val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
-            val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
-
             dstFeature.category match {
               case ir.FeatureCategory.DataPort => {
                 // dataport connection
 
+                val srcCamkesFeatureQueueName_DP: String = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
+                val dstCamkesFeatureQueueName_DP: String = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
+
+                val srcConnectionEnd_DP = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName_DP)
+                val dstConnectionEnd_DP = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName_DP)
+
                 if(useCaseConnections) {
                   val queueConnectorType = Sel4ConnectorTypes.CASE_AADL_EventDataport
 
-                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_DP, queueConnectorType)
 
-                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_DP)
 
                   if (aadlTypes.rawConnections) {
                     val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
@@ -108,12 +108,12 @@ import org.sireum.message.Reporter
                     ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, F).render)
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName, srcToVM).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName_DP, srcToVM).render)
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, dstToVM).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName_DP, dstToVM).render)
 
-                  updateHolder(srcConnectionEnd, holder)
+                  updateHolder(srcConnectionEnd_DP, holder)
 
                 }
                 else {
@@ -121,9 +121,9 @@ import org.sireum.message.Reporter
                     if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
                     else Sel4ConnectorTypes.seL4SharedData
 
-                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_DP, queueConnectorType)
 
-                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_DP)
 
                   if (aadlTypes.rawConnections) {
                     val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
@@ -140,12 +140,12 @@ import org.sireum.message.Reporter
                   val producerPerms: String = if(srcToVM) "RW" else "W"
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName}_access = "${producerPerms}";""".render)
+                    st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName_DP}_access = "${producerPerms}";""".render)
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render)
+                    st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName_DP}_access = "R";""".render)
 
-                  updateHolder(srcConnectionEnd, holder)
+                  updateHolder(srcConnectionEnd_DP, holder)
                 }
               }
 
@@ -162,14 +162,14 @@ import org.sireum.message.Reporter
                     if (dstToVM) Sel4ConnectorTypes.seL4GlobalAsynch
                     else Sel4ConnectorTypes.seL4Notification
 
-                  val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureNotificationName)
-                  val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureNotificationName)
+                  val srcConnectionEnd_ED = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureNotificationName)
+                  val dstConnectionEnd_ED = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureNotificationName)
 
-                  var holder = getConnectionHolder(srcConnectionEnd, notificationConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_ED, notificationConnectorType)
 
-                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_ED)
 
-                  updateHolder(srcConnectionEnd, holder)
+                  updateHolder(srcConnectionEnd_ED, holder)
                 }
 
                 { // queue dataport connection
@@ -177,15 +177,15 @@ import org.sireum.message.Reporter
                     if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
                     else Sel4ConnectorTypes.seL4SharedData
 
-                  val srcCamkesFeatureQueueName: String = Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
-                  val dstCamkesFeatureQueueName: String = Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
+                  val srcCamkesFeatureQueueName_ED: String = Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
+                  val dstCamkesFeatureQueueName_ED: String = Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
 
-                  val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
-                  val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
+                  val srcConnectionEnd_ED = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName_ED)
+                  val dstConnectionEnd_ED = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName_ED)
 
-                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_ED, queueConnectorType)
 
-                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
+                  holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_ED)
 
                   if (aadlTypes.rawConnections) {
                     val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
@@ -201,7 +201,7 @@ import org.sireum.message.Reporter
 
                   if(!srcToVM) {
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName}_access = "W";""".render)
+                      st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName_ED}_access = "W";""".render)
                   } else {
                     // don't add access restrictions when component is in a vm, otherwise get errors like
                     //
@@ -212,7 +212,7 @@ import org.sireum.message.Reporter
 
                   if(!dstToVM) {
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName}_access = "R";""".render)
+                      st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName_ED}_access = "R";""".render)
                   } else {
                     // don't add access restrictions since in a vm
 
@@ -227,7 +227,7 @@ import org.sireum.message.Reporter
                   }
 
 
-                  updateHolder(srcConnectionEnd, holder)
+                  updateHolder(srcConnectionEnd_ED, holder)
                 }
               }
 
