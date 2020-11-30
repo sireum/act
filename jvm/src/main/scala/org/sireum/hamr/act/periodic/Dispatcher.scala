@@ -5,7 +5,6 @@ package org.sireum.hamr.act.periodic
 import org.sireum._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.symbols._
-import org.sireum.message.Reporter
 
 object Dispatcher {
 
@@ -15,30 +14,26 @@ object Dispatcher {
                                connectionCounter: Counter,
                                timerAttributeCounter: Counter,
                               
-                               headerInclude: String,
-                               reporter: Reporter): CamkesAssemblyContribution = {
+                               headerInclude: String): CamkesAssemblyContribution = {
 
     val ret: CamkesAssemblyContribution = PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
       case PeriodicDispatchingType.Pacer =>
         Pacer(symbolTable, actOptions).handlePeriodicComponents(
           connectionCounter,
           timerAttributeCounter,
-          headerInclude,
-          reporter)
+          headerInclude)
 
       case PeriodicDispatchingType.SelfPacer =>
         SelfPacer(symbolTable, actOptions).handlePeriodicComponents(
           connectionCounter,
           timerAttributeCounter,
-          headerInclude,
-          reporter)
+          headerInclude)
 
       case PeriodicDispatchingType.PeriodicDispatcher =>
         PeriodicDispatcher(symbolTable, actOptions).handlePeriodicComponents(
           connectionCounter,
           timerAttributeCounter,
-          headerInclude,
-          reporter)
+          headerInclude)
     }
     return ret
   }
@@ -46,19 +41,18 @@ object Dispatcher {
   def handlePeriodicComponent(symbolTable: SymbolTable,
                               actOptions: ActOptions,
 
-                              aadlThread: AadlThread,
-                              reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+                              aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
     
     val ret: (CamkesComponentContributions, CamkesGlueCodeContributions) =
       PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
         case PeriodicDispatchingType.Pacer =>
-          Pacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
+          Pacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread)
 
         case PeriodicDispatchingType.SelfPacer =>
-          SelfPacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
+          SelfPacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread)
 
         case PeriodicDispatchingType.PeriodicDispatcher =>
-          PeriodicDispatcher(symbolTable, actOptions).handlePeriodicComponent(aadlThread, reporter)
+          PeriodicDispatcher(symbolTable, actOptions).handlePeriodicComponent(aadlThread)
       }
 
     return ret

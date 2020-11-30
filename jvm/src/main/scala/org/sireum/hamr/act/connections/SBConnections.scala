@@ -11,15 +11,13 @@ import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil => CommonTypeUtil}
 import org.sireum.hamr.ir
-import org.sireum.message.Reporter
 
 @record class SBConnections(monitors: HashSMap[String, Monitor],
                           sharedData: HashMap[String, SharedData],
                           srcQueues: Map[String, Map[String, QueueObject]],
                           symbolTable: SymbolTable,
                           aadlTypes: AadlTypes,
-                          actOptions: ActOptions,
-                          reporter: Reporter) {
+                          actOptions: ActOptions) {
 
   val platform: ActPlatform.Type = actOptions.platform
 

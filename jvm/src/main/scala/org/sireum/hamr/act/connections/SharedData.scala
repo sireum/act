@@ -3,16 +3,15 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlComponent, SymbolTable}
 import org.sireum.hamr.ir
-import org.sireum.message.Reporter
 
 object SharedDataUtil {
 
-  def buildSharedData(symbolTable: SymbolTable,
-                      reporter: Reporter): HashMap[String, SharedData] = {
+  def buildSharedData(symbolTable: SymbolTable): HashMap[String, SharedData] = {
     var sharedData: HashMap[String, SharedData] = HashMap.empty
 
     for(aadlProcess <- symbolTable.getProcesses()) {

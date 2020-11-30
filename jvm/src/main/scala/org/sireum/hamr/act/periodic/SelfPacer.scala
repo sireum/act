@@ -4,11 +4,10 @@ package org.sireum.hamr.act.periodic
 
 import org.sireum._
 import org.sireum.hamr.act._
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
 import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, SymbolTable}
-import org.sireum.message.Reporter
 
 @datatype class SelfPacer (val symbolTable: SymbolTable,
                            val actOptions: ActOptions) extends PeriodicImpl {
@@ -17,8 +16,7 @@ import org.sireum.message.Reporter
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String,
-                               reporter: Reporter): CamkesAssemblyContribution = {
+                               headerInclude: String): CamkesAssemblyContribution = {
 
     val threads = symbolTable.getThreads()
 
@@ -61,8 +59,7 @@ import org.sireum.message.Reporter
       cContainers = ISZ())
   }
 
-  def handlePeriodicComponent(aadlThread: AadlThread,
-                              reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+  def handlePeriodicComponent(aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
 
     assert(aadlThread.isPeriodic())
 

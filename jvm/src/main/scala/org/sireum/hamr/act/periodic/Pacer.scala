@@ -7,12 +7,11 @@ import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits}
 import org.sireum.hamr.act.connections.ConnectionHolder
 import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.properties.{CaseSchedulingProperties, OsateProperties}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ExperimentalOptions
-import org.sireum.message.Reporter
 
 @datatype class Pacer(val symbolTable: SymbolTable,
                       val actOptions: ActOptions) extends PeriodicImpl {
@@ -23,10 +22,9 @@ import org.sireum.message.Reporter
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String,
-                               reporter: Reporter): CamkesAssemblyContribution = {
+                               headerInclude: String): CamkesAssemblyContribution = {
     if(useCaseConnectors) {
-      return handlePeriodicComponents_CASE_Connector(connectionCounter, timerAttributeCounter, headerInclude, reporter)
+      return handlePeriodicComponents_CASE_Connector(connectionCounter, timerAttributeCounter, headerInclude)
     }
 
     assert(!useCaseConnectors)
@@ -203,8 +201,7 @@ import org.sireum.message.Reporter
 
   def handlePeriodicComponents_CASE_Connector(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String,
-                               reporter: Reporter): CamkesAssemblyContribution = {
+                               headerInclude: String): CamkesAssemblyContribution = {
     assert(useCaseConnectors)
 
     var imports: ISZ[String] = ISZ()
@@ -398,8 +395,7 @@ import org.sireum.message.Reporter
       settingCmakeEntries, auxResources)
   }
 
-  def handlePeriodicComponent(aadlThread: AadlThread,
-                              reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+  def handlePeriodicComponent(aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
     assert(aadlThread.isPeriodic())
     
     val component = aadlThread.component

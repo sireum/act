@@ -1015,4 +1015,17 @@ bool is_empty_${s.name}(${s.structName} *port) {
 
   def safeToEditCamkeComment(): ST = { return st"# This file will not be overwritten so is safe to edit" }
 
+  def postGenInstructionsMessage(camkesProjDirectory: String,
+                                 runCamkesScript: String): ST = {
+    val ret: ST =
+      st"""CAmkES Instructions:
+          |--------------------------
+          |  CAmkES Project Directory: ${camkesProjDirectory}
+          |
+          |  Execute the following to simulate the system via QEMU:
+          |
+          |    ${runCamkesScript} -s"""
+
+    return ret
+  }
 }

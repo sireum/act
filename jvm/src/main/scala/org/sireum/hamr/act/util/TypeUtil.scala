@@ -3,6 +3,7 @@
 package org.sireum.hamr.act.util
 
 import org.sireum._
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.ir
 
@@ -82,7 +83,7 @@ object TypeUtil {
       case "Base_Types::String" => Some("char*")
 
       case "Base_Types::Integer" =>
-        Util.reporter.error(None(), Util.toolName, "Unbounded Base_Types::Integer is not supported")
+        reporter.error(None(), Util.toolName, "Unbounded Base_Types::Integer is not supported")
         None[String]()
 
       case _ => None[String]()

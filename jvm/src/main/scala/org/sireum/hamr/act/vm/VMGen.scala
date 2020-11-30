@@ -13,7 +13,6 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcess, AadlThread, Dispatch
 import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.FeatureEnd
-import org.sireum.message.Reporter
 
 object VMGen {
 
@@ -242,8 +241,7 @@ object VMGen {
                     typeMap: HashSMap[String, ir.Component],
                     samplingPorts: HashMap[String, SamplingPortInterface],
                     srcQueues: Map[String, Map[String, QueueObject]],
-                    actOptions: ActOptions,
-                    reporter: Reporter) {
+                    actOptions: ActOptions) {
 
   val platform: ActPlatform.Type = actOptions.platform
   val performHamrIntegration: B = Util.hamrIntegration(platform)
@@ -336,7 +334,7 @@ object VMGen {
     aadlThread.dispatchProtocol match {
       case Dispatch_Protocol.Periodic =>
         val (componentContributions, glueCodeContributions) =
-          Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread, reporter)
+          Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread)
 
         consumes = consumes ++ componentContributions.shell.consumes
 

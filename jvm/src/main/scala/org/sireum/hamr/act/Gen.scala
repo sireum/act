@@ -10,6 +10,7 @@ import org.sireum.hamr.act.connections._
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.templates._
 import org.sireum.hamr.act.util.PathUtil
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.vm._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
@@ -20,14 +21,12 @@ import org.sireum.hamr.codegen.common.util.{PathUtil => CommonPathUtil}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
-import org.sireum.message.Reporter
 import org.sireum.ops.ISZOps
 
 @record class Gen(model: Aadl,
                   symbolTable: SymbolTable,
                   aadlTypes: AadlTypes,
-                  actOptions: ActOptions,
-                  reporter: Reporter) {
+                  actOptions: ActOptions) {
 
   val platform: ActPlatform.Type = actOptions.platform
   val hamrBasePackageName: Option[String] = actOptions.hamrBasePackageName
@@ -69,7 +68,7 @@ import org.sireum.ops.ISZOps
     return reporter.hasError
   }
 
-  def process(cSources: ISZ[String]) : (Option[ActContainer], Reporter) = {
+  def process(cSources: ISZ[String]) : Option[ActContainer] = {
 
     auxCImplIncludes = cSources.map(c => st"""#include "../../../${c}"""")
 
@@ -129,7 +128,7 @@ import org.sireum.ops.ISZOps
         val periodicAssemblyContributions: CamkesAssemblyContribution =
           Dispatcher.handlePeriodicComponents(
             symbolTable, actOptions, connectionCounter, timerAttributeCounter,
-            Util.getSbTypeHeaderFilenameForIncludes(), reporter)
+            Util.getSbTypeHeaderFilenameForIncludes())
 
         globalImports = globalImports ++ periodicAssemblyContributions.imports
         instances = instances ++ periodicAssemblyContributions.instances
@@ -181,7 +180,7 @@ import org.sireum.ops.ISZOps
 
       } // end sb type library
 
-      return (Some(ActContainer(
+      return Some(ActContainer(
         rootServer = CommonUtil.getLastName(symbolTable.rootSystem.component.identifier),
         connectors = camkesConnectorContainers,
         models = astObjects,
@@ -191,10 +190,10 @@ import org.sireum.ops.ISZOps
         auxFiles = auxResourceFiles,
         globalImports = globalImports.elements,
         globalPreprocessorIncludes = globalPreprocessorIncludes.elements,
-        requiresTimeServer = PeriodicUtil.requiresTimeServer(symbolTable, actOptions.platform))), reporter)
+        requiresTimeServer = PeriodicUtil.requiresTimeServer(symbolTable, actOptions.platform)))
 
     } else {
-      return ((None[ActContainer](), reporter))
+      return None[ActContainer]()
     }
   }
 
@@ -257,7 +256,7 @@ import org.sireum.ops.ISZOps
             val processId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
             val (component, auxResources) =
-              VMGen(symbolTable, typeMap, samplingPorts, srcQueues, actOptions, reporter).genThread(aadlThread)
+              VMGen(symbolTable, typeMap, samplingPorts, srcQueues, actOptions).genThread(aadlThread)
 
             instances = instances :+
               Instance(address_space = "",
@@ -840,7 +839,7 @@ import org.sireum.ops.ISZOps
       case Some(Dispatch_Protocol.Periodic) =>
 
         val (componentContributions, glueCodeContributions) =
-          Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread, reporter)
+          Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread)
 
         binarySemaphores = binarySemaphores ++ componentContributions.shell.binarySemaphores
         semaphores = semaphores ++ componentContributions.shell.semaphores
@@ -863,7 +862,7 @@ import org.sireum.ops.ISZOps
 
       case x =>
         if(x.nonEmpty) {
-          Util.reporter.error(None(), Util.toolName, s"Dispatch protocol $x for ${CommonUtil.getLastName(c.identifier)} is not supported")
+          reporter.error(None(), Util.toolName, s"Dispatch protocol $x for ${CommonUtil.getLastName(c.identifier)} is not supported")
         } else {
           reporter.warn(None(), Util.toolName, s"Dispatch Protocol not specified for ${CommonUtil.getLastName(c.identifier)}, assuming Sporadic")
         }
@@ -2666,7 +2665,7 @@ import org.sireum.ops.ISZOps
     }
 
     if(!hasErrors()) {
-      sharedData = SharedDataUtil.buildSharedData(symbolTable, reporter)
+      sharedData = SharedDataUtil.buildSharedData(symbolTable)
     }
 
     return !hasErrors()
@@ -2723,13 +2722,13 @@ import org.sireum.ops.ISZOps
 
   def processTBConnections(c: ir.Component): (ISZ[ast.Connection], ISZ[ST]) = {
     assert(platform == ActPlatform.SeL4_TB)
-    val conn = TBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions, reporter)
+    val conn = TBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions)
     return conn.processConnections(c, connectionCounter)
   }
 
   def processSBConnections(): ConnectionContainer = {
     assert(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)
-    val conn = SBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions, reporter)
+    val conn = SBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions)
     return conn.processConnectionInstances(connectionCounter)
   }
 }

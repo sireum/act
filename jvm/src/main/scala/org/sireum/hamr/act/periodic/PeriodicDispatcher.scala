@@ -7,12 +7,12 @@ import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate._
 import org.sireum.hamr.act.templates.StringTemplate
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
-import org.sireum.message.Reporter
 
 @datatype class PeriodicDispatcher(val symbolTable: SymbolTable,
                                    val actOptions: ActOptions) extends PeriodicImpl {
@@ -21,8 +21,7 @@ import org.sireum.message.Reporter
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String,
-                               reporter: Reporter): CamkesAssemblyContribution = {
+                               headerInclude: String): CamkesAssemblyContribution = {
 
     val components: ISZ[AadlComponent] = symbolTable.componentMap.values
     
@@ -131,8 +130,7 @@ import org.sireum.message.Reporter
   }
 
 
-  def handlePeriodicComponent(aadlThread: AadlThread,
-                              reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+  def handlePeriodicComponent(aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
     val component = aadlThread.component
     val classifier = Util.getClassifier(component.classifier.get)
 

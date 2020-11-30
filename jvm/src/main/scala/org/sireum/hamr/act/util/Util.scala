@@ -13,17 +13,14 @@ import org.sireum.hamr.ir.FeatureEnd
 import org.sireum.message.Reporter
 
 object Util {
-  var reporter: Reporter = Reporter.create
+  val reporter: Reporter = org.sireum.message.Reporter.create
+
   var verbose: B = T
 
   val toolName: String = "HAMR Codegen - ACT"
 
-  val DEVELOPER_MODE: B = if(org.sireum.Os.env("ACT_DEVELOPER_MODE").nonEmpty) {
-    reporter.warn(None(), Util.toolName, "ACT developer mode enabled")
-    T
-  } else {
-    F
-  }
+  // special message 'kind' so instruction messages can be filtered
+  val ACT_INSTRUCTIONS_MESSAGE_KIND: String = "ACT - Instructions"
 
   val GEN_ARTIFACT_PREFIX: String = "sb"
   val GEN_ARTIFACT_CAP_PREFIX: String = "SB"

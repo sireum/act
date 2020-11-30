@@ -7,7 +7,6 @@ import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.ir
-import org.sireum.message.Reporter
 
 
 @sig trait PeriodicImpl {
@@ -16,11 +15,9 @@ import org.sireum.message.Reporter
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String,
-                               reporter: Reporter): CamkesAssemblyContribution
+                               headerInclude: String): CamkesAssemblyContribution
 
-  def handlePeriodicComponent(aadlThread: AadlThread,
-                              reporter: Reporter): (CamkesComponentContributions, CamkesGlueCodeContributions)
+  def handlePeriodicComponent(aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions)
 }
 
 @enum object PeriodicDispatchingType {

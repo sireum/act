@@ -3,20 +3,19 @@ package org.sireum.hamr.act.connections
 
 import org.sireum._
 import org.sireum.hamr.act.ast
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.ir
-import org.sireum.message.Reporter
 
 @record class TBConnections(monitors: HashSMap[String, Monitor],
                           sharedData: HashMap[String, SharedData],
                           srcQueues: Map[String, Map[String, QueueObject]],
                           symbolTable: SymbolTable,
                           aadlTypes: AadlTypes,
-                          actOptions: ActOptions,
-                          reporter: Reporter) {
+                          actOptions: ActOptions) {
 
   val platform: ActPlatform.Type = actOptions.platform
 

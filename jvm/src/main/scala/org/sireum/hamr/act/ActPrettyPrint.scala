@@ -28,8 +28,7 @@ import org.sireum.ops.StringOps
                 aadlRootDir: String,
                 slangLibInstanceNames: ISZ[String],
                 symbolTable: SymbolTable,
-                options: ActOptions
-               ): ISZ[Resource] = {
+                options: ActOptions): ISZ[Resource] = {
 
     val platform = options.platform
 
