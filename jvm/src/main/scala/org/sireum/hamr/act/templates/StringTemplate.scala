@@ -1019,7 +1019,7 @@ bool is_empty_${s.name}(${s.structName} *port) {
                                  runCamkesScript: String): ST = {
     val ret: ST =
       st"""CAmkES Instructions:
-          |--------------------------
+          |--------------------
           |  CAmkES Project Directory: ${camkesProjDirectory}
           |
           |  Execute the following to simulate the system via QEMU:
