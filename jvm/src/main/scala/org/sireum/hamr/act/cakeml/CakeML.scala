@@ -7,7 +7,7 @@ import org.sireum.hamr.act.templates.CakeMLTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
-import org.sireum.hamr.codegen.common.{CommonUtil, Names, SeL4NixNamesUtil}
+import org.sireum.hamr.codegen.common.{CommonUtil, Names, NixSeL4NameUtil}
 import org.sireum.hamr.ir
 
 object CakeML {
@@ -23,7 +23,7 @@ object CakeML {
     val classifierName = Util.getClassifier(aadlThread.component.classifier.get)
     val filename: String = Util.genCImplFilename(Util.brand(s"${classifierName}_ffi"))
 
-    val apiHelperFilename: String = Util.genCHeaderFilename(SeL4NixNamesUtil.apiHelperFilename(names))
+    val apiHelperFilename: String = Util.genCHeaderFilename(NixSeL4NameUtil.apiHelperFilename(names))
 
     var includes: ISZ[String] = ISZ("all.h", "camkes.h", "stdbool.h", apiHelperFilename)
     var globals: ISZ[ST] = ISZ()
@@ -37,7 +37,7 @@ object CakeML {
 
     val _includes: ISZ[String] = includes.map((m : String) => s"#include <${m}>")
 
-    val logInfo = SeL4NixNamesUtil.apiHelperLoggerMethodName("logInfo", names.componentSingletonType)
+    val logInfo = NixSeL4NameUtil.apiHelperLoggerMethodName("logInfo", names.componentSingletonType)
 
     { // initialization
       val statements: ISZ[ST] = ISZ(
@@ -94,11 +94,11 @@ object CakeML {
       p.direction match {
         case ir.Direction.In =>
           val ffiName = CakeMLTemplate.ffi_getterMethodName(portName)
-          val slangName = SeL4NixNamesUtil.apiHelperGetterMethodName(portName, names)
+          val slangName = NixSeL4NameUtil.apiHelperGetterMethodName(portName, names)
           CakeMLTemplate.ffi_get(ffiName, slangName, fileUri)
         case ir.Direction.Out =>
           val ffiName = CakeMLTemplate.ffi_setterMethodName(portName)
-          val slangName = SeL4NixNamesUtil.apiHelperSetterMethodName(portName, names)
+          val slangName = NixSeL4NameUtil.apiHelperSetterMethodName(portName, names)
           val isDataPort = CommonUtil.isDataPort(p)
           CakeMLTemplate.ffi_send(ffiName, slangName, isDataPort, fileUri)
         case x => halt(s"Not expecting direction ${x}")

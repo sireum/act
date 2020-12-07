@@ -3,7 +3,7 @@ package org.sireum.hamr.act.templates
 
 import org.sireum._
 import org.sireum.hamr.act.util.{CMakeOption, CMakePreprocessorOption}
-import org.sireum.hamr.codegen.common.SeL4NixNamesUtil
+import org.sireum.hamr.codegen.common.NixSeL4NameUtil
 import org.sireum.hamr.codegen.common.templates._
 
 object CakeMLTemplate {
@@ -124,7 +124,7 @@ object CakeMLTemplate {
 
       val methodName = s"log${name}"
       val ffiMethodName = s"ffiapi_${methodName}"
-      val apiHelper = SeL4NixNamesUtil.apiHelperLoggerMethodName(methodName, componentType)
+      val apiHelper = NixSeL4NameUtil.apiHelperLoggerMethodName(methodName, componentType)
 
       val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", ffiMethodName, 0)
 
