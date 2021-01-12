@@ -25,11 +25,10 @@ val SIREUM_HOME = Os.path(Os.env("SIREUM_HOME").get)
 val sireum = SIREUM_HOME / "bin" / "sireum"
 val actVersionsProps = SIREUM_HOME / "hamr"/ "codegen" / "act" / "resources" / "act_versions.properties"
 
-val vm_repo_dir = Os.home / "CASE" / "camkes-arm-vm" / "projects" / "vm"
+val vm_repo_dir = Os.home / "CASE" / "camkes-arm-vm" / "projects" / "camkes-vm"
 
-assert(SIREUM_HOME.exists)
-assert(actVersionsProps.exists)
-assert(vm_repo_dir.exists)
+def assertResourceExists(o: ISZ[Os.Path]): Unit = { o.foreach((x: Os.Path) => assert(x.exists, s"${x} doesn't exist")) }
+assertResourceExists(ISZ(SIREUM_HOME, actVersionsProps, vm_repo_dir))
 
 var props = actVersionsProps.properties
 
@@ -50,7 +49,7 @@ def update(key: String, currentVersion: String): B = {
   }
 }
 
-val cur_vm_h_version = runGit(ISZ("git", "log", "-n", "1", "--pretty=format:%h", "components/VM/configurations/vm.h"), vm_repo_dir)
+val cur_vm_h_version = runGit(ISZ("git", "log", "-n", "1", "--pretty=format:%h", "components/VM_Arm/configurations/vm.h"), vm_repo_dir)
 
 var updated = update("vm.h", cur_vm_h_version)
 

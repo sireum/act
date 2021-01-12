@@ -5,6 +5,20 @@ package org.sireum.hamr.act.vm
 import org.sireum._
 import org.sireum.hamr.act.ast._
 
+/**
+* Original location of vm.h
+*   https://github.com/seL4/camkes-arm-vm/blob/e494a6eee46912fc0d89b5976c8e2d2e94dd6e6c/components/VM/configurations/vm.h
+*
+* Current location of vm.h as of 2021.01.11
+*   https://github.com/seL4/camkes-vm/blob/8050057cb5a5b27568e0ec1e46b32c2a4fc5e2c0/components/VM_Arm/configurations/vm.h
+*
+*   i.e. this was the version being pointed to via the camkes-arm-vm-manifest
+*     https://github.com/seL4/camkes-arm-vm-manifest/blob/91e741bbfd44bd028a6efbb633b7353e8be7fe81/default.xml#L21
+*
+*     after a "repo init -u https://github.com/SEL4PROJ/camkes-arm-vm-manifest.git --depth=1"
+*/
+
+
 /** expansion of objects in macro https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L52-L87
 *
 * #define VM_INIT_DEF() \
