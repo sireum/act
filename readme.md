@@ -1,9 +1,8 @@
 # AADL-to-CAmkES Translator (ACT)
 
-| Branch | macOS | Linux | Windows |  
-| :----: | :---: | :---: | :---: | 
-| master | [![Travis CI Status](https://travis-ci.org/sireum/act.svg?branch=master)](https://travis-ci.org/sireum/act) | [![Shippable Status](https://api.shippable.com/projects/5b95b754fb783206009ba34e/badge?branch=master)](https://app.shippable.com/projects/5b95b754fb783206009ba34e) | [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/fdebboflkpehf447/branch/master?svg=true)](https://ci.appveyor.com/project/robby-phd/act/branch/master) |
-
+[![Actions Status](https://github.com/sireum/act/workflows/CI/badge.svg)](https://github.com/sireum/act/actions)
+| :--: |
+| <sub><sup>amd64: mac, linux, windows</sup></sub> | 
 ## Installation
 
 ### OSATE Version
