@@ -3,6 +3,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
+import org.sireum.hamr.act.proof.{ProofContainer, ProofUtil}
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
@@ -17,7 +18,7 @@ import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.types.AadlTypes
-import org.sireum.hamr.codegen.common.util.{PathUtil => CommonPathUtil}
+import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, PathUtil => CommonPathUtil}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
@@ -536,11 +537,21 @@ import org.sireum.ops.ISZOps
 
         gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, f) +: gcImplMethods
 
+        val camkesPortId = Util.brand(fid)
         dataports = dataports :+ Dataport(
-          name = Util.brand(fid),
+          name = camkesPortId,
           optional = F,
           typ = samplingPort.structName
         )
+
+        {
+          val camkesInstanceId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+          val alloyPortId = s"${camkesInstanceId}_${camkesPortId}"
+
+          ProofUtil.addCamkesPort(alloyPortId)
+          ProofUtil.addCamkesPortConstraint(camkesInstanceId, alloyPortId, CommonUtil.isInFeature(f))
+          ProofUtil.addPortRefinment(CommonUtil.getName(f.identifier), alloyPortId)
+        }
       }
 
       def handleDataPort_TB_Profile(): Unit = {
@@ -960,7 +971,7 @@ import org.sireum.ops.ISZOps
       cmakeLIBS = ISZ()
     )
 
-    return Component(
+    val comp = Component(
       control = T,
       hardware = F,
       name = cid,
@@ -982,6 +993,18 @@ import org.sireum.ops.ISZOps
 
       externalEntities = ISZ()
     )
+
+    {
+      val camkesInstanceId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+
+      ProofUtil.addAadlComponent(aadlThread, names, symbolTable)
+
+      ProofUtil.addCamkesComponent(camkesInstanceId)
+
+      ProofUtil.addComponentRefinement(names.aadlQualifiedName, camkesInstanceId)
+    }
+
+    return comp
   }
 
   def hamrSendUnconnectedOutgoingPort(c: ir.Component,

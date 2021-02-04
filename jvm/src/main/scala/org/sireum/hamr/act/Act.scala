@@ -1,6 +1,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
+import org.sireum.hamr.act.proof.{ProofUtil, ProofContainer, AlloyProofGen, SMT2ProofGen}
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
@@ -81,13 +82,20 @@ object Act {
       val auxCFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"c").map(m => m._1)
       val auxHFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"h").map(m => m._1)
       val auxHeaderDirectories = (Set.empty ++ auxHFiles.map(m => Os.path(m).up.value)).elements
-      
+
+      ProofUtil.proofContainer = ProofContainer.empty()
+
       val container = Gen(m2, symbolTable, aadlTypes, options).process(auxHFiles)
 
       val slangLibInstanceNames: ISZ[String] = options.platform match {
         case ActPlatform.SeL4 =>
           symbolTable.getThreads().map(m => Names(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
         case _ => ISZ()
+      }
+
+      if(ExperimentalOptions.generateRefinementProof(options.experimentalOptions)) {
+        resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, options.outputDir)
+        resources = resources ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, options.outputDir)
       }
 
       container match {
@@ -112,13 +120,19 @@ object Act {
 
     if(!reporter.hasError) {
 
+      val camkesArmVmScript: Option[String] = {
+        val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.CAMKES_ARM_VM_SCRIPT_PATH))
+        if(c.nonEmpty) Some(c(0).path)
+        else None()
+      }
+
       val runCamkesScript: String = {
-        val c = resources.filter(p => ops.StringOps(p.path).endsWith(s"${PathUtil.DIR_BIN}/run-camkes.sh"))
+        val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.RUN_CAMKES_SCRIPT_PATH))
         if(c.nonEmpty) c(0).path
         else "??"
       }
       reporter.info(None(), Util.ACT_INSTRUCTIONS_MESSAGE_KIND,
-        StringTemplate.postGenInstructionsMessage(options.outputDir, runCamkesScript).render)
+        StringTemplate.postGenInstructionsMessage(options.outputDir, camkesArmVmScript, runCamkesScript).render)
     }
 
     return ActResult(resources)

@@ -102,7 +102,7 @@ object VMGen {
       auxResourceFiles = auxResourceFiles :+ Resource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/CMakeLists.txt",
         content = VM_Template.vm_cmakelists_app(vmProcessID, libNames, appAddSubdirs),
-        overwrite = T, makeExecutable = F)
+        overwrite = F, makeExecutable = F)
 
       auxResourceFiles = auxResourceFiles :+ Resource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/${Util.genCImplFilename(vmProcessID)}",
@@ -395,7 +395,7 @@ object VMGen {
     )
 
     auxResources = auxResources :+ Util.createExeResource(
-      path = s"${PathUtil.DIR_BIN}/${VM_Template.setup_camkes_vm_script_filename}",
+      path = PathUtil.CAMKES_ARM_VM_SCRIPT_PATH,
       contents = VM_Template.setup_camkes_vm_Script(),
       overwrite = T
     )

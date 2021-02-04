@@ -3,8 +3,9 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
+import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.ast.{Attribute, ConnectorType}
+import org.sireum.hamr.act.ast.{Attribute, ConnectionEnd, ConnectorType}
 import org.sireum.hamr.act.templates.ConnectionsSbTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
@@ -61,6 +62,8 @@ import org.sireum.hamr.ir
 
         val srcAadlThread: AadlThread = symbolTable.getThreadByName(conn.src.component)
         val dstAadlThread: AadlThread = symbolTable.getThreadByName(conn.dst.component)
+
+        ProofUtil.addAadlConnection(srcFeaturePath, dstFeaturePath)
 
         val srcToVM: B = srcAadlThread.toVirtualMachine(symbolTable)
         val dstToVM: B = dstAadlThread.toVirtualMachine(symbolTable)
@@ -326,8 +329,15 @@ import org.sireum.hamr.ir
     }
 
     for (connectionHolderEntry <- map.entries) {
-      val fromEnd = connectionHolderEntry._1
-      val holder = connectionHolderEntry._2
+      val fromEnd: ConnectionEnd = connectionHolderEntry._1
+      val holder: ConnectionHolder = connectionHolderEntry._2
+
+      val src = s"${fromEnd.component}_${fromEnd.end}"
+
+      for(dstEnd <- holder.toConnectionEnds) {
+        val dst = s"${dstEnd.component}_${dstEnd.end}"
+        ProofUtil.addCamkesConnection(src, dst)
+      }
 
       connections = connections :+ Util.createConnections(
         holder.connectionName,

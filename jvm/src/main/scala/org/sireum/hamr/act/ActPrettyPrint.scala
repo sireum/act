@@ -215,7 +215,7 @@ import org.sireum.ops.StringOps
     auxResources = auxResources ++ container.auxFiles
 
 
-    addExeResource(s"${PathUtil.DIR_BIN}/run-camkes.sh", StringTemplate.runCamkesScript(symbolTable.hasVM()))
+    addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, StringTemplate.runCamkesScript(symbolTable.hasVM()))
 
     // add dest dir to path
     val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => Resource(

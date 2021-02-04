@@ -706,8 +706,6 @@ object VM_Template {
     return s"$${${s}}"
   }
 
-  val setup_camkes_vm_script_filename: String = "setup-camkes-arm-vm.sh"
-
   def setup_camkes_vm_Script(): ST = {
     val CAMKES_ARM_VM_DIR: String = "CAMKES_ARM_VM_DIR"
 
