@@ -11,7 +11,7 @@ object ProofUtil {
   def addAadlComponent(src: AadlThread, names: Names, symbolTable: SymbolTable) : Unit = {
     val aadlId = names.aadlQualifiedName
 
-    addAadlComponent(aadlId)
+    proofContainer.aadlComponents = proofContainer.aadlComponents :+ aadlId
 
     for(aadlPort <- src.ports){
       aadlPort.feature match {
@@ -28,11 +28,6 @@ object ProofUtil {
   }
 
   var proofContainer: ProofContainer = ProofContainer.empty()
-
-
-  def addAadlComponent(aadlId: String): Unit = {
-    proofContainer.aadlComponents = proofContainer.aadlComponents :+ aadlId
-  }
 
   def addAadlPort(aadlId: String): Unit = {
     proofContainer.aadlPorts = proofContainer.aadlPorts :+ aadlId
