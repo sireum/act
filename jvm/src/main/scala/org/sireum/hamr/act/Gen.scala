@@ -740,6 +740,7 @@ import org.sireum.ops.ISZOps
 
                         i = i + 1
                       }
+                    case _ => halt(s"${fpath}: expecting out connection")
                   }
 
                 case _ => halt(s"${fpath}: not expecting direction ${f.direction}")
