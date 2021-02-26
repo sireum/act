@@ -7,15 +7,7 @@ import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.ir
 
-object TypeUtil {
-
-  def isMissingType(c: ir.Component) : B = {
-    return isMissingTypeClassifier(c.classifier.get)
-  }
-
-  def isMissingTypeClassifier(c: ir.Classifier) : B = {
-    return c.name == Util.MISSING_AADL_TYPE
-  }
+object ActTypeUtil {
 
   def isBaseType(c: ir.Component): B = {
     return isBaseTypeString(c.classifier.get.name)
@@ -23,18 +15,6 @@ object TypeUtil {
 
   def isBaseTypeString(c: String): B = {
     return translateBaseType(c).nonEmpty
-  }
-
-  def isRecordType(c: ir.Component): B = {
-    return c.category == ir.ComponentCategory.Data && c.subComponents.size > 0
-  }
-
-  def isEnumDef(c: ir.Component): B = {
-    val ret: B = PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__DATA_REPRESENTATION) match {
-      case Some(ir.ValueProp("Enum")) => T
-      case _ => F
-    }
-    return ret
   }
 
   def isArrayDef(c: ir.Component): B = {

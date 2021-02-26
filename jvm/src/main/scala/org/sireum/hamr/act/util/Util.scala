@@ -101,7 +101,7 @@ object Util {
 
 
   def getClassifierFullyQualified(c : ir.Classifier) : String = {
-    val t: String = TypeUtil.translateBaseType(c.name) match {
+    val t: String = ActTypeUtil.translateBaseType(c.name) match {
       case Some(v) => v
       case _ => c.name
     }
@@ -206,7 +206,7 @@ object Util {
       return "union_art_DataContent"
     } else {
       val name = Util.getClassifierFullyQualified(aadlType.classifier.get)
-      if (TypeUtil.isArrayDef(aadlType)) {
+      if (ActTypeUtil.isArrayDef(aadlType)) {
         return getContainerName(name)
       } else {
         return name

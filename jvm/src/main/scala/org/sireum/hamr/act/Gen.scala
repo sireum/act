@@ -17,7 +17,7 @@ import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
-import org.sireum.hamr.codegen.common.types.AadlTypes
+import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil}
 import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, PathUtil => CommonPathUtil}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.ir
@@ -1559,7 +1559,7 @@ import org.sireum.ops.ISZOps
         defs = defs,
         preventBadging = preventBadging)
     } else {
-      val defs = values.filter((v : ir.Component) => TypeUtil.translateBaseType(v.classifier.get.name).isEmpty).
+      val defs = values.filter((v : ir.Component) => ActTypeUtil.translateBaseType(v.classifier.get.name).isEmpty).
         map((v : ir.Component) => processDataType(v, F))
 
       return StringTemplate.tbTypeHeaderFile(
@@ -1590,13 +1590,13 @@ import org.sireum.ops.ISZOps
               |    ${(fields, "\n")}
               |  } ${name};"""
         }
-      } else if (TypeUtil.isBaseType(c)) {
-        st"${TypeUtil.translateBaseType(c.classifier.get.name)}"
+      } else if (ActTypeUtil.isBaseType(c)) {
+        st"${ActTypeUtil.translateBaseType(c.classifier.get.name)}"
       } else if (isField) {
         st"${Util.getClassifierFullyQualified(c.classifier.get)}"
       } else if (TypeUtil.isMissingType(c)) {
         StringTemplate.tbMissingType()
-      } else if (TypeUtil.isEnumDef(c)) {
+      } else if (TypeUtil.isEnumType(c)) {
         val enums = PropertyUtil.getPropertyValues(c.properties, OsateProperties.DATA_MODEL__ENUMERATORS)
         val values: ISZ[String] = enums.map((e: ir.PropertyValue) => {
           e match {
@@ -1609,23 +1609,27 @@ import org.sireum.ops.ISZOps
         val ename = Util.getClassifierFullyQualified(c.classifier.get)
         st"""typedef
             |  enum {${(values, ", ")}} ${ename};"""
-      } else if (TypeUtil.isArrayDef(c)) {
+      } else if (ActTypeUtil.isArrayDef(c)) {
         // TODO multidim arrays
         val name = Util.getClassifierFullyQualified(c.classifier.get)
-        val dim: Z = TypeUtil.getArrayDimension(c) match {
+        val dim: Z = ActTypeUtil.getArrayDimension(c) match {
           case Some(d) => d
           case _ =>
             reporter.error(None(), Util.toolName, s"Array dimension not specified for ${c.classifier.get.name}")
             z"-1"
         }
         val container = Util.getContainerName(name)
-        st"""typedef ${TypeUtil.getArrayBaseType(c)} ${name} [${TypeUtil.getArrayDimension(c)}];
+        st"""typedef ${ActTypeUtil.getArrayBaseType(c)} ${name} [${ActTypeUtil.getArrayDimension(c)}];
             |
             |typedef
             |  struct ${container} {
             |    ${name} f;
             |  } ${container};"""
-      } else {
+      } else if (TypeUtil.isMissingType(c)) {
+        reporter.error(None(), Util.toolName, s"${TypeUtil.MISSING_AADL_TYPE} found")
+        st""
+      }
+      else {
         reporter.error(None(), Util.toolName, s"Unexpected datatype: ${c}")
         st" "
       }
@@ -2707,11 +2711,11 @@ import org.sireum.ops.ISZOps
           val pair = (d, typeMap.get(u(s)).get)
           graph = graph + pair
         }
-      } else if(TypeUtil.isArrayDef(d)) {
-        val pair = (d, typeMap.get(TypeUtil.getArrayBaseType(d).get).get)
+      } else if(ActTypeUtil.isArrayDef(d)) {
+        val pair = (d, typeMap.get(ActTypeUtil.getArrayBaseType(d).get).get)
         graph = graph + pair
       } else {
-        if(!(TypeUtil.isBaseType(d) || TypeUtil.isEnumDef(d) || TypeUtil.isMissingType(d))) {
+        if(!(ActTypeUtil.isBaseType(d) || TypeUtil.isEnumType(d) || TypeUtil.isMissingType(d))) {
           reporter.error(None(), Util.toolName, s"Unexpected data type ${d}")
         }
       }
