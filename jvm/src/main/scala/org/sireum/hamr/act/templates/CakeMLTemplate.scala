@@ -166,11 +166,13 @@ object CakeMLTemplate {
     val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", ffiMethodName, 0)
 
     val args: String = if(isDataPort) "parameterSizeBytes*8, (U8 *)parameter" else ""
+    val sf: String = if(isDataPort) StackFrameTemplate.SF else StackFrameTemplate.SF_LAST
+
     val ret: ST = st"""void ${ffiMethodName}(${defaultArgs2}) {
                       |  ${declNewStackFrame};
                       |
                       |  ${callInit()}
-                      |  ${slangMethodName}(${StackFrameTemplate.SF} ${args});
+                      |  ${slangMethodName}(${sf} ${args});
                       |}"""
     return ret
   }
