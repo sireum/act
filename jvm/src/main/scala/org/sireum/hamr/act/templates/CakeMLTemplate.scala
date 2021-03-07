@@ -287,6 +287,32 @@ object CakeMLTemplate {
                       |  double result = *((float*)bytes);
                       |  memcpy(output, (unsigned char*) &result, sizeof(double));
                       |}
+                      |
+                      |void ffiraw_print_buffer(unsigned char *parameter, long parameterSizeBytes, unsigned char *output, long outputSizeBytes) {
+                      |
+                      |  int elideAfter = 20; // stop printing after this many consecutive 0's seen
+                      |  int stopAfter = 50; // exit after this many consecutive 0's seen, lessens 'busy-wait'
+                      |
+                      |  U8* buffer = (U8 *) parameter;
+                      |
+                      |  printf("%i bytes\n", parameterSizeBytes);
+                      |
+                      |  if(parameterSizeBytes > 0) {
+                      |    int numZerosSeen = 0;
+                      |    printf("[0%x\n", buffer[0]); // first byte is a bool
+                      |    for(int i = 1; i < parameterSizeBytes; i++) {
+                      |      numZerosSeen = buffer[i] == 0 ? (numZerosSeen + 1) : 0;
+                      |      if(numZerosSeen >= elideAfter) {
+                      |        if(numZerosSeen % stopAfter == 0) { printf("..."); break; }
+                      |      } else {
+                      |      	if(buffer[i] < 16) printf("0");
+                      |      	printf("%x ", buffer[i]);
+                      |      	if(i % 16 == 0) printf("\n");
+                      |      }
+                      |    }
+                      |    printf("]\n");
+                      |  }
+                      |}
                       |"""
     return ret
   }
