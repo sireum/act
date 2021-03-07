@@ -37,7 +37,7 @@ object CakeML {
 
     val _includes: ISZ[String] = includes.map((m : String) => s"#include <${m}>")
 
-    val logInfo = NixSeL4NameUtil.apiHelperLoggerMethodName("logInfo", names.componentSingletonType)
+    val logInfo = NixSeL4NameUtil.apiHelperLoggerMethodName("logInfo", names.cComponentType)
 
     { // initialization
       val statements: ISZ[ST] = ISZ(
