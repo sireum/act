@@ -79,8 +79,8 @@ object ScriptTemplate {
                       |  echo ""
                       |  echo "Available Options:"
                       |  echo "  -c, --camkes-dir      Location of CAmkES project"
-                      |  echo "  -n, --non-interactive Non-interactive mode.  Symlink in apps directory will be replaced
-                      |                                if present, CAmkES build directory will not be deleted
+                      |  echo "  -n, --non-interactive Non-interactive mode.  Symlink in apps directory will be replaced"
+                      |  echo "                        if present, CAmkES build directory will not be deleted"
                       |  echo "  -o, --camkes-options  CAmkES options (e.g -o \"-DWITH_LOC=ON -DCapDLLoaderMaxObjects=40000\")"
                       |  echo "  -s, --simulate        Simulate via QEMU"
                       |  exit 2
