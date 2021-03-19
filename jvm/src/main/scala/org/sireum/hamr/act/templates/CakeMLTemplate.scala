@@ -295,12 +295,12 @@ object CakeMLTemplate {
                       |
                       |  U8* buffer = (U8 *) parameter;
                       |
-                      |  printf("%i bytes\n", parameterSizeBytes);
+                      |  printf("%i bytes\n", parameterSizeBytes); // doesn't include the bool byte
                       |
                       |  if(parameterSizeBytes > 0) {
                       |    int numZerosSeen = 0;
                       |    printf("[%02x\n", buffer[0]); // first byte is a bool
-                      |    for(int i = 1; i < parameterSizeBytes; i++) {
+                      |    for(int i = 1; i < parameterSizeBytes + 1; i++) {
                       |      numZerosSeen = buffer[i] == 0 ? (numZerosSeen + 1) : 0;
                       |      if(numZerosSeen >= elideAfter) {
                       |        if(numZerosSeen % stopAfter == 0) { printf("..."); break; }

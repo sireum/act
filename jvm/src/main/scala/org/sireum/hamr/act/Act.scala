@@ -67,14 +67,14 @@ object Act {
         aadlTypes = aadlTypes,
         reporter = reporter)
 
-      if(!CommonTypeUtil.verifyBitCodec(aadlTypes, symbolTable, reporter)){
+      if (!CommonTypeUtil.verifyBitCodec(aadlTypes, symbolTable, reporter)) {
         return ActResult(resources)
       }
 
       val auxFiles: ISZ[(String, String)] = options.auxFiles.entries.map(m => {
         val resourceName = s"${options.outputDir}/${Util.AUX_CODE_DIRECTORY_NAME}/${m._1}"
         resources = resources :+ Util.createResource(resourceName, st"${m._2}", T)
-        
+
         val relName = s"${Util.AUX_CODE_DIRECTORY_NAME}/${m._1}"
         (relName, m._2)
       })
@@ -93,7 +93,7 @@ object Act {
         case _ => ISZ()
       }
 
-      if(ExperimentalOptions.generateRefinementProof(options.experimentalOptions)) {
+      if (ExperimentalOptions.generateRefinementProof(options.experimentalOptions)) {
         resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, options.outputDir)
         resources = resources ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, options.outputDir)
       }
@@ -116,23 +116,23 @@ object Act {
           )
         case _ =>
       }
-    }
 
-    if(!reporter.hasError) {
+      if (!reporter.hasError) {
 
-      val camkesArmVmScript: Option[String] = {
-        val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.CAMKES_ARM_VM_SCRIPT_PATH))
-        if(c.nonEmpty) Some(c(0).path)
-        else None()
+        val camkesArmVmScript: Option[String] = {
+          val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.CAMKES_ARM_VM_SCRIPT_PATH))
+          if (c.nonEmpty) Some(c(0).path)
+          else None()
+        }
+
+        val runCamkesScript: String = {
+          val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.RUN_CAMKES_SCRIPT_PATH))
+          if (c.nonEmpty) c(0).path
+          else "??"
+        }
+        reporter.info(None(), Util.ACT_INSTRUCTIONS_MESSAGE_KIND,
+          StringTemplate.postGenInstructionsMessage(options.outputDir, camkesArmVmScript, runCamkesScript, symbolTable.hasVM()).render)
       }
-
-      val runCamkesScript: String = {
-        val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.RUN_CAMKES_SCRIPT_PATH))
-        if(c.nonEmpty) c(0).path
-        else "??"
-      }
-      reporter.info(None(), Util.ACT_INSTRUCTIONS_MESSAGE_KIND,
-        StringTemplate.postGenInstructionsMessage(options.outputDir, camkesArmVmScript, runCamkesScript).render)
     }
 
     return ActResult(resources)

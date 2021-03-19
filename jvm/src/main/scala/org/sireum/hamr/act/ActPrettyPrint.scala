@@ -6,9 +6,10 @@ import org.sireum._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.{ConnectorContainer, ConnectorTemplate}
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
-import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, SlangEmbeddedTemplate, StringTemplate}
+import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, ScriptTemplate, SlangEmbeddedTemplate, StringTemplate}
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
+import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
@@ -195,7 +196,7 @@ import org.sireum.ops.StringOps
     var preludes: ISZ[ST] = ISZ(CMakeTemplate.cmake_add_definitions(ISZ("CAMKES")))
 
     if(symbolTable.hasCakeMLComponents()) {
-      val filename = "CMake_CakeMlOptions.cmake"
+      val filename = "CMake_CakeMLOptions.cmake"
       add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
@@ -203,6 +204,13 @@ import org.sireum.ops.StringOps
     if(platform == ActPlatform.SeL4) {
       val filename= "CMake_TranspilerOptions.cmake"
       add(filename, CMakeTemplate.cmake_add_options(SlangEmbeddedTemplate.TRANSPILER_OPTIONS))
+      preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
+    }
+
+    if((platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only) &&
+      symbolTable.hasVM()) {
+      val filename= "CMake_CAmkES_VM_Options.cmake"
+      add(filename, CMakeTemplate.cmake_add_options(VM_Template.VM_CMAKE_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
@@ -215,7 +223,7 @@ import org.sireum.ops.StringOps
     auxResources = auxResources ++ container.auxFiles
 
 
-    addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, StringTemplate.runCamkesScript(symbolTable.hasVM()))
+    addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, ScriptTemplate.runCamkesScript(symbolTable.hasVM()))
 
     // add dest dir to path
     val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => Resource(

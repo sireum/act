@@ -12,7 +12,7 @@ object VM_Template {
   val data61_VM_Macros_Location: String = "<configurations/vm.h>"
 
   val VM_CMAKE_OPTIONS: ISZ[CMakeOption] = ISZ(
-    CMakeStandardOption(USE_PRECONFIGURED_ROOTFS, F, "Use preconfigured rootfs")
+    CMakeStandardOption(USE_PRECONFIGURED_ROOTFS, F, "Use preconfigured rootfs rather than downloading a vanilla linux image")
   )
 
   def vm_assembly_preprocessor_includes(): ISZ[String] = {
@@ -279,8 +279,6 @@ object VM_Template {
                      |include(ExternalProject)
                      |include(external-project-helpers)
                      |
-                     |${CMakeTemplate.cmake_add_options(VM_CMAKE_OPTIONS)}
-                     |
                      |#MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
                      |#MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
                      |#MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
@@ -291,7 +289,7 @@ object VM_Template {
                      |#MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
                      |
                      |if("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt" AND (NOT ${USE_PRECONFIGURED_ROOTFS}))
-                     |    MESSAGE("Downloading VM")
+                     |    MESSAGE("Not using preconfigured rootfs, will download a vanilla linux image instead")
                      |
                      |    set(cpp_flags "-DKERNELARMPLATFORM_QEMU-ARM-VIRT")
                      |    set(linux_repo "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git")
@@ -302,22 +300,15 @@ object VM_Template {
                      |    # Checkout and configure linux to build crossvm module
                      |    ExternalProject_Add(
                      |        checkout_linux
-                     |        GIT_REPOSITORY
-                     |        $${linux_repo}
-                     |        GIT_TAG
-                     |        $${linux_tag}
-                     |        GIT_SHALLOW
-                     |        1
-                     |        GIT_PROGRESS
-                     |        1
-                     |        BUILD_COMMAND
-                     |        ""
-                     |        INSTALL_COMMAND
-                     |        ""
-                     |        CONFIGURE_COMMAND
-                     |        ""
-                     |        SOURCE_DIR
-                     |        $${CMAKE_CURRENT_BINARY_DIR}/linux_out
+                     |        GIT_REPOSITORY $${linux_repo}
+                     |        GIT_TAG $${linux_tag}
+                     |        GIT_SHALLOW TRUE
+                     |        GIT_PROGRESS TRUE
+                     |        USES_TERMINAL_DOWNLOAD TRUE
+                     |        BUILD_COMMAND ""
+                     |        INSTALL_COMMAND ""
+                     |        CONFIGURE_COMMAND ""
+                     |        SOURCE_DIR $${CMAKE_CURRENT_BINARY_DIR}/linux_out
                      |    )
                      |    Message("Done cloning $${linux_repo}")
                      |
