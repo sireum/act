@@ -35,7 +35,6 @@ object ScriptTemplate {
           |    -m size=1024 \
           |    -kernel images/capdl-loader-image-arm-qemu-arm-virt"""
     } else {
-      st"""./simulate"""
       st"""# ./simulate
           |
           |# console output from simulation disappears when QEMU shuts down when run from
