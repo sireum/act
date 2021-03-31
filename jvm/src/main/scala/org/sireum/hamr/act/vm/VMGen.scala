@@ -237,7 +237,8 @@ object VMGen {
   }
 }
 
-@record class VMGen(symbolTable: SymbolTable,
+@record class VMGen(useDomainScheduling: B,
+                    symbolTable: SymbolTable,
                     typeMap: HashSMap[String, ir.Component],
                     samplingPorts: HashMap[String, SamplingPortInterface],
                     srcQueues: Map[String, Map[String, QueueObject]],
@@ -288,7 +289,7 @@ object VMGen {
 
     // TODO: will we ever process models where a sporadic thread is isolated in the vm
     // or we're not using the pacer
-    assert(PeriodicUtil.requiresPacerArtifacts(aadlThread.component, symbolTable, platform),
+    assert(PeriodicUtil.requiresPacerArtifacts(aadlThread.component, symbolTable, useDomainScheduling),
       s"Expecting a periodic thread that will be triggered via a Pacer: ${aadlThread.identifier}"
     )
 
@@ -334,7 +335,7 @@ object VMGen {
     aadlThread.dispatchProtocol match {
       case Dispatch_Protocol.Periodic =>
         val (componentContributions, glueCodeContributions) =
-          Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread)
+          Dispatcher.handlePeriodicComponent(useDomainScheduling, symbolTable, actOptions, aadlThread)
 
         consumes = consumes ++ componentContributions.shell.consumes
 

@@ -8,7 +8,9 @@ import org.sireum.hamr.codegen.common.symbols._
 
 object Dispatcher {
 
-  def handlePeriodicComponents(symbolTable: SymbolTable,
+  def handlePeriodicComponents(useDomainScheduling: B,
+
+                               symbolTable: SymbolTable,
                                actOptions: ActOptions,
                               
                                connectionCounter: Counter,
@@ -16,7 +18,7 @@ object Dispatcher {
                               
                                headerInclude: String): CamkesAssemblyContribution = {
 
-    val ret: CamkesAssemblyContribution = PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
+    val ret: CamkesAssemblyContribution = PeriodicUtil.getDispatchingType(symbolTable, useDomainScheduling) match {
       case PeriodicDispatchingType.Pacer =>
         Pacer(symbolTable, actOptions).handlePeriodicComponents(
           connectionCounter,
@@ -38,13 +40,14 @@ object Dispatcher {
     return ret
   }
 
-  def handlePeriodicComponent(symbolTable: SymbolTable,
+  def handlePeriodicComponent(useDomainScheduling: B,
+                              symbolTable: SymbolTable,
                               actOptions: ActOptions,
 
                               aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
     
     val ret: (CamkesComponentContributions, CamkesGlueCodeContributions) =
-      PeriodicUtil.getDispatchingType(symbolTable, actOptions.platform) match {
+      PeriodicUtil.getDispatchingType(symbolTable, useDomainScheduling) match {
         case PeriodicDispatchingType.Pacer =>
           Pacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread)
 

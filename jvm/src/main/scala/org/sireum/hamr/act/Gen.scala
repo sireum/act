@@ -64,6 +64,7 @@ import org.sireum.ops.ISZOps
   val timerAttributeCounter: Counter = Counter()
 
   val useCaseConnectors: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
+  val useDomainScheduling: B = PeriodicUtil.useDomainScheduling(symbolTable, actOptions.platform)
 
   def hasErrors(): B = {
     return reporter.hasError
@@ -128,7 +129,7 @@ import org.sireum.ops.ISZOps
       {
         val periodicAssemblyContributions: CamkesAssemblyContribution =
           Dispatcher.handlePeriodicComponents(
-            symbolTable, actOptions, connectionCounter, timerAttributeCounter,
+            useDomainScheduling, symbolTable, actOptions, connectionCounter, timerAttributeCounter,
             Util.getSbTypeHeaderFilenameForIncludes())
 
         globalImports = globalImports ++ periodicAssemblyContributions.imports
@@ -191,7 +192,7 @@ import org.sireum.ops.ISZOps
         auxFiles = auxResourceFiles,
         globalImports = globalImports.elements,
         globalPreprocessorIncludes = globalPreprocessorIncludes.elements,
-        requiresTimeServer = PeriodicUtil.requiresTimeServer(symbolTable, actOptions.platform)))
+        requiresTimeServer = PeriodicUtil.requiresTimeServer(symbolTable, useDomainScheduling)))
 
     } else {
       return None[ActContainer]()
@@ -257,7 +258,7 @@ import org.sireum.ops.ISZOps
             val processId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
             val (component, auxResources) =
-              VMGen(symbolTable, typeMap, samplingPorts, srcQueues, actOptions).genThread(aadlThread)
+              VMGen(useDomainScheduling, symbolTable, typeMap, samplingPorts, srcQueues, actOptions).genThread(aadlThread)
 
             instances = instances :+
               Instance(address_space = "",
@@ -311,7 +312,7 @@ import org.sireum.ops.ISZOps
             case _ =>
           }
 
-          if(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4) {
+          if(useDomainScheduling && (platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)) {
             aadlThread.getDomain(symbolTable) match {
               case Some(domain) =>
                 camkesConfiguration = camkesConfiguration :+ PacerTemplate.domainConfiguration(camkesComponentId, domain)
@@ -837,7 +838,7 @@ import org.sireum.ops.ISZOps
     var gcRunLoopMidStmts: ISZ[ST] = gcImplDrainQueues.map(x => x._2)
     var gcRunLoopEndStmts: ISZ[ST] = ISZ()
 
-    if(!PeriodicUtil.requiresPacerArtifacts(c, symbolTable, actOptions.platform)) {
+    if(!PeriodicUtil.requiresPacerArtifacts(c, symbolTable, useDomainScheduling)) {
       semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH)
 
       val semWait: ST = st"MUTEXOP(${StringTemplate.SEM_WAIT}())"
@@ -851,7 +852,7 @@ import org.sireum.ops.ISZOps
       case Some(Dispatch_Protocol.Periodic) =>
 
         val (componentContributions, glueCodeContributions) =
-          Dispatcher.handlePeriodicComponent(symbolTable, actOptions, aadlThread)
+          Dispatcher.handlePeriodicComponent(useDomainScheduling, symbolTable, actOptions, aadlThread)
 
         binarySemaphores = binarySemaphores ++ componentContributions.shell.binarySemaphores
         semaphores = semaphores ++ componentContributions.shell.semaphores

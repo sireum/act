@@ -45,7 +45,11 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, Symbol
       )
     }
 
-    val maxDomain: Z = symbolTable.getMaxDomain()
+    val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
+    val maxDomain: Z = aadlProcessor.getMaxDomain() match {
+      case Some(z) => z + 1
+      case _ => symbolTable.computeMaxDomain()
+    }
     val settingCmakeEntries: ISZ[ST] = ISZ(PacerTemplate.settings_cmake_entries(maxDomain))
 
     return CamkesAssemblyContribution(
@@ -140,12 +144,7 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, Symbol
 
   def getSchedule(allThreads: ISZ[AadlThread]): ISZ[Resource] = {
 
-    val aadlProcessors: ISZ[AadlProcessor] = symbolTable.getAllBoundProcessors()
-    if(aadlProcessors.isEmpty || aadlProcessors.size > 1) {
-      // TODO: ??
-      halt(st"Unexpected: Expecting exactly one bound processor but found ${(aadlProcessors.map((m: AadlProcessor) => m.path), ", ")}".render)
-    }
-    val aadlProcessor = aadlProcessors(0)
+    val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
 
     val path = "kernel/domain_schedule.c"
 
