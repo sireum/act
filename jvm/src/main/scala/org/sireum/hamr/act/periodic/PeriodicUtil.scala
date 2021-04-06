@@ -114,7 +114,9 @@ object PeriodicUtil {
         val x = st"${(boundProcessors.elements.map((m: AadlProcessor) => m.path), ",")}"
         mesg = mesg :+ st"""All processes containing threads must be bound to the same processor.
                            |Bind all processes to exactly one of the following: ${x}"""
-      } else if(canUseDomainScheduling) {
+      }
+
+      if(canUseDomainScheduling) {
         boundProcessor = Some(boundProcessors.elements(0))
       }
     }
