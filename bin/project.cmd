@@ -26,11 +26,17 @@ val act = "hamr-act"
 
 val homeDir = Os.slashDir.up.canon
 
-val actJvm = moduleJvm(
+val actJvm = moduleJvmPub(
   id = act,
   baseDir = homeDir,
   jvmDeps = ISZ(common),
-  jvmIvyDeps = ISZ()
+  jvmIvyDeps = ISZ(),
+  pubOpt = pub(
+    desc = "HAMR AADL-to-CAmkES Translator (ACT)",
+    url = "github.com/sireum/act",
+    licenses = org.sireum.project.ProjectUtil.bsd2,
+    devs = ISZ(jasonBelt)
+  )
 )
 
 val project = Project.empty + actJvm
