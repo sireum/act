@@ -34,7 +34,7 @@ val actJvm = moduleJvmPub(
   pubOpt = pub(
     desc = "HAMR AADL-to-CAmkES Translator (ACT)",
     url = "github.com/sireum/act",
-    licenses = org.sireum.project.ProjectUtil.bsd2,
+    licenses = bsd2,
     devs = ISZ(jasonBelt)
   )
 )
