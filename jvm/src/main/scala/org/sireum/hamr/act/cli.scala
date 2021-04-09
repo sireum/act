@@ -36,6 +36,7 @@ object cli {
     description = "AADL to CAmkES translator",
     header = "Sireum ACT: An AADL-to-CAmkES Translator",
     usage = "<option>* <file>+",
+    usageDescOpt = None(),
     opts = ISZ(
       Opt(name = "input", longKey = "input", shortKey = Some('i'),
         tpe = Type.Choice(name = "actFormat", sep = None(), elements = ISZ("air", "camkesir", "aadl")),
