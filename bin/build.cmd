@@ -51,7 +51,7 @@ import org.sireum._
 
 def usage(): Unit = {
   println("ACT /build")
-  println("Usage: ( compile | test | test-js | m2 | jitpack | clean )+")
+  println("Usage: ( compile | test | clean )+")
 }
 
 
@@ -61,23 +61,12 @@ if (Os.cliArgs.isEmpty) {
 }
 
 
-val homeBin = Os.slashDir
-val home = homeBin.up
-val sireumJar = homeBin / "sireum.jar"
-val mill = homeBin / "mill.bat"
-var didTipe = F
-var didCompile = F
-var didM2 = F
+val homeBin: Os.Path = Os.slashDir
+val home: Os.Path = homeBin.up
+val sireum: Os.Path = homeBin / (if (Os.isWin) "sireum.bat" else "sireum")
 
-
-def downloadMill(): Unit = {
-  if (!mill.exists) {
-    println("Downloading mill ...")
-    mill.downloadFrom("http://files.sireum.org/mill-standalone")
-    mill.chmod("+x")
-    println()
-  }
-}
+val proyekName: String = "sireum-proyek"
+val project: Os.Path = homeBin / "project4testing.cmd"
 
 
 def clone(repo: String): Unit = {
@@ -101,99 +90,33 @@ def cloneProjects(): Unit = {
 }
 
 def tipe(): Unit = {
-  if (!didTipe) {
-    didTipe = T
-    println("Slang type checking ...")
-    Os.proc(ISZ("java", "-jar", sireumJar.string, "slang", "tipe", "--verbose", "-r", "-s", home.string)).
-      at(home).console.runCheck()
-    println()
-  }
+  println("Slang type checking ...")
+  Os.proc(ISZ(sireum.string, "slang", "tipe", "--verbose", "-r", "-s", home.string)).
+    at(home).console.runCheck()
+  println()
 }
 
 
 def compile(): Unit = {
-  if (!didCompile) {
-    didCompile = T
-    if (didM2) {
-      didM2 = F
-      (home / "out").removeAll()
-    }
-    tipe()
-    println("Compiling ...")
-    mill.call(ISZ("all", "act.jvm.tests.compile",
-      "act.js.tests.compile")).at(home).console.runCheck()
-    println()
-  }
+  tipe()
+
+  println("Compiling ...")
+  proc"$sireum proyek compile --project $project -n $proyekName --par --sha3 .".at(home).console.runCheck()
+  println()
 }
 
 
 def test(): Unit = {
-  compile()
-  println("Running shared tests ...")
-  mill.call(ISZ("act.jvm.tests")).at(home).console.runCheck()
+  tipe()
+
+  println("Testing ...")
+  val packageNames: String = "org.sireum.hamr.act"
+  val names: String = "org.sireum.hamr.act"
+
+  proc"$sireum proyek test --project $project -n $proyekName --par --sha3 --packages $packageNames . $names".at(home).console.runCheck()
   println()
 }
 
-
-def testJs(): Unit = {
-  compile()
-  println("Running js tests ...")
-  mill.call(ISZ("act.js.tests")).at(home).console.runCheck()
-  println()
-}
-
-
-def jitpack(): Unit = {
-  println("Triggering jitpack ...")
-  val r = mill.call(ISZ("jitPack", "--owner", "sireum", "--repo", "act")).
-    at(home).console.run()
-  r match {
-    case r: Os.Proc.Result.Normal =>
-      println(r.out)
-      println(r.err)
-      if (!r.ok) {
-        eprintln(s"Exit code: ${r.exitCode}")
-      }
-    case r: Os.Proc.Result.Exception =>
-      eprintln(s"Exception: ${r.err}")
-    case _: Os.Proc.Result.Timeout =>
-      eprintln("Timeout")
-      eprintln()
-  }
-  println()
-}
-
-
-def m2(): Unit = {
-  didM2 = T
-  didCompile = F
-
-  val m2s: ISZ[ISZ[String]] =
-    for (pkg <- ISZ("act"); plat <- ISZ("jvm", "js"))
-      yield ISZ(pkg, plat, "m2")
-
-  val m2Paths: ISZ[Os.Path] =
-    for (cd <- for (m2 <- m2s) yield st"${(m2, Os.fileSep)}".render) yield  home / "out" / cd
-
-  for (m2p <- m2Paths) {
-    m2p.removeAll()
-  }
-
-  (home / "out").removeAll()
-
-  Os.proc(ISZ[String](mill.string, "all") ++ (for (m2 <- m2s) yield st"${(m2, ".")}".render)).
-    at(home).env(ISZ("SIREUM_SOURCE_BUILD" ~> "false")).console.runCheck()
-
-  val repository = Os.home / ".m2" / "repository"
-  repository.removeAll()
-
-  println()
-  println("Artifacts")
-  for (m2p <- m2Paths; p <- (m2p / "dest").overlayMove(repository, F, F, _ => T, T).values) {
-    println(s"* $p")
-  }
-  println()
-}
 
 def clean(): Unit = {
   println(s"Cleaning ${home}")
@@ -203,8 +126,6 @@ def clean(): Unit = {
     m.removeAll()
   })
 }
-
-downloadMill()
 
 
 for (i <- 0 until Os.cliArgs.size) {
@@ -216,15 +137,6 @@ for (i <- 0 until Os.cliArgs.size) {
     case string"test" =>
       cloneProjects()
       test()
-    case string"test-js" =>
-      cloneProjects()
-      testJs()
-    case string"m2" =>
-      cloneProjects()
-      m2()
-    case string"jitpack" =>
-      cloneProjects()
-      jitpack()
     case cmd =>
       usage()
       eprintln(s"Unrecognized command: $cmd")
