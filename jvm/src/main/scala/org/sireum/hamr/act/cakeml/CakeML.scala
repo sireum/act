@@ -95,7 +95,7 @@ object CakeML {
         case ir.Direction.In =>
           val ffiName = CakeMLTemplate.ffi_getterMethodName(portName)
           val slangName = NixSeL4NameUtil.apiHelperGetterMethodName(portName, names)
-          CakeMLTemplate.ffi_get(ffiName, slangName, fileUri)
+          CakeMLTemplate.ffi_get(ffiName, slangName, fileUri, p.category)
         case ir.Direction.Out =>
           val ffiName = CakeMLTemplate.ffi_setterMethodName(portName)
           val slangName = NixSeL4NameUtil.apiHelperSetterMethodName(portName, names)

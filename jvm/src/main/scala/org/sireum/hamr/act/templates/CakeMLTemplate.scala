@@ -5,6 +5,7 @@ import org.sireum._
 import org.sireum.hamr.act.util.{CMakeOption, CMakePreprocessorOption}
 import org.sireum.hamr.codegen.common.NixSeL4NameUtil
 import org.sireum.hamr.codegen.common.templates._
+import org.sireum.hamr.ir.FeatureCategory
 
 object CakeMLTemplate {
 
@@ -147,17 +148,30 @@ object CakeMLTemplate {
 
   def ffi_setterMethodName(port: String): String = { return s"ffiapi_send_${port}" }
 
-  def ffi_get(ffiMethodName: String, slangMethodName: String, fileUri: String): ST = {
+  def ffi_get(ffiMethodName: String, slangMethodName: String, fileUri: String, featureType: FeatureCategory.Type): ST = {
     val declNewStackFrame = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", ffiMethodName, 0)
+
+    val actions: ST = featureType match {
+      case FeatureCategory.DataPort =>
+        st"""size_t numBits = 0;
+            |${slangMethodName}(${StackFrameTemplate.SF} &numBits, (U8 *)(output));
+            |${METHOD_NAME_CHECK_AND_REPORT_BUFFER_OVERRUN}(${StackFrameTemplate.SF} numBits / 8, (outputSizeBytes));
+            |${METHOD_NAME_DUMP_BUFFER}(${StackFrameTemplate.SF} numBits, output);"""
+      case FeatureCategory.EventPort =>
+        st"output[0] = ${slangMethodName}(${StackFrameTemplate.SF_LAST})"
+      case FeatureCategory.EventDataPort =>
+        st"""size_t numBits = 0;
+            |output[0] = ${slangMethodName}(${StackFrameTemplate.SF} &numBits, (U8 *)(output + 1));
+            |${METHOD_NAME_CHECK_AND_REPORT_BUFFER_OVERRUN}(${StackFrameTemplate.SF} numBits / 8, (outputSizeBytes - 1));
+            |${METHOD_NAME_DUMP_BUFFER}(${StackFrameTemplate.SF} numBits, output);"""
+      case _ => halt(s"Unexpected feature type ${featureType}")
+    }
 
     val ret: ST = st"""void ${ffiMethodName}(${defaultArgs2}) {
                       |  ${declNewStackFrame};
                       |
                       |  ${callInit()}
-                      |  size_t numBits = 0;
-                      |  output[0] = ${slangMethodName}(${StackFrameTemplate.SF} &numBits, (U8 *)(output + 1));
-                      |  ${METHOD_NAME_CHECK_AND_REPORT_BUFFER_OVERRUN}(${StackFrameTemplate.SF} numBits / 8, (outputSizeBytes-1));
-                      |  ${METHOD_NAME_DUMP_BUFFER}(${StackFrameTemplate.SF} numBits, output);
+                      |  ${actions}
                       |}"""
     return ret
   }
