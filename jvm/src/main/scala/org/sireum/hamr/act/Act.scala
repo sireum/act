@@ -67,7 +67,7 @@ object Act {
         aadlTypes = aadlTypes,
         reporter = reporter)
 
-      if (!CommonTypeUtil.verifyBitCodec(aadlTypes, symbolTable, reporter)) {
+      if (reporter.hasError) {
         return ActResult(resources)
       }
 

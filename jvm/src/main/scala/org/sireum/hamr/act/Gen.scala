@@ -72,19 +72,27 @@ import org.sireum.ops.ISZOps
 
   def process(cSources: ISZ[String]) : Option[ActContainer] = {
 
-    auxCImplIncludes = cSources.map(c => st"""#include "../../../${c}"""")
-
-    for(d <- model.dataComponents){ typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d) }
-    val sortedData = sortData(typeMap.values)
-
-    buildTransportMechanisms(symbolTable.rootSystem.component)
+    // Resolver ensures that the wire protocol is in place if there are cakeml components,
+    // regardless of what the target platform is (e.g. could reject for sel4_tb even
+    // though we don't do cakeml integration at that level)
 
     if(!hasErrors()) {
-      auxResourceFiles = auxResourceFiles :+
-        Util.createResource(
-          path = s"${Util.getTypeIncludesPath()}/${Util.getSbTypeHeaderFilenameWithExtension()}",
-          contents = processDataTypes(sortedData),
-          overwrite = T)
+      auxCImplIncludes = cSources.map(c => st"""#include "../../../${c}"""")
+
+      for (d <- model.dataComponents) {
+        typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d)
+      }
+      val sortedData = sortData(typeMap.values)
+
+      buildTransportMechanisms(symbolTable.rootSystem.component)
+
+      if (!hasErrors()) {
+        auxResourceFiles = auxResourceFiles :+
+          Util.createResource(
+            path = s"${Util.getTypeIncludesPath()}/${Util.getSbTypeHeaderFilenameWithExtension()}",
+            contents = processDataTypes(sortedData),
+            overwrite = T)
+      }
     }
 
     if(!hasErrors()) {
