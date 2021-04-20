@@ -847,9 +847,11 @@ bool is_empty_${s.name}(${s.structName} *port) {
 
   def postGenInstructionsMessage(camkesProjDirectory: String,
                                  camkesArmVmScript: Option[String],
+                                 cakeMLAssemblyLocations: ISZ[String],
                                  runCamkesScript: String,
                                  hasVM: B): ST = {
-    val o: Option[ST] = camkesArmVmScript match {
+
+    val installCamkesArmInstructions: Option[ST] = camkesArmVmScript match {
       case Some(s) => Some(
         st"""Execute the following to install the CAmkES-ARM-VM project:
             |
@@ -858,21 +860,34 @@ bool is_empty_${s.name}(${s.structName} *port) {
       case _ => None()
     }
 
-    val vmOption: Option[ST] =
-      if(hasVM) Some(st"""
-                         |Your project contains VMs so consider passing '-o "-D${VM_Template.USE_PRECONFIGURED_ROOTFS}=ON"'""")
-      else None()
+    var hints: ISZ[ST] = ISZ()
+    var cakeMLLocs: Option[ST] = None()
+
+    if(cakeMLAssemblyLocations.nonEmpty) {
+      hints = hints :+
+        st"""Pass '-o "-D${CakeMLTemplate.PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT}=ON"' when the CAkeML assemblies are in place."""
+
+      cakeMLLocs = Some(st"""
+                            |Place the CakeML assemblies in the following files:
+                            |  ${(cakeMLAssemblyLocations, "\n")}""")
+    }
+
+    if(hasVM) {
+      hints = hints :+ st"""Your project contains VMs so consider passing '-o "-D${VM_Template.USE_PRECONFIGURED_ROOTFS}=ON"'"""
+    }
 
     val ret: ST =
       st"""CAmkES Instructions:
           |--------------------
           |  CAmkES Project Directory: ${camkesProjDirectory}
+          |  ${cakeMLLocs}
           |
-          |  $o
+          |  $installCamkesArmInstructions
           |  Execute the following to simulate the system via QEMU:
           |
           |    ${runCamkesScript} -s
-          |    ${vmOption}"""
+          |
+          |    ${(hints, "\n\n")}"""
 
     return ret
   }

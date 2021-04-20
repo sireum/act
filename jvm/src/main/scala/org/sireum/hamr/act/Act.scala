@@ -130,8 +130,17 @@ object Act {
           if (c.nonEmpty) c(0).path
           else "??"
         }
+
+        val cakeMLAssemblyLocations = resources.filter(p => ops.StringOps(p.path).endsWith(".S"))
+          .map((r: Resource) => r.path)
+
         reporter.info(None(), Util.ACT_INSTRUCTIONS_MESSAGE_KIND,
-          StringTemplate.postGenInstructionsMessage(options.outputDir, camkesArmVmScript, runCamkesScript, symbolTable.hasVM()).render)
+          StringTemplate.postGenInstructionsMessage(
+            camkesProjDirectory = options.outputDir,
+            camkesArmVmScript = camkesArmVmScript,
+            cakeMLAssemblyLocations = cakeMLAssemblyLocations,
+            runCamkesScript = runCamkesScript,
+            hasVM = symbolTable.hasVM()).render)
       }
     }
 
