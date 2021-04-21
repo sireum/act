@@ -284,7 +284,7 @@ object VMGen {
     // TODO: currently expecting exactly 1 thread per vm isolated process
     assert(parent.subComponents.filter(c => CommonUtil.isThread(c.component)).size == 1, s"Expecting exactly one thread per vm bound process ${parent.identifier}")
 
-    // TODO: currently only supporting SeL4_Only, SeL4 to come; SeL4_TB will not be supported
+    // TODO: currently only supporting SeL4_Only, and SeL4; SeL4_TB will not be supported
     assert(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4, s"Platform ${platform} is not supported for vm bound processes")
 
     // TODO: will we ever process models where a sporadic thread is isolated in the vm
