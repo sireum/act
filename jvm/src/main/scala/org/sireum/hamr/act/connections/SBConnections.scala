@@ -94,7 +94,7 @@ import org.sireum.hamr.ir
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_DP)
 
                   if (aadlTypes.rawConnections) {
-                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
+                    val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
                       case Some(z) =>
                         if (z % z"4096" == z"0") z
                         else (z / z"4096" + 1) * z"4096"
@@ -127,7 +127,7 @@ import org.sireum.hamr.ir
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_DP)
 
                   if (aadlTypes.rawConnections) {
-                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
+                    val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
                       case Some(z) =>
                         if (z % z"4096" == z"0") z
                         else (z / z"4096" + 1) * z"4096"
@@ -189,7 +189,7 @@ import org.sireum.hamr.ir
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_ED)
 
                   if (aadlTypes.rawConnections) {
-                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
+                    val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
                       case Some(z) =>
                         if (z % z"4096" == z"0") z
                         else (z / z"4096" + 1) * z"4096"
@@ -251,7 +251,7 @@ import org.sireum.hamr.ir
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
                   if (aadlTypes.rawConnections) {
-                    val size: Z = CommonTypeUtil.getMaxBitsSize(aadlTypes) match {
+                    val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
                       case Some(z) =>
                         if (z % z"4096" == z"0") z
                         else (z / z"4096" + 1) * z"4096"
