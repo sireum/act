@@ -82,7 +82,9 @@ import org.sireum.ops.ISZOps
       for (d <- model.dataComponents) {
         typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d)
       }
-      val sortedData = sortData(typeMap.values)
+      val sortedData: ISZ[ir.Component] =
+        if(performHamrIntegration) typeMap.values // will only be art.DataContent so no need to sort
+        else sortData(typeMap.values)
 
       buildTransportMechanisms(symbolTable.rootSystem.component)
 
