@@ -120,11 +120,12 @@ def test(): Unit = {
 
 def clean(): Unit = {
   println(s"Cleaning ${home}")
-  val dirsToScrub: ISZ[Os.Path] = ISZ("air", "common", "hamr_codegen", "lib", "out", "runtime").map(m => home / m)
-  dirsToScrub.foreach((m: Os.Path) => {
-    println(s"Deleting ${m}")
-    m.removeAll()
-  })
+  val homeResources: ISZ[Os.Path] = ISZ("air", "common", "hamr_codegen", "lib", "out", "runtime", "versions.properties").map(m => home / m)
+  val homeBinResources: ISZ[Os.Path] = ISZ("sireum.jar", "sireum").map(m => homeBin / m)
+  for(r <- (homeResources ++ homeBinResources) if r.exists) {
+    println(s"Deleting ${r}")
+    r.removeAll()
+  }
 }
 
 
