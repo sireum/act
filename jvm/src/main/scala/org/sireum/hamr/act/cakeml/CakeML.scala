@@ -6,15 +6,19 @@ import org.sireum._
 import org.sireum.hamr.act.templates.CakeMLTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, NixSeL4NameUtil}
 import org.sireum.hamr.ir
+import org.sireum.message.Reporter
 
 object CakeML {
 
   def processThread(aadlThread: AadlThread,
                     basePackageName: String,
-                    symbolTable: SymbolTable): ISZ[Resource] = {
+                    symbolTable: SymbolTable,
+                    aadlRoot: Option[String],
+                    reporter: Reporter): ISZ[Resource] = {
 
     val names = Names(aadlThread.component, basePackageName)
 
@@ -71,13 +75,37 @@ object CakeML {
       overwrite = T,
       makeExecutable = F))
 
-    val assemblyFilename: String = Util.brand(s"${classifierName}.S")
+    val sourceText: ISZ[String] = PropertyUtil.getSourceText(aadlThread.component.properties)
 
-    ret = ret :+ Resource(
-      path = s"${path}/${assemblyFilename}",
-      content = CakeMLTemplate.emptyAssemblyFile(),
-      overwrite = F,
-      makeExecutable = F)
+      if(sourceText.nonEmpty) {
+        if(sourceText.size > 1) {
+          val msg = s"Expecting a single entry for ${OsateProperties.PROGRAMMING_PROPERTIES__SOURCE_TEXT} but found ${sourceText.size}."
+          reporter.error(aadlThread.component.identifier.pos, Util.toolName, msg)
+        }
+        var cand = Os.path(sourceText(0))
+        if(!cand.exists && aadlRoot.nonEmpty) {
+          cand = Os.path(aadlRoot.get) / sourceText(0)
+        }
+
+        if(!cand.exists) {
+          val msg = s"Couldn't locate ${sourceText(0)}"
+          reporter.error(aadlThread.component.identifier.pos, Util.toolName, msg)
+        } else {
+          val contents = cand.read
+          ret = ret :+ Resource(
+            path = s"${path}/${cand.name}",
+            content = st"${contents}",
+            overwrite = T,
+            makeExecutable = F)
+        }
+      } else {
+        val assemblyFilename = Util.brand(s"${classifierName}.S")
+        ret = ret :+ Resource(
+          path = s"${path}/${assemblyFilename}",
+          content = CakeMLTemplate.emptyAssemblyFile(),
+          overwrite = F,
+          makeExecutable = F)
+      }
 
     return ret
   }

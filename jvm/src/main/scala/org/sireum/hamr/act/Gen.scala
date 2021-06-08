@@ -950,7 +950,12 @@ import org.sireum.ops.ISZOps
     var cSources: ISZ[Resource] = ISZ()
 
     if(aadlThread.isCakeMLComponent()) {
-      val ffis: ISZ[Resource] = CakeML.processThread(aadlThread, hamrBasePackageName.get, symbolTable)
+      val ffis: ISZ[Resource] = CakeML.processThread( //
+        aadlThread, //
+        hamrBasePackageName.get, //
+        symbolTable, //
+        actOptions.aadlRootDirectory, //
+        reporter)
       cSources = cSources ++ ffis
     }
 

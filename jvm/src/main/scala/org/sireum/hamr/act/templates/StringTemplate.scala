@@ -868,7 +868,7 @@ bool is_empty_${s.name}(${s.structName} *port) {
         st"""Pass '-o "-D${CakeMLTemplate.PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT}=ON"' when the CAkeML assemblies are in place."""
 
       cakeMLLocs = Some(st"""
-                            |Place the CakeML assemblies in the following files:
+                            |Location of CakeML assemblies:
                             |  ${(cakeMLAssemblyLocations, "\n")}""")
     }
 
