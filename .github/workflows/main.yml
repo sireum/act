@@ -8,10 +8,11 @@ jobs:
 
   build-ubuntu:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip action]')"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Retrieve versions.properties
         run: |
           wget -q https://raw.githubusercontent.com/sireum/kekinian/master/versions.properties
@@ -37,15 +38,15 @@ jobs:
         run: |
           export COURSIER_CACHE=$GITHUB_WORKSPACE/cache/coursier
           cd $GITHUB_WORKSPACE
-          git submodule update --init --recursive
           bin/build.cmd test
           
   build-mac:
     runs-on: macOS-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip action]')"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Retrieve versions.properties
         run: |
           curl -JLOs https://raw.githubusercontent.com/sireum/kekinian/master/versions.properties
@@ -71,15 +72,15 @@ jobs:
         run: |
           export COURSIER_CACHE=$GITHUB_WORKSPACE/cache/coursier
           cd $GITHUB_WORKSPACE
-          git submodule update --init --recursive
           bin/build.cmd test
           
   build-windows:
     runs-on: windows-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip action]')"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Install Cygwin
         shell: cmd
         run: |
@@ -121,13 +122,4 @@ jobs:
           set CC=x86_64-w64-mingw32-gcc.exe
           set CXX=x86_64-w64-mingw32-c++.exe
           cd /d %GITHUB_WORKSPACE%
-          git submodule update --init --recursive
           bin\build.cmd test
-                    
-  skip:
-    
-    runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '[skip ci]') || contains(github.event.head_commit.message, '[skip action]')"
-    steps:
-      - run: |
-          echo Skipped
