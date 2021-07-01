@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.templates.CakeMLTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, NixSeL4NameUtil}
@@ -65,7 +66,11 @@ object CakeML {
 
     methods = methods ++ processPorts(aadlThread, basePackageName, filename)
 
-    methods = methods :+ CakeMLTemplate.postlude(!symbolTable.hasVM())
+    val selfPacing: B = aadlThread.getParent(symbolTable).getBoundProcessor(symbolTable).get.getPacingMethod() match {
+      case Some(x) => x == PacingMethod.SelfPacing
+      case None() => !symbolTable.hasVM()
+    }
+    methods = methods :+ CakeMLTemplate.postlude(selfPacing)
 
     val content: ST = CakeMLTemplate.ffiTemplate(_includes, globals, methods)
 

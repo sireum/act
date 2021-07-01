@@ -632,6 +632,6 @@ import org.sireum.hamr.codegen.common.util.ExperimentalOptions
         PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
     }
 
-    return ISZ(Util.createResource(path, contents, F))
+    return ISZ(Util.createResource(path, contents, aadlProcessor.getScheduleSourceText().nonEmpty))
   }
 }

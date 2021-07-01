@@ -5,6 +5,7 @@ package org.sireum.hamr.act.periodic
 import org.sireum._
 import org.sireum.hamr.act.util.{ActPlatform, Util}
 import org.sireum.hamr.codegen.common.CommonUtil
+import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties
 import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, PacerUtil, SymbolTable}
 import org.sireum.hamr.codegen.common.util.CodeGenPlatform
 import org.sireum.hamr.ir
@@ -17,7 +18,11 @@ object PeriodicUtil {
         if(symbolTable.hasVM()) {
           PeriodicDispatchingType.Pacer
         } else {
-          PeriodicDispatchingType.SelfPacer
+          symbolTable.getThreads()(0).getParent(symbolTable).getBoundProcessor(symbolTable).get.getPacingMethod() match {
+            case Some(CaseSchedulingProperties.PacingMethod.Pacer) => PeriodicDispatchingType.Pacer
+            case Some(CaseSchedulingProperties.PacingMethod.SelfPacing) => PeriodicDispatchingType.SelfPacer
+            case _ => PeriodicDispatchingType.SelfPacer
+          }
         }
       } else {
         PeriodicDispatchingType.PeriodicDispatcher
