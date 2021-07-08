@@ -68,7 +68,7 @@ object CakeML {
 
     val selfPacing: B = aadlThread.getParent(symbolTable).getBoundProcessor(symbolTable).get.getPacingMethod() match {
       case Some(x) => x == PacingMethod.SelfPacing
-      case None() => !symbolTable.hasVM()
+      case _ => !symbolTable.hasVM()
     }
     methods = methods :+ CakeMLTemplate.postlude(selfPacing)
 

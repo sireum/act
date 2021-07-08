@@ -162,7 +162,7 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, Symbol
               } else {
                 halt(s"Could not locate Schedule_Source_Text ${candidate}")
               }
-            case None() => halt(s"Unexpected: Couldn't locate Schedule_Source_Text ${path}")
+            case _ => halt(s"Unexpected: Couldn't locate Schedule_Source_Text ${path}")
           }
         }
       case _ =>
