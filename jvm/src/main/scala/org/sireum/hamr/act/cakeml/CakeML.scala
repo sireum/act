@@ -75,7 +75,7 @@ object CakeML {
 
     val content: ST = CakeMLTemplate.ffiTemplate(_includes, globals, methods)
 
-    var ret: ISZ[Resource] = ISZ(ResourceUtil.createStResource(
+    var ret: ISZ[Resource] = ISZ(ResourceUtil.createResource(
       path = s"${path}/${filename}",
       content = content,
       overwrite = T))
@@ -104,7 +104,7 @@ object CakeML {
         }
       } else {
         val assemblyFilename = Util.brand(s"${classifierName}.S")
-        ret = ret :+ ResourceUtil.createStResource(
+        ret = ret :+ ResourceUtil.createResource(
           path = s"${path}/${assemblyFilename}",
           content = CakeMLTemplate.emptyAssemblyFile(),
           overwrite = F)

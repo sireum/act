@@ -80,14 +80,14 @@ object AlloyProofGen {
 
     val path: Os.Path = Os.path(outputDir) / "proof" / "alloy_case.als"
 
-    resources = resources :+ ResourceUtil.createStResource(
+    resources = resources :+ ResourceUtil.createResource(
       path = path.value,
       content = als,
       overwrite = T)
 
     val thmPath: Os.Path = Os.path(outputDir) / "proof" / "alloy_case.thm"
 
-    resources = resources :+ ResourceUtil.createStResource(
+    resources = resources :+ ResourceUtil.createResource(
       path = thmPath.value,
       content = AlloyTemplate.theme(),
       overwrite = T)

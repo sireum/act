@@ -430,7 +430,7 @@ object Util {
                          |
                          |typedef _Atomic uintmax_t ${SB_EVENT_COUNTER_TYPE};
                          |"""
-    ResourceUtil.createStResource(s"${Util.getTypeIncludesPath()}/${Util.SB_COUNTER_HEADER_FILENAME}", counter, T)
+    ResourceUtil.createResource(s"${Util.getTypeIncludesPath()}/${Util.SB_COUNTER_HEADER_FILENAME}", counter, T)
   }
 
   def getSbCounterFilenameForIncludes(): String = { return s"<${Util.SB_COUNTER_HEADER_FILENAME}>" }

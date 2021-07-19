@@ -562,7 +562,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
                        gcLoopEntries: ISZ[ST]): Resource = {
     val glueCode = PacerTemplate.pacerGlueCode(gcIncludes, gcMethods, gcLoopEntries)
  
-    return ResourceUtil.createStResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
+    return ResourceUtil.createResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
   }
   
   def getSchedule(allThreads: ISZ[AadlThread]): ISZ[Resource] = {
@@ -632,6 +632,6 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
     }
 
-    return ISZ(ResourceUtil.createStResource(path, contents, aadlProcessor.getScheduleSourceText().nonEmpty))
+    return ISZ(ResourceUtil.createResource(path, contents, aadlProcessor.getScheduleSourceText().nonEmpty))
   }
 }

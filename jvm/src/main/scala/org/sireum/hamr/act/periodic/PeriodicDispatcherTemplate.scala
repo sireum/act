@@ -90,7 +90,7 @@ object PeriodicDispatcherTemplate {
                      |"""
 
     val compTypeFileName:String = Util.brand(DISPATCH_CLASSIFIER)
-    return ResourceUtil.createStResource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
+    return ResourceUtil.createResource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
   }
 
   def componentNotificationName(camkesComponentId: Option[String]): String = {

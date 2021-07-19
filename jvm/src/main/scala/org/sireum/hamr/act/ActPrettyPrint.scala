@@ -41,10 +41,10 @@ import org.sireum.ops.StringOps
     if(ExperimentalOptions.generateDotGraphs(options.experimentalOptions)){
       val assembly = container.models(0).asInstanceOf[Assembly]
       val dot = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, F)
-      add(s"graph.dot", dot.render)
+      add(s"graph.dot", dot)
 
       val dotSimple = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, T)
-      add(s"graph_simple.dot", dotSimple.render)
+      add(s"graph_simple.dot", dotSimple)
     }
 
     var cmakeComponents: ISZ[ST] = container.cContainers.map((c: C_Container) => {
@@ -62,14 +62,14 @@ import org.sireum.ops.StringOps
           if(p.exists) {
             if(StringOps(st).endsWith(".c")) {
               val fname = s"${rootDestDir}/src/${p.name}"
-              add(fname, p.read)
+              addString(fname, p.read)
 
               sourcePaths = sourcePaths :+ fname
 
             }
             else if(StringOps(st).endsWith(".h")) {
               val fname = s"${rootDestDir}/includes/${p.name}"
-              add(fname, p.read)
+              addString(fname, p.read)
             }
             else {
               reporter.warn(None(), Util.toolName, s"${path} does not appear to be a valid C source file")
@@ -121,14 +121,14 @@ import org.sireum.ops.StringOps
     if(container.samplingPorts.nonEmpty) {
 
       val seqNumFile = s"${Util.getTypeRootPath()}/includes/${Util.genCHeaderFilename(StringTemplate.SeqNumName)}"
-      add(seqNumFile, StringTemplate.seqNumHeader().render)
+      add(seqNumFile, StringTemplate.seqNumHeader())
 
       for (spi <- container.samplingPorts) {
         val header = StringTemplate.samplingPortHeader(spi)
         val impl = StringTemplate.samplingPortImpl(spi)
 
-        add(spi.headerPath, header.render)
-        add(spi.implPath, impl.render)
+        add(spi.headerPath, header)
+        add(spi.implPath, impl)
       }
     }
 
@@ -170,14 +170,14 @@ import org.sireum.ops.StringOps
                                            |)"""
 
         if(connTemplate.fromTemplate.nonEmpty) {
-          auxResources = auxResources :+ ResourceUtil.createStResource(
+          auxResources = auxResources :+ ResourceUtil.createResource(
             path = s"templates/${connTemplate.fromTemplateName}",
             content = connTemplate.fromTemplate.get,
             overwrite = T)
         }
 
         if(connTemplate.toTemplate.nonEmpty) {
-          auxResources = auxResources :+ ResourceUtil.createStResource(
+          auxResources = auxResources :+ ResourceUtil.createResource(
             path = s"templates/${connTemplate.toTemplateName}",
             content = connTemplate.toTemplate.get,
             overwrite = T)
@@ -195,33 +195,33 @@ import org.sireum.ops.StringOps
 
     if(symbolTable.hasCakeMLComponents()) {
       val filename = "CMake_CakeMLOptions.cmake"
-      add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS).render)
+      add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
     if(platform == ActPlatform.SeL4) {
       val filename= "CMake_TranspilerOptions.cmake"
-      add(filename, CMakeTemplate.cmake_add_options(SlangEmbeddedTemplate.TRANSPILER_OPTIONS).render)
+      add(filename, CMakeTemplate.cmake_add_options(SlangEmbeddedTemplate.TRANSPILER_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
     if((platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only) &&
       symbolTable.hasVM()) {
       val filename= "CMake_CAmkES_VM_Options.cmake"
-      add(filename, CMakeTemplate.cmake_add_options(VM_Template.VM_CMAKE_OPTIONS).render)
+      add(filename, CMakeTemplate.cmake_add_options(VM_Template.VM_CMAKE_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
     val cmakelist = CMakeTemplate.cmakeLists(container.rootServer, cmakeEntries, preludes)
 
-    add("CMakeLists.txt", cmakelist.render)
+    add("CMakeLists.txt", cmakelist)
 
 
     val c: ISZ[Resource] = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)
     auxResources = auxResources ++ container.auxFiles
 
 
-    addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, ScriptTemplate.runCamkesScript(symbolTable.hasVM()).render)
+    addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, ScriptTemplate.runCamkesScript(symbolTable.hasVM()))
 
     // add dest dir to path
     val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
@@ -301,7 +301,7 @@ import org.sireum.ops.StringOps
           |}
           |"""
 
-    add(s"${rootServer}.camkes", st.render)
+    add(s"${rootServer}.camkes", st)
 
     return None()
   }
@@ -372,9 +372,9 @@ import org.sireum.ops.StringOps
               |"""
 
         if(Util.isMonitor(name)) {
-          add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st.render)
+          add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st)
         } else {
-          add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st.render)
+          add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st)
         }
         None()
       }
@@ -395,7 +395,7 @@ import org.sireum.ops.StringOps
           |  ${(methods, "\n")}
           |};"""
 
-    add(s"${Util.DIR_INTERFACES}/${o.name}.idl4", st.render)
+    add(s"${Util.DIR_INTERFACES}/${o.name}.idl4", st)
 
     return None()
   }
@@ -420,12 +420,16 @@ import org.sireum.ops.StringOps
     return Some(st)
   }
 
-  def add(path: String, content: String) : Unit = {
-    resources = resources :+ ResourceUtil.createStringResource(path, content, T)
+  def addString(path: String, content: String) : Unit = {
+    add(path, st"${content}")
   }
 
-  def addExeResource(path: String, content: String) : Unit = {
-    resources = resources :+ ResourceUtil.createExeStringResource(path, content, T)
+  def add(path: String, content: ST) : Unit = {
+    resources = resources :+ ResourceUtil.createResource(path, content, T)
+  }
+
+  def addExeResource(path: String, content: ST) : Unit = {
+    resources = resources :+ ResourceUtil.createExeResource(path, content, T)
   }
 
   def getSlangLibrary(componentName: String, platform: ActPlatform.Type): Option[String] = {

@@ -69,7 +69,7 @@ object SMT2ProofGen {
 
     val path: Os.Path = Os.path(outputDir) / "proof" / "smt2_case.smt2"
 
-    resources = resources :+ ResourceUtil.createStResource(
+    resources = resources :+ ResourceUtil.createResource(
       path = path.value,
       content = proof,
       overwrite = T)

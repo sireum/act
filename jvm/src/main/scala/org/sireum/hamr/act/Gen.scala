@@ -90,7 +90,7 @@ import org.sireum.ops.ISZOps
 
       if (!hasErrors()) {
         auxResourceFiles = auxResourceFiles :+
-          ResourceUtil.createStResource(
+          ResourceUtil.createResource(
             path = s"${Util.getTypeIncludesPath()}/${Util.getSbTypeHeaderFilenameWithExtension()}",
             content = processDataTypes(sortedData),
             overwrite = T)
@@ -152,7 +152,7 @@ import org.sireum.ops.ISZOps
       }
 
       auxResourceFiles = auxResourceFiles :+
-        ResourceUtil.createStResource("settings.cmake", CMakeTemplate.genSettingsCmake(settingsCmakeEntries), F)
+        ResourceUtil.createResource("settings.cmake", CMakeTemplate.genSettingsCmake(settingsCmakeEntries), F)
 
       val composition = Composition(
         groups = ISZ(),
@@ -188,7 +188,7 @@ import org.sireum.ops.ISZOps
         val contents: ST = CMakeTemplate.cmake_generateTypeCmakeLists(filenames)
 
         auxResourceFiles = auxResourceFiles :+
-          ResourceUtil.createStResource(s"${Util.getTypeRootPath()}/CMakeLists.txt", contents, T)
+          ResourceUtil.createResource(s"${Util.getTypeRootPath()}/CMakeLists.txt", contents, T)
 
       } // end sb type library
 
@@ -1315,17 +1315,17 @@ import org.sireum.ops.ISZOps
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
             if(f.category == ir.FeatureCategory.DataPort) {
-              ResourceUtil.createStResource(implName, StringTemplate.tbMonReadWrite(
+              ResourceUtil.createResource(implName, StringTemplate.tbMonReadWrite(
                 paramTypeName, PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, Util.getSbTypeHeaderFilenameForIncludes(), preventBadging), T)
             } else {
-              ResourceUtil.createStResource(implName, StringTemplate.tbEnqueueDequeue(
+              ResourceUtil.createResource(implName, StringTemplate.tbEnqueueDequeue(
                 paramTypeName, PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, Util.getSbTypeHeaderFilenameForIncludes(), preventBadging), T)
             }
 
           val headerFilename = Util.genCHeaderFilename(monitorName)
           val headerFilePath = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/includes/${headerFilename}"
           val contents = StringTemplate.cHeaderFile(headerFilename, ISZ(), ISZ())
-          val cincludes = ResourceUtil.createStResource(headerFilePath, contents, T)
+          val cincludes = ResourceUtil.createResource(headerFilePath, contents, T)
 
           monitors = monitors + (connInstName ~>
             TB_Monitor(inst, interface,
@@ -1402,7 +1402,7 @@ import org.sireum.ops.ISZOps
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
-            ResourceUtil.createStResource(implName,
+            ResourceUtil.createResource(implName,
               StringTemplate.tbEnqueueDequeueIhor(paramTypeName,
                 PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE),
                 monitorName,
@@ -1413,7 +1413,7 @@ import org.sireum.ops.ISZOps
           val headerFilename = Util.genCHeaderFilename(monitorName)
           val headerFilePath = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/includes/${headerFilename}"
           val contents = StringTemplate.cHeaderFile(headerFilename, ISZ(), ISZ())
-          val cincludes = ResourceUtil.createStResource(headerFilePath, contents, T)
+          val cincludes = ResourceUtil.createResource(headerFilePath, contents, T)
 
           monitors = monitors + (connInstName ~>
             Ihor_Monitor(inst, interfaceReceiver, interfaceSender,
@@ -1490,7 +1490,7 @@ import org.sireum.ops.ISZOps
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
-            ResourceUtil.createStResource(
+            ResourceUtil.createResource(
               implName,
               StringTemplate.tbRaiseGetEvents(PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, preventBadging),
               T)
@@ -1498,7 +1498,7 @@ import org.sireum.ops.ISZOps
           val headerFilename = Util.genCHeaderFilename(monitorName)
           val headerFilePath = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/includes/${headerFilename}"
           val headerContents = StringTemplate.cHeaderFile(headerFilename, ISZ(), ISZ())
-          val cincludes = ResourceUtil.createStResource(headerFilePath, headerContents, T)
+          val cincludes = ResourceUtil.createResource(headerFilePath, headerContents, T)
 
           monitors = monitors + (connInstName ~>
             Ihor_Monitor(inst, interfaceReceiver, interfaceSender,
@@ -2638,7 +2638,7 @@ import org.sireum.ops.ISZOps
       entries = sts
     )
 
-    return ResourceUtil.createStResource(
+    return ResourceUtil.createResource(
       path = s"${PathUtil.getComponentHeaderPath(aadlThread, symbolTable)}/${compTypeHeaderFilename}",
       content = contents,
       overwrite = T)
@@ -2688,7 +2688,7 @@ import org.sireum.ops.ISZOps
       postInit = postInit,
       runMethod = runMethod)
 
-    return ResourceUtil.createStResource(
+    return ResourceUtil.createResource(
       path = s"${path}/${componentImplFilename}",
       content = glueCodeImpl,
       overwrite = T)

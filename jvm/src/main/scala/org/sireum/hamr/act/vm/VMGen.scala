@@ -73,39 +73,39 @@ object VMGen {
       VM_Template.vm_cmake_DeclareCamkesArmVM(id, ISZ(connectionFilename), libNames)
     })
 
-    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/CMakeLists.txt",
       content = VM_Template.vm_cmakelists(vmThreadIds, declareCamkesArmVMs, vmVars),
       overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/${DIR_VM_EXYNOS5422}/devices.camkes",
       content = VM_Template.vm_exynos5422_devices_camkes(vmThreadIds),
       overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/${DIR_VM_QEMU_ARM_VIRT}/devices.camkes",
       content = VM_Template.vm_qemu_arm_virt_devices_camkes(vmThreadIds),
       overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/${DIR_VM_OVERLAY_FILES_INIT_SCRIPT}/cross_vm_module_init",
       content = VM_Template.vm_overlay_scripts__init_scripts__cross_vm_module_init(),
       overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/${DIR_VM_OVERLAY_FILES_INIT_SCRIPT}/inittab_hvc0",
       content = VM_Template.vm_overlay_script__init_scripts__inittab_hvc0(),
       overwrite = F)
 
     for(vmProcessID <- vmThreadIds) {
 
-      auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
+      auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/CMakeLists.txt",
         content = VM_Template.vm_cmakelists_app(vmProcessID, libNames, appAddSubdirs),
         overwrite = F)
 
-      auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
+      auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/${Util.genCImplFilename(vmProcessID)}",
         content = VM_Template.vm_app_dummy(vmProcessID, VMGen.getVMAppIncludes()),
         overwrite = F)
@@ -367,7 +367,7 @@ object VMGen {
     }
 
     val vmCrossConns: ST = VM_Template.vm_cross_vm_connections(crossConnGCMethods, crossConnConnections)
-    auxResources = auxResources :+ ResourceUtil.createStResource(
+    auxResources = auxResources :+ ResourceUtil.createResource(
       path = s"${VMGen.getRootVMDir()}/${VMGen.DIR_VM_SRC}/${VMGen.getCrossVMConnectionsFilename(aadlThread, symbolTable)}",
       content = vmCrossConns,
       overwrite = T)
@@ -395,7 +395,7 @@ object VMGen {
       externalEntities = externalEntities
     )
 
-    auxResources = auxResources :+ ResourceUtil.createExeStResource(
+    auxResources = auxResources :+ ResourceUtil.createExeResource(
       path = PathUtil.CAMKES_ARM_VM_SCRIPT_PATH,
       content = VM_Template.setup_camkes_vm_Script(),
       overwrite = T)

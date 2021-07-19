@@ -361,12 +361,12 @@ object EventDataQueueTemplate {
       counterTypeName = Util.SB_EVENT_COUNTER_TYPE)
 
     val auxResourceFiles = ISZ(
-      ResourceUtil.createStResource(
+      ResourceUtil.createResource(
         path = s"${Util.getTypeIncludesPath()}/${queueHeaderFilename}",
         content = interface,
         overwrite = T),
 
-      ResourceUtil.createStResource(
+      ResourceUtil.createResource(
         path = s"${Util.getTypeSrcPath()}/${queueImplFilename}",
         content = impl,
         overwrite = T)

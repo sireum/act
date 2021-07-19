@@ -207,6 +207,6 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
         PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
     }
 
-    return ISZ(ResourceUtil.createStResource(path, contents, F))
+    return ISZ(ResourceUtil.createResource(path, contents, F))
   }
 }
