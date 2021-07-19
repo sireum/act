@@ -8,6 +8,7 @@ import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 @datatype class SelfPacer (val symbolTable: SymbolTable,
                            val actOptions: ActOptions) extends PeriodicImpl {
@@ -206,6 +207,6 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, Symbol
         PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
     }
 
-    return ISZ(Util.createResource(path, contents, F))
+    return ISZ(ResourceUtil.createStResource(path, contents, F))
   }
 }

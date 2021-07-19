@@ -13,7 +13,7 @@ import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
-import org.sireum.hamr.codegen.common.util.ExperimentalOptions
+import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 import org.sireum.ops.StringOps
 
 @record class ActPrettyPrint {
@@ -41,10 +41,10 @@ import org.sireum.ops.StringOps
     if(ExperimentalOptions.generateDotGraphs(options.experimentalOptions)){
       val assembly = container.models(0).asInstanceOf[Assembly]
       val dot = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, F)
-      add(s"graph.dot", dot)
+      add(s"graph.dot", dot.render)
 
       val dotSimple = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, T)
-      add(s"graph_simple.dot", dotSimple)
+      add(s"graph_simple.dot", dotSimple.render)
     }
 
     var cmakeComponents: ISZ[ST] = container.cContainers.map((c: C_Container) => {
@@ -62,14 +62,14 @@ import org.sireum.ops.StringOps
           if(p.exists) {
             if(StringOps(st).endsWith(".c")) {
               val fname = s"${rootDestDir}/src/${p.name}"
-              add(fname, st"""${p.read}""")
+              add(fname, p.read)
 
               sourcePaths = sourcePaths :+ fname
 
             }
             else if(StringOps(st).endsWith(".h")) {
               val fname = s"${rootDestDir}/includes/${p.name}"
-              add(fname, st"""${p.read}""")
+              add(fname, p.read)
             }
             else {
               reporter.warn(None(), Util.toolName, s"${path} does not appear to be a valid C source file")
@@ -121,14 +121,14 @@ import org.sireum.ops.StringOps
     if(container.samplingPorts.nonEmpty) {
 
       val seqNumFile = s"${Util.getTypeRootPath()}/includes/${Util.genCHeaderFilename(StringTemplate.SeqNumName)}"
-      add(seqNumFile, StringTemplate.seqNumHeader())
+      add(seqNumFile, StringTemplate.seqNumHeader().render)
 
       for (spi <- container.samplingPorts) {
         val header = StringTemplate.samplingPortHeader(spi)
         val impl = StringTemplate.samplingPortImpl(spi)
 
-        add(spi.headerPath, header)
-        add(spi.implPath, impl)
+        add(spi.headerPath, header.render)
+        add(spi.implPath, impl.render)
       }
     }
 
@@ -170,19 +170,17 @@ import org.sireum.ops.StringOps
                                            |)"""
 
         if(connTemplate.fromTemplate.nonEmpty) {
-          auxResources = auxResources :+ Resource(
+          auxResources = auxResources :+ ResourceUtil.createStResource(
             path = s"templates/${connTemplate.fromTemplateName}",
             content = connTemplate.fromTemplate.get,
-            overwrite = T,
-            makeExecutable = F)
+            overwrite = T)
         }
 
         if(connTemplate.toTemplate.nonEmpty) {
-          auxResources = auxResources :+ Resource(
+          auxResources = auxResources :+ ResourceUtil.createStResource(
             path = s"templates/${connTemplate.toTemplateName}",
             content = connTemplate.toTemplate.get,
-            overwrite = T,
-            makeExecutable = F)
+            overwrite = T)
         }
       }
     }
@@ -197,33 +195,33 @@ import org.sireum.ops.StringOps
 
     if(symbolTable.hasCakeMLComponents()) {
       val filename = "CMake_CakeMLOptions.cmake"
-      add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS))
+      add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS).render)
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
     if(platform == ActPlatform.SeL4) {
       val filename= "CMake_TranspilerOptions.cmake"
-      add(filename, CMakeTemplate.cmake_add_options(SlangEmbeddedTemplate.TRANSPILER_OPTIONS))
+      add(filename, CMakeTemplate.cmake_add_options(SlangEmbeddedTemplate.TRANSPILER_OPTIONS).render)
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
     if((platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only) &&
       symbolTable.hasVM()) {
       val filename= "CMake_CAmkES_VM_Options.cmake"
-      add(filename, CMakeTemplate.cmake_add_options(VM_Template.VM_CMAKE_OPTIONS))
+      add(filename, CMakeTemplate.cmake_add_options(VM_Template.VM_CMAKE_OPTIONS).render)
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
     val cmakelist = CMakeTemplate.cmakeLists(container.rootServer, cmakeEntries, preludes)
 
-    add("CMakeLists.txt", cmakelist)
+    add("CMakeLists.txt", cmakelist.render)
 
 
     val c: ISZ[Resource] = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)
     auxResources = auxResources ++ container.auxFiles
 
 
-    addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, ScriptTemplate.runCamkesScript(symbolTable.hasVM()))
+    addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, ScriptTemplate.runCamkesScript(symbolTable.hasVM()).render)
 
     // add dest dir to path
     val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
@@ -303,7 +301,7 @@ import org.sireum.ops.StringOps
           |}
           |"""
 
-    add(s"${rootServer}.camkes", st)
+    add(s"${rootServer}.camkes", st.render)
 
     return None()
   }
@@ -374,9 +372,9 @@ import org.sireum.ops.StringOps
               |"""
 
         if(Util.isMonitor(name)) {
-          add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st)
+          add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st.render)
         } else {
-          add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st)
+          add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st.render)
         }
         None()
       }
@@ -397,7 +395,7 @@ import org.sireum.ops.StringOps
           |  ${(methods, "\n")}
           |};"""
 
-    add(s"${Util.DIR_INTERFACES}/${o.name}.idl4", st)
+    add(s"${Util.DIR_INTERFACES}/${o.name}.idl4", st.render)
 
     return None()
   }
@@ -422,12 +420,12 @@ import org.sireum.ops.StringOps
     return Some(st)
   }
 
-  def add(path: String, content: ST) : Unit = {
-    resources = resources :+ Util.createResource(path, content, T)
+  def add(path: String, content: String) : Unit = {
+    resources = resources :+ ResourceUtil.createStringResource(path, content, T)
   }
 
-  def addExeResource(path: String, content: ST) : Unit = {
-    resources = resources :+ Util.createExeResource(path, content, T)
+  def addExeResource(path: String, content: String) : Unit = {
+    resources = resources :+ ResourceUtil.createExeStringResource(path, content, T)
   }
 
   def getSlangLibrary(componentName: String, platform: ActPlatform.Type): Option[String] = {

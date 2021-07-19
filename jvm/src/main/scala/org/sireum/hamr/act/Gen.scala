@@ -18,7 +18,7 @@ import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil}
-import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, PathUtil => CommonPathUtil}
+import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil, PathUtil => CommonPathUtil}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
@@ -90,9 +90,9 @@ import org.sireum.ops.ISZOps
 
       if (!hasErrors()) {
         auxResourceFiles = auxResourceFiles :+
-          Util.createResource(
+          ResourceUtil.createStResource(
             path = s"${Util.getTypeIncludesPath()}/${Util.getSbTypeHeaderFilenameWithExtension()}",
-            contents = processDataTypes(sortedData),
+            content = processDataTypes(sortedData),
             overwrite = T)
       }
     }
@@ -152,7 +152,7 @@ import org.sireum.ops.ISZOps
       }
 
       auxResourceFiles = auxResourceFiles :+
-        Util.createResource("settings.cmake", CMakeTemplate.genSettingsCmake(settingsCmakeEntries), F)
+        ResourceUtil.createStResource("settings.cmake", CMakeTemplate.genSettingsCmake(settingsCmakeEntries), F)
 
       val composition = Composition(
         groups = ISZ(),
@@ -188,7 +188,7 @@ import org.sireum.ops.ISZOps
         val contents: ST = CMakeTemplate.cmake_generateTypeCmakeLists(filenames)
 
         auxResourceFiles = auxResourceFiles :+
-          Util.createResource(s"${Util.getTypeRootPath()}/CMakeLists.txt", contents, T)
+          ResourceUtil.createStResource(s"${Util.getTypeRootPath()}/CMakeLists.txt", contents, T)
 
       } // end sb type library
 
@@ -1315,17 +1315,17 @@ import org.sireum.ops.ISZOps
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
             if(f.category == ir.FeatureCategory.DataPort) {
-              Util.createResource(implName, StringTemplate.tbMonReadWrite(
+              ResourceUtil.createStResource(implName, StringTemplate.tbMonReadWrite(
                 paramTypeName, PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, Util.getSbTypeHeaderFilenameForIncludes(), preventBadging), T)
             } else {
-              Util.createResource(implName, StringTemplate.tbEnqueueDequeue(
+              ResourceUtil.createStResource(implName, StringTemplate.tbEnqueueDequeue(
                 paramTypeName, PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, Util.getSbTypeHeaderFilenameForIncludes(), preventBadging), T)
             }
 
           val headerFilename = Util.genCHeaderFilename(monitorName)
           val headerFilePath = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/includes/${headerFilename}"
           val contents = StringTemplate.cHeaderFile(headerFilename, ISZ(), ISZ())
-          val cincludes = Util.createResource(headerFilePath, contents, T)
+          val cincludes = ResourceUtil.createStResource(headerFilePath, contents, T)
 
           monitors = monitors + (connInstName ~>
             TB_Monitor(inst, interface,
@@ -1402,7 +1402,7 @@ import org.sireum.ops.ISZOps
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
-            Util.createResource(implName,
+            ResourceUtil.createStResource(implName,
               StringTemplate.tbEnqueueDequeueIhor(paramTypeName,
                 PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE),
                 monitorName,
@@ -1413,7 +1413,7 @@ import org.sireum.ops.ISZOps
           val headerFilename = Util.genCHeaderFilename(monitorName)
           val headerFilePath = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/includes/${headerFilename}"
           val contents = StringTemplate.cHeaderFile(headerFilename, ISZ(), ISZ())
-          val cincludes = Util.createResource(headerFilePath, contents, T)
+          val cincludes = ResourceUtil.createStResource(headerFilePath, contents, T)
 
           monitors = monitors + (connInstName ~>
             Ihor_Monitor(inst, interfaceReceiver, interfaceSender,
@@ -1490,7 +1490,7 @@ import org.sireum.ops.ISZOps
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
-            Util.createResource(
+            ResourceUtil.createStResource(
               implName,
               StringTemplate.tbRaiseGetEvents(PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, preventBadging),
               T)
@@ -1498,7 +1498,7 @@ import org.sireum.ops.ISZOps
           val headerFilename = Util.genCHeaderFilename(monitorName)
           val headerFilePath = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/includes/${headerFilename}"
           val headerContents = StringTemplate.cHeaderFile(headerFilename, ISZ(), ISZ())
-          val cincludes = Util.createResource(headerFilePath, headerContents, T)
+          val cincludes = ResourceUtil.createStResource(headerFilePath, headerContents, T)
 
           monitors = monitors + (connInstName ~>
             Ihor_Monitor(inst, interfaceReceiver, interfaceSender,
@@ -2638,9 +2638,9 @@ import org.sireum.ops.ISZOps
       entries = sts
     )
 
-    return Util.createResource(
+    return ResourceUtil.createStResource(
       path = s"${PathUtil.getComponentHeaderPath(aadlThread, symbolTable)}/${compTypeHeaderFilename}",
-      contents = contents,
+      content = contents,
       overwrite = T)
   }
 
@@ -2688,9 +2688,9 @@ import org.sireum.ops.ISZOps
       postInit = postInit,
       runMethod = runMethod)
 
-    return Util.createResource(
+    return ResourceUtil.createStResource(
       path = s"${path}/${componentImplFilename}",
-      contents = glueCodeImpl,
+      content = glueCodeImpl,
       overwrite = T)
   }
 

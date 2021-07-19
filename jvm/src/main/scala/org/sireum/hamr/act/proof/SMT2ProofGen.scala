@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.templates.SMT2Template
 import org.sireum.hamr.act.util.Util
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object SMT2ProofGen {
   var resources: ISZ[Resource] = ISZ()
@@ -68,9 +69,9 @@ object SMT2ProofGen {
 
     val path: Os.Path = Os.path(outputDir) / "proof" / "smt2_case.smt2"
 
-    resources = resources :+ Util.createResource(
+    resources = resources :+ ResourceUtil.createStResource(
       path = path.value,
-      contents = proof,
+      content = proof,
       overwrite = T)
 
     return resources

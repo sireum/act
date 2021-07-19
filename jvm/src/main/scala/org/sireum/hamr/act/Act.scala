@@ -7,11 +7,9 @@ import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.Names
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.properties.PropertyUtil
-import org.sireum.hamr.codegen.common.symbols.{SymbolResolver, SymbolTable}
-import org.sireum.hamr.codegen.common.transformers.Transformers
-import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeResolver, TypeUtil => CommonTypeUtil}
-import org.sireum.hamr.codegen.common.util.ExperimentalOptions
+import org.sireum.hamr.codegen.common.symbols.SymbolTable
+import org.sireum.hamr.codegen.common.types.AadlTypes
+import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -41,7 +39,7 @@ object Act {
     val auxFiles: ISZ[(String, String)] = options.auxFiles.entries.map(m => {
 
       val resourceName = s"${options.outputDir}/${Util.AUX_CODE_DIRECTORY_NAME}/${m._1}"
-      resources = resources :+ Util.createResource(resourceName, st"${m._2}", T)
+      resources = resources :+ ResourceUtil.createStringResource(resourceName, m._2, T)
 
       val relName = s"${Util.AUX_CODE_DIRECTORY_NAME}/${m._1}"
       (relName, m._2)

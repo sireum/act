@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.StringUtil
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object EventDataQueueTemplate {
   def getQueueSizeMacroName(queueName: String): String = {
@@ -360,17 +361,15 @@ object EventDataQueueTemplate {
       counterTypeName = Util.SB_EVENT_COUNTER_TYPE)
 
     val auxResourceFiles = ISZ(
-      Resource(
+      ResourceUtil.createStResource(
         path = s"${Util.getTypeIncludesPath()}/${queueHeaderFilename}",
         content = interface,
-        overwrite = T,
-        makeExecutable = F),
+        overwrite = T),
 
-      Resource(
+      ResourceUtil.createStResource(
         path = s"${Util.getTypeSrcPath()}/${queueImplFilename}",
         content = impl,
-        overwrite = T,
-        makeExecutable = F)
+        overwrite = T)
     )
 
     return auxResourceFiles

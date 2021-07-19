@@ -9,6 +9,7 @@ import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, NixSeL4NameUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
@@ -74,11 +75,10 @@ object CakeML {
 
     val content: ST = CakeMLTemplate.ffiTemplate(_includes, globals, methods)
 
-    var ret: ISZ[Resource] = ISZ(Resource(
+    var ret: ISZ[Resource] = ISZ(ResourceUtil.createStResource(
       path = s"${path}/${filename}",
       content = content,
-      overwrite = T,
-      makeExecutable = F))
+      overwrite = T))
 
     val sourceText: ISZ[String] = PropertyUtil.getSourceText(aadlThread.component.properties)
 
@@ -97,19 +97,17 @@ object CakeML {
           reporter.error(aadlThread.component.identifier.pos, Util.toolName, msg)
         } else {
           val contents = cand.read
-          ret = ret :+ Resource(
+          ret = ret :+ ResourceUtil.createStringResource(
             path = s"${path}/${cand.name}",
-            content = st"${contents}",
-            overwrite = T,
-            makeExecutable = F)
+            content = contents,
+            overwrite = T)
         }
       } else {
         val assemblyFilename = Util.brand(s"${classifierName}.S")
-        ret = ret :+ Resource(
+        ret = ret :+ ResourceUtil.createStResource(
           path = s"${path}/${assemblyFilename}",
           content = CakeMLTemplate.emptyAssemblyFile(),
-          overwrite = F,
-          makeExecutable = F)
+          overwrite = F)
       }
 
     return ret

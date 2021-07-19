@@ -10,6 +10,7 @@ import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlProcess, AadlThread, Dispatch_Protocol, SymbolTable}
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.FeatureEnd
@@ -72,42 +73,42 @@ object VMGen {
       VM_Template.vm_cmake_DeclareCamkesArmVM(id, ISZ(connectionFilename), libNames)
     })
 
-    auxResourceFiles = auxResourceFiles :+ Resource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
       path = s"${getRootVMDir()}/CMakeLists.txt",
       content = VM_Template.vm_cmakelists(vmThreadIds, declareCamkesArmVMs, vmVars),
-      overwrite = T, makeExecutable = F)
+      overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ Resource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
       path = s"${getRootVMDir()}/${DIR_VM_EXYNOS5422}/devices.camkes",
       content = VM_Template.vm_exynos5422_devices_camkes(vmThreadIds),
-      overwrite = T, makeExecutable = F)
+      overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ Resource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
       path = s"${getRootVMDir()}/${DIR_VM_QEMU_ARM_VIRT}/devices.camkes",
       content = VM_Template.vm_qemu_arm_virt_devices_camkes(vmThreadIds),
-      overwrite = T, makeExecutable = F)
+      overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ Resource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
       path = s"${getRootVMDir()}/${DIR_VM_OVERLAY_FILES_INIT_SCRIPT}/cross_vm_module_init",
       content = VM_Template.vm_overlay_scripts__init_scripts__cross_vm_module_init(),
-      overwrite = T, makeExecutable = F)
+      overwrite = T)
 
-    auxResourceFiles = auxResourceFiles :+ Resource(
+    auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
       path = s"${getRootVMDir()}/${DIR_VM_OVERLAY_FILES_INIT_SCRIPT}/inittab_hvc0",
       content = VM_Template.vm_overlay_script__init_scripts__inittab_hvc0(),
-      overwrite = F, makeExecutable = F)
+      overwrite = F)
 
     for(vmProcessID <- vmThreadIds) {
 
-      auxResourceFiles = auxResourceFiles :+ Resource(
+      auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/CMakeLists.txt",
         content = VM_Template.vm_cmakelists_app(vmProcessID, libNames, appAddSubdirs),
-        overwrite = F, makeExecutable = F)
+        overwrite = F)
 
-      auxResourceFiles = auxResourceFiles :+ Resource(
+      auxResourceFiles = auxResourceFiles :+ ResourceUtil.createStResource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/${Util.genCImplFilename(vmProcessID)}",
         content = VM_Template.vm_app_dummy(vmProcessID, VMGen.getVMAppIncludes()),
-        overwrite = F, makeExecutable = F)
+        overwrite = F)
     }
 
     auxResourceFiles = auxResourceFiles ++
@@ -366,11 +367,10 @@ object VMGen {
     }
 
     val vmCrossConns: ST = VM_Template.vm_cross_vm_connections(crossConnGCMethods, crossConnConnections)
-    auxResources = auxResources :+ Util.createResource(
+    auxResources = auxResources :+ ResourceUtil.createStResource(
       path = s"${VMGen.getRootVMDir()}/${VMGen.DIR_VM_SRC}/${VMGen.getCrossVMConnectionsFilename(aadlThread, symbolTable)}",
-      contents = vmCrossConns,
-      overwrite = T
-    )
+      content = vmCrossConns,
+      overwrite = T)
 
     includes = includes + PacerTemplate.pacerDataportFilenameForIncludes()
 
@@ -395,11 +395,10 @@ object VMGen {
       externalEntities = externalEntities
     )
 
-    auxResources = auxResources :+ Util.createExeResource(
+    auxResources = auxResources :+ ResourceUtil.createExeStResource(
       path = PathUtil.CAMKES_ARM_VM_SCRIPT_PATH,
-      contents = VM_Template.setup_camkes_vm_Script(),
-      overwrite = T
-    )
+      content = VM_Template.setup_camkes_vm_Script(),
+      overwrite = T)
 
     return (c, auxResources)
   }

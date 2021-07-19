@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object PeriodicDispatcherTemplate {
 
@@ -89,7 +90,7 @@ object PeriodicDispatcherTemplate {
                      |"""
 
     val compTypeFileName:String = Util.brand(DISPATCH_CLASSIFIER)
-    return Util.createResource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
+    return ResourceUtil.createStResource(s"${Util.DIR_COMPONENTS}/${DISPATCH_CLASSIFIER}/${Util.DIR_SRC}/${compTypeFileName}.c", st, T)
   }
 
   def componentNotificationName(camkesComponentId: Option[String]): String = {

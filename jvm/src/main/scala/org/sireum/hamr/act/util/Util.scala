@@ -7,6 +7,7 @@ import org.sireum.hamr.act.ast
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.FeatureEnd
@@ -374,14 +375,6 @@ object Util {
 
   def genCImplFilename(s: String): String = { return s"${s}.c" }
 
-  def createResource(path: String, contents: ST, overwrite: B): Resource = {
-    return Resource(path, contents, overwrite, F)
-  }
-
-  def createExeResource(path: String, contents: ST, overwrite: B): Resource = {
-    return Resource(path, contents, overwrite, T)
-  }
-
   def getUserEventEntrypointMethodName(component: ir.Component, feature: ir.FeatureEnd): String = {
     val fid = CommonUtil.getLastName(feature.identifier)
     val cid = Util.getClassifier(component.classifier.get)
@@ -437,7 +430,7 @@ object Util {
                          |
                          |typedef _Atomic uintmax_t ${SB_EVENT_COUNTER_TYPE};
                          |"""
-    Util.createResource(s"${Util.getTypeIncludesPath()}/${Util.SB_COUNTER_HEADER_FILENAME}", counter, T)
+    ResourceUtil.createStResource(s"${Util.getTypeIncludesPath()}/${Util.SB_COUNTER_HEADER_FILENAME}", counter, T)
   }
 
   def getSbCounterFilenameForIncludes(): String = { return s"<${Util.SB_COUNTER_HEADER_FILENAME}>" }

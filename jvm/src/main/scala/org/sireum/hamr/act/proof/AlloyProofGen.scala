@@ -5,6 +5,7 @@ import org.sireum._
 import org.sireum.hamr.act.templates.AlloyTemplate
 import org.sireum.hamr.act.util.Util
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object AlloyProofGen {
 
@@ -79,16 +80,16 @@ object AlloyProofGen {
 
     val path: Os.Path = Os.path(outputDir) / "proof" / "alloy_case.als"
 
-    resources = resources :+ Util.createResource(
+    resources = resources :+ ResourceUtil.createStResource(
       path = path.value,
-      contents = als,
+      content = als,
       overwrite = T)
 
     val thmPath: Os.Path = Os.path(outputDir) / "proof" / "alloy_case.thm"
 
-    resources = resources :+ Util.createResource(
+    resources = resources :+ ResourceUtil.createStResource(
       path = thmPath.value,
-      contents = AlloyTemplate.theme(),
+      content = AlloyTemplate.theme(),
       overwrite = T)
 
     return resources

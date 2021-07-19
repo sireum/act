@@ -11,7 +11,7 @@ import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols._
-import org.sireum.hamr.codegen.common.util.ExperimentalOptions
+import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
 @datatype class Pacer(val symbolTable: SymbolTable,
                       val actOptions: ActOptions) extends PeriodicImpl {
@@ -562,7 +562,7 @@ import org.sireum.hamr.codegen.common.util.ExperimentalOptions
                        gcLoopEntries: ISZ[ST]): Resource = {
     val glueCode = PacerTemplate.pacerGlueCode(gcIncludes, gcMethods, gcLoopEntries)
  
-    return Util.createResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
+    return ResourceUtil.createStResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
   }
   
   def getSchedule(allThreads: ISZ[AadlThread]): ISZ[Resource] = {
@@ -632,6 +632,6 @@ import org.sireum.hamr.codegen.common.util.ExperimentalOptions
         PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
     }
 
-    return ISZ(Util.createResource(path, contents, aadlProcessor.getScheduleSourceText().nonEmpty))
+    return ISZ(ResourceUtil.createStResource(path, contents, aadlProcessor.getScheduleSourceText().nonEmpty))
   }
 }
