@@ -228,7 +228,8 @@ import org.sireum.ops.StringOps
       path = s"${destDir}/${o.path}",
       content = o.content,
       overwrite = o.overwrite,
-      makeExecutable = o.makeExecutable
+      makeExecutable = o.makeExecutable,
+      makeCRLF = o.makeCRLF
     ))
 
     return ret
