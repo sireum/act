@@ -15,10 +15,12 @@ object ScriptTemplate {
     val SIMULATE: String = "SIMULATE"
     val CAMKES_OPTIONS: String = "CAMKES_OPTIONS"
 
+    val bt: String = "\\"
+
     val buildSim: ST = if(hasVM) {
-      st"""../init-build.sh $${${CAMKES_OPTIONS}} \
-          |    -DPLATFORM=qemu-arm-virt \
-          |    -DARM_HYP=ON \
+      st"""../init-build.sh $${${CAMKES_OPTIONS}} ${bt}
+          |    -DPLATFORM=qemu-arm-virt ${bt}
+          |    -DARM_HYP=ON ${bt}
           |    -DCAMKES_APP=$$HAMR_CAMKES_PROJ
           |
           |ninja"""
@@ -28,11 +30,11 @@ object ScriptTemplate {
           |ninja"""
     }
     val simulate: ST = if(hasVM) {
-      st"""qemu-system-aarch64 \
-          |    -machine virt,virtualization=on,highmem=off,secure=off \
-          |    -cpu cortex-a53 \
-          |    -nographic \
-          |    -m size=1024 \
+      st"""qemu-system-aarch64 ${bt}
+          |    -machine virt,virtualization=on,highmem=off,secure=off ${bt}
+          |    -cpu cortex-a53 ${bt}
+          |    -nographic ${bt}
+          |    -m size=1024 ${bt}
           |    -kernel images/capdl-loader-image-arm-qemu-arm-virt"""
     } else {
       st"""# ./simulate
@@ -41,12 +43,12 @@ object ScriptTemplate {
           |# generated ./simulate script. Instead call QEMU directly using the default
           |# values ./simulate would pass
           |
-          |qemu-system-x86_64 \
-          |    -cpu Nehalem,-vme,+pdpe1gb,-xsave,-xsaveopt,-xsavec,-fsgsbase,-invpcid,enforce \
-          |    -nographic \
-          |    -serial mon:stdio \
-          |    -m size=512M \
-          |    -kernel images/kernel-x86_64-pc99 \
+          |qemu-system-x86_64 ${bt}
+          |    -cpu Nehalem,-vme,+pdpe1gb,-xsave,-xsaveopt,-xsavec,-fsgsbase,-invpcid,enforce ${bt}
+          |    -nographic ${bt}
+          |    -serial mon:stdio ${bt}
+          |    -m size=512M ${bt}
+          |    -kernel images/kernel-x86_64-pc99 ${bt}
           |    -initrd images/capdl-loader-image-x86_64-pc99"""
     }
 
@@ -80,7 +82,7 @@ object ScriptTemplate {
                       |  echo "  -c, --camkes-dir      Location of CAmkES project"
                       |  echo "  -n, --non-interactive Non-interactive mode.  Symlink in apps directory will be replaced"
                       |  echo "                        if present, CAmkES build directory will not be deleted"
-                      |  echo "  -o, --camkes-options  CAmkES options (e.g -o \"-DWITH_LOC=ON -DCapDLLoaderMaxObjects=40000\")"
+                      |  echo "  -o, --camkes-options  CAmkES options (e.g -o ${bt}"-DWITH_LOC=ON -DCapDLLoaderMaxObjects=40000${bt}")"
                       |  echo "  -s, --simulate        Simulate via QEMU"
                       |  exit 2
                       |}

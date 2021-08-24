@@ -22,6 +22,8 @@ object StringTemplate {
   val SeqNumName: String = "seqNum"
   val SeqNumType: String = s"${SeqNumName}_t"
 
+  val bt: String = "\\"
+
   def cHeaderFile(filename: String,
                   includes: ISZ[String],
                   entries: ISZ[ST]): ST = {
@@ -74,19 +76,19 @@ object StringTemplate {
                    |#define __${Util.cbrand("OS")}_CAMKES__${badges}
                    |
                    |#ifndef ${SB_VERIFY}
-                   |#define MUTEXOP(OP)\
-                   |if((OP) != 0) {\
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
-                   |  *((int*)0)=0xdeadbeef;\
+                   |#define MUTEXOP(OP)${bt}
+                   |if((OP) != 0) {${bt}
+                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);${bt}
+                   |  *((int*)0)=0xdeadbeef;${bt}
                    |}
                    |#else
                    |#define MUTEXOP(OP) OP
                    |#endif // ${SB_VERIFY}
                    |#ifndef ${SB_VERIFY}
-                   |#define CALLBACKOP(OP)\
-                   |if((OP) != 0) {\
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);\
-                   |  *((int*)0)=0xdeadbeef;\
+                   |#define CALLBACKOP(OP)${bt}
+                   |if((OP) != 0) {${bt}
+                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);${bt}
+                   |  *((int*)0)=0xdeadbeef;${bt}
                    |}
                    |#else
                    |#define CALLBACKOP(OP) OP
