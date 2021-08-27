@@ -225,7 +225,7 @@ import org.sireum.ops.ISZOps
       case ir.ComponentCategory.Process =>
         val aadlProcess = symbolTable.getProcess(CommonUtil.getName(c.identifier))
 
-        if(aadlProcess.toVirtualMachine()) {
+        if(aadlProcess.toVirtualMachine(symbolTable)) {
           val threads = aadlProcess.subComponents.filter(c => CommonUtil.isThread(c.component))
 
           // sanity check: currently expecting exactly one thread per process when virtualizing
