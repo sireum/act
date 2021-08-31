@@ -96,11 +96,10 @@ object CakeML {
           val msg = s"Couldn't locate ${sourceText(0)}"
           reporter.error(aadlThread.component.identifier.pos, Util.toolName, msg)
         } else {
-          val contents = cand.read
-          ret = ret :+ ResourceUtil.createStringResource(
-            path = s"${path}/${cand.name}",
-            content = contents,
-            overwrite = T)
+          ret = ret :+ ResourceUtil.createExternalResource(
+            srcPath = cand.string,
+            dstPath = s"${path}/${cand.name}",
+            symlink = F)
         }
       } else {
         val assemblyFilename = Util.brand(s"${classifierName}.S")

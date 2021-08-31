@@ -86,19 +86,19 @@ object Act {
     if (!reporter.hasError) {
 
       val camkesArmVmScript: Option[String] = {
-        val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.CAMKES_ARM_VM_SCRIPT_PATH))
-        if (c.nonEmpty) Some(c(0).path)
+        val c = resources.filter(p => ops.StringOps(p.dstPath).endsWith(PathUtil.CAMKES_ARM_VM_SCRIPT_PATH))
+        if (c.nonEmpty) Some(c(0).dstPath)
         else None()
       }
 
       val runCamkesScript: String = {
-        val c = resources.filter(p => ops.StringOps(p.path).endsWith(PathUtil.RUN_CAMKES_SCRIPT_PATH))
-        if (c.nonEmpty) c(0).path
+        val c = resources.filter(p => ops.StringOps(p.dstPath).endsWith(PathUtil.RUN_CAMKES_SCRIPT_PATH))
+        if (c.nonEmpty) c(0).dstPath
         else "??"
       }
 
-      val cakeMLAssemblyLocations = resources.filter(p => ops.StringOps(p.path).endsWith(".S"))
-        .map((r: Resource) => r.path)
+      val cakeMLAssemblyLocations = resources.filter(p => ops.StringOps(p.dstPath).endsWith(".S"))
+        .map((r: Resource) => r.dstPath)
 
       reporter.info(None(), Util.ACT_INSTRUCTIONS_MESSAGE_KIND,
         StringTemplate.postGenInstructionsMessage(

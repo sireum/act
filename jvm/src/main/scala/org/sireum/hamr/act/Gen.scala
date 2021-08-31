@@ -172,10 +172,10 @@ import org.sireum.ops.ISZOps
       { // generate sb type library cmake
         val prefix: String = s"${Util.getTypeRootPath()}/"
 
-        val typeSrcs: ISZ[Resource] = auxResourceFiles.filter(p => ops.StringOps(p.path).startsWith(Util.getTypeSrcPath()))
+        val typeSrcs: ISZ[Resource] = auxResourceFiles.filter(p => ops.StringOps(p.dstPath).startsWith(Util.getTypeSrcPath()))
         var filenames: ISZ[String] = typeSrcs.map(m => {
-          assert(ops.StringOps(m.path).startsWith(prefix), s"Unexpected type path ${m.path}")
-          ops.StringOps(m.path).substring(prefix.size, m.path.size)
+          assert(ops.StringOps(m.dstPath).startsWith(prefix), s"Unexpected type path ${m.dstPath}")
+          ops.StringOps(m.dstPath).substring(prefix.size, m.dstPath.size)
         })
 
         val spis: ISZ[String] = samplingPorts.values.map((m: SamplingPortInterface) => {

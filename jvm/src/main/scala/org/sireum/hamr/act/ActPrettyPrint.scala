@@ -11,7 +11,7 @@ import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.DirectoryUtil
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.{EResource, IResource, Resource}
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 import org.sireum.ops.StringOps
@@ -80,9 +80,9 @@ import org.sireum.ops.StringOps
         }
       }
 
-      sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.path) ++ c.cmakeSOURCES
+      sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.dstPath) ++ c.cmakeSOURCES
       includePaths = includePaths ++ c.cIncludes.map((r: Resource) =>
-        Util.getDirectory(r.path)) ++ c.cmakeINCLUDES
+        Util.getDirectory(r.dstPath)) ++ c.cmakeINCLUDES
 
       val slangLib: Option[String] = getSlangLibrary(c.componentId, platform)
 
@@ -107,15 +107,17 @@ import org.sireum.ops.StringOps
 
       cmakeComponents = cmakeComponents :+ CMakeTemplate.cmake_DeclareCamkesComponent(
         componentName = m.i.component.name,
-        sources = ISZ(m.cimplementation.path),
-        includes = ISZ(Util.getDirectory(m.cinclude.path), Util.getTypeIncludesPath()),
+        sources = ISZ(m.cimplementation.dstPath),
+        includes = ISZ(Util.getDirectory(m.cinclude.dstPath), Util.getTypeIncludesPath()),
         libs = ISZ(),
         hasAux = F,
         slangLib = slangLib)
 
-      add(s"${m.cimplementation.path}", m.cimplementation.content)
-      add(s"${m.cinclude.path}", m.cinclude.content)
-      add(s"${m.cinclude.path}", m.cinclude.content)
+      addResource(m.cimplementation)
+      addResource(m.cinclude)
+
+      //add(s"${m.cimplementation.path}", m.cimplementation.content)
+      //add(s"${m.cinclude.path}", m.cinclude.content)
     }
 
     if(container.samplingPorts.nonEmpty) {
@@ -224,13 +226,23 @@ import org.sireum.ops.StringOps
     addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, ScriptTemplate.runCamkesScript(symbolTable.hasVM()))
 
     // add dest dir to path
-    val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => Resource(
-      path = s"${destDir}/${o.path}",
-      content = o.content,
-      overwrite = o.overwrite,
-      makeExecutable = o.makeExecutable,
-      makeCRLF = o.makeCRLF
-    ))
+    val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => {
+      val dstPath = s"${destDir}/${o.dstPath}"
+      o match {
+        case i: IResource =>
+          IResource(
+            dstPath = dstPath,
+            content = i.content,
+            overwrite = i.overwrite,
+            makeExecutable = i.makeExecutable,
+            makeCRLF = i.makeCRLF)
+        case e: EResource =>
+          EResource(
+            srcPath = e.srcPath,
+            dstPath = dstPath,
+            symlink = e.symlink
+          )
+      }})
 
     return ret
   }
@@ -260,7 +272,7 @@ import org.sireum.ops.StringOps
 
     var imports = Set.empty[String] ++ actContainer.get.globalImports.map((m: String) => s"import ${m};")
 
-    imports = imports ++ resources.map((o: Resource) => s"""import "${o.path}";""")
+    imports = imports ++ resources.map((o: Resource) => s"""import "${o.dstPath}";""")
 
     val connectors: ISZ[ST] = actContainer.get.connectors.map((c: ConnectorContainer) => {
       val conn = c.assemblyEntry
@@ -423,6 +435,11 @@ import org.sireum.ops.StringOps
 
   def addString(path: String, content: String) : Unit = {
     add(path, st"${content}")
+  }
+
+  def addResource(r: Resource) : Unit = {
+    //resources = resources :+ ResourceUtil.createResource(path, content, T)
+    resources = resources :+ r
   }
 
   def add(path: String, content: ST) : Unit = {
