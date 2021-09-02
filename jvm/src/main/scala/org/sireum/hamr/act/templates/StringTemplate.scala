@@ -885,7 +885,7 @@ bool is_empty_${s.name}(${s.structName} *port) {
           |  ${cakeMLLocs}
           |
           |  $installCamkesArmInstructions
-          |  Execute the following to simulate the system via QEMU:
+          |  Execute the following to simulate the system via QEMU. Pass '-h' to see the available options.
           |
           |    ${runCamkesScript} -s
           |
