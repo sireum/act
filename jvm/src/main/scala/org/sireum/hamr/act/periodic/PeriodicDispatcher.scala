@@ -32,7 +32,7 @@ import org.sireum.hamr.codegen.common.symbols._
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
     
-    val periodicComponents: ISZ[AadlThread] = components.filter(c => CommonUtil.isPeriodic(c.component) && CommonUtil.isThread(c.component)).map(m => m.asInstanceOf[AadlThread])
+    val periodicComponents: ISZ[AadlThread] = symbolTable.getThreads().filter(c => CommonUtil.isPeriodic(c)).map(m => m)
 
     if(periodicComponents.nonEmpty) {
       var periodicDispatcherNotifications: ISZ[ast.Emits] = ISZ()

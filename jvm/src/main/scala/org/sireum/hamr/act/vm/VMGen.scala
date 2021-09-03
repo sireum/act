@@ -290,7 +290,7 @@ object VMGen {
 
     // TODO: will we ever process models where a sporadic thread is isolated in the vm
     // or we're not using the pacer
-    assert(PeriodicUtil.requiresPacerArtifacts(aadlThread.component, symbolTable, useDomainScheduling),
+    assert(PeriodicUtil.requiresPacerArtifacts(aadlThread, symbolTable, useDomainScheduling),
       s"Expecting a periodic thread that will be triggered via a Pacer: ${aadlThread.identifier}"
     )
 

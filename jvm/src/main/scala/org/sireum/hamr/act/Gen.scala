@@ -848,7 +848,7 @@ import org.sireum.ops.ISZOps
     var gcRunLoopMidStmts: ISZ[ST] = gcImplDrainQueues.map(x => x._2)
     var gcRunLoopEndStmts: ISZ[ST] = ISZ()
 
-    if(!PeriodicUtil.requiresPacerArtifacts(c, symbolTable, useDomainScheduling)) {
+    if(!PeriodicUtil.requiresPacerArtifacts(aadlThread, symbolTable, useDomainScheduling)) {
       semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH)
 
       val semWait: ST = st"MUTEXOP(${StringTemplate.SEM_WAIT}())"
@@ -858,8 +858,8 @@ import org.sireum.ops.ISZOps
       gcRunLoopStartStmts = gcRunLoopStartStmts :+ semWait
     }
 
-    PropertyUtil.getDispatchProtocol(c) match {
-      case Some(Dispatch_Protocol.Periodic) =>
+    aadlThread.dispatchProtocol match {
+      case Dispatch_Protocol.Periodic =>
 
         val (componentContributions, glueCodeContributions) =
           Dispatcher.handlePeriodicComponent(useDomainScheduling, symbolTable, actOptions, aadlThread)
@@ -881,14 +881,8 @@ import org.sireum.ops.ISZOps
 
         gcInterfaceStatements = gcInterfaceStatements ++ glueCodeContributions.header.methods
 
-      case Some(Dispatch_Protocol.Sporadic) =>
+      case Dispatch_Protocol.Sporadic =>
 
-      case x =>
-        if(x.nonEmpty) {
-          reporter.error(None(), Util.toolName, s"Dispatch protocol $x for ${CommonUtil.getLastName(c.identifier)} is not supported")
-        } else {
-          reporter.warn(None(), Util.toolName, s"Dispatch Protocol not specified for ${CommonUtil.getLastName(c.identifier)}, assuming Sporadic")
-        }
     }
 
     val names: Names = Names(c, hamrBasePackageName.get)

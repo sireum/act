@@ -6,9 +6,8 @@ import org.sireum._
 import org.sireum.hamr.act.util.{ActPlatform, Util}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties
-import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, PacerUtil, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, PacerUtil, SymbolTable}
 import org.sireum.hamr.codegen.common.util.CodeGenPlatform
-import org.sireum.hamr.ir
 
 object PeriodicUtil {
 
@@ -34,8 +33,8 @@ object PeriodicUtil {
     return symbolTable.hasPeriodicThreads() && !usingPacer
   }
 
-  def requiresPacerArtifacts(c: ir.Component, symbolTable: SymbolTable, usingPacer: B): B = {
-    return CommonUtil.isPeriodic(c) && usingPacer
+  def requiresPacerArtifacts(aadlThread: AadlThread, symbolTable: SymbolTable, usingPacer: B): B = {
+    return CommonUtil.isPeriodic(aadlThread) && usingPacer
   }
 
   def getBoundProcessor(symbolTable: SymbolTable): AadlProcessor = {
