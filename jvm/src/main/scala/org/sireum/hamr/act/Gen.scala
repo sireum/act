@@ -3,7 +3,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.proof.{ProofContainer, ProofUtil}
+import org.sireum.hamr.act.proof.{ProofUtil}
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
@@ -18,7 +18,7 @@ import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil}
-import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil, PathUtil => CommonPathUtil}
+import org.sireum.hamr.codegen.common.util.{ResourceUtil, PathUtil => CommonPathUtil}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
@@ -66,7 +66,7 @@ import org.sireum.ops.ISZOps
   val useCaseConnectors: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
   val useDomainScheduling: B = PeriodicUtil.useDomainScheduling(symbolTable, actOptions.platform)
 
-  def hasErrors(): B = {
+  def hasErrors: B = {
     return reporter.hasError
   }
 
@@ -76,7 +76,7 @@ import org.sireum.ops.ISZOps
     // regardless of what the target platform is (e.g. could reject for sel4_tb even
     // though we don't do cakeml integration at that level)
 
-    if(!hasErrors()) {
+    if(!hasErrors) {
       auxCImplIncludes = cSources.map(c => st"""#include "../../../${c}"""")
 
       for (d <- model.dataComponents) {
@@ -86,9 +86,9 @@ import org.sireum.ops.ISZOps
         if(performHamrIntegration) typeMap.values // will only be art.DataContent so no need to sort
         else sortData(typeMap.values)
 
-      buildTransportMechanisms(symbolTable.rootSystem.component)
+      buildTransportMechanisms()
 
-      if (!hasErrors()) {
+      if (!hasErrors) {
         auxResourceFiles = auxResourceFiles :+
           ResourceUtil.createResource(
             path = s"${Util.getTypeIncludesPath()}/${Util.getSbTypeHeaderFilenameWithExtension()}",
@@ -97,19 +97,19 @@ import org.sireum.ops.ISZOps
       }
     }
 
-    if(!hasErrors()) {
-      gen(symbolTable.rootSystem.component)
+    if(!hasErrors) {
+      gen(symbolTable.rootSystem)
     }
 
     // build connections
-    if(!hasErrors() && platform != ActPlatform.SeL4_TB) {
+    if(!hasErrors && platform != ActPlatform.SeL4_TB) {
       val connContainer: ConnectionContainer = processSBConnections()
       camkesConnections = camkesConnections ++ connContainer.connections
       camkesConfiguration = camkesConfiguration ++ connContainer.configurationEntries
       camkesConnectorContainers = camkesConnectorContainers ++ connContainer.optConnectorHolder
     }
 
-    if(!hasErrors()) {
+    if(!hasErrors) {
       // filter??
       camkesConnectorContainers = (Set.empty[ConnectorContainer] ++ camkesConnectorContainers).elements
 
@@ -209,21 +209,20 @@ import org.sireum.ops.ISZOps
     }
   }
 
-  def gen(c: ir.Component) : Unit = {
-    c.category match {
-      case ir.ComponentCategory.System =>
-        for (sc <- c.subComponents) {
-          gen(sc)
+  def gen(c: AadlComponent) : Unit = {
+    c match {
+      case aadlSystem: AadlSystem =>
+
+        for(process <- aadlSystem.subComponents()) {
+          gen(process)
         }
 
         if(platform == ActPlatform.SeL4_TB) {
-          val (connections, configs) = processTBConnections(c)
+          val (connections, configs) = processTBConnections(c.component)
           camkesConnections = camkesConnections ++ connections
           camkesConfiguration = camkesConfiguration ++ configs
         }
-
-      case ir.ComponentCategory.Process =>
-        val aadlProcess = symbolTable.getProcess(CommonUtil.getName(c.identifier))
+      case aadlProcess: AadlProcess =>
 
         if(aadlProcess.toVirtualMachine(symbolTable)) {
           val threads = aadlProcess.subComponents.filter(c => CommonUtil.isThread(c.component))
@@ -240,28 +239,19 @@ import org.sireum.ops.ISZOps
           configurationMacros = ISZ(),
           composition = g)
 
-      case ir.ComponentCategory.Processor =>        // ignore for now?
-      case ir.ComponentCategory.Bus =>              // ignore for now?
-      case ir.ComponentCategory.Device =>           // ignore for now?
-      case ir.ComponentCategory.Memory =>           // ignore for now?
-      case ir.ComponentCategory.VirtualProcessor => // ignore for now?
-
-      case x => halt(s"Not currently processing ${x}")
+      case _ =>
     }
   }
 
   def genProcess(aadlProcess : AadlProcess) : Composition = {
 
-    val c = aadlProcess.component
-
-    var compositionMacros: ISZ[String] = ISZ()
+    val compositionMacros: ISZ[String] = ISZ()
     var connections: ISZ[Connection] = ISZ()
     var instances: ISZ[Instance] = ISZ()
 
-    for(sc <- c.subComponents) {
-      sc.category match {
-        case ir.ComponentCategory.Thread => {
-          val aadlThread = symbolTable.getThread(sc)
+    for(sc <- aadlProcess.subComponents) {
+      sc match {
+        case aadlThread: AadlThread => {
           val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
           if (aadlThread.toVirtualMachine(symbolTable)) {
@@ -316,7 +306,7 @@ import org.sireum.ops.ISZOps
               )
           }
 
-          PropertyUtil.getStackSizeInBytes(sc) match {
+          PropertyUtil.getStackSizeInBytes(sc.component) match {
             case Some(bytes) =>
               camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(camkesComponentId, bytes)
             case _ =>
@@ -330,29 +320,29 @@ import org.sireum.ops.ISZOps
             }
           }
         }
-        case ir.ComponentCategory.Subprogram => {
+        case aadlSubprogram: AadlSubprogram => {
           var params: ISZ[Parameter] = ISZ()
-          for (f <- sc.features) {
-            val fend = f.asInstanceOf[ir.FeatureEnd]
-            params = params :+ Parameter(array = F,
-              direction = if (fend.direction == ir.Direction.In) Direction.In else Direction.Out,
-              name = CommonUtil.getLastName(f.identifier),
-              typ = Util.getClassifier(fend.classifier.get))
+          for (f <- aadlSubprogram.parameters) {
+            params = params :+ Parameter(
+              array = F,
+              direction = if (f.direction == ir.Direction.In) Direction.In else Direction.Out,
+              name = f.getName(),
+              typ = Util.getClassifier(f.feature.classifier.get))
           }
 
           val method = Method(
-            name = CommonUtil.getLastName(sc.identifier),
+            name = aadlSubprogram.identifier,
             parameters = params,
             returnType = None[String]()
           )
 
-          val procName = Util.getClassifier(sc.classifier.get)
+          val procName = aadlSubprogram.getClassifier()
           astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
         }
-        case ir.ComponentCategory.SubprogramGroup => {
+        case spg: AadlSubprogramGroup => {
           var methods: ISZ[Method] = ISZ()
 
-          for (m <- sc.features) {
+          for (m <- spg.component.features) {
             m match {
               case spa: ir.FeatureAccess =>
                 if (spa.classifier.nonEmpty) {
@@ -381,7 +371,7 @@ import org.sireum.ops.ISZOps
 
                   methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String]())
                 } else {
-                  reporter.error(None(), Util.toolName, s"Could not resolve feature ${CommonUtil.getName(spa.identifier)} from ${CommonUtil.getName(sc.identifier)}")
+                  reporter.error(None(), Util.toolName, s"Could not resolve feature ${CommonUtil.getName(spa.identifier)} from ${sc.path}")
                 }
               case _ =>
             }
@@ -391,11 +381,12 @@ import org.sireum.ops.ISZOps
             halt(s"Subprogram group subcomponents not currently handled: ${sc}")
           }
 
-          val procName = Util.getClassifier(sc.classifier.get)
+          val procName = Util.getClassifier(spg.component.classifier.get)
           astObjects = astObjects :+ Procedure(name = procName, methods = methods, includes = ISZ())
         }
-        case ir.ComponentCategory.Data => {
-          val typeName = Util.getClassifierFullyQualified(sc.classifier.get)
+        case aadlData: AadlData => {
+          val classifier = aadlData.component.classifier.get
+          val typeName = Util.getClassifierFullyQualified(classifier)
 
           val readMethod = Method(
             name = s"read_${typeName}",
@@ -409,7 +400,7 @@ import org.sireum.ops.ISZOps
             returnType = None[String]()
           )
 
-          val procName = Util.getSharedDataInterfaceName(sc.classifier.get)
+          val procName = Util.getSharedDataInterfaceName(classifier)
           astObjects = astObjects :+ Procedure(
             name = procName,
             methods = ISZ(readMethod, writeMethod),
@@ -417,14 +408,14 @@ import org.sireum.ops.ISZOps
           )
         }
         case _ =>
-          halt(s"Not handling: subcomponent of type '${sc.category}'.  ${CommonUtil.getName(sc.identifier)}")
+          halt(s"Not handling: subcomponent of type '${sc.component.category}'.  ${sc.path}")
       }
     }
 
     val monInstances = monitors.values.map((m: Monitor) => m.i)
 
     if(platform == ActPlatform.SeL4_TB) {
-      val (_connections, configs) = processTBConnections(c)
+      val (_connections, configs) = processTBConnections(aadlProcess.component)
       connections = connections ++ _connections
       camkesConfiguration = camkesConfiguration ++ configs
     }
@@ -532,7 +523,7 @@ import org.sireum.ops.ISZOps
       }
     }
 
-    for(f <- aadlThread.getFeatureEnds() if(symbolTable.isConnected(f))) {
+    for(f <- aadlThread.getFeatureEnds() if symbolTable.isConnected(f)) {
       val fpath = CommonUtil.getName(f.identifier)
       val fid = CommonUtil.getLastName(f.identifier)
 
@@ -915,17 +906,17 @@ import org.sireum.ops.ISZOps
       val outgoingPorts: ISZ[ir.FeatureEnd] = CommonUtil.getOutPorts(c).filter(f =>
         symbolTable.outConnections.contains(CommonUtil.getName(f.identifier)))
 
-      gcImplMethods = gcImplMethods ++ outgoingPorts.map((f: ir.FeatureEnd) => hamrSendOutgoingPort(c, names, f, typeMap, uri))
+      gcImplMethods = gcImplMethods ++ outgoingPorts.map((f: ir.FeatureEnd) => hamrSendOutgoingPort(names, f, typeMap, uri))
 
       val unconnectedOutgoingPorts: ISZ[ir.FeatureEnd] = CommonUtil.getOutPorts(c).filter(f =>
         !symbolTable.outConnections.contains(CommonUtil.getName(f.identifier)))
 
-      gcImplMethods = gcImplMethods ++ unconnectedOutgoingPorts.map((f: ir.FeatureEnd) => hamrSendUnconnectedOutgoingPort(c, names, f, typeMap, uri))
+      gcImplMethods = gcImplMethods ++ unconnectedOutgoingPorts.map((f: ir.FeatureEnd) => hamrSendUnconnectedOutgoingPort(names, f, uri))
 
       val inPorts: ISZ[ir.FeatureEnd] = CommonUtil.getInPorts(c).filter(f =>
         symbolTable.inConnections.contains(CommonUtil.getName(f.identifier)))
 
-      gcImplMethods = gcImplMethods ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(c, names, f, typeMap, uri))
+      gcImplMethods = gcImplMethods ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(names, f, typeMap, uri))
 
       val unconnectedInPorts: ISZ[ir.FeatureEnd] = CommonUtil.getInPorts(c).filter(f =>
         !symbolTable.inConnections.contains(CommonUtil.getName(f.identifier)))
@@ -938,7 +929,7 @@ import org.sireum.ops.ISZOps
       // remove any mid loop statements and replace with sel4 specific ones
       gcRunLoopMidStmts = freezeInEventPorts ++ SlangEmbeddedTemplate.hamrRunLoopEntries(names.cEntryPointAdapterQualifiedName)
 
-      gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(c, names, f, typeMap, uri))
+      gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(names, f, uri))
     }
 
     var cSources: ISZ[Resource] = ISZ()
@@ -1018,10 +1009,8 @@ import org.sireum.ops.ISZOps
     return comp
   }
 
-  def hamrSendUnconnectedOutgoingPort(c: ir.Component,
-                                      names: Names,
+  def hamrSendUnconnectedOutgoingPort(names: Names,
                                       srcPort: ir.FeatureEnd,
-                                      typeMap: HashSMap[String, ir.Component],
                                       uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
     val sel4ExtName = names.sel4SlangExtensionQualifiedNameC
@@ -1033,8 +1022,7 @@ import org.sireum.ops.ISZOps
     return SlangEmbeddedTemplate.hamrSendUnconnectedOutgoingDataPort(methodName, declNewStackFrame)
   }
 
-  def hamrSendOutgoingPort(c: ir.Component,
-                           names: Names,
+  def hamrSendOutgoingPort(names: Names,
                            srcPort: ir.FeatureEnd,
                            typeMap: HashSMap[String, ir.Component],
                            uri: String): ST = {
@@ -1072,10 +1060,8 @@ import org.sireum.ops.ISZOps
     return ret
   }
 
-  def hamrReceiveUnconnectedIncomingPort(c: ir.Component,
-                                         names: Names,
+  def hamrReceiveUnconnectedIncomingPort(names: Names,
                                          srcPort: ir.FeatureEnd,
-                                         typeMap: HashSMap[String, ir.Component],
                                          uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
     val sel4ExtName = names.sel4SlangExtensionQualifiedNameC
@@ -1095,8 +1081,7 @@ import org.sireum.ops.ISZOps
                |${receiveMethod}"""
   }
 
-  def hamrReceiveIncomingPort(c: ir.Component,
-                              names: Names,
+  def hamrReceiveIncomingPort(names: Names,
                               srcPort: ir.FeatureEnd,
                               typeMap: HashSMap[String, ir.Component],
                               uri: String): ST = {
@@ -1158,7 +1143,6 @@ import org.sireum.ops.ISZOps
     for (portPath <- symbolTable.outConnections.keys.filter(p => symbolTable.outConnections.get(p).get.size > 0)) {
 
       for (connInst <- symbolTable.outConnections.get(portPath).get()) {
-        val dst: ir.Component = symbolTable.airComponentMap.get(CommonUtil.getName(connInst.dst.component)).get
         val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.dst.feature.get)).get
 
         connInst.kind match {
@@ -1206,11 +1190,9 @@ import org.sireum.ops.ISZOps
 
     for (in <- entries) {
       for (connInst <- in._2) {
-        val src: ir.Component = symbolTable.airComponentMap.get(CommonUtil.getName(connInst.src.component)).get
         val srcFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.src.feature.get)).get
         val srcId: String = CommonUtil.getName(srcFeature.identifier)
 
-        val dst: ir.Component = symbolTable.airComponentMap.get(CommonUtil.getName(connInst.dst.component)).get
         val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.dst.feature.get)).get
         val dstId: String = CommonUtil.getName(dstFeature.identifier)
 
@@ -1622,12 +1604,7 @@ import org.sireum.ops.ISZOps
       } else if (ActTypeUtil.isArrayDef(c)) {
         // TODO multidim arrays
         val name = Util.getClassifierFullyQualified(c.classifier.get)
-        val dim: Z = ActTypeUtil.getArrayDimension(c) match {
-          case Some(d) => d
-          case _ =>
-            reporter.error(None(), Util.toolName, s"Array dimension not specified for ${c.classifier.get.name}")
-            z"-1"
-        }
+
         val container = Util.getContainerName(name)
         st"""typedef ${ActTypeUtil.getArrayBaseType(c)} ${name} [${ActTypeUtil.getArrayDimension(c)}];
             |
@@ -1718,7 +1695,7 @@ import org.sireum.ops.ISZOps
         var interfaces: ISZ[ST] = ISZ()
         var implementations: ISZ[ST] = ISZ()
         var preInits: ISZ[ST] = ISZ()
-        var postInits: ISZ[ST] = ISZ()
+        val postInits: ISZ[ST] = ISZ()
 
         feature.direction match {
           case ir.Direction.In =>
@@ -1920,7 +1897,7 @@ import org.sireum.ops.ISZOps
             var cIncludes: ISZ[ST] = ISZ()
 
             var preInits: ISZ[ST] = ISZ()
-            var postInits: ISZ[ST] = ISZ()
+            val postInits: ISZ[ST] = ISZ()
 
             val enqueueEntries: ISZ[ST] = dsts.valueSet.elements.map(qo => {
 
@@ -2123,7 +2100,7 @@ import org.sireum.ops.ISZOps
             var cIncludes: ISZ[ST] = ISZ()
 
             var preInits: ISZ[ST] = ISZ()
-            var postInits: ISZ[ST] = ISZ()
+            val postInits: ISZ[ST] = ISZ()
 
             var externMethods: ISZ[ST] = ISZ()
             val enqueueEntries: ISZ[ST] = dsts.valueSet.elements.map(qo => {
@@ -2688,25 +2665,25 @@ import org.sireum.ops.ISZOps
       overwrite = T)
   }
 
-  def buildTransportMechanisms(sys : ir.Component): B = {
+  def buildTransportMechanisms(): B = {
 
-    if(!hasErrors()) {
+    if(!hasErrors) {
       buildMonitors()
     }
 
-    if(!hasErrors()){
+    if(!hasErrors){
       buildSBQueues()
     }
 
-    if(!hasErrors()) {
+    if(!hasErrors) {
       buildSamplingPortInterfaces()
     }
 
-    if(!hasErrors()) {
+    if(!hasErrors) {
       sharedData = SharedDataUtil.buildSharedData(symbolTable)
     }
 
-    return !hasErrors()
+    return !hasErrors
   }
 
   def sortData(data: ISZ[ir.Component]): ISZ[ir.Component] = {
