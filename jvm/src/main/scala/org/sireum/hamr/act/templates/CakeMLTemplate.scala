@@ -272,36 +272,6 @@ object CakeMLTemplate {
                       |  output[0] = 1;
                       |}
                       |
-                      |/**
-                      | * Required by the FFI framework
-                      | */
-                      |
-                      |void ffiwrite (${defaultArgs2}){
-                      |}
-                      |
-                      |void cml_exit(int arg) {
-                      |  #ifdef DEBUG_FFI
-                      |  {
-                      |    fprintf(stderr,"GCNum: %d, GCTime(us): %ld\n",numGC,microsecs);
-                      |  }
-                      |  #endif
-                      |  exit(arg);
-                      |}
-                      |
-                      |// convert big-endian 32-bit float to little-endian 64 bit double
-                      |void ffifloat2double(unsigned char *parameter, long parameterSizeBytes,
-                      |                     unsigned char *output,    long outputSizeBytes) {
-                      |  char bytes [4];
-                      |  assert (4 == parameterSizeBytes);
-                      |  bytes[3] = parameter[0];
-                      |  bytes[2] = parameter[1];
-                      |  bytes[1] = parameter[2];
-                      |  bytes[0] = parameter[3];
-                      |
-                      |  double result = *((float*)bytes);
-                      |  memcpy(output, (unsigned char*) &result, sizeof(double));
-                      |}
-                      |
                       |void ffiraw_print_buffer(unsigned char *parameter, long parameterSizeBytes, unsigned char *output, long outputSizeBytes) {
                       |
                       |  int elideAfter = 20; // stop printing after this many consecutive 0's seen
