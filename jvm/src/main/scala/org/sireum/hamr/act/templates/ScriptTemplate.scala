@@ -29,32 +29,26 @@ object ScriptTemplate {
           |
           |ninja"""
     }
-    val simulate: ST = if(hasVM) {
-      st"""qemu-system-aarch64 ${bt}
-          |    -machine virt,virtualization=on,highmem=off,secure=off ${bt}
-          |    -cpu cortex-a53 ${bt}
-          |    -nographic ${bt}
-          |    -m size=1024 ${bt}
+    val qemu: ST = if(hasVM) {
+      st"""qemu-system-aarch64 \\
+          |    -machine virt,virtualization=on,highmem=off,secure=off \\
+          |    -cpu cortex-a53 \\
+          |    -nographic \\
+          |    -m size=1024 \\
           |    -kernel images/capdl-loader-image-arm-qemu-arm-virt"""
     } else {
-      st"""# ./simulate
-          |
-          |# console output from simulation disappears when QEMU shuts down when run from
-          |# generated ./simulate script. Instead call QEMU directly using the default
-          |# values ./simulate would pass
-          |
-          |qemu-system-x86_64 ${bt}
-          |    -cpu Nehalem,-vme,+pdpe1gb,-xsave,-xsaveopt,-xsavec,-fsgsbase,-invpcid,enforce ${bt}
-          |    -nographic ${bt}
-          |    -serial mon:stdio ${bt}
-          |    -m size=512M ${bt}
-          |    -kernel images/kernel-x86_64-pc99 ${bt}
+      st"""qemu-system-x86_64 \\
+          |    -cpu Nehalem,-vme,+pdpe1gb,-xsave,-xsaveopt,-xsavec,-fsgsbase,-invpcid,enforce \\
+          |    -nographic \\
+          |    -serial mon:stdio \\
+          |    -m size=512M \\
+          |    -kernel images/kernel-x86_64-pc99 \\
           |    -initrd images/capdl-loader-image-x86_64-pc99"""
     }
 
     val ret: ST = st"""#!/usr/bin/env bash
                       |
-                      |set -o errexit -o pipefail -o noclobber -o nounset
+                      |set -o errexit -o pipefail -o nounset
                       |
                       |export SCRIPT_HOME=$$( cd "$$( dirname "$$0" )" &> /dev/null && pwd )
                       |export PROJECT_HOME=$$( cd "$$( dirname "$$0" )/.." &> /dev/null && pwd )
@@ -182,8 +176,25 @@ object ScriptTemplate {
                       |# simulate via QEMU
                       |########################
                       |
+                      |cat >$${BUILD_DIR}/sim << EOL
+                      |#!/usr/bin/env bash
+                      |
+                      |export SCRIPT_HOME=${bt}$$( cd "${bt}$$( dirname "${bt}$$0" )" &> /dev/null && pwd )
+                      |cd ${bt}$${SCRIPT_HOME}
+                      |
+                      |# console output from simulation disappears when QEMU shuts down when run from
+                      |# the CAmkES generated ./simulate script. Instead call QEMU directly using the
+                      |# default values ./simulate would pass
+                      |
+                      |${qemu}
+                      |EOL
+                      |
+                      |chmod 700 $${BUILD_DIR}/sim
+                      |echo "Wrote: $${BUILD_DIR}/sim"
+                      |
                       |if [ "$${${SIMULATE}}" = true ]; then
-                      |  ${simulate}
+                      |  # $${BUILD_DIR}/simulate
+                      |  $${BUILD_DIR}/sim
                       |fi
                       |"""
     return ret
