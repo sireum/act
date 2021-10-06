@@ -17,6 +17,6 @@ import org.sireum._
                                      val description: String) extends CMakeOption
 
 @datatype class CMakePreprocessorOption(val name: String,
-                                        preprocessorName: String,
+                                        val preprocessorName: String,
                                         val defaultValue: B,
                                         val description: String) extends CMakeOption

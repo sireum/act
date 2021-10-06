@@ -3,7 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
-import org.sireum.hamr.act.util.{CMakeOption, CMakePreprocessorOption, Util}
+import org.sireum.hamr.act.util.{CMakeOption, CMakePreprocessorOption, CMakeStandardOption, Util}
 import org.sireum.hamr.act.vm.VMGen
 
 object CMakeTemplate {
@@ -230,6 +230,12 @@ object CMakeTemplate {
                    |
                    |if(${c.name} OR "$$ENV{${c.name}}" STREQUAL "ON")
                    |   add_definitions(-D${c.preprocessorName})
+                   |endif()"""
+      case c: CMakeStandardOption =>
+        return st"""${s}
+                   |
+                   |if("$$ENV{${c.name}}" STREQUAL "ON")
+                   |   set(${c.name} ON)
                    |endif()"""
       case _ => s
     }
