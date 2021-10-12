@@ -5,15 +5,15 @@ import org.sireum._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.Connections
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
+import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
-import org.sireum.hamr.codegen.common.symbols.{AadlProcess, AadlThread, Dispatch_Protocol, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlDataPort, AadlEventDataPort, AadlPort, AadlProcess, AadlThread, Dispatch_Protocol, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
 import org.sireum.hamr.ir
-import org.sireum.hamr.ir.FeatureEnd
 
 object VMGen {
 
@@ -296,40 +296,40 @@ object VMGen {
 
     includes = includes + Util.getSbTypeHeaderFilenameForIncludes()
 
-    for(featureEnd <- aadlThread.getFeatureEnds() if(symbolTable.isConnected(featureEnd))) {
-      val fid = CommonUtil.getLastName(featureEnd.identifier)
+    val connectedPorts = aadlThread.getPorts().filter(f => symbolTable.isConnected(f.feature))
+    for(port <- connectedPorts) {
 
-      featureEnd.category match {
-        case ir.FeatureCategory.EventDataPort if !useCaseConnectors => {
+      port match {
+        case a: AadlEventDataPort if !useCaseConnectors => {
           actOptions.platform match {
             case ActPlatform.SeL4_Only =>
-              handleEventDataPort(featureEnd, aadlThread)
+              handleEventDataPort(port, aadlThread)
             case ActPlatform.SeL4 =>
-              handleEventDataPort(featureEnd, aadlThread)
+              handleEventDataPort(port, aadlThread)
 
             case notyet =>
               // TODO
-              halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${fid}")
+              halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${port.identifier}")
           }
         }
-        case ir.FeatureCategory.EventDataPort if useCaseConnectors => {
+        case a: AadlEventDataPort if useCaseConnectors => {
           actOptions.platform match {
             case ActPlatform.SeL4_Only =>
-              handleEventDataPort_CASE_Connectors(featureEnd, aadlThread)
+              handleEventDataPort_CASE_Connectors(port, aadlThread)
             case ActPlatform.SeL4 =>
-              handleEventDataPort_CASE_Connectors(featureEnd, aadlThread)
+              handleEventDataPort_CASE_Connectors(port, aadlThread)
 
             case notyet =>
               // TODO
-              halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${fid}")
+              halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${port.identifier}")
           }
         }
-        case ir.FeatureCategory.DataPort =>
-          handleDataPort(featureEnd, aadlThread)
+        case a: AadlDataPort =>
+          handleDataPort(port, aadlThread)
 
         case _ =>
           // TODO
-          halt(s"Currently expecting vm isolated threads to have only event data ports: ${aadlThread.identifier}.${fid}")
+          halt(s"Currently expecting vm isolated threads to have only event data ports: ${aadlThread.identifier}.${port.identifier}")
       }
     }
 
@@ -403,64 +403,64 @@ object VMGen {
     return (c, auxResources)
   }
 
-  def handleDataPort(f: FeatureEnd, parent: AadlThread): Unit = {
+  def handleDataPort(aadlPort: AadlPort, aadlThread: AadlThread): Unit = {
 
-    val fid = CommonUtil.getLastName(f.identifier)
-
-    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.classifier.get)).get
+    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(aadlPort.feature.classifier.get)).get
     val sel4TypeName: String = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
 
     val spi: SamplingPortInterface = samplingPorts.get(sel4TypeName).get
 
     includes = includes + s"<${spi.headerFilename}>"
 
-    val dataPortName = Util.brand(fid)
+    val camkesDataPortId = Util.brand(aadlPort.identifier)
 
     dataports = dataports :+ Dataport(
-      name = dataPortName,
+      name = camkesDataPortId,
       typ = spi.structName,
       optional = F)
 
+    ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesDataPortId, Sel4ConnectorTypes.seL4SharedDataWithCaps, symbolTable)
+
     crossConnGCMethods = crossConnGCMethods :+
-      VM_Template.vm_cross_conn_extern_dataport_method(dataPortName)
+      VM_Template.vm_cross_conn_extern_dataport_method(camkesDataPortId)
 
     crossConnConnections = crossConnConnections :+
       VM_Template.vm_cross_conn_Connections(
-        methodNamePrefix = dataPortName,
+        methodNamePrefix = camkesDataPortId,
         emitMethodNamePrefix = None(),
         notificationNamePrefix = None(),
         counter = crossConnConnections.size)
   }
 
-  def handleEventDataPort(f: FeatureEnd, parent: AadlThread): Unit = {
+  def handleEventDataPort(aadlPort: AadlPort, aadlThread: AadlThread): Unit = {
     assert(!useCaseConnectors)
 
-    val fid = CommonUtil.getLastName(f.identifier)
+    val fid = aadlPort.identifier
 
-    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.classifier.get)).get
+    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(aadlPort.feature.classifier.get)).get
     val sel4TypeName: String = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
 
-    val queueSize = PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE)
+    val queueSize = PropertyUtil.getQueueSize(aadlPort.feature, Util.DEFAULT_QUEUE_SIZE)
     val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
 
     includes = includes + s"<${Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)}>"
 
-    f.direction match {
+    aadlPort.direction match {
       case ir.Direction.In => {
 
-        val connections = symbolTable.inConnections.get(CommonUtil.getName(f.identifier)).get
+        val connections = symbolTable.inConnections.get(aadlPort.path).get
         // TODO: fan ins ????
         if (connections.size != 1) {
           // this would probably be bad if sender is fan-outing to a mix of
           // native and VM components.  Perhaps okay if broadcasting to
           // all native though?
-          halt(s"Not currently supporting fan-ins for vm isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
+          halt(s"Not currently supporting fan-ins for vm isolated threads ${aadlThread.identifier}.${aadlPort.identifier}")
         }
 
-        val dataportName = Util.getEventDataSBQueueDestFeatureName(fid)
+        val camkesDataPortId = Util.getEventDataSBQueueDestFeatureName(fid)
 
-        val notificationName: String = {
-          val name = Util.genSeL4NotificationName(f, T)
+        val camkesEventPortId: String = {
+          val name = Util.genSeL4NotificationName(aadlPort.feature, T)
           consumes = consumes :+ Consumes(
             name = name,
             typ = Util.EVENT_NOTIFICATION_TYPE,
@@ -468,90 +468,96 @@ object VMGen {
           name
         }
 
+        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesEventPortId, Sel4ConnectorTypes.seL4GlobalAsynch, symbolTable)
+
         dataports = dataports :+ Dataport(
-          name = dataportName,
+          name = camkesDataPortId,
           typ = queueType,
           optional = F)
 
-        crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_dataport_method(dataportName)
+        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesDataPortId, Sel4ConnectorTypes.seL4SharedDataWithCaps, symbolTable)
 
         crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_notification_methods(notificationName)
+          VM_Template.vm_cross_conn_extern_dataport_method(camkesDataPortId)
+
+        crossConnGCMethods = crossConnGCMethods :+
+          VM_Template.vm_cross_conn_extern_notification_methods(camkesEventPortId)
 
         crossConnConnections = crossConnConnections :+
           VM_Template.vm_cross_conn_Connections(
-            methodNamePrefix = dataportName,
+            methodNamePrefix = camkesDataPortId,
             emitMethodNamePrefix = None(),
-            notificationNamePrefix = Some(notificationName),
+            notificationNamePrefix = Some(camkesEventPortId),
             counter = crossConnConnections.size)
       }
       case ir.Direction.Out => {
 
-        val connections = symbolTable.outConnections.get(CommonUtil.getName(f.identifier)).get
+        val connections = symbolTable.outConnections.get(aadlPort.path).get
         // TODO: what to do about fan outs?
         if (connections.size != 1) {
           // what if receivers have different queue sizes?  Would need to
           // broadcast.  Need examples
-          halt(s"Not currently supporting fan-outs for VM isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
+          halt(s"Not currently supporting fan-outs for VM isolated threads ${aadlThread.identifier}.${aadlPort.identifier}")
         }
 
-        val emitsName = Util.genSeL4NotificationQueueName(f, queueSize)
+        val camkesEventPortId = Util.genSeL4NotificationQueueName(aadlPort.feature, queueSize)
 
         emits = emits :+ Emits(
-          name = emitsName,
+          name = camkesEventPortId,
           typ = Util.EVENT_NOTIFICATION_TYPE)
 
-        val dataPortName = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize)
+        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesEventPortId, Sel4ConnectorTypes.seL4GlobalAsynch, symbolTable)
+
+        val camkesDataPortId = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize)
 
         dataports = dataports :+ Dataport(
-          name = dataPortName,
+          name = camkesDataPortId,
           typ = queueType,
           optional = F)
 
-        crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_dataport_method(dataPortName)
+        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesDataPortId, Sel4ConnectorTypes.seL4SharedDataWithCaps, symbolTable)
 
         crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_emit_method(emitsName)
+          VM_Template.vm_cross_conn_extern_dataport_method(camkesDataPortId)
+
+        crossConnGCMethods = crossConnGCMethods :+
+          VM_Template.vm_cross_conn_extern_emit_method(camkesEventPortId)
 
         crossConnConnections = crossConnConnections :+
           VM_Template.vm_cross_conn_Connections(
-            methodNamePrefix = dataPortName,
-            emitMethodNamePrefix = Some(emitsName),
+            methodNamePrefix = camkesDataPortId,
+            emitMethodNamePrefix = Some(camkesEventPortId),
             notificationNamePrefix = None(),
             counter = crossConnConnections.size)
       }
-      case x => halt(s"Not expecting direction ${x}: ${parent.identifier}.{fid}")
+      case x => halt(s"Not expecting direction ${x}: ${aadlThread.identifier}.${aadlPort.identifier}")
     }
   }
 
-  def handleEventDataPort_CASE_Connectors(f: FeatureEnd, parent: AadlThread): Unit = {
+  def handleEventDataPort_CASE_Connectors(aadlPort: AadlPort, parent: AadlThread): Unit = {
     assert(useCaseConnectors)
 
-    val fid = CommonUtil.getLastName(f.identifier)
-
-    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.classifier.get)).get
+    val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(aadlPort.feature.classifier.get)).get
     val sel4TypeName: String = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
 
-    val queueSize = PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE)
+    val queueSize = PropertyUtil.getQueueSize(aadlPort.feature, Util.DEFAULT_QUEUE_SIZE)
     val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
 
     includes = includes + s"<${Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)}>"
 
-    f.direction match {
+    aadlPort.direction match {
       case ir.Direction.In => {
 
-        val connections = symbolTable.inConnections.get(CommonUtil.getName(f.identifier)).get
+        val connections = symbolTable.inConnections.get(aadlPort.path).get
         // TODO: fan ins ????
         if (connections.size != 1) {
           // this would probably be bad if sender is fan-outing to a mix of
           // native and VM components.  Perhaps okay if broadcasting to
           // all native though?
-          halt(s"Not currently supporting fan-ins for vm isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
+          halt(s"Not currently supporting fan-ins for vm isolated threads ${parent.identifier}.${aadlPort.identifier}")
         }
 
-        val dataportName = Util.getEventDataSBQueueDestFeatureName(fid)
+        val dataportName = Util.getEventDataSBQueueDestFeatureName(aadlPort.identifier)
 
         val notificationName: String = dataportName
 
@@ -575,15 +581,15 @@ object VMGen {
       }
       case ir.Direction.Out => {
 
-        val connections = symbolTable.outConnections.get(CommonUtil.getName(f.identifier)).get
+        val connections = symbolTable.outConnections.get(aadlPort.path).get
         // TODO: what to do about fan outs?
         if (connections.size != 1 && !useCaseConnectors) {
           // what if receivers have different queue sizes?  Would need to
           // broadcast.  Need examples
-          halt(s"Not currently supporting fan-outs for VM isolated threads ${parent.identifier}.${CommonUtil.getLastName(f.identifier)}")
+          halt(s"Not currently supporting fan-outs for VM isolated threads ${parent.identifier}.${aadlPort.identifier}")
         }
 
-        val dataPortName = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize)
+        val dataPortName = Util.getEventDataSBQueueSrcFeatureName(aadlPort.identifier, queueSize)
 
         val emitsName = dataPortName //Util.genSeL4NotificationQueueName(f, queueSize)
 
@@ -605,7 +611,7 @@ object VMGen {
             notificationNamePrefix = None(),
             counter = crossConnConnections.size)
       }
-      case x => halt(s"Not expecting direction ${x}: ${parent.identifier}.{fid}")
+      case x => halt(s"Not expecting direction ${x}: ${parent.identifier}.${aadlPort.identifier}")
     }
   }
 }

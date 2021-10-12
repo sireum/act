@@ -468,245 +468,284 @@ import org.sireum.ops.ISZOps
     for(f <- aadlThread.getFeatureAccesses()) {
 
       def handleSubprogramAccess(): Unit = {
-        val fid = CommonUtil.getLastName(f.identifier)
+        val proc = Util.getClassifier(f.feature.classifier.get)
 
-        val proc = Util.getClassifier(f.classifier.get)
-
-        f.accessType match {
+        f.kind match {
           case ir.AccessType.Requires =>
             imports = imports + Util.getInterfaceFilename(proc)
             uses = uses :+ Uses(
-              name = fid,
+              name = f.identifier,
               optional = F,
               typ = proc)
           case ir.AccessType.Provides =>
             imports = imports + Util.getInterfaceFilename(proc)
             provides = provides :+ Provides(
-              name = fid,
+              name = f.identifier,
               typ = proc)
         }
       }
 
       def handleDataAccess(): Unit = {
-        val fid = CommonUtil.getLastName(f.identifier)
+        val typeName = Util.getClassifierFullyQualified(f.feature.classifier.get)
+        val interfaceName = Util.getSharedDataInterfaceName(f.feature.classifier.get)
 
-        val typeName = Util.getClassifierFullyQualified(f.classifier.get)
-        val interfaceName = Util.getSharedDataInterfaceName(f.classifier.get)
-
-        f.accessType match {
+        f.kind match {
           case ir.AccessType.Requires =>
             imports = imports + Util.getInterfaceFilename(interfaceName)
             dataports = dataports :+ Dataport(
-              name = fid,
+              name = f.identifier,
               optional = F,
               typ = typeName)
           case ir.AccessType.Provides =>
             imports = imports + Util.getInterfaceFilename(interfaceName)
             dataports = dataports :+ Dataport(
-              name = fid,
+              name = f.identifier,
               optional = F,
               typ = typeName)
         }
       }
 
-      f.category match {
-        case ir.FeatureCategory.SubprogramAccessGroup =>
+      f match {
+        case a: AadlSubprogramGroupAccess =>
           handleSubprogramAccess()
-        case ir.FeatureCategory.SubprogramAccess =>
+        case a: AadlSubprogramAccess =>
           handleSubprogramAccess()
 
-        case ir.FeatureCategory.DataAccess =>
+        case a: AadlDataAccess =>
           handleDataAccess()
 
         case _ =>
-          reporter.error(None(), Util.toolName, s"Not expecting AccessType: ${CommonUtil.getName(f.identifier)}")
+          reporter.error(None(), Util.toolName, s"Not expecting AccessType: ${f.path}")
       }
     }
 
-    for(f <- aadlThread.getFeatureEnds() if symbolTable.isConnected(f)) {
-      val fpath = CommonUtil.getName(f.identifier)
-      val fid = CommonUtil.getLastName(f.identifier)
+    val connectedPorts: ISZ[AadlPort] = aadlThread.getPorts().filter(p => symbolTable.isConnected(p.feature))
+    for(f <- connectedPorts) {
 
-      def handleDataPort_SB_Profile(): Unit = {
-        assert(f.direction == ir.Direction.In || f.direction == ir.Direction.Out)
+        f match {
+          case a: AadlDataPort =>
+            def dataPort_SB_Profile(): Unit = {
+              assert(f.direction == ir.Direction.In || f.direction == ir.Direction.Out)
 
-        val samplingPort: SamplingPortInterface = getSamplingPort(f)
+              val samplingPort: SamplingPortInterface = getSamplingPort(f.feature)
 
-        camkesIncludes = camkesIncludes + s"<${Os.path(samplingPort.headerPath).name}>"
+              camkesIncludes = camkesIncludes + s"<${Os.path(samplingPort.headerPath).name}>"
 
-        cmakeSOURCES = cmakeSOURCES :+ samplingPort.implPath
-        cmakeINCLUDES = cmakeINCLUDES :+ CommonPathUtil.value(Os.path(samplingPort.headerPath).up.value)
+              cmakeSOURCES = cmakeSOURCES :+ samplingPort.implPath
+              cmakeINCLUDES = cmakeINCLUDES :+ CommonPathUtil.value(Os.path(samplingPort.headerPath).up.value)
 
-        gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, f) +: gcImplMethods
+              gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, f.feature) +: gcImplMethods
 
-        val camkesPortId = Util.brand(fid)
-        dataports = dataports :+ Dataport(
-          name = camkesPortId,
-          optional = F,
-          typ = samplingPort.structName
-        )
-
-        {
-          val camkesInstanceId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
-          val alloyPortId = s"${camkesInstanceId}_${camkesPortId}"
-
-          ProofUtil.addCamkesPort(alloyPortId)
-          ProofUtil.addCamkesPortConstraint(camkesInstanceId, alloyPortId, CommonUtil.isInFeature(f))
-          ProofUtil.addPortRefinment(CommonUtil.getName(f.identifier), alloyPortId)
-        }
-      }
-
-      def handleDataPort_TB_Profile(): Unit = {
-        f.direction match {
-          case ir.Direction.In =>
-            // uses monitor
-            // consumes notification
-            if (symbolTable.inConnections.get(fpath).nonEmpty) {
-              val monitor = Monitors.getMonitorForInPort(f, monitors).get.asInstanceOf[TB_Monitor]
-              imports = imports + Util.getInterfaceFilename(monitor.interface.name)
-
-              uses = uses :+ Uses(
-                name = Util.genMonitorFeatureName(f, None[Z]()),
-                typ = monitor.interface.name,
-                optional = F)
-
-              consumes = consumes :+ Consumes(
-                name = Util.genSeL4NotificationName(f, T),
-                typ = Util.getMonitorNotificationType(f.category),
-                optional = F)
-            }
-          case ir.Direction.Out =>
-            // uses monitor
-            symbolTable.outConnections.get(fpath) match {
-              case Some(outs) =>
-                var i: Z = 0
-                for (o <- outs) {
-                  val monitor = monitors.get(CommonUtil.getName(o.name)).get.asInstanceOf[TB_Monitor]
-                  imports = imports + Util.getInterfaceFilename(monitor.interface.name)
-
-                  uses = uses :+ Uses(
-                    name = Util.genMonitorFeatureName(f, Some(i)),
-                    typ = monitor.interface.name,
-                    optional = F
-                  )
-                  i = i + 1
-                }
-              case _ =>
-            }
-          case _ =>
-            halt(s"Not expecting direction ${f.direction}")
-        }
-      }
-
-      def handleEventPort(isEventData: B): Unit = {
-        f.direction match {
-          case ir.Direction.In =>
-
-            val isConnected = symbolTable.inConnections.contains(CommonUtil.getName(f.identifier))
-            val incorporateEntrypointSource = Util.getComputeEntrypointSourceText(f.properties).nonEmpty && aadlThread.isSporadic()
-
-            if (isConnected && (incorporateEntrypointSource || performHamrIntegration)) {
-              val name = Util.genSeL4NotificationName(f, isEventData)
-              val handlerName = s"${name}_handler"
-              val regCallback = s"${name}_reg_callback"
-
-              if (isEventData) {
-                val featureName = CommonUtil.getLastName(f.identifier)
-                gcImplMethods = gcImplMethods :+
-                  StringTemplate.cEventNotificationHandler(handlerName, regCallback, featureName)
-              }
-              gcImplPostInits = gcImplPostInits :+ StringTemplate.cRegCallback(handlerName, regCallback, f)
-            } else {
-              reporter.warn(None(), Util.toolName, s"port: ${fid} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
-            }
-
-          case _ =>
-        }
-      }
-
-      def eventDataPort_SB_Component_Profile(): Unit = {
-        // notification plus a shared counter
-
-        // correct for fan out connections?
-
-        val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.classifier.get)).get
-        val sel4TypeName = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
-
-        auxResourceFiles = auxResourceFiles :+ Util.sbCounterTypeDeclResource()
-
-        f.direction match {
-          case ir.Direction.In =>
-            val queueSize = PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE)
-            val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
-
-            val queueImplFilename = Util.getEventData_SB_QueueImplFileName(sel4TypeName, queueSize)
-            val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
-
-            cmakeSOURCES = cmakeSOURCES :+ s"${Util.getTypeSrcPath()}/${queueImplFilename}"
-            camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
-
-            val isOptional = symbolTable.getInConnections(fpath).isEmpty
-
-            if(!useCaseConnectors) {
-              consumes = consumes :+ Consumes(
-                name = Util.genSeL4NotificationName(f, T),
-                typ = Util.EVENT_NOTIFICATION_TYPE,
-                optional = isOptional)
-            }
-
-            dataports = dataports :+ Dataport(
-              name = Util.getEventDataSBQueueDestFeatureName(fid),
-              typ = queueType,
-              optional = isOptional)
-
-          case ir.Direction.Out =>
-
-            val dsts: Map[String, QueueObject] = srcQueues.get(fpath).get // dstId -> queueObject
-
-            for (qo <- dsts.valueSet.elements) {
-              val queueSize = qo.queueSize
-              val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
-              val queueImplName = Util.getEventData_SB_QueueImplFileName(sel4TypeName, queueSize)
-              val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
-
-              cmakeSOURCES = cmakeSOURCES :+ s"${Util.getTypeSrcPath()}/${queueImplName}"
-              camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
-
-              if(!useCaseConnectors) {
-                emits = emits :+ Emits(
-                  name = Util.genSeL4NotificationQueueName(f, queueSize),
-                  typ = Util.EVENT_NOTIFICATION_TYPE)
-              }
-
+              val camkesDataPortId = Util.brand(f.identifier)
               dataports = dataports :+ Dataport(
-                name = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize),
-                typ = queueType,
-                optional = F)
-            }
-          case _ => halt(s"Unexpected port direction: ${f.direction}")
-        }
-      }
+                name = camkesDataPortId,
+                optional = F,
+                typ = samplingPort.structName
+              )
 
-        f.category match {
-          case ir.FeatureCategory.DataPort =>
+              ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+            }
+
+            def dataPort_TB_Profile(): Unit = {
+              f.direction match {
+                case ir.Direction.In =>
+                  // uses monitor
+                  // consumes notification
+                  if (symbolTable.inConnections.get(f.path).nonEmpty) {
+                    val monitor = Monitors.getMonitorForInPort(f.feature, monitors).get.asInstanceOf[TB_Monitor]
+                    imports = imports + Util.getInterfaceFilename(monitor.interface.name)
+
+                    uses = uses :+ Uses(
+                      name = Util.genMonitorFeatureName(f.feature, None[Z]()),
+                      typ = monitor.interface.name,
+                      optional = F)
+
+                    consumes = consumes :+ Consumes(
+                      name = Util.genSeL4NotificationName(f.feature, T),
+                      typ = Util.getMonitorNotificationType(f.feature.category),
+                      optional = F)
+                  }
+                case ir.Direction.Out =>
+                  // uses monitor
+                  symbolTable.outConnections.get(f.path) match {
+                    case Some(outs) =>
+                      var i: Z = 0
+                      for (o <- outs) {
+                        val monitor = monitors.get(CommonUtil.getName(o.name)).get.asInstanceOf[TB_Monitor]
+                        imports = imports + Util.getInterfaceFilename(monitor.interface.name)
+
+                        uses = uses :+ Uses(
+                          name = Util.genMonitorFeatureName(f.feature, Some(i)),
+                          typ = monitor.interface.name,
+                          optional = F
+                        )
+                        i = i + 1
+                      }
+                    case _ =>
+                  }
+                case _ =>
+                  halt(s"Not expecting direction ${f.direction}")
+              }
+            }
+
             platform match {
-              case ActPlatform.SeL4_TB => handleDataPort_TB_Profile()
-              case ActPlatform.SeL4 => handleDataPort_SB_Profile()
-              case ActPlatform.SeL4_Only => handleDataPort_SB_Profile()
+              case ActPlatform.SeL4_TB => dataPort_TB_Profile()
+              case ActPlatform.SeL4 => dataPort_SB_Profile()
+              case ActPlatform.SeL4_Only => dataPort_SB_Profile()
             }
 
-          case ir.FeatureCategory.EventDataPort =>
+          case a: AadlEventDataPort =>
+
+            def eventDataPort_TB_Profile(): Unit = {
+              // handle data part
+              f.direction match {
+                case ir.Direction.In =>
+                  // uses monitor
+                  // consumes notification
+                  if (symbolTable.inConnections.get(f.path).nonEmpty) {
+                    val monitor = Monitors.getMonitorForInPort(f.feature, monitors).get.asInstanceOf[TB_Monitor]
+                    imports = imports + Util.getInterfaceFilename(monitor.interface.name)
+
+                    uses = uses :+ Uses(
+                      name = Util.genMonitorFeatureName(f.feature, None[Z]()),
+                      typ = monitor.interface.name,
+                      optional = F)
+
+                    consumes = consumes :+ Consumes(
+                      name = Util.genSeL4NotificationName(f.feature, T),
+                      typ = Util.getMonitorNotificationType(f.feature.category),
+                      optional = F)
+                  }
+                case ir.Direction.Out =>
+                  // uses monitor
+                  symbolTable.outConnections.get(f.path) match {
+                    case Some(outs) =>
+                      var i: Z = 0
+                      for (o <- outs) {
+                        val monitor = monitors.get(CommonUtil.getName(o.name)).get.asInstanceOf[TB_Monitor]
+                        imports = imports + Util.getInterfaceFilename(monitor.interface.name)
+
+                        uses = uses :+ Uses(
+                          name = Util.genMonitorFeatureName(f.feature, Some(i)),
+                          typ = monitor.interface.name,
+                          optional = F
+                        )
+                        i = i + 1
+                      }
+                    case _ =>
+                  }
+                case _ =>
+                  halt(s"Not expecting direction ${f.direction}")
+              }
+
+              // handle the event part
+              f.direction match {
+                case ir.Direction.In =>
+
+                  val incorporateEntrypointSource = Util.getComputeEntrypointSourceText(f.feature.properties).nonEmpty && aadlThread.isSporadic()
+
+                  if (incorporateEntrypointSource || performHamrIntegration) {
+                    val name = Util.genSeL4NotificationName(f.feature, T)
+                    val handlerName = s"${name}_handler"
+                    val regCallback = s"${name}_reg_callback"
+
+                    val featureName = f.identifier
+                    gcImplMethods = gcImplMethods :+
+                      StringTemplate.cEventNotificationHandler(handlerName, regCallback, featureName)
+
+                    gcImplPostInits = gcImplPostInits :+ StringTemplate.cRegCallback(handlerName, regCallback, f.feature)
+                  } else {
+                    reporter.warn(None(), Util.toolName, s"port: ${f.identifier} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
+                  }
+
+                case _ =>
+              }
+            }
+
+            def eventDataPort_SB_Profile(): Unit = {
+              // notification plus a shared counter
+
+              // correct for fan out connections?
+
+              val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(f.feature.classifier.get)).get
+              val sel4TypeName = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
+
+              auxResourceFiles = auxResourceFiles :+ Util.sbCounterTypeDeclResource()
+
+              f.direction match {
+                case ir.Direction.In =>
+                  val queueSize = PropertyUtil.getQueueSize(f.feature, Util.DEFAULT_QUEUE_SIZE)
+                  val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
+
+                  val queueImplFilename = Util.getEventData_SB_QueueImplFileName(sel4TypeName, queueSize)
+                  val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
+
+                  cmakeSOURCES = cmakeSOURCES :+ s"${Util.getTypeSrcPath()}/${queueImplFilename}"
+                  camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
+
+                  val isOptional = symbolTable.getInConnections(f.path).isEmpty
+
+                  if(!useCaseConnectors) {
+                    val camkesEventPortId = Util.genSeL4NotificationName(f.feature, T)
+                    consumes = consumes :+ Consumes(
+                      name = camkesEventPortId,
+                      typ = Util.EVENT_NOTIFICATION_TYPE,
+                      optional = isOptional)
+
+                    ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+                  }
+
+                  val camkesDataPortId = Util.getEventDataSBQueueDestFeatureName(f.identifier)
+                  dataports = dataports :+ Dataport(
+                    name = camkesDataPortId,
+                    typ = queueType,
+                    optional = isOptional)
+
+                  ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+
+                case ir.Direction.Out =>
+
+                  val dsts: Map[String, QueueObject] = srcQueues.get(f.path).get // dstId -> queueObject
+
+                  for (qo <- dsts.valueSet.elements) {
+                    val queueSize = qo.queueSize
+                    val queueType = Util.getEventDataSBQueueTypeName(sel4TypeName, queueSize)
+                    val queueImplName = Util.getEventData_SB_QueueImplFileName(sel4TypeName, queueSize)
+                    val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(sel4TypeName, queueSize)
+
+                    cmakeSOURCES = cmakeSOURCES :+ s"${Util.getTypeSrcPath()}/${queueImplName}"
+                    camkesIncludes = camkesIncludes + s"<${queueHeaderFilename}>"
+
+                    if(!useCaseConnectors) {
+                      val camkesEventPortId = Util.genSeL4NotificationQueueName(f.feature, queueSize)
+                      emits = emits :+ Emits(
+                        name = camkesEventPortId,
+                        typ = Util.EVENT_NOTIFICATION_TYPE)
+
+                      ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+                    }
+
+                    val camkesDataPortId = Util.getEventDataSBQueueSrcFeatureName(f.identifier, queueSize)
+                    dataports = dataports :+ Dataport(
+                      name = camkesDataPortId,
+                      typ = queueType,
+                      optional = F)
+
+                    ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+                  }
+                case _ => halt(s"Unexpected port direction: ${f.direction}")
+              }
+            }
+
             platform match {
-              case ActPlatform.SeL4_TB =>
-                handleDataPort_TB_Profile()
-                handleEventPort(T)
-              case ActPlatform.SeL4 => eventDataPort_SB_Component_Profile()
-              case ActPlatform.SeL4_Only => eventDataPort_SB_Component_Profile()
+              case ActPlatform.SeL4_TB => eventDataPort_TB_Profile()
+              case ActPlatform.SeL4 => eventDataPort_SB_Profile()
+              case ActPlatform.SeL4_Only => eventDataPort_SB_Profile()
             }
 
-          case ir.FeatureCategory.EventPort =>
+          case a: AadlEventPort =>
 
-            def handleEventPort_TB_Component_Profile(): Unit = {
+            def eventPort_TB_Profile(): Unit = {
               f.direction match {
                 case ir.Direction.In =>
                   // import receiver interface
@@ -714,14 +753,14 @@ import org.sireum.ops.ISZOps
 
                   // uses
                   uses = uses :+ Uses(
-                    name = Util.genMonitorFeatureName(f, None[Z]()),
+                    name = Util.genMonitorFeatureName(f.feature, None[Z]()),
                     typ = Util.MONITOR_INTERFACE_NAME_RECEIVER,
                     optional = F,
                   )
 
                   // consumes notification
                   consumes = consumes :+ Consumes(
-                    name = Util.genSeL4NotificationName(f, T),
+                    name = Util.genSeL4NotificationName(f.feature, T),
                     typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                     optional = F)
 
@@ -729,27 +768,27 @@ import org.sireum.ops.ISZOps
                   // import sender interface
                   imports = imports + s""""../../interfaces/${Util.MONITOR_INTERFACE_NAME_SENDER}.idl4""""
 
-                  symbolTable.outConnections.get(fpath) match {
+                  symbolTable.outConnections.get(f.path) match {
                     case Some(outs) =>
                       var i: Z = 0
                       for (o <- outs) {
 
                         uses = uses :+ Uses(
-                          name = Util.genMonitorFeatureName(f, Some(i)),
+                          name = Util.genMonitorFeatureName(f.feature, Some(i)),
                           typ = Util.MONITOR_INTERFACE_NAME_SENDER,
                           optional = F
                         )
 
                         i = i + 1
                       }
-                    case _ => halt(s"${fpath}: expecting out connection")
+                    case _ => halt(s"${f.path}: expecting out connection")
                   }
 
-                case _ => halt(s"${fpath}: not expecting direction ${f.direction}")
+                case _ => halt(s"${f.path}: not expecting direction ${f.direction}")
               }
             }
 
-            def handleEventPort_SB_Component_Profile(): Unit = {
+            def eventPort_SB_Profile(): Unit = {
               // notification plus a shared counter
 
               // correct for fan out connections?
@@ -762,41 +801,53 @@ import org.sireum.ops.ISZOps
 
               f.direction match {
                 case ir.Direction.In =>
+                  val camkesEventPortId = Util.getEventSBNotificationName(f.identifier)
                   consumes = consumes :+ Consumes(
-                    name = Util.getEventSBNotificationName(fid),
+                    name = camkesEventPortId,
                     typ = Util.EVENT_NOTIFICATION_TYPE,
                     optional = F)
 
+                  ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+
+                  val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
                   dataports = dataports :+ Dataport(
-                    name = Util.getEventSBCounterName(fid),
+                    name = camkesDataPortId,
                     typ = counterType,
                     optional = F)
+
+                  ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
 
                 case ir.Direction.Out =>
+                  val camkesEventPortId = Util.getEventSBNotificationName(f.identifier)
                   emits = emits :+ Emits(
-                    name = Util.getEventSBNotificationName(fid),
+                    name = camkesEventPortId,
                     typ = Util.EVENT_NOTIFICATION_TYPE)
 
+                  ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+
+                  val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
                   dataports = dataports :+ Dataport(
-                    name = Util.getEventSBCounterName(fid),
+                    name = camkesDataPortId,
                     typ = counterType,
                     optional = F)
+
+                  ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
 
                 case _ => halt(s"Unexpected port direction: ${f.direction}")
               }
             }
 
             platform match {
-              case ActPlatform.SeL4_TB => handleEventPort_TB_Component_Profile()
-              case ActPlatform.SeL4 => handleEventPort_SB_Component_Profile()
-              case ActPlatform.SeL4_Only => handleEventPort_SB_Component_Profile()
+              case ActPlatform.SeL4_TB => eventPort_TB_Profile()
+              case ActPlatform.SeL4 => eventPort_SB_Profile()
+              case ActPlatform.SeL4_Only => eventPort_SB_Profile()
             }
 
           case _ =>
-            reporter.warn(None(), Util.toolName, s"Skipping ${f.category} for ${fid}.${fid}")
+            reporter.warn(None(), Util.toolName, s"Skipping ${f.feature.category} for ${f.identifier}")
         }
 
-        generateGlueCodePortInterfaceMethod(aadlThread, f) match {
+        generateGlueCodePortInterfaceMethod(aadlThread, f.feature) match {
           case Some(C_SimpleContainer(cIncludes, interface, impl, preInit, postInits, drainQueues)) =>
             if (cIncludes.nonEmpty) {
               gcImplIncludes = gcImplIncludes ++ cIncludes
@@ -1003,7 +1054,7 @@ import org.sireum.ops.ISZOps
 
       ProofUtil.addCamkesComponent(camkesInstanceId)
 
-      ProofUtil.addComponentRefinement(names.aadlQualifiedName, camkesInstanceId)
+      ProofUtil.addComponentRefinement(aadlThread, camkesInstanceId)
     }
 
     return comp
