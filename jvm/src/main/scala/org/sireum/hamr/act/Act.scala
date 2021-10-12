@@ -17,6 +17,7 @@ object Act {
 
   def run(model: ir.Aadl, options: ActOptions, aadlTypes: AadlTypes, symbolTable: SymbolTable, sysReporter: Reporter): ActResult = {
     Util.reporter.setMessages(ISZ())
+    ProofUtil.reset()
     val results = runInternal(model, options, aadlTypes, symbolTable)
     sysReporter.reports(Util.reporter.messages)
     return results
@@ -60,8 +61,8 @@ object Act {
     }
 
     if (ExperimentalOptions.generateRefinementProof(options.experimentalOptions)) {
-      resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, options.outputDir)
-      resources = resources ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, options.outputDir)
+      //resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, symbolTable, options.outputDir)
+      resources = resources ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, symbolTable, options.outputDir)
     }
 
     container match {

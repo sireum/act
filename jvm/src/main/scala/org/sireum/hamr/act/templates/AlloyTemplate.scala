@@ -230,8 +230,8 @@ object AlloyTemplate{
     return ret
   }
 
-  def proof(aadlComponents: ISZ[ST],
-            aadlPorts: ISZ[ST],
+  def proof(aadlComponents: ISZ[String],
+            aadlPorts: ISZ[String],
             aadlPortConstraints: ISZ[ST],
             aadlConnections: ISZ[ST],
             numAadlComponents: Z,

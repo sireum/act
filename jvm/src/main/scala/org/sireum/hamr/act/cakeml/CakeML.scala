@@ -8,7 +8,7 @@ import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
-import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlDataPort, AadlEventDataPort, AadlFeatureData, AadlPort, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, Names, NixSeL4NameUtil}
 import org.sireum.hamr.ir
@@ -115,21 +115,20 @@ object CakeML {
 
   def processPorts(aadlThread: AadlThread, basePackageName: String, fileUri: String): ISZ[ST] = {
     var methods: ISZ[ST] = ISZ()
-    val ports: ISZ[ir.FeatureEnd] = aadlThread.getFeatureEnds().filter((f: ir.FeatureEnd) => CommonUtil.isEventPort(f) || CommonUtil.isDataPort(f))
     val names = Names(aadlThread.component, basePackageName)
 
-    val _ports: ISZ[ST] = ports.map((p: ir.FeatureEnd) => {
-      val portName = CommonUtil.getLastName(p.identifier)
+    val _ports: ISZ[ST] = aadlThread.getPorts().map((p: AadlPort) => {
+      val portName = p.identifier
 
       p.direction match {
         case ir.Direction.In =>
           val ffiName = CakeMLTemplate.ffi_getterMethodName(portName)
           val slangName = NixSeL4NameUtil.apiHelperGetterMethodName(portName, names)
-          CakeMLTemplate.ffi_get(ffiName, slangName, fileUri, p.category)
+          CakeMLTemplate.ffi_get(ffiName, slangName, fileUri, p.feature.category)
         case ir.Direction.Out =>
           val ffiName = CakeMLTemplate.ffi_setterMethodName(portName)
           val slangName = NixSeL4NameUtil.apiHelperSetterMethodName(portName, names)
-          val isDataPort = CommonUtil.isDataPort(p)
+          val isDataPort = p.isInstanceOf[AadlEventDataPort] || p.isInstanceOf[AadlDataPort]
           CakeMLTemplate.ffi_send(ffiName, slangName, isDataPort, fileUri)
         case x => halt(s"Not expecting direction ${x}")
       }

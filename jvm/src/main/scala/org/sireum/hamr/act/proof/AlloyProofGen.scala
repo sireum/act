@@ -2,9 +2,11 @@
 package org.sireum.hamr.act.proof
 
 import org.sireum._
+import org.sireum.hamr.act.proof.ProofContainer.{CAmkESPortType, ComponentPath, Direction, PortPath}
 import org.sireum.hamr.act.templates.AlloyTemplate
-import org.sireum.hamr.act.util.Util
+import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.symbols.{AadlPort, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object AlloyProofGen {
@@ -12,19 +14,29 @@ object AlloyProofGen {
   var resources: ISZ[Resource] = ISZ()
 
   def genAlloyProof(container: ProofContainer,
+                    symbolTable: SymbolTable,
                     outputDir: String): ISZ[Resource] = {
     resources = ISZ()
 
     val base = AlloyTemplate.base()
 
-    val aadlComponents: ISZ[ST] = container.aadlComponents.map((m: String) => st"$m")
+    val aadlComponents: ISZ[String] = container.aadlComponents.map((m: AadlThread) => m.path)
 
-    val aadlPorts: ISZ[ST] = container.aadlPorts.map((s: String) => st"$s")
+    val (aadlPorts, aadlPortConstraints): (ISZ[String], ISZ[ST]) = {
+      var ports: ISZ[String] = ISZ()
+      var portConstraints: ISZ[ST] = ISZ()
 
-    val aadlPortConstraints: ISZ[ST] = container.aadlPortConstraints.
-      map((r : (String, String, String)) =>
-        st"""${r._2}.component = ${r._1}
-            |${r._2}.direction = ${r._3}""")
+      for(thread <- container.aadlComponents;
+          port <- thread.getPorts() if symbolTable.isConnected(port.feature)) {
+        ports = ports :+ port.path
+        portConstraints = portConstraints :+ {
+          val dir = if (CommonUtil.isInPort(port.feature)) "In" else "Out"
+          st"""${port.path}.component = ${thread.path}
+              |${port.path}.direction = ${dir}"""
+        }
+      }
+      (ports, portConstraints)
+    }
 
     val aadlConenctions: ISZ[ST] = container.aadlConnections.
       map((r: (String, String)) => st"${r._1} -> ${r._2}")
@@ -34,7 +46,7 @@ object AlloyProofGen {
     val camkesPorts: ISZ[ST] = container.camkesPorts.map((s: String) => st"$s")
 
     val camkesPortConstraints: ISZ[ST] = container.camkesPortConstraints.
-      map((r : (String, String, String)) =>
+      map((r : (ComponentPath, PortPath, Direction, CAmkESPortType)) =>
         st"""${r._2}.component = ${r._1}
             |${r._2}.direction = ${r._3}""")
 
@@ -43,10 +55,10 @@ object AlloyProofGen {
 
 
     val componentsRefinements: ISZ[ST] = container.componentRefinements.
-      map((r: (String, String)) => st"${r._1} -> ${r._2}")
+      map((r: (AadlThread, String)) => st"${r._1.path} -> ${r._2}")
 
     val portRefinements: ISZ[ST] = container.portRefinements.
-      map((r: (String, String)) => st"${r._1} -> ${r._2}")
+      map((r: (AadlPort, String)) => st"${r._1.path} -> ${r._2}")
 
 
     val proof = AlloyTemplate.proof(
