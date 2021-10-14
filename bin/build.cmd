@@ -91,7 +91,7 @@ def cloneProjects(): Unit = {
 
 def tipe(): Unit = {
   println("Slang type checking ...")
-  Os.proc(ISZ(sireum.string, "slang", "tipe", "--verbose", "-r", "-s", home.string)).
+  Os.proc(ISZ(sireum.string, "proyek", "tipe", "--project", project, "--par", "--strict-aliasing", home.string)).
     at(home).console.runCheck()
   println()
 }
