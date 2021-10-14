@@ -37,19 +37,15 @@ object SMT2ProofGen {
         port <- thread.getPorts() if symbolTable.isConnected(port.feature)) {
         ports = ports :+ s"(${port.path})"
         portComponents = portComponents :+ SMT2Template.aadlPortComponents(port.path, thread.path)
-        portTypes = portTypes :+ {
-          val portType = port match {
-            case a: AadlDataPort => "DataPort"
-            case a: AadlEventDataPort => "EventDataPort"
-            case a: AadlEventPort => "EventPort"
-            case _ => "UNKNOWN_PORT_TYPE"
-          }
-          SMT2Template.aadlPortType(port.path, portType)
+        val portType: String = port match {
+          case a: AadlDataPort => "DataPort"
+          case a: AadlEventDataPort => "EventDataPort"
+          case a: AadlEventPort => "EventPort"
+          case _ => "UNKNOWN_PORT_TYPE"
         }
-        portDirs = portDirs :+ {
-          val dir: String = if (CommonUtil.isInPort(port.feature)) "In" else "Out"
-          SMT2Template.aadlPortDirection(port.path, dir)
-        }
+        portTypes = portTypes :+ SMT2Template.aadlPortType(port.path, portType)
+        val dir: String = if (CommonUtil.isInPort(port.feature)) "In" else "Out"
+        portDirs = portDirs :+ SMT2Template.aadlPortDirection(port.path, dir)
       }
 
       (ports, portComponents, portTypes, portDirs)

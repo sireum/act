@@ -29,11 +29,10 @@ object AlloyProofGen {
       for(thread <- container.aadlComponents;
           port <- thread.getPorts() if symbolTable.isConnected(port.feature)) {
         ports = ports :+ port.path
-        portConstraints = portConstraints :+ {
-          val dir = if (CommonUtil.isInPort(port.feature)) "In" else "Out"
+        val dir: String = if (CommonUtil.isInPort(port.feature)) "In" else "Out"
+        portConstraints = portConstraints :+
           st"""${port.path}.component = ${thread.path}
               |${port.path}.direction = ${dir}"""
-        }
       }
       (ports, portConstraints)
     }
