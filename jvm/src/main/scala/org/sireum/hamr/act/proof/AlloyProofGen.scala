@@ -49,7 +49,7 @@ object AlloyProofGen {
         st"""${r._2}.component = ${r._1}
             |${r._2}.direction = ${r._3}""")
 
-    val camkesConnections: ISZ[ST] = container.camkesConnections.
+    val camkesConnections: ISZ[ST] = container.camkesPortConnections.
       map((r: (String, String)) => st"${r._1} -> ${r._2}")
 
 

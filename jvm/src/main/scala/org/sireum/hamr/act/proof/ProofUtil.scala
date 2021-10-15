@@ -6,8 +6,19 @@ import org.sireum.hamr.act.util.{Sel4ConnectorTypes, Util}
 import org.sireum.hamr.codegen.common.{CommonUtil, Names}
 import org.sireum.hamr.codegen.common.symbols.{AadlPort, AadlThread, SymbolTable}
 
-
 object ProofContainer {
+
+  @datatype class CAmkESConnection(connectionName: String,
+                                   sourceCAmkESPort: String,
+                                   destCAmkESPort: String,
+                                   typ: Sel4ConnectorTypes.Type)
+
+  @enum object AadlPortType {
+    "AadlDataPort"
+    "AadlEventPort"
+    "AadlEventDataPort"
+  }
+
   type ComponentPath = String
   type PortPath = String
   type CAmkESPortType = String
@@ -17,7 +28,7 @@ object ProofContainer {
     return ProofContainer(
       ISZ(), ISZ(),
 
-      ISZ(), ISZ(), ISZ(), ISZ(),
+      ISZ(), ISZ(), ISZ(), ISZ(), ISZ(),
 
       ISZ(), ISZ()
     )
@@ -80,9 +91,13 @@ object ProofUtil {
     proofContainer.camkesPortConstraints = proofContainer.camkesPortConstraints :+ p
   }
 
-  def addCamkesConnection(srcId: String, dstId: String): Unit = {
+  def addCamkesConnection(c: CAmkESConnection): Unit = {
+    proofContainer.camkesConnections = proofContainer.camkesConnections :+ c
+  }
+
+  def addCamkesPortConnection(srcId: String, dstId: String): Unit = {
     val p = (srcId, dstId)
-    proofContainer.camkesConnections = proofContainer.camkesConnections :+ p
+    proofContainer.camkesPortConnections = proofContainer.camkesPortConnections :+ p
   }
 
 
@@ -104,7 +119,9 @@ object ProofUtil {
                              var camkesComponents: ISZ[ComponentPath],
                              var camkesPorts: ISZ[PortPath],
                              var camkesPortConstraints: ISZ[(ComponentPath, PortPath, Direction, CAmkESPortType)],
-                             var camkesConnections: ISZ[(String, String)],
+                             var camkesPortConnections: ISZ[(String, String)],
+
+                             var camkesConnections: ISZ[CAmkESConnection],
 
                              var componentRefinements: ISZ[(AadlThread, ComponentPath)],
                              var portRefinements: ISZ[(AadlPort, PortPath)]

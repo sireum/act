@@ -3,7 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
-import org.sireum.hamr.act.proof.ProofContainer.{CAmkESPortType, PortPath}
+import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection}
 import org.sireum.hamr.act.util.Sel4ConnectorTypes
 
 object SMT2Template {
@@ -24,7 +24,7 @@ object SMT2Template {
   }
 
   def camkesPortComponents(camkesComponent: String, camkesPort: String): ST = {
-    return st"(assert (= ${camkesPort} (select CAMKESPortComponent ${camkesComponent})))"
+    return st"(assert (= ${camkesPort} (select CAmkESPortComponent ${camkesComponent})))"
   }
 
   def aadlPortType(aadlPort: String, portType: String): ST = {
@@ -35,13 +35,15 @@ object SMT2Template {
     return st"(assert (= ${direction} (select AADLPortDirection ${aadlPort})))"
   }
 
-  def camkesPortType(camkesPort: PortPath, camkesPortType: CAmkESPortType): ST = {
-    return st"(assert (= ${camkesPortType} (select CAMKESPortType ${camkesPort})))"
+  def camkesConnectionType(c: CAmkESConnection): ST = {
+    return st"(assert (= ${c.typ.name} (select CAmkESConnectionType ${c.connectionName})))"
   }
 
-  def camkesPortDirection(camkesPort: String, direction: String): ST = {
-    return st"(assert (= ${direction} (select CAMKESPortDirection ${camkesPort})))"
+  def camkesFlowsTo(c: CAmkESConnection): ST = {
+    return st"(and (= _conn ${c.connectionName}) (= _p1 ${c.sourceCAmkESPort}) (= _p2 ${c.destCAmkESPort}))"
   }
+
+  def camkesConnection(m: CAmkESConnection): ST = { return st"(${m.connectionName})" }
 
   def proof(aadlComponents: ISZ[ST],
             aadlPorts: ISZ[String],
@@ -53,14 +55,22 @@ object SMT2Template {
             camkesComponents: ISZ[ST],
             camkesPorts: ISZ[ST],
             camkesPortComponents: ISZ[ST],
-            camkesPortTypes: ISZ[ST],
-            camkesPortDirection: ISZ[ST],
+            camkesConnectionTypes: ISZ[ST],
             camkesConnectionFlowTos: ISZ[ST],
+
+            camkesConnections: ISZ[ST],
 
             componentRefinements: ISZ[ST],
             portRefinements: ISZ[ST]): ST = {
 
-    val sel4ConnTypes = Sel4ConnectorTypes.elements.map((m: Sel4ConnectorTypes.Type) => st"(${m.name})")
+    val sel4ConnEnums = Sel4ConnectorTypes.elements.map((m: Sel4ConnectorTypes.Type) => st"(${m.name})")
+    val camkesPortMatches = Sel4ConnectorTypes.elements.map((m: Sel4ConnectorTypes.Type) =>
+      st"(and (= ${m.name} (select CAmkESPortType src)) (= ${m.name} (select CAmkESPortType dst)))")
+
+    val aadlPortEnums = AadlPortType.elements.map((m: AadlPortType.Type) => st"(${m.name})")
+    val portMatches = AadlPortType.elements.map((m: AadlPortType.Type) =>
+      st"(and (= ${m.name} (select AADLPortType src)) (= ${m.name} (select AADLPortType dst)))")
+
     val ret: ST =
       st"""(set-logic ALL)
           |
@@ -70,9 +80,7 @@ object SMT2Template {
           |  (Out))))
           |
           |(declare-datatypes ((PortType 0)) ((
-          |  (DataPort)
-          |  (EventPort)
-          |  (EventDataPort))))
+          |  ${(aadlPortEnums, "\n")})))
           |
           |; ${aadlComponents.size} AADLComponent
           |(declare-datatypes ((AADLComponent 0)) ((
@@ -104,45 +112,46 @@ object SMT2Template {
           |
           |
           |(declare-datatypes ((seL4PortType 0)) ((
-          |  ${(sel4ConnTypes, "\n")})))
+          |  ${(sel4ConnEnums, "\n")})))
           |
-          |; ${camkesComponents.size} CAMKESComponent
-          |(declare-datatypes ((CAMKESComponent 0)) ((
+          |; ${camkesComponents.size} CAmkESComponent
+          |(declare-datatypes ((CAmkESComponent 0)) ((
           |  ${(camkesComponents, "\n")}
           |)))
           |
-          |; ${camkesPorts.size} CAMKESPort
-          |(declare-datatypes ((CAMKESPort 0)) ((
+          |; ${camkesPorts.size} CAmkESPort
+          |(declare-datatypes ((CAmkESPort 0)) ((
           |  ${(camkesPorts, "\n")}
           |)))
           |
-          |; ${camkesPortTypes.size} CAMKESPortType
-          |(declare-const CAMKESPortType (Array CAMKESPort seL4PortType))
-          |${(camkesPortTypes, "\n")}
+          |; ${camkesConnections.size} CAmkESConnection
+          |(declare-datatypes ((CAmkESConnection 0)) ((
+          |  ${(camkesConnections, "\n")}
+          |)))
           |
-          |; ${camkesPortDirection.size} CAMKESPortDirection
-          |(declare-const CAMKESPortDirection (Array CAMKESPort Direction))
-          |${(camkesPortDirection, "\n")}
+          |; ${camkesConnectionTypes.size} CAmkESConnectionType
+          |(declare-const CAmkESConnectionType (Array CAmkESConnection seL4PortType))
+          |${(camkesConnectionTypes, "\n")}
           |
-          |; ${camkesPortComponents.size} CAMKESPortComponent
-          |(declare-const CAMKESPortComponent (Array CAMKESPort CAMKESComponent))
+          |; ${camkesPortComponents.size} CAmkESPortComponent
+          |(declare-const CAmkESPortComponent (Array CAmkESPort CAmkESComponent))
           |${(camkesPortComponents, "\n")}
           |
-          |; ${camkesConnectionFlowTos.size} CAMKESConnectionFlowTos
-          |(define-fun CAMKESConnectionFlowTos ((p1 CAMKESPort) (p2 CAMKESPort)) Bool
+          |; ${camkesConnectionFlowTos.size} CAmkESConnectionFlowTos
+          |(define-fun CAmkESConnectionFlowTos ((_conn CAmkESConnection) (_p1 CAmkESPort) (_p2 CAmkESPort)) Bool
           |  (or
           |    ${(camkesConnectionFlowTos, "\n")}
           |    false))
           |
           |
           |; ${componentRefinements.size} ComponentRefinement
-          |(define-fun ComponentRefinement ((ac AADLComponent) (cc CAMKESComponent)) Bool
+          |(define-fun ComponentRefinement ((ac AADLComponent) (cc CAmkESComponent)) Bool
           |  (or
           |    ${(componentRefinements, "\n")}
           |    false))
           |
           |; ${portRefinements.size} PortRefinement
-          |(define-fun PortRefinement ((ap AADLPort) (cp CAMKESPort)) Bool
+          |(define-fun PortRefinement ((ap AADLPort) (cp CAmkESPort)) Bool
           |  (or
           |    ${(portRefinements, "\n")}
           |    false))
@@ -150,25 +159,22 @@ object SMT2Template {
           |
           |(define-fun AADLFlowDirectionality () Bool
           |  (forall ((p1 AADLPort) (p2 AADLPort))
-          |    (=>
-          |      (AADLConnectionFlowTos p1 p2)
-          |      (and (= Out (select AADLPortDirection p1)) (= In (select AADLPortDirection p2))))))
+          |    (=> (AADLConnectionFlowTos p1 p2)
+          |        (and (= Out (select AADLPortDirection p1)) (= In (select AADLPortDirection p2))))))
           |
           |(define-fun AADLFlowNoSelfConnection () Bool
           |  (forall ((p1 AADLPort) (p2 AADLPort))
-          |    (=>
-          |      (AADLConnectionFlowTos p1 p2)
-          |      (not (= p1 p2)))))
+          |    (=> (AADLConnectionFlowTos p1 p2)
+          |        (not (= p1 p2)))))
           |
           |(define-fun AADLConnectedPortTypeMatch () Bool
           |  (forall ((src AADLPort) (dst AADLPort))
-          |    (=>
-          |      (AADLConnectionFlowTos src dst)
-          |      (or
-          |          (and (= DataPort (select AADLPortType src)) (= DataPort (select AADLPortType dst)))
-          |          (and (= EventPort (select AADLPortType src)) (= EventPort (select AADLPortType dst)))
-          |          (and (= EventDataPort (select AADLPortType src)) (= EventDataPort (select AADLPortType dst)))
+          |    (=> (AADLConnectionFlowTos src dst)
+          |        (or
+          |          ${portMatches}
           |          false))))
+          |
+          |
           |
           |(define-fun AADLWellFormedness () Bool
           |  (and
@@ -177,80 +183,74 @@ object SMT2Template {
           |    AADLConnectedPortTypeMatch))
           |
           |
-          |(define-fun CAMKESFlowDirectionality () Bool
-          |  (forall ((p1 CAMKESPort) (p2 CAMKESPort))
-          |    (=>
-          |      (CAMKESConnectionFlowTos p1 p2)
-          |      (and (= Out (select CAMKESPortDirection p1)) (= In (select CAMKESPortDirection p2))))))
+          |(define-fun CAmkESFlowNoSelfConnection () Bool
+          |  (forall ((_conn CAmkESConnection) (_p1 CAmkESPort) (_p2 CAmkESPort))
+          |    (=> (CAmkESConnectionFlowTos _conn _p1 _p2)
+          |        (not (= _p1 _p2)))))
           |
-          |(define-fun CAMKESFlowNoSelfConnection () Bool
-          |  (forall ((p1 CAMKESPort) (p2 CAMKESPort))
-          |    (=>
-          |      (CAMKESConnectionFlowTos p1 p2)
-          |      (not (= p1 p2)))))
+          |(define-fun UniqueComponentRefinements () Bool
+          |  (forall ((aadlComponent1 AADLComponent) (camkesComponent CAmkESComponent))
+          |    (=> (ComponentRefinement aadlComponent1 camkesComponent)
+          |        (not (exists ((aadlComponent2 AADLComponent))
+          |               (and (not (= aadlComponent1 aadlComponent2))
+          |                    (ComponentRefinement aadlComponent2 camkesComponent)))))))
           |
-          |(define-fun CAMKESConnectedPortTypeMatch () Bool
-          |  (forall ((src CAMKESPort) (dst CAMKESPort))
-          |    (=>
-          |      (CAMKESConnectionFlowTos src dst)
-          |      (or
-          |          (and (= seL4SharedData (select CAMKESPortType src)) (= seL4SharedData (select CAMKESPortType dst)))
-          |          (and (= seL4Notification (select CAMKESPortType src)) (= seL4Notification (select CAMKESPortType dst)))
-          |          false))))
+          |(define-fun UniquePortRefinements () Bool
+          |  (forall ((aadlPort1 AADLPort) (camkesPort CAmkESPort))
+          |    (=> (PortRefinement aadlPort1 camkesPort)
+          |        (not (exists ((aadlPort2 AADLPort))
+          |               (and (not (= aadlPort1 aadlPort2))
+          |                    (PortRefinement aadlPort2 camkesPort)))))))
           |
-          |(define-fun CAMKESWellFormedness () Bool
+          |(define-fun CAmkESWellFormedness () Bool
           |  (and
-          |    CAMKESFlowDirectionality
-          |    CAMKESFlowNoSelfConnection
-          |    CAMKESConnectedPortTypeMatch))
-          |
+          |    CAmkESFlowNoSelfConnection))
           |
           |(define-fun DataPortRefinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
-          |  (exists ((camkesSource CAMKESPort) (camkesDest CAMKESPort))
-          |    (and
-          |      (= seL4SharedData (select CAMKESPortType camkesSource))
-          |      (PortRefinement aadlSource camkesSource)
-          |      (PortRefinement aadlDest camkesDest)
-          |      (ComponentRefinement (select AADLPortComponent aadlSource) (select CAMKESPortComponent camkesSource))
-          |      (ComponentRefinement (select AADLPortComponent aadlDest) (select CAMKESPortComponent camkesDest))
-          |      (CAMKESConnectionFlowTos camkesSource camkesDest))))
+          |  (exists ((conn CAmkESConnection) (camkesSource CAmkESPort) (camkesDest CAmkESPort))
+          |      (and (CAmkESConnectionFlowTos conn camkesSource camkesDest)
+          |           (= (select CAmkESConnectionType conn) ${Sel4ConnectorTypes.seL4SharedData.name} )
+          |           (PortRefinement aadlSource camkesSource)
+          |           (PortRefinement aadlDest  camkesDest)
+          |           (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
+          |           (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest)))))
           |
           |(define-fun EventPortRefinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
-          |  (exists ((camkesSource CAMKESPort) (camkesDest CAMKESPort))
+          |  (exists ((conn CAmkESConnection) (camkesSource CAmkESPort) (camkesDest CAmkESPort))
           |    (and
-          |      (= seL4Notification (select CAMKESPortType camkesSource))
+          |      (CAmkESConnectionFlowTos conn camkesSource camkesDest)
+          |      (= (select CAmkESConnectionType conn) ${Sel4ConnectorTypes.seL4Notification.name} )
           |      (PortRefinement aadlSource camkesSource)
           |      (PortRefinement aadlDest camkesDest)
-          |      (ComponentRefinement (select AADLPortComponent aadlSource) (select CAMKESPortComponent camkesSource))
-          |      (ComponentRefinement (select AADLPortComponent aadlDest) (select CAMKESPortComponent camkesDest))
-          |      (CAMKESConnectionFlowTos camkesSource camkesDest))))
+          |      (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
+          |      (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest)))))
           |
           |(define-fun ConnectionPreservation () Bool
           |  (forall ((aadlSource AADLPort) (aadlDest AADLPort))
-          |    (=> (AADLConnectionFlowTos aadlSource aadlDest)  ; if there is a flow from src to dst
+          |    (=> (AADLConnectionFlowTos aadlSource aadlDest)
           |        (or
           |          (and
-          |               (= DataPort (select AADLPortType aadlSource)) ; aadl source port is a data port
-          |               (DataPortRefinement aadlSource aadlDest))
+          |               (= ${AadlPortType.AadlDataPort.name} (select AADLPortType aadlSource))
+          |               (DataPortRefinement aadlSource aadlDest)) ; payload
           |          (and
-          |               (= EventPort (select AADLPortType aadlSource)) ; aadl source port is an event port
-          |               (DataPortRefinement aadlSource aadlDest) ; event counter
-          |               (EventPortRefinement aadlSource aadlDest))
+          |               (= ${AadlPortType.AadlEventPort.name} (select AADLPortType aadlSource))
+          |               (DataPortRefinement aadlSource aadlDest)   ; event counter
+          |               (EventPortRefinement aadlSource aadlDest)) ; event
           |          (and
-          |               (= EventDataPort (select AADLPortType aadlSource)) ; aadl source port is an event data port
-          |               (DataPortRefinement aadlSource aadlDest)
-          |               (EventPortRefinement aadlSource aadlDest))
+          |               (= ${AadlPortType.AadlEventDataPort.name} (select AADLPortType aadlSource))
+          |               (DataPortRefinement aadlSource aadlDest)   ; payload
+          |               (EventPortRefinement aadlSource aadlDest)) ; event
           |           false))))
           |
           |(define-fun NoNewConnections () Bool
-          |  (forall ((camkesSource CAMKESPort) (camkesDest CAMKESPort))
-          |    (=> (CAMKESConnectionFlowTos camkesSource camkesDest)
+          |  (forall ((conn CAmkESConnection) (camkesSource CAmkESPort) (camkesDest CAmkESPort))
+          |    (=> (CAmkESConnectionFlowTos conn camkesSource camkesDest)
           |        (exists ((aadlSource AADLPort) (aadlDest AADLPort))
           |          (and
           |            (PortRefinement aadlSource camkesSource)
           |            (PortRefinement aadlDest camkesDest)
-          |            (ComponentRefinement (select AADLPortComponent aadlSource) (select CAMKESPortComponent camkesSource))
-          |            (ComponentRefinement (select AADLPortComponent aadlDest) (select CAMKESPortComponent camkesDest))
+          |            (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
+          |            (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest))
           |            (AADLConnectionFlowTos aadlSource aadlDest))))))
           |
           |
@@ -258,8 +258,10 @@ object SMT2Template {
           |(push)
           |(assert (and
           |  AADLWellFormedness
-          |  CAMKESWellFormedness
+          |  CAmkESWellFormedness
           |  ConnectionPreservation
+          |  UniqueComponentRefinements
+          |  UniquePortRefinements
           |  NoNewConnections
           |))
           |(check-sat)
@@ -272,19 +274,19 @@ object SMT2Template {
           |(check-sat)
           |(pop)
           |
-          |(echo "CAMKESWellFormedness: Proves that the generated CAMKES evidence is well-formed (should be unsat):")
+          |(echo "CAmkESWellFormedness: Proves that the generated CAmkES evidence is well-formed (should be unsat):")
           |(push)
-          |(assert (not CAMKESWellFormedness))
+          |(assert (not CAmkESWellFormedness))
           |(check-sat)
           |(pop)
           |
-          |(echo "ConnectionPreservation: Proves that the generated CAMKES connections preserve AADL's (should be unsat):")
+          |(echo "ConnectionPreservation: Proves that the generated CAmkES connections preserve AADL's (should be unsat):")
           |(push)
           |(assert (not ConnectionPreservation))
           |(check-sat)
           |(pop)
           |
-          |(echo "NoNewConnections: Proves that the generated CAMKES connections does not contain more than AADL's (should be unsat):")
+          |(echo "NoNewConnections: Proves that the generated CAmkES connections does not contain more than AADL's (should be unsat):")
           |(push)
           |(assert (not NoNewConnections))
           |(check-sat)

@@ -50,8 +50,6 @@ object Act {
     val auxHFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"h").map(m => m._1)
     val auxHeaderDirectories = (Set.empty ++ auxHFiles.map(m => Os.path(m).up.value)).elements
 
-    ProofUtil.proofContainer = ProofContainer.empty()
-
     val container = Gen(model, symbolTable, aadlTypes, options).process(auxHFiles)
 
     val slangLibInstanceNames: ISZ[String] = options.platform match {
