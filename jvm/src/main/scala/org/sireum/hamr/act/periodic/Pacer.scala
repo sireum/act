@@ -224,7 +224,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     def getConnectionHolder(connectionEnd: ast.ConnectionEnd, connectionType: Sel4ConnectorTypes.Type): ConnectionHolder = {
       if (!map.contains(connectionEnd)) {
         val connectionName = Util.getConnectionName(connectionCounter.increment())
-        map = map + (connectionEnd ~> ConnectionHolder(connectionName, connectionType, MSZ(), MSZ()))
+        map = map + (connectionEnd ~> ConnectionHolder(connectionName, connectionType, ISZ(), ISZ()))
       }
 
       return map.get(connectionEnd).get
@@ -389,9 +389,9 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         holder.connectionName,
         holder.connectionType,
         ISZ(fromEnd),
-        holder.toConnectionEnds.toIS)
+        holder.toConnectionEnds)
 
-      val filtered = Set.empty[String] ++ holder.configurationEntries.toIS
+      val filtered = Set.empty[String] ++ holder.configurationEntries
       configurations = configurations ++ filtered.elements.map((m: String) => st"$m")
     }
 

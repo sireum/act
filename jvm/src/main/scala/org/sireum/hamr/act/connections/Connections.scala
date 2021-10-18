@@ -12,8 +12,8 @@ import org.sireum.hamr.ir
 
 @datatype class ConnectionHolder(connectionName: String,
                                  connectionType: Sel4ConnectorTypes.Type,
-                                 toConnectionEnds: MSZ[ast.ConnectionEnd],
-                                 configurationEntries: MSZ[String])
+                                 toConnectionEnds: ISZ[ast.ConnectionEnd],
+                                 configurationEntries: ISZ[String])
 
 @datatype class ConnectionContainer(connections: ISZ[ast.Connection],
                                     configurationEntries: ISZ[ST],
