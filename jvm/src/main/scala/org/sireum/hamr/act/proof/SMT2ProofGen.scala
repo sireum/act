@@ -3,11 +3,11 @@
 package org.sireum.hamr.act.proof
 
 import org.sireum._
-import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection}
+import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection, CAmkESPortType, ComponentPath, Direction, PortPath}
 import org.sireum.hamr.act.templates.SMT2Template
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util.{Sel4ConnectorTypes, Util}
-import org.sireum.hamr.codegen.common.{CommonUtil}
+import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.{AadlDataPort, AadlEventDataPort, AadlEventPort, AadlPort, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
