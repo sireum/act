@@ -5,6 +5,7 @@ package org.sireum.hamr.act.templates
 import org.sireum._
 import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection}
 import org.sireum.hamr.act.util.Sel4ConnectorTypes
+import org.sireum.hamr.codegen.common.symbols.AadlThread
 
 object SMT2Template {
   def portRefinement(aadlPort: String, camkesPort: String): ST = {
@@ -21,6 +22,10 @@ object SMT2Template {
 
   def aadlPortComponents(aadlComponent: String, aadlPort: String): ST = {
     return st"(assert (= ${aadlPort} (select AADLPortComponent ${aadlComponent})))"
+  }
+
+  def aadlDispatchProtocol(aadlThread: AadlThread): ST = {
+    return st"(assert (= ${aadlThread.dispatchProtocol.name} (select AADLDispatchProtocol ${aadlThread.path})))"
   }
 
   def camkesPortComponents(camkesComponent: String, camkesPort: String): ST = {
@@ -51,6 +56,9 @@ object SMT2Template {
             aadlPortTypes: ISZ[ST],
             aadlPortDirection: ISZ[ST],
             aadlConnectionFlowTos: ISZ[ST],
+            aadlDispatchProtocols: ISZ[ST],
+
+            altAadlDispatchProtocols: ST,
 
             camkesComponents: ISZ[ST],
             camkesPorts: ISZ[ST],
@@ -75,6 +83,22 @@ object SMT2Template {
       st"""(set-logic ALL)
           |
           |
+          |(declare-datatypes ((ComponentType 0)) ((
+          |  (AadlComponent)
+          |  (AadlVMComponent)
+          |  (PacerComponent)
+          |  (PeriodicDispatcher))))
+          |
+          |(declare-datatypes ((DispatchProtocol 0)) ((
+          |  (Periodic)
+          |  (Sporadic)
+          |  (UNSPECIFIED_DISPATCH_PROTOCOL))))
+          |
+          |(declare-datatypes ((SchedulingType 0)) ((
+          |  (Pacing)
+          |  (SelfPacing)
+          |  (PeriodicDispatching))))
+          |
           |(declare-datatypes ((Direction 0)) ((
           |  (In)
           |  (Out))))
@@ -86,6 +110,14 @@ object SMT2Template {
           |(declare-datatypes ((AADLComponent 0)) ((
           |  ${(aadlComponents, "\n")}
           |)))
+          |
+          |; ${aadlDispatchProtocols.size} AADLDispatchProtocol
+          |(declare-const AADLDispatchProtocol (Array AADLComponent DispatchProtocol))
+          |${(aadlDispatchProtocols, "\n")}
+          |
+          |; ${aadlDispatchProtocols.size} altAADLDispatchProtocol
+          |(define-fun altAADLDispatchProtocol ((_comp AADLComponent)) DispatchProtocol
+          |  ${altAadlDispatchProtocols})
           |
           |; ${aadlPorts.size} AADLPort
           |(declare-datatypes ((AADLPort 0)) ((
@@ -174,10 +206,18 @@ object SMT2Template {
           |          ${portMatches}
           |          false))))
           |
+          |(define-fun AADLDispatchProtocolSpecified () Bool
+          |  (forall ((_comp AADLComponent))
+          |    (not (= UNSPECIFIED_DISPATCH_PROTOCOL (select AADLDispatchProtocol _comp)))))
           |
+          |(define-fun altAADLDispatchProtocolSpecified () Bool
+          |  (forall ((_comp AADLComponent))
+          |    (not (= UNSPECIFIED_DISPATCH_PROTOCOL (altAADLDispatchProtocol _comp)))))
           |
           |(define-fun AADLWellFormedness () Bool
           |  (and
+          |    altAADLDispatchProtocolSpecified
+          |    AADLDispatchProtocolSpecified
           |    AADLFlowDirectionality
           |    AADLFlowNoSelfConnection
           |    AADLConnectedPortTypeMatch))

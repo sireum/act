@@ -20,14 +20,25 @@ object SMT2ProofGen {
                    outputDir:String): ISZ[Resource] = {
     resources = ISZ()
 
-    val aadlComponents: ISZ[ST] = container.aadlComponents.map((m: AadlThread) => {
-      val pos: Option[ST] =
-        m.component.identifier.pos match {
-          case Some(pos) => Some(st" declared at ${pos.uriOpt} (${pos.beginLine}, ${pos.beginColumn})")
-          case _ => None()
-        }
-      st"(${m.path}); Instance of ${m.component.classifier.get.name}${pos}"
-    })
+    val (aadlComponents, aadlDispatchProtocols, altAadlDispatchProtocols): (ISZ[ST], ISZ[ST], ST) = {
+      var aadlComps: ISZ[ST] = ISZ()
+      var aadlDPs: ISZ[ST] = ISZ()
+      var altAadlDPEntries: ISZ[ST] = ISZ()
+      for(t <- container.aadlComponents) {
+        val pos: Option[ST] =
+          t.component.identifier.pos match {
+            case Some(pos) => Some(st" declared at ${pos.uriOpt} (${pos.beginLine}, ${pos.beginColumn})")
+            case _ => None()
+          }
+        aadlComps = aadlComps :+ st"(${t.path}); Instance of ${t.component.classifier.get.name}${pos}"
+        aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(t)
+        altAadlDPEntries = altAadlDPEntries :+ st"(ite (= _comp ${t.path}) ${t.dispatchProtocol.name}"
+      }
+      val cparens = altAadlDPEntries.map(m => ")")
+      val x = st"""${(altAadlDPEntries, "\n")}
+                  |UNSPECIFIED_DISPATCH_PROTOCOL${(cparens, "")}"""
+      (aadlComps, aadlDPs, x)
+    }
 
     val (aadlPorts, aadlPortComponents, aadlPortTypes, aadlPortDirection): (ISZ[String], ISZ[ST], ISZ[ST], ISZ[ST]) = {
       var ports: ISZ[String] = ISZ()
@@ -100,6 +111,8 @@ object SMT2ProofGen {
       aadlPortTypes = aadlPortTypes,
       aadlPortDirection = aadlPortDirection,
       aadlConnectionFlowTos = aadlConnectionFlowTos,
+      aadlDispatchProtocols = aadlDispatchProtocols,
+      altAadlDispatchProtocols = altAadlDispatchProtocols,
 
       camkesComponents = camkesComponents,
       camkesPorts = camkesPorts,
