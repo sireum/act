@@ -34,7 +34,7 @@ object SMT2ProofGen {
         aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(t)
         altAadlDPEntries = altAadlDPEntries :+ st"(ite (= _comp ${t.path}) ${t.dispatchProtocol.name}"
       }
-      val cparens = altAadlDPEntries.map(m => ")")
+      val cparens = altAadlDPEntries.map((m: ST) => ")")
       val x = st"""${(altAadlDPEntries, "\n")}
                   |UNSPECIFIED_DISPATCH_PROTOCOL${(cparens, "")}"""
       (aadlComps, aadlDPs, x)
