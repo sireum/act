@@ -3,7 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
-import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection}
+import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection, SchedulingType}
 import org.sireum.hamr.act.util.Sel4ConnectorTypes
 import org.sireum.hamr.codegen.common.symbols.AadlThread
 
@@ -40,15 +40,15 @@ object SMT2Template {
     return st"(assert (= ${direction} (select AADLPortDirection ${aadlPort})))"
   }
 
-  def camkesConnectionType(c: CAmkESConnection): ST = {
-    return st"(assert (= ${c.typ.name} (select CAmkESConnectionType ${c.connectionName})))"
+  def camkesConnectionType(connName: String, connType: Sel4ConnectorTypes.Type): ST = {
+    return st"(assert (= ${connType.name} (select CAmkESConnectionType ${connName})))"
   }
 
-  def camkesFlowsTo(c: CAmkESConnection): ST = {
-    return st"(and (= _conn ${c.connectionName}) (= _p1 ${c.sourceCAmkESPort}) (= _p2 ${c.destCAmkESPort}))"
+  def camkesFlowsTo(connName: String, src: String, dst: String): ST = {
+    return st"(and (= _conn ${connName}) (= _p1 ${src}) (= _p2 ${dst}))"
   }
 
-  def camkesConnection(m: CAmkESConnection): ST = { return st"(${m.connectionName})" }
+  def camkesConnection(connName: String): ST = { return st"(${connName})" }
 
   def proof(aadlComponents: ISZ[ST],
             aadlPorts: ISZ[String],
@@ -68,16 +68,22 @@ object SMT2Template {
 
             camkesConnections: ISZ[ST],
 
+            selfPacingConnections: ISZ[ST],
+            pacingConnections: ISZ[ST],
+            periodicDispatchingConnections: ISZ[ST],
+
             componentRefinements: ISZ[ST],
-            portRefinements: ISZ[ST]): ST = {
+            portRefinements: ISZ[ST],
+
+            modelSchedulingType: SchedulingType.Type): ST = {
 
     val sel4ConnEnums = Sel4ConnectorTypes.elements.map((m: Sel4ConnectorTypes.Type) => st"(${m.name})")
-    val camkesPortMatches = Sel4ConnectorTypes.elements.map((m: Sel4ConnectorTypes.Type) =>
-      st"(and (= ${m.name} (select CAmkESPortType src)) (= ${m.name} (select CAmkESPortType dst)))")
 
     val aadlPortEnums = AadlPortType.elements.map((m: AadlPortType.Type) => st"(${m.name})")
     val portMatches = AadlPortType.elements.map((m: AadlPortType.Type) =>
       st"(and (= ${m.name} (select AADLPortType src)) (= ${m.name} (select AADLPortType dst)))")
+
+    val schedulingTypes: ISZ[ST] = SchedulingType.elements.map((m: SchedulingType.Type) => st"(${m.name})")
 
     val ret: ST =
       st"""(set-logic ALL)
@@ -95,9 +101,8 @@ object SMT2Template {
           |  (UNSPECIFIED_DISPATCH_PROTOCOL))))
           |
           |(declare-datatypes ((SchedulingType 0)) ((
-          |  (Pacing)
-          |  (SelfPacing)
-          |  (PeriodicDispatching))))
+          |  ${(schedulingTypes, "\n")}
+          |  (UNSPECIFIED_SCHEDULING_TYPE))))
           |
           |(declare-datatypes ((Direction 0)) ((
           |  (In)
@@ -105,6 +110,10 @@ object SMT2Template {
           |
           |(declare-datatypes ((PortType 0)) ((
           |  ${(aadlPortEnums, "\n")})))
+          |
+          |
+          |(declare-const ModelSchedulingType SchedulingType)
+          |(assert (= ModelSchedulingType ${modelSchedulingType}))
           |
           |; ${aadlComponents.size} AADLComponent
           |(declare-datatypes ((AADLComponent 0)) ((
@@ -160,6 +169,21 @@ object SMT2Template {
           |(declare-datatypes ((CAmkESConnection 0)) ((
           |  ${(camkesConnections, "\n")}
           |)))
+          |
+          |(define-fun isSelfPacingConnection ((_conn CAmkESConnection)) Bool
+          |  (and (= ModelSchedulingType SelfPacing)
+          |       (or ${(selfPacingConnections, "\n")}
+          |           false)))
+          |
+          |(define-fun isPacingConnection ((_conn CAmkESConnection)) Bool
+          |  (and (= ModelSchedulingType Pacing)
+          |       (or ${(pacingConnections, "\n")}
+          |           false)))
+          |
+          |(define-fun isPeriodicDispatchingConnection ((_conn CAmkESConnection)) Bool
+          |  (and (= ModelSchedulingType PeriodicDispatching)
+          |       (or ${(periodicDispatchingConnections, "\n")}
+          |            false)))
           |
           |; ${camkesConnectionTypes.size} CAmkESConnectionType
           |(declare-const CAmkESConnectionType (Array CAmkESConnection seL4PortType))
@@ -282,16 +306,29 @@ object SMT2Template {
           |               (EventPortRefinement aadlSource aadlDest)) ; event
           |           false))))
           |
+          |(define-fun isAADLConnectionRefinement ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) Bool
+          |  (exists ((aadlSource AADLPort) (aadlDest AADLPort))
+          |    (and
+          |      (PortRefinement aadlSource camkesSource)
+          |      (PortRefinement aadlDest camkesDest)
+          |      (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
+          |      (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest))
+          |      (AADLConnectionFlowTos aadlSource aadlDest))))
+          |
+          |(define-fun isCAmkESSchedulingConnection ((_conn CAmkESConnection)) Bool
+          |  (or
+          |    (isSelfPacingConnection _conn)
+          |    (isPacingConnection _conn)
+          |    (isPeriodicDispatchingConnection _conn)
+          |    false))
+          |
           |(define-fun NoNewConnections () Bool
           |  (forall ((conn CAmkESConnection) (camkesSource CAmkESPort) (camkesDest CAmkESPort))
           |    (=> (CAmkESConnectionFlowTos conn camkesSource camkesDest)
-          |        (exists ((aadlSource AADLPort) (aadlDest AADLPort))
-          |          (and
-          |            (PortRefinement aadlSource camkesSource)
-          |            (PortRefinement aadlDest camkesDest)
-          |            (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
-          |            (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest))
-          |            (AADLConnectionFlowTos aadlSource aadlDest))))))
+          |      (or
+          |        (isAADLConnectionRefinement camkesSource camkesDest)
+          |        (isCAmkESSchedulingConnection conn)
+          |        false))))
           |
           |
           |(echo "RefinementProof: Shows that there is a model satisfying all the constraints (should be sat):")

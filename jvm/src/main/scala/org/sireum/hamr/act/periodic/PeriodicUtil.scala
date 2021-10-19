@@ -3,9 +3,11 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
+import org.sireum.hamr.act.proof.ProofContainer.SchedulingType
 import org.sireum.hamr.act.util.{ActPlatform, Util}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties
+import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
 import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, PacerUtil, SymbolTable}
 import org.sireum.hamr.codegen.common.util.CodeGenPlatform
 
@@ -45,6 +47,34 @@ object PeriodicUtil {
     val aadlThread = symbolTable.getThreads()(0)
     val aadlProcess = aadlThread.getParent(symbolTable)
     return symbolTable.getBoundProcessor(aadlProcess).get
+  }
+
+  def getSchedulingType(symbolTable: SymbolTable, platform: ActPlatform.Type): SchedulingType.Type = {
+    val ret: SchedulingType.Type =
+      if(useDomainScheduling(symbolTable, platform)) {
+        var cand: Set[PacingMethod.Type] = Set.empty
+        for (b <- symbolTable.getAllBoundProcessors() if b.getPacingMethod().nonEmpty) {
+          cand = cand + b.getPacingMethod().get
+        }
+        if (cand.nonEmpty) {
+          assert(cand.size == 1, "Found multiple pacing strategies")
+          cand.elements(0) match {
+            case PacingMethod.SelfPacing => SchedulingType.SelfPacing
+            case PacingMethod.Pacer => SchedulingType.Pacing
+          }
+        }
+        else if (!symbolTable.hasVM()) {
+          SchedulingType.SelfPacing
+        }
+        else {
+          SchedulingType.Pacing
+        }
+      }
+      else {
+        SchedulingType.PeriodicDispatching
+      }
+
+    return ret
   }
 
   def useDomainScheduling(symbolTable: SymbolTable, platform: ActPlatform.Type): B = {

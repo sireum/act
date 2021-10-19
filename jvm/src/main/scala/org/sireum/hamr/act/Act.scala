@@ -1,7 +1,8 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.proof.{AlloyProofGen, ProofContainer, ProofUtil, SMT2ProofGen}
+import org.sireum.hamr.act.periodic.PeriodicUtil
+import org.sireum.hamr.act.proof.{ProofUtil, SMT2ProofGen}
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
@@ -60,6 +61,7 @@ object Act {
 
     if (ExperimentalOptions.generateRefinementProof(options.experimentalOptions)) {
       //resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, symbolTable, options.outputDir)
+      ProofUtil.proofContainer.modelSchedulingType = PeriodicUtil.getSchedulingType(symbolTable, options.platform)
       resources = resources ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, symbolTable, options.outputDir)
     }
 

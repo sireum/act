@@ -4,6 +4,7 @@ package org.sireum.hamr.act.periodic
 
 import org.sireum._
 import org.sireum.hamr.act._
+import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
@@ -36,7 +37,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
 
       configurations = configurations :+ PacerTemplate.domainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
 
-      connections = connections :+ Util.createConnection(
+      val connection = Util.createConnection(
         connectionName = Util.getConnectionName(connectionCounter.increment()),
         connectionType = Sel4ConnectorTypes.seL4Notification,
         srcComponent = componentId,
@@ -44,6 +45,10 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
         dstComponent = componentId,
         dstFeature = SelfPacerTemplate.selfPacerClientTockIdentifier()
       )
+
+      connections = connections :+ connection
+
+      ProofUtil.addSelfPacingConnection(connection)
     }
 
     val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
@@ -114,6 +119,9 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
       name = SelfPacerTemplate.selfPacerClientTockIdentifier(),
       typ = SelfPacerTemplate.selfPacerTickTockType(),
       optional = F)
+
+    ProofUtil.addCAmkESSelfPacerPort(aadlThread, SelfPacerTemplate.selfPacerClientTickIdentifier(), symbolTable)
+    ProofUtil.addCAmkESSelfPacerPort(aadlThread, SelfPacerTemplate.selfPacerClientTockIdentifier(), symbolTable)
 
     val shell = ast.Component(
       emits = emits,

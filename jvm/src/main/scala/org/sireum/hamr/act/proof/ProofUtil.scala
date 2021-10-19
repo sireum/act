@@ -2,16 +2,28 @@
 package org.sireum.hamr.act.proof
 
 import org.sireum._
-import org.sireum.hamr.act.util.{Sel4ConnectorTypes, Util}
-import org.sireum.hamr.codegen.common.{CommonUtil, Names}
+import org.sireum.hamr.act.ast
+import org.sireum.hamr.act.util.{Util}
+import org.sireum.hamr.codegen.common.{Names}
 import org.sireum.hamr.codegen.common.symbols.{AadlPort, AadlThread, SymbolTable}
 
 object ProofContainer {
 
-  @datatype class CAmkESConnection(connectionName: String,
-                                   sourceCAmkESPort: String,
-                                   destCAmkESPort: String,
-                                   typ: Sel4ConnectorTypes.Type)
+  @enum object CAmkESConnectionType {
+    "Refinement"
+    "SelfPacing"
+    "Pacing"
+    "PeriodicDispatching"
+  }
+
+  @datatype class CAmkESConnection(connType: CAmkESConnectionType.Type,
+                                   connection: ast.Connection)
+
+  @enum object SchedulingType {
+    "Pacing"
+    "SelfPacing"
+    "PeriodicDispatching"
+  }
 
   @enum object AadlPortType {
     "AadlDataPort"
@@ -26,25 +38,17 @@ object ProofContainer {
 
   def empty(): ProofContainer = {
     return ProofContainer(
-      ISZ(), ISZ(),
-
-      ISZ(), ISZ(), ISZ(), ISZ(), ISZ(),
-
-      ISZ(), ISZ()
+      modelSchedulingType = SchedulingType.PeriodicDispatching,
+      aadlComponents = ISZ(),
+      aadlConnections = ISZ(),
+      camkesComponents = ISZ(),
+      camkesPorts = ISZ(),
+      camkesPortConstraints = ISZ(),
+      camkesPortConnections = ISZ(),
+      camkesConnections = ISZ(),
+      componentRefinements = ISZ(),
+      portRefinements = ISZ()
     )
-  }
-
-  def merge(a1: ProofContainer, a2: ProofContainer): Unit = {
-    a1.aadlComponents = a1.aadlComponents ++ a2.aadlComponents
-    a1.aadlConnections = a1.aadlConnections ++ a2.aadlConnections
-
-    a1.camkesComponents = a1.camkesComponents ++ a2.camkesComponents
-    a1.camkesPorts = a1.camkesPorts ++ a2.camkesPorts
-    a1.camkesPortConstraints = a1.camkesPortConstraints ++ a2.camkesPortConstraints
-    a1.camkesConnections = a1.camkesConnections ++ a2.camkesConnections
-
-    a1.componentRefinements = a1.componentRefinements ++ a2.componentRefinements
-    a1.portRefinements = a1.portRefinements ++ a2.portRefinements
   }
 }
 
@@ -56,13 +60,20 @@ object ProofUtil {
 
   def reset(): Unit = { proofContainer = ProofContainer.empty() }
 
-  def addCamkesPort(aadlThread: AadlThread, aadlPort: AadlPort,
-                    camkesPortId: String, connType: Sel4ConnectorTypes.Type, symbolTable: SymbolTable): Unit = {
-      val camkesInstanceId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
-      val proofPortId = s"${camkesInstanceId}_${camkesPortId}"
+  def addCAmkESSelfPacerPort(aadlThread: AadlThread, camkesPortId: String, symbolTable: SymbolTable): Unit = {
+    val camkesInstanceId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+    val proofPortId = s"${camkesInstanceId}_${camkesPortId}"
+    ProofUtil.addCamkesPortI(proofPortId)
+    ProofUtil.addCamkesPortConstraintI(camkesInstanceId, proofPortId)
+  }
 
-      ProofUtil.addCamkesPortI(proofPortId)
-      ProofUtil.addCamkesPortConstraintI(camkesInstanceId, proofPortId, CommonUtil.isInFeature(aadlPort.feature), connType)
+  def addCamkesPortRefinement(aadlThread: AadlThread, aadlPort: AadlPort,
+                              camkesPortId: String, symbolTable: SymbolTable): Unit = {
+    val camkesInstanceId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+    val proofPortId = s"${camkesInstanceId}_${camkesPortId}"
+
+    ProofUtil.addCamkesPortI(proofPortId)
+    ProofUtil.addCamkesPortConstraintI(camkesInstanceId, proofPortId)
       ProofUtil.addPortRefinementI(aadlPort, proofPortId)
   }
 
@@ -85,14 +96,17 @@ object ProofUtil {
     proofContainer.camkesPorts = proofContainer.camkesPorts :+ camkesPortPath
   }
 
-  def addCamkesPortConstraintI(componentPath: ComponentPath, portPath: PortPath, isIn: B, camkesPortType: Sel4ConnectorTypes.Type): Unit = {
-    val dir: String = if (isIn) "In" else "Out"
-    val p = (componentPath, portPath, dir, camkesPortType.name)
+  def addCamkesPortConstraintI(componentPath: ComponentPath, portPath: PortPath): Unit = {
+    val p = (componentPath, portPath)
     proofContainer.camkesPortConstraints = proofContainer.camkesPortConstraints :+ p
   }
 
-  def addCamkesConnection(c: CAmkESConnection): Unit = {
-    proofContainer.camkesConnections = proofContainer.camkesConnections :+ c
+  def addSelfPacingConnection(c: ast.Connection): Unit = {
+    proofContainer.camkesConnections = proofContainer.camkesConnections :+ CAmkESConnection(CAmkESConnectionType.SelfPacing, c)
+  }
+
+  def addCamkesRefinementConnection(c: ast.Connection): Unit ={
+    proofContainer.camkesConnections = proofContainer.camkesConnections :+ CAmkESConnection(CAmkESConnectionType.Refinement, c)
   }
 
   def addCamkesPortConnection(srcId: String, dstId: String): Unit = {
@@ -113,12 +127,14 @@ object ProofUtil {
 }
 
 
-@record class ProofContainer(var aadlComponents: ISZ[AadlThread],
+@record class ProofContainer(var modelSchedulingType: SchedulingType.Type,
+
+                             var aadlComponents: ISZ[AadlThread],
                              var aadlConnections: ISZ[(String, String)],
 
                              var camkesComponents: ISZ[ComponentPath],
                              var camkesPorts: ISZ[PortPath],
-                             var camkesPortConstraints: ISZ[(ComponentPath, PortPath, Direction, CAmkESPortType)],
+                             var camkesPortConstraints: ISZ[(ComponentPath, PortPath)],
                              var camkesPortConnections: ISZ[(String, String)],
 
                              var camkesConnections: ISZ[CAmkESConnection],

@@ -3,10 +3,10 @@
 package org.sireum.hamr.act.proof
 
 import org.sireum._
-import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection, CAmkESPortType, ComponentPath, Direction, PortPath}
+import org.sireum.hamr.act.ast.ConnectionEnd
+import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnectionType, CAmkESPortType, ComponentPath, Direction, PortPath, SchedulingType}
 import org.sireum.hamr.act.templates.SMT2Template
-import org.sireum.hamr.act.util.Util.reporter
-import org.sireum.hamr.act.util.{Sel4ConnectorTypes, Util}
+import org.sireum.hamr.act.util.{Sel4ConnectorTypes}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.{AadlDataPort, AadlEventDataPort, AadlEventPort, AadlPort, AadlThread, SymbolTable}
@@ -73,29 +73,45 @@ object SMT2ProofGen {
     val camkesPorts: ISZ[ST] = container.camkesPorts.map((s: String) => st"($s)")
 
     val camkesPortComponents: ISZ[ST] = container.camkesPortConstraints.
-      map((r : (ComponentPath, PortPath, Direction, CAmkESPortType)) => SMT2Template.camkesPortComponents(r._2, r._1) )
+      map((r : (ComponentPath, PortPath)) => SMT2Template.camkesPortComponents(r._2, r._1) )
 
-    val (camkesConnections, camkesConnectionTypes): (ISZ[ST], ISZ[ST]) = {
-      var seen: Map[String, Sel4ConnectorTypes.Type] = Map.empty
+    val (camkesRefinementConnections,
+         camkesRefinementConnectionTypes,
+         camkesConnectionRefinementFlowTos,
+         camkesSelfPacingConnection): (ISZ[ST], ISZ[ST], ISZ[ST], ISZ[ST]) = {
+
       var _camkesConTypes:ISZ[ST] = ISZ()
       var _camkesCons: ISZ[ST] = ISZ()
-      for(c <- container.camkesConnections) {
-        if(seen.contains(c.connectionName)) {
-          if(seen.get(c.connectionName).get != c.typ) {
-            val msg = s"Found different types for CAmkES connection ${c.connectionName}: ${c.typ} ${seen.get(c.connectionName).get}"
-            reporter.error(None(), Util.toolName, msg)
-          }
-        } else {
-          seen = seen + (c.connectionName ~> c.typ)
-          _camkesCons = _camkesCons :+ SMT2Template.camkesConnection(c)
-          _camkesConTypes = _camkesConTypes :+ SMT2Template.camkesConnectionType(c)
+      var _camkesFlowsTo: ISZ[ST] = ISZ()
+      var _camkesSelfPacingConns: ISZ[ST]= ISZ()
+
+      for(holder <- container.camkesConnections) {
+        assert(holder.connection.from_ends.size == 1)
+
+        val fromEnd: ConnectionEnd = holder.connection.from_ends(0)
+
+        val src = s"${fromEnd.component}_${fromEnd.end}"
+
+        for (dstEnd <- holder.connection.to_ends) {
+          val dst = s"${dstEnd.component}_${dstEnd.end}"
+          _camkesFlowsTo = _camkesFlowsTo :+ SMT2Template.camkesFlowsTo(holder.connection.name, src, dst)
+        }
+
+        _camkesCons = _camkesCons :+ SMT2Template.camkesConnection(holder.connection.name)
+
+        _camkesConTypes = _camkesConTypes :+ SMT2Template.camkesConnectionType(
+          holder.connection.name, Sel4ConnectorTypes.byName(holder.connection.connectionType ).get)
+
+        holder.connType match {
+          case CAmkESConnectionType.Pacing =>
+          case CAmkESConnectionType.SelfPacing =>
+            _camkesSelfPacingConns = _camkesSelfPacingConns :+ st"(= _conn ${holder.connection.name})"
+          case CAmkESConnectionType.PeriodicDispatching =>
+          case _ =>
         }
       }
-      (_camkesCons, _camkesConTypes)
+      (_camkesCons, _camkesConTypes, _camkesFlowsTo, _camkesSelfPacingConns)
     }
-
-    val camkesConnectionFlowTos: ISZ[ST] = container.camkesConnections.
-      map((r: CAmkESConnection) => SMT2Template.camkesFlowsTo(r))
 
     val componentRefinements: ISZ[ST] = container.componentRefinements.
       map((r: (AadlThread, String)) => SMT2Template.componentRefinement(r._1.path, r._2))
@@ -116,14 +132,20 @@ object SMT2ProofGen {
 
       camkesComponents = camkesComponents,
       camkesPorts = camkesPorts,
-      camkesPortComponents = camkesPortComponents,
-      camkesConnectionTypes = camkesConnectionTypes,
-      camkesConnectionFlowTos = camkesConnectionFlowTos,
 
-      camkesConnections = camkesConnections,
+      camkesPortComponents = camkesPortComponents,
+      camkesConnectionTypes = camkesRefinementConnectionTypes,
+      camkesConnectionFlowTos = camkesConnectionRefinementFlowTos,
+
+      camkesConnections = camkesRefinementConnections,
+      selfPacingConnections = camkesSelfPacingConnection,
+      pacingConnections = ISZ(),
+      periodicDispatchingConnections = ISZ(),
 
       componentRefinements = componentRefinements,
-      portRefinements = portRefinements
+      portRefinements = portRefinements,
+
+      modelSchedulingType = container.modelSchedulingType
     )
 
     val path: Os.Path = Os.path(outputDir) / "proof" / "smt2_case.smt2"

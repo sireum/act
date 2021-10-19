@@ -419,7 +419,7 @@ object VMGen {
       typ = spi.structName,
       optional = F)
 
-    ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesDataPortId, Sel4ConnectorTypes.seL4SharedDataWithCaps, symbolTable)
+    ProofUtil.addCamkesPortRefinement(aadlThread, aadlPort, camkesDataPortId, symbolTable)
 
     crossConnGCMethods = crossConnGCMethods :+
       VM_Template.vm_cross_conn_extern_dataport_method(camkesDataPortId)
@@ -468,14 +468,14 @@ object VMGen {
           name
         }
 
-        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesEventPortId, Sel4ConnectorTypes.seL4GlobalAsynch, symbolTable)
+        ProofUtil.addCamkesPortRefinement(aadlThread, aadlPort, camkesEventPortId, symbolTable)
 
         dataports = dataports :+ Dataport(
           name = camkesDataPortId,
           typ = queueType,
           optional = F)
 
-        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesDataPortId, Sel4ConnectorTypes.seL4SharedDataWithCaps, symbolTable)
+        ProofUtil.addCamkesPortRefinement(aadlThread, aadlPort, camkesDataPortId, symbolTable)
 
         crossConnGCMethods = crossConnGCMethods :+
           VM_Template.vm_cross_conn_extern_dataport_method(camkesDataPortId)
@@ -506,7 +506,7 @@ object VMGen {
           name = camkesEventPortId,
           typ = Util.EVENT_NOTIFICATION_TYPE)
 
-        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesEventPortId, Sel4ConnectorTypes.seL4GlobalAsynch, symbolTable)
+        ProofUtil.addCamkesPortRefinement(aadlThread, aadlPort, camkesEventPortId, symbolTable)
 
         val camkesDataPortId = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize)
 
@@ -515,7 +515,7 @@ object VMGen {
           typ = queueType,
           optional = F)
 
-        ProofUtil.addCamkesPort(aadlThread, aadlPort, camkesDataPortId, Sel4ConnectorTypes.seL4SharedDataWithCaps, symbolTable)
+        ProofUtil.addCamkesPortRefinement(aadlThread, aadlPort, camkesDataPortId, symbolTable)
 
         crossConnGCMethods = crossConnGCMethods :+
           VM_Template.vm_cross_conn_extern_dataport_method(camkesDataPortId)

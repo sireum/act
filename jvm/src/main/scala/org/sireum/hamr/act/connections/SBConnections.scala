@@ -333,28 +333,15 @@ import org.sireum.hamr.ir
       val fromEnd: ConnectionEnd = connectionHolderEntry._1
       val holder: ConnectionHolder = connectionHolderEntry._2
 
-      {
-        val src = s"${fromEnd.component}_${fromEnd.end}"
-
-        for (dstEnd <- holder.toConnectionEnds) {
-          val dst = s"${dstEnd.component}_${dstEnd.end}"
-          ProofUtil.addCamkesPortConnection(src, dst)
-
-          val camkesConnection = CAmkESConnection(
-            connectionName = holder.connectionName,
-            sourceCAmkESPort = src,
-            destCAmkESPort = dst,
-            typ = holder.connectionType)
-
-          ProofUtil.addCamkesConnection(camkesConnection)
-        }
-      }
-
-      connections = connections :+ Util.createConnections(
+      val connection = Util.createConnections(
         holder.connectionName,
         holder.connectionType,
         ISZ(fromEnd),
         holder.toConnectionEnds)
+
+      connections = connections :+ connection
+
+      ProofUtil.addCamkesRefinementConnection(connection)
 
       val filtered = Set.empty[String] ++ holder.configurationEntries
       configurationEntries = configurationEntries ++ filtered.elements.map((m: String) => st"$m")

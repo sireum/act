@@ -3,7 +3,7 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.proof.{ProofUtil}
+import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
@@ -543,7 +543,7 @@ import org.sireum.ops.ISZOps
                 typ = samplingPort.structName
               )
 
-              ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+              ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
             }
 
             def dataPort_TB_Profile(): Unit = {
@@ -692,7 +692,7 @@ import org.sireum.ops.ISZOps
                       typ = Util.EVENT_NOTIFICATION_TYPE,
                       optional = isOptional)
 
-                    ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+                    ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
                   }
 
                   val camkesDataPortId = Util.getEventDataSBQueueDestFeatureName(f.identifier)
@@ -701,7 +701,7 @@ import org.sireum.ops.ISZOps
                     typ = queueType,
                     optional = isOptional)
 
-                  ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
 
                 case ir.Direction.Out =>
 
@@ -722,7 +722,7 @@ import org.sireum.ops.ISZOps
                         name = camkesEventPortId,
                         typ = Util.EVENT_NOTIFICATION_TYPE)
 
-                      ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+                      ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
                     }
 
                     val camkesDataPortId = Util.getEventDataSBQueueSrcFeatureName(f.identifier, queueSize)
@@ -731,7 +731,7 @@ import org.sireum.ops.ISZOps
                       typ = queueType,
                       optional = F)
 
-                    ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+                    ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
                   }
                 case _ => halt(s"Unexpected port direction: ${f.direction}")
               }
@@ -807,7 +807,7 @@ import org.sireum.ops.ISZOps
                     typ = Util.EVENT_NOTIFICATION_TYPE,
                     optional = F)
 
-                  ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
 
                   val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
                   dataports = dataports :+ Dataport(
@@ -815,7 +815,7 @@ import org.sireum.ops.ISZOps
                     typ = counterType,
                     optional = F)
 
-                  ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
 
                 case ir.Direction.Out =>
                   val camkesEventPortId = Util.getEventSBNotificationName(f.identifier)
@@ -823,7 +823,7 @@ import org.sireum.ops.ISZOps
                     name = camkesEventPortId,
                     typ = Util.EVENT_NOTIFICATION_TYPE)
 
-                  ProofUtil.addCamkesPort(aadlThread, a, camkesEventPortId, Sel4ConnectorTypes.seL4Notification, symbolTable)
+                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
 
                   val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
                   dataports = dataports :+ Dataport(
@@ -831,7 +831,7 @@ import org.sireum.ops.ISZOps
                     typ = counterType,
                     optional = F)
 
-                  ProofUtil.addCamkesPort(aadlThread, a, camkesDataPortId, Sel4ConnectorTypes.seL4SharedData, symbolTable)
+                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
 
                 case _ => halt(s"Unexpected port direction: ${f.direction}")
               }

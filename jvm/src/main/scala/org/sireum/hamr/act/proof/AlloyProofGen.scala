@@ -44,10 +44,11 @@ object AlloyProofGen {
 
     val camkesPorts: ISZ[ST] = container.camkesPorts.map((s: String) => st"$s")
 
-    val camkesPortConstraints: ISZ[ST] = container.camkesPortConstraints.
-      map((r : (ComponentPath, PortPath, Direction, CAmkESPortType)) =>
-        st"""${r._2}.component = ${r._1}
-            |${r._2}.direction = ${r._3}""")
+    val camkesPortConstraints: ISZ[ST] = ISZ()
+    //container.camkesPortConstraints.
+      //map((r : (ComponentPath, PortPath, Direction, CAmkESPortType)) =>
+        //st"""${r._2}.component = ${r._1}
+          //  |${r._2}.direction = ${r._3}""")
 
     val camkesConnections: ISZ[ST] = container.camkesPortConnections.
       map((r: (String, String)) => st"${r._1} -> ${r._2}")
