@@ -118,7 +118,8 @@ object JSON {
     @pure def printLibraryComponent(o: LibraryComponent): ST = {
       return printObject(ISZ(
         ("type", st""""LibraryComponent""""),
-        ("name", printString(o.name))
+        ("name", printString(o.name)),
+        ("ports", printISZ(T, o.ports, printString _))
       ))
     }
 
@@ -293,7 +294,7 @@ object JSON {
 
   }
 
-  @record class Parser(input: String) {
+  @record class Parser(val input: String) {
     val parser: Json.Parser = Json.Parser.create(input)
 
     def errorOpt: Option[Json.ErrorMsg] = {
@@ -472,7 +473,10 @@ object JSON {
       parser.parseObjectKey("name")
       val name = parser.parseString()
       parser.parseObjectNext()
-      return LibraryComponent(name)
+      parser.parseObjectKey("ports")
+      val ports = parser.parseISZ(parser.parseString _)
+      parser.parseObjectNext()
+      return LibraryComponent(name, ports)
     }
 
     def parseUses(): Uses = {

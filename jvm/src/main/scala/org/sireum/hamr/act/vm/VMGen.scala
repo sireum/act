@@ -5,6 +5,7 @@ import org.sireum._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.Connections
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
+import org.sireum.hamr.act.proof.ProofContainer.CAmkESComponentCategory
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.util._
@@ -374,7 +375,10 @@ object VMGen {
 
     includes = includes + PacerTemplate.pacerDataportFilenameForIncludes()
 
-    val c = Component(
+    val c = Util.createCAmkESComponent(
+      aadlThread = None(),
+      componentCategory = CAmkESComponentCategory.VM_Refinement,
+
       control = T,
       hardware = F,
       name = Util.getCamkesComponentName(aadlThread, symbolTable),

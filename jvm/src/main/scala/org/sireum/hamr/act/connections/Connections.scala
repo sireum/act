@@ -100,12 +100,4 @@ object Connections {
     }
     return ret
   }
-
-  def createConnection(connectionCounter: Counter,
-                       connectionType: Sel4ConnectorTypes.Type,
-                       srcComponent: String, srcFeature: String,
-                       dstComponent: String, dstFeature: String): ast.Connection = {
-    val connectionName = Util.getConnectionName(connectionCounter.increment())
-    return Util.createConnection(connectionName, connectionType, srcComponent, srcFeature, dstComponent, dstFeature)
-  }
 }

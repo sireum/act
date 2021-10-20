@@ -51,7 +51,8 @@ import org.sireum._
                          ) extends CamkesComponent
 
 
-@datatype class LibraryComponent(val name: String) extends CamkesComponent
+@datatype class LibraryComponent(val name: String,
+                                 val ports: ISZ[String]) extends CamkesComponent
 
 @datatype class Uses(name: String,
                      typ: String,

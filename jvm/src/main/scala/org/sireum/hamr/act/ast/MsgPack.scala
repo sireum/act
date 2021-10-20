@@ -163,6 +163,7 @@ object MsgPack {
     def writeLibraryComponent(o: LibraryComponent): Unit = {
       writer.writeZ(Constants.LibraryComponent)
       writer.writeString(o.name)
+      writer.writeISZ(o.ports, writer.writeString _)
     }
 
     def writeUses(o: Uses): Unit = {
@@ -427,7 +428,8 @@ object MsgPack {
         reader.expectZ(Constants.LibraryComponent)
       }
       val name = reader.readString()
-      return LibraryComponent(name)
+      val ports = reader.readISZ(reader.readString _)
+      return LibraryComponent(name, ports)
     }
 
     def readUses(): Uses = {

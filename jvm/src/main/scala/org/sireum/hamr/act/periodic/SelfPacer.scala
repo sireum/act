@@ -4,6 +4,7 @@ package org.sireum.hamr.act.periodic
 
 import org.sireum._
 import org.sireum.hamr.act._
+import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
@@ -38,6 +39,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
       configurations = configurations :+ PacerTemplate.domainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
 
       val connection = Util.createConnection(
+        connectionCategory = CAmkESConnectionType.SelfPacing,
         connectionName = Util.getConnectionName(connectionCounter.increment()),
         connectionType = Sel4ConnectorTypes.seL4Notification,
         srcComponent = componentId,
@@ -47,8 +49,6 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
       )
 
       connections = connections :+ connection
-
-      ProofUtil.addSelfPacingConnection(connection)
     }
 
     val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)

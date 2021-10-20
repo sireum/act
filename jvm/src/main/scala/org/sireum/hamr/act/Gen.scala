@@ -9,6 +9,7 @@ import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.connections._
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
+import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.templates._
 import org.sireum.hamr.act.util.PathUtil
 import org.sireum.hamr.act.util.Util.reporter
@@ -260,8 +261,9 @@ import org.sireum.ops.ISZOps
             val (component, auxResources) =
               VMGen(useDomainScheduling, symbolTable, typeMap, samplingPorts, srcQueues, actOptions).genThread(aadlThread)
 
-            instances = instances :+
-              Instance(address_space = "",
+            instances = instances :+ Util.createCAmkESInstance(
+              originAadl = None(),
+                address_space = "",
                 name = processId,
                 component = component
               )
@@ -271,7 +273,8 @@ import org.sireum.ops.ISZOps
 
             auxResourceFiles = auxResourceFiles ++ auxResources
 
-            connections = connections :+ Connections.createConnection(
+            connections = connections :+ Util.createConnectionC(
+              CAmkESConnectionType.VM,
               connectionCounter,
               Sel4ConnectorTypes.seL4VMDTBPassthrough,
               processId, "dtb_self",
@@ -299,11 +302,13 @@ import org.sireum.ops.ISZOps
             auxResourceFiles = auxResourceFiles :+ Util.sbCounterTypeDeclResource()
 
           } else {
-            instances = instances :+
-              Instance(address_space = "",
-                name = camkesComponentId,
-                component = genThread(aadlThread)
-              )
+            instances = instances :+ Util.createCAmkESInstance(
+              originAadl = Some(aadlThread),
+
+              address_space = "",
+              name = camkesComponentId,
+              component = genThread(aadlThread)
+            )
           }
 
           PropertyUtil.getStackSizeInBytes(sc.component) match {
@@ -1024,7 +1029,10 @@ import org.sireum.ops.ISZOps
       cmakeLIBS = ISZ()
     )
 
-    val comp = Component(
+    val comp = Util.createCAmkESComponent(
+      aadlThread = Some(aadlThread),
+      componentCategory = CAmkESComponentCategory.Refinement,
+
       control = T,
       hardware = F,
       name = cid,
@@ -1046,16 +1054,6 @@ import org.sireum.ops.ISZOps
 
       externalEntities = ISZ()
     )
-
-    {
-      val camkesInstanceId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
-
-      ProofUtil.addAadlComponent(aadlThread, names, symbolTable)
-
-      ProofUtil.addCamkesComponent(camkesInstanceId)
-
-      ProofUtil.addComponentRefinement(aadlThread, camkesInstanceId)
-    }
 
     return comp
   }
@@ -1295,7 +1293,10 @@ import org.sireum.ops.ISZOps
 
           val providesVarName = "mon"
 
-          val monitor = Component(
+          val monitor = Util.createCAmkESComponent(
+            aadlThread = None(),
+            componentCategory = CAmkESComponentCategory.Monitor,
+
             control = F,
             hardware = F,
             name = monitorName,
@@ -1373,7 +1374,10 @@ import org.sireum.ops.ISZOps
           val paramType = typeMap.get(typeName).get
           val paramTypeName = Util.getSel4TypeName(paramType, performHamrIntegration)
 
-          val monitor = Component(
+          val monitor = Util.createCAmkESComponent(
+            aadlThread = None(),
+            componentCategory = CAmkESComponentCategory.Monitor,
+
             control = F,
             hardware = F,
             name = monitorName,
@@ -1458,7 +1462,10 @@ import org.sireum.ops.ISZOps
           val providesReceiverVarName = "mon_receive"
           val providesSenderVarName = "mon_send"
 
-          val monitor = Component(
+          val monitor = Util.createCAmkESComponent(
+            aadlThread = None(),
+            componentCategory = CAmkESComponentCategory.Monitor,
+
             control = F,
             hardware = F,
             name = monitorName,

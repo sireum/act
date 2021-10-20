@@ -61,6 +61,10 @@ object SMT2Template {
             altAadlDispatchProtocols: ST,
 
             camkesComponents: ISZ[ST],
+            periodicDispatcherComponent: Option[ST],
+            pacerComponent: Option[ST],
+            timeServerComponent: Option[ST],
+
             camkesPorts: ISZ[ST],
             camkesPortComponents: ISZ[ST],
             camkesConnectionTypes: ISZ[ST],
@@ -160,6 +164,21 @@ object SMT2Template {
           |  ${(camkesComponents, "\n")}
           |)))
           |
+          |(define-fun isPeriodicDispatcher ((_component CAmkESComponent)) Bool
+          |  (and (= ModelSchedulingType PeriodicDispatching)
+          |       (or ${periodicDispatcherComponent}
+          |           false)))
+          |
+          |(define-fun isPacer ((_component CAmkESComponent)) Bool
+          |  (and (= ModelSchedulingType Pacing)
+          |       (or ${pacerComponent}
+          |           false)))
+          |
+          |(define-fun isTimeServer ((_component CAmkESComponent)) Bool
+          |  (and ; TODO - list scenarios where a time server is expected
+          |       (or ${timeServerComponent}
+          |           false)))
+          |
           |; ${camkesPorts.size} CAmkESPort
           |(declare-datatypes ((CAmkESPort 0)) ((
           |  ${(camkesPorts, "\n")}
@@ -183,7 +202,7 @@ object SMT2Template {
           |(define-fun isPeriodicDispatchingConnection ((_conn CAmkESConnection)) Bool
           |  (and (= ModelSchedulingType PeriodicDispatching)
           |       (or ${(periodicDispatchingConnections, "\n")}
-          |            false)))
+          |           false)))
           |
           |; ${camkesConnectionTypes.size} CAmkESConnectionType
           |(declare-const CAmkESConnectionType (Array CAmkESConnection seL4PortType))

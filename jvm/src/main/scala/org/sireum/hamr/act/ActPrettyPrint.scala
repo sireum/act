@@ -331,10 +331,6 @@ import org.sireum.ops.StringOps
       instances = instances :+ st"""component ${i.component.name} ${i.name};"""
     }
 
-    if(actContainer.get.requiresTimeServer) {
-      instances = instances :+ st"component ${PeriodicDispatcherTemplate.TIMER_SERVER_CLASSIFIER} ${PeriodicDispatcherTemplate.TIMER_INSTANCE};"
-    }
-
     for(c <- o.connections) {
       val froms = c.from_ends.map((m: ast.ConnectionEnd) => st"from ${m.component}.${m.end}")
       val tos = c.to_ends.map((m: ast.ConnectionEnd) => st"to ${m.component}.${m.end}")

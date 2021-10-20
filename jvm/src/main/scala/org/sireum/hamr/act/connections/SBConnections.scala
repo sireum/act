@@ -6,7 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.ast.{Attribute, ConnectionEnd, ConnectorType}
-import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnection
+import org.sireum.hamr.act.proof.ProofContainer.{CAmkESConnectionType}
 import org.sireum.hamr.act.templates.ConnectionsSbTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
@@ -333,15 +333,12 @@ import org.sireum.hamr.ir
       val fromEnd: ConnectionEnd = connectionHolderEntry._1
       val holder: ConnectionHolder = connectionHolderEntry._2
 
-      val connection = Util.createConnections(
+      connections = connections :+ Util.createConnections(
+        CAmkESConnectionType.Refinement,
         holder.connectionName,
         holder.connectionType,
         ISZ(fromEnd),
         holder.toConnectionEnds)
-
-      connections = connections :+ connection
-
-      ProofUtil.addCamkesRefinementConnection(connection)
 
       val filtered = Set.empty[String] ++ holder.configurationEntries
       configurationEntries = configurationEntries ++ filtered.elements.map((m: String) => st"$m")

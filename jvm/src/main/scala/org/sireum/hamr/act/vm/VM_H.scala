@@ -190,7 +190,7 @@ object VM_GENERAL_COMPOSITION_DEF {
       Instance(
         address_space = "",
         name = "fserv",
-        component = LibraryComponent(name = "FileServer")
+        component = LibraryComponent(name = "FileServer", ports = ISZ())
       )
     )
     return ret
@@ -255,11 +255,11 @@ object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
       Instance(
         address_space = "",
         name = serial,
-        component = LibraryComponent(name = "SerialServer")),
+        component = LibraryComponent(name = "SerialServer", ports = ISZ())),
       Instance(
         address_space = "",
         name = time_server,
-        component = LibraryComponent(name = "TimeServer"))
+        component = LibraryComponent(name = "TimeServer", ports = ISZ()))
     )
     return ret
   }

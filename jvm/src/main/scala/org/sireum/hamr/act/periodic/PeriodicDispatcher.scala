@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate._
+import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
@@ -45,6 +46,7 @@ import org.sireum.hamr.codegen.common.symbols._
         if(hookupPeriodicComponentsToTimeServer) {
           // connect camkes component to time server
           connections = connections :+ Util.createConnection(
+            CAmkESConnectionType.PeriodicDispatching,
             Util.getConnectionName(connectionCounter.increment()),
             Sel4ConnectorTypes.seL4TimeServer,
             camkesComponentId, PeriodicDispatcherTemplate.TIMER_ID,
@@ -65,6 +67,7 @@ import org.sireum.hamr.codegen.common.symbols._
 
         // connect dispatcher to component
         connections = connections :+ Util.createConnection(
+          CAmkESConnectionType.PeriodicDispatching,
           Util.getConnectionName(connectionCounter.increment()),
           Sel4ConnectorTypes.seL4Notification,
           PeriodicDispatcherTemplate.DISPATCH_PERIODIC_INSTANCE, dispatcherNotificationName,
@@ -85,6 +88,7 @@ import org.sireum.hamr.codegen.common.symbols._
       val dispatchCamkesComponent: ast.Instance = genDispatchCamkesComponent(periodicDispatcherNotifications)
 
       instances = instances :+ dispatchCamkesComponent
+      instances = instances :+ timerComponent()
 
       val dispatchCSource = PeriodicDispatcherTemplate.dispatchComponentCSource(
         headerInclude, periodicDispatcherCalendars)
@@ -102,6 +106,7 @@ import org.sireum.hamr.codegen.common.symbols._
 
       // connect dispatch timer to time server
       connections = connections :+ Util.createConnection(
+        CAmkESConnectionType.PeriodicDispatching,
         Util.getConnectionName(connectionCounter.increment()),
         Sel4ConnectorTypes.seL4TimeServer,
         PeriodicDispatcherTemplate.DISPATCH_PERIODIC_INSTANCE, PeriodicDispatcherTemplate.TIMER_ID_DISPATCHER,
@@ -109,6 +114,7 @@ import org.sireum.hamr.codegen.common.symbols._
 
       // connect notification/callback from time server to dispatch timer
       connections = connections :+ Util.createConnection(
+        CAmkESConnectionType.PeriodicDispatching,
         Util.getConnectionName(connectionCounter.increment()),
         Sel4ConnectorTypes.seL4GlobalAsynchCallback,
         PeriodicDispatcherTemplate.TIMER_INSTANCE, PeriodicDispatcherTemplate.TIMER_SERVER_NOTIFICATION_ID,
@@ -211,10 +217,14 @@ import org.sireum.hamr.codegen.common.symbols._
   }
 
   def genDispatchCamkesComponent(notifications: ISZ[ast.Emits]): ast.Instance = {
-    val i = ast.Instance(
+    val i = Util.createCAmkESInstance(
+      originAadl = None(),
+
       address_space = "",
       name = DISPATCH_PERIODIC_INSTANCE,
-      component = ast.Component(
+      component = Util.createCAmkESComponent(
+        aadlThread = None(),
+        componentCategory = CAmkESComponentCategory.PeriodicDispatcher,
         control = T,
         hardware = F,
         name = DISPATCH_CLASSIFIER,
@@ -242,30 +252,16 @@ import org.sireum.hamr.codegen.common.symbols._
   }
 
   def timerComponent(): ast.Instance = {
-    val i = ast.Instance(
+    val i = Util.createCAmkESInstance(
+      originAadl = None(),
+
       address_space = "",
       name = TIMER_INSTANCE,
-      component = ast.Component(
-        control = F,
-        hardware = F,
+      component = Util.createCAmkESLibraryComponent(
+        componentCategory = CAmkESComponentCategory.TimeServer,
+
         name = TIMER_SERVER_CLASSIFIER,
-        mutexes = ISZ(),
-        binarySemaphores = ISZ(),
-        semaphores = ISZ(),
-        dataports = ISZ(),
-        emits = ISZ(ast.Emits(
-          name = TIMER_SERVER_NOTIFICATION_ID,
-          typ = Util.NOTIFICATION_TYPE)),
-        uses = ISZ(),
-        consumes = ISZ(),
-        provides = ISZ(ast.Provides(
-          name = TIMER_SERVER_TIMER_ID,
-          typ = TIMER_TYPE)),
-        includes = ISZ(),
-        attributes = ISZ(),
-        preprocessorIncludes = ISZ(),
-        imports = ISZ(),
-        externalEntities = ISZ()
+        ports = ISZ(TIMER_SERVER_NOTIFICATION_ID, TIMER_SERVER_TIMER_ID)
       )
     )
     return i

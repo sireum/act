@@ -3,17 +3,27 @@ package org.sireum.hamr.act.proof
 
 import org.sireum._
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.util.{Util}
-import org.sireum.hamr.codegen.common.{Names}
-import org.sireum.hamr.codegen.common.symbols.{AadlPort, AadlThread, SymbolTable}
+import org.sireum.hamr.act.util.Util
+import org.sireum.hamr.codegen.common.Names
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlThread, SymbolTable}
 
 object ProofContainer {
+
+  @enum object CAmkESComponentCategory {
+    "Refinement"
+    "VM_Refinement"
+    "Pacer"
+    "TimeServer"
+    "PeriodicDispatcher"
+    "Monitor"
+  }
 
   @enum object CAmkESConnectionType {
     "Refinement"
     "SelfPacing"
     "Pacing"
     "PeriodicDispatching"
+    "VM"
   }
 
   @datatype class CAmkESConnection(connType: CAmkESConnectionType.Type,
@@ -41,7 +51,10 @@ object ProofContainer {
       modelSchedulingType = SchedulingType.PeriodicDispatching,
       aadlComponents = ISZ(),
       aadlConnections = ISZ(),
-      camkesComponents = ISZ(),
+
+      camkesInstances = ISZ(),
+      camkesComponents = Map.empty,
+
       camkesPorts = ISZ(),
       camkesPortConstraints = ISZ(),
       camkesPortConnections = ISZ(),
@@ -87,9 +100,12 @@ object ProofUtil {
     proofContainer.aadlConnections = proofContainer.aadlConnections :+ p
   }
 
+  def addCAmkESInstance(aadlOrigin: Option[AadlComponent], component: ast.Instance): Unit = {
+    proofContainer.camkesInstances = proofContainer.camkesInstances :+ ((aadlOrigin, component))
+  }
 
-  def addCamkesComponent(camkesComponentPath: ComponentPath): Unit = {
-    proofContainer.camkesComponents = proofContainer.camkesComponents :+ camkesComponentPath
+  def addCamkesComponent(component: ast.CamkesComponent, componentCategory: CAmkESComponentCategory.Type): Unit = {
+    proofContainer.camkesComponents = proofContainer.camkesComponents + (component ~> componentCategory)
   }
 
   def addCamkesPortI(camkesPortPath: PortPath): Unit = {
@@ -101,12 +117,8 @@ object ProofUtil {
     proofContainer.camkesPortConstraints = proofContainer.camkesPortConstraints :+ p
   }
 
-  def addSelfPacingConnection(c: ast.Connection): Unit = {
-    proofContainer.camkesConnections = proofContainer.camkesConnections :+ CAmkESConnection(CAmkESConnectionType.SelfPacing, c)
-  }
-
-  def addCamkesRefinementConnection(c: ast.Connection): Unit ={
-    proofContainer.camkesConnections = proofContainer.camkesConnections :+ CAmkESConnection(CAmkESConnectionType.Refinement, c)
+  def addCAmkESConnection(connectionCategory: CAmkESConnectionType.Type, c: ast.Connection): Unit = {
+    proofContainer.camkesConnections = proofContainer.camkesConnections :+ CAmkESConnection(connectionCategory, c)
   }
 
   def addCamkesPortConnection(srcId: String, dstId: String): Unit = {
@@ -132,7 +144,9 @@ object ProofUtil {
                              var aadlComponents: ISZ[AadlThread],
                              var aadlConnections: ISZ[(String, String)],
 
-                             var camkesComponents: ISZ[ComponentPath],
+                             var camkesComponents: Map[ast.CamkesComponent, CAmkESComponentCategory.Type],
+                             var camkesInstances: ISZ[(Option[AadlComponent], ast.Instance)],
+
                              var camkesPorts: ISZ[PortPath],
                              var camkesPortConstraints: ISZ[(ComponentPath, PortPath)],
                              var camkesPortConnections: ISZ[(String, String)],

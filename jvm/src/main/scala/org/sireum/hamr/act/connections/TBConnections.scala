@@ -3,6 +3,7 @@ package org.sireum.hamr.act.connections
 
 import org.sireum._
 import org.sireum.hamr.act.ast
+import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
@@ -91,7 +92,8 @@ import org.sireum.hamr.ir
               val dstId = accessComponentId(dstComp.identifier)
 
               if (ownerId != dstId) {
-                connections = connections :+ Connections.createConnection(
+                connections = connections :+ Util.createConnectionC(
+                  connectionCategory = CAmkESConnectionType.Refinement,
                   connectionCounter = connectionCounter,
                   connectionType = Sel4ConnectorTypes.seL4SharedData,
                   srcComponent = dstComponentId,
@@ -118,7 +120,8 @@ import org.sireum.hamr.ir
   def createSeL4GlobalAsynchConnection(connectionCounter: Counter,
                                        srcComponent: String, srcFeature: String,
                                        dstComponent: String, dstFeature: String): ast.Connection = {
-    return Connections.createConnection(
+    return Util.createConnectionC(
+      CAmkESConnectionType.Refinement,
       connectionCounter,
       Sel4ConnectorTypes.seL4GlobalAsynch,
       srcComponent, srcFeature,
@@ -128,7 +131,8 @@ import org.sireum.hamr.ir
   def createSeL4NotificationConnection(connectionCounter: Counter,
                                        srcComponent: String, srcFeature: String,
                                        dstComponent: String, dstFeature: String): ast.Connection = {
-    return Connections.createConnection(
+    return Util.createConnectionC(
+      CAmkESConnectionType.Refinement,
       connectionCounter,
       Sel4ConnectorTypes.seL4Notification,
       srcComponent, srcFeature,
@@ -138,7 +142,8 @@ import org.sireum.hamr.ir
   def createRPCConnection(connectionCounter: Counter,
                           srcComponent: String, srcFeature: String,
                           dstComponent: String, dstFeature: String) : ast.Connection = {
-    return Connections.createConnection(
+    return Util.createConnectionC(
+      CAmkESConnectionType.Refinement,
       connectionCounter,
       Sel4ConnectorTypes.seL4RPCCall,
       srcComponent, srcFeature,
@@ -159,7 +164,8 @@ import org.sireum.hamr.ir
     camkesConfiguration = camkesConfiguration :+ st"""${srcComponent}.${srcFeatureName}_access = "W";"""
     camkesConfiguration = camkesConfiguration :+ st"""${dstComponent}.${dstFeatureName}_access = "R";"""
 
-    return Connections.createConnection(
+    return Util.createConnectionC(
+      CAmkESConnectionType.Refinement,
       connectionCounter,
       Sel4ConnectorTypes.seL4SharedData,
       srcComponent, srcFeatureName,
@@ -178,7 +184,8 @@ import org.sireum.hamr.ir
     val srcFeatureName = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
     val dstFeatureName = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
 
-    return Connections.createConnection(
+    return Util.createConnectionC(
+      CAmkESConnectionType.Refinement,
       connectionCounter,
       Sel4ConnectorTypes.seL4SharedData,
       srcComponent, srcFeatureName,

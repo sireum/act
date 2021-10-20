@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act._
 import org.sireum.hamr.act.ast.{Consumes, Dataport, Emits}
 import org.sireum.hamr.act.connections.ConnectionHolder
+import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
@@ -59,6 +60,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       
       // tick/tock connection
       connections = connections :+ Util.createConnection(
+        CAmkESConnectionType.Pacing,
         Util.getConnectionName(connectionCounter.increment()),
         Sel4ConnectorTypes.seL4Notification,
         PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_TICK_IDENTIFIER,
@@ -112,6 +114,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
           if(!useCaseConnectors) {
             // connect notification to client
             connections = connections :+ Util.createConnection(
+              connectionCategory = CAmkESConnectionType.Pacing,
               connectionName = Util.getConnectionName(connectionCounter.increment()),
               connectionType = Sel4ConnectorTypes.seL4GlobalAsynch,
               srcComponent = PacerTemplate.PACER_IDENTIFIER,
@@ -128,6 +131,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
           // connect queue to client
           connections = connections :+ Util.createConnection(
+            connectionCategory = CAmkESConnectionType.Pacing,
             connectionName = connectionName,
             connectionType = dataportConnectorType,
             srcComponent = PacerTemplate.PACER_IDENTIFIER,
@@ -149,6 +153,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
           // connect period notification to client
           connections = connections :+ Util.createConnection(
+            connectionCategory = CAmkESConnectionType.Pacing,
             connectionName = Util.getConnectionName(connectionCounter.increment()),
             connectionType = Sel4ConnectorTypes.seL4Notification,
             srcComponent = PacerTemplate.PACER_IDENTIFIER,
@@ -253,6 +258,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
       // tick/tock connection
       connections = connections :+ Util.createConnection(
+        CAmkESConnectionType.Pacing,
         Util.getConnectionName(connectionCounter.increment()),
         Sel4ConnectorTypes.seL4Notification,
         PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_TICK_IDENTIFIER,
@@ -386,6 +392,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       val holder = connectionHolderEntry._2
 
       connections = connections :+ Util.createConnections(
+        CAmkESConnectionType.Pacing,
         holder.connectionName,
         holder.connectionType,
         ISZ(fromEnd),
@@ -532,10 +539,15 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       typ = PacerTemplate.PACER_TICK_TOCK_TYPE,
       optional = F)
 
-    val instance: ast.Instance = ast.Instance(
+    val instance: ast.Instance = Util.createCAmkESInstance(
+      originAadl = None(),
+
       address_space = "",
       name = PacerTemplate.PACER_IDENTIFIER,
-      component = ast.Component(
+      component = Util.createCAmkESComponent(
+        aadlThread = None(),
+        componentCategory = CAmkESComponentCategory.Pacer,
+
         control =  T,
         hardware = F,
         name = PacerTemplate.PACER_COMPONENT_TYPE,
