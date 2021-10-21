@@ -300,6 +300,46 @@ import MTransformer._
     return PreResultLibraryComponent
   }
 
+  def preCAmkESFeature(o: CAmkESFeature): PreResult[CAmkESFeature] = {
+    o match {
+      case o: Uses =>
+        val r: PreResult[CAmkESFeature] = preUses(o) match {
+         case PreResult(continu, MSome(r: CAmkESFeature)) => PreResult(continu, MSome[CAmkESFeature](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CAmkESFeature")
+         case PreResult(continu, _) => PreResult(continu, MNone[CAmkESFeature]())
+        }
+        return r
+      case o: Provides =>
+        val r: PreResult[CAmkESFeature] = preProvides(o) match {
+         case PreResult(continu, MSome(r: CAmkESFeature)) => PreResult(continu, MSome[CAmkESFeature](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CAmkESFeature")
+         case PreResult(continu, _) => PreResult(continu, MNone[CAmkESFeature]())
+        }
+        return r
+      case o: Emits =>
+        val r: PreResult[CAmkESFeature] = preEmits(o) match {
+         case PreResult(continu, MSome(r: CAmkESFeature)) => PreResult(continu, MSome[CAmkESFeature](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CAmkESFeature")
+         case PreResult(continu, _) => PreResult(continu, MNone[CAmkESFeature]())
+        }
+        return r
+      case o: Consumes =>
+        val r: PreResult[CAmkESFeature] = preConsumes(o) match {
+         case PreResult(continu, MSome(r: CAmkESFeature)) => PreResult(continu, MSome[CAmkESFeature](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CAmkESFeature")
+         case PreResult(continu, _) => PreResult(continu, MNone[CAmkESFeature]())
+        }
+        return r
+      case o: Dataport =>
+        val r: PreResult[CAmkESFeature] = preDataport(o) match {
+         case PreResult(continu, MSome(r: CAmkESFeature)) => PreResult(continu, MSome[CAmkESFeature](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CAmkESFeature")
+         case PreResult(continu, _) => PreResult(continu, MNone[CAmkESFeature]())
+        }
+        return r
+    }
+  }
+
   def preUses(o: Uses): PreResult[Uses] = {
     return PreResultUses
   }
@@ -538,6 +578,46 @@ import MTransformer._
 
   def postLibraryComponent(o: LibraryComponent): MOption[LibraryComponent] = {
     return PostResultLibraryComponent
+  }
+
+  def postCAmkESFeature(o: CAmkESFeature): MOption[CAmkESFeature] = {
+    o match {
+      case o: Uses =>
+        val r: MOption[CAmkESFeature] = postUses(o) match {
+         case MSome(result: CAmkESFeature) => MSome[CAmkESFeature](result)
+         case MSome(_) => halt("Can only produce object of type CAmkESFeature")
+         case _ => MNone[CAmkESFeature]()
+        }
+        return r
+      case o: Provides =>
+        val r: MOption[CAmkESFeature] = postProvides(o) match {
+         case MSome(result: CAmkESFeature) => MSome[CAmkESFeature](result)
+         case MSome(_) => halt("Can only produce object of type CAmkESFeature")
+         case _ => MNone[CAmkESFeature]()
+        }
+        return r
+      case o: Emits =>
+        val r: MOption[CAmkESFeature] = postEmits(o) match {
+         case MSome(result: CAmkESFeature) => MSome[CAmkESFeature](result)
+         case MSome(_) => halt("Can only produce object of type CAmkESFeature")
+         case _ => MNone[CAmkESFeature]()
+        }
+        return r
+      case o: Consumes =>
+        val r: MOption[CAmkESFeature] = postConsumes(o) match {
+         case MSome(result: CAmkESFeature) => MSome[CAmkESFeature](result)
+         case MSome(_) => halt("Can only produce object of type CAmkESFeature")
+         case _ => MNone[CAmkESFeature]()
+        }
+        return r
+      case o: Dataport =>
+        val r: MOption[CAmkESFeature] = postDataport(o) match {
+         case MSome(result: CAmkESFeature) => MSome[CAmkESFeature](result)
+         case MSome(_) => halt("Can only produce object of type CAmkESFeature")
+         case _ => MNone[CAmkESFeature]()
+        }
+        return r
+    }
   }
 
   def postUses(o: Uses): MOption[Uses] = {
@@ -933,6 +1013,56 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: LibraryComponent = r.getOrElse(o)
     val postR: MOption[LibraryComponent] = postLibraryComponent(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformCAmkESFeature(o: CAmkESFeature): MOption[CAmkESFeature] = {
+    val preR: PreResult[CAmkESFeature] = preCAmkESFeature(o)
+    val r: MOption[CAmkESFeature] = if (preR.continu) {
+      val o2: CAmkESFeature = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: MOption[CAmkESFeature] = o2 match {
+        case o2: Uses =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+        case o2: Provides =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+        case o2: Emits =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+        case o2: Consumes =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+        case o2: Dataport =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: CAmkESFeature = r.getOrElse(o)
+    val postR: MOption[CAmkESFeature] = postCAmkESFeature(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {

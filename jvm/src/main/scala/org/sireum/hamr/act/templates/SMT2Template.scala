@@ -5,7 +5,7 @@ package org.sireum.hamr.act.templates
 import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection, SchedulingType}
-import org.sireum.hamr.act.util.Sel4ConnectorTypes
+import org.sireum.hamr.act.util.{ActPlatform, Sel4ConnectorTypes}
 import org.sireum.hamr.codegen.common.symbols.AadlThread
 
 object SMT2Template {
@@ -51,7 +51,9 @@ object SMT2Template {
 
   def camkesConnection(connName: String): ST = { return st"(${connName})" }
 
-  def proof(aadlComponents: ISZ[ST],
+  def proof(mode: ActPlatform.Type,
+
+            aadlComponents: ISZ[ST],
             aadlPorts: ISZ[String],
             aadlPortComponents: ISZ[ST],
             aadlPortTypes: ISZ[ST],
@@ -62,9 +64,11 @@ object SMT2Template {
             altAadlDispatchProtocols: ST,
 
             camkesComponents: ISZ[ST],
+
             periodicDispatcherComponent: Option[ST],
             pacerComponent: Option[ST],
             timeServerComponent: Option[ST],
+            monitors: ISZ[ST],
 
             camkesPorts: ISZ[ST],
             camkesDataPortAccessRestrictions: ISZ[ST],
@@ -93,9 +97,13 @@ object SMT2Template {
 
     val accessTypes: ISZ[ST] = ast.AccessType.elements.map((m: ast.AccessType.Type) => st"(${m.name})")
 
+    val modes: ISZ[ST] = ActPlatform.elements.map((m: ActPlatform.Type) => st"(${m.name})")
+
     val ret: ST =
       st"""(set-logic ALL)
           |
+          |(declare-datatypes ((Mode 0)) ((
+          |  ${(modes, "\n")})))
           |
           |(declare-datatypes ((ComponentType 0)) ((
           |  (AadlComponent)
@@ -119,6 +127,9 @@ object SMT2Template {
           |(declare-datatypes ((PortType 0)) ((
           |  ${(aadlPortEnums, "\n")})))
           |
+          |
+          |(declare-const CodegenMode Mode)
+          |(assert (= CodegenMode ${mode}))
           |
           |(declare-const ModelSchedulingType SchedulingType)
           |(assert (= ModelSchedulingType ${modelSchedulingType}))
@@ -185,6 +196,11 @@ object SMT2Template {
           |  (and ; TODO - list scenarios where a time server is expected
           |       (or ${timeServerComponent}
           |           false)))
+          |
+          |(define-fun isMonitor ((_component CAmkESComponent)) Bool
+          |  (or ${(monitors, "\n")}
+          |      false))
+          |
           |
           |; ${camkesPorts.size} CAmkESPort
           |(declare-datatypes ((CAmkESPort 0)) ((
@@ -306,7 +322,7 @@ object SMT2Template {
           |    CAmkESDataPortAccess
           |    CAmkESFlowNoSelfConnection))
           |
-          |(define-fun DataPortRefinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
+          |(define-fun SB_DataPortRefinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
           |  (exists ((conn CAmkESConnection) (camkesSource CAmkESPort) (camkesDest CAmkESPort))
           |      (and (CAmkESConnectionFlowTos conn camkesSource camkesDest)
           |           (= (select CAmkESConnectionType conn) ${Sel4ConnectorTypes.seL4SharedData.name} )
@@ -315,7 +331,7 @@ object SMT2Template {
           |           (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
           |           (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest)))))
           |
-          |(define-fun EventPortRefinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
+          |(define-fun SB_EventPortRefinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
           |  (exists ((conn CAmkESConnection) (camkesSource CAmkESPort) (camkesDest CAmkESPort))
           |    (and
           |      (CAmkESConnectionFlowTos conn camkesSource camkesDest)
@@ -325,22 +341,33 @@ object SMT2Template {
           |      (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
           |      (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest)))))
           |
+          |(define-fun SB_Refinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
+          |  (and (or (= CodegenMode ${ActPlatform.SeL4.name}) (= CodegenMode ${ActPlatform.SeL4_Only.name}) false)
+          |       (or
+          |         (and
+          |           (= ${AadlPortType.AadlDataPort.name} (select AADLPortType aadlSource))
+          |           (SB_DataPortRefinement aadlSource aadlDest)) ; payload
+          |         (and
+          |           (= ${AadlPortType.AadlEventPort.name} (select AADLPortType aadlSource))
+          |           (SB_DataPortRefinement aadlSource aadlDest)   ; event counter
+          |           (SB_EventPortRefinement aadlSource aadlDest)) ; event
+          |         (and
+          |           (= ${AadlPortType.AadlEventDataPort.name} (select AADLPortType aadlSource))
+          |           (SB_DataPortRefinement aadlSource aadlDest)   ; payload
+          |           (SB_EventPortRefinement aadlSource aadlDest)) ; event
+          |         false)))
+          |
+          |(define-fun TB_Refinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool
+          |  (and (= CodegenMode ${ActPlatform.SeL4_TB.name})
+          |       false))
+          |
           |(define-fun ConnectionPreservation () Bool
           |  (forall ((aadlSource AADLPort) (aadlDest AADLPort))
           |    (=> (AADLConnectionFlowTos aadlSource aadlDest)
-          |        (or
-          |          (and
-          |               (= ${AadlPortType.AadlDataPort.name} (select AADLPortType aadlSource))
-          |               (DataPortRefinement aadlSource aadlDest)) ; payload
-          |          (and
-          |               (= ${AadlPortType.AadlEventPort.name} (select AADLPortType aadlSource))
-          |               (DataPortRefinement aadlSource aadlDest)   ; event counter
-          |               (EventPortRefinement aadlSource aadlDest)) ; event
-          |          (and
-          |               (= ${AadlPortType.AadlEventDataPort.name} (select AADLPortType aadlSource))
-          |               (DataPortRefinement aadlSource aadlDest)   ; payload
-          |               (EventPortRefinement aadlSource aadlDest)) ; event
-          |           false))))
+          |      (or (SB_Refinement aadlSource aadlDest)
+          |          (TB_Refinement aadlSource aadlDest)
+          |          false))))
+          |
           |
           |(define-fun isAADLConnectionRefinement ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) Bool
           |  (exists ((aadlSource AADLPort) (aadlDest AADLPort))

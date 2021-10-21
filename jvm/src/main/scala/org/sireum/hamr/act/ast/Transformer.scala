@@ -192,6 +192,46 @@ object Transformer {
       return PreResult(ctx, T, None())
     }
 
+    @pure def preCAmkESFeature(ctx: Context, o: CAmkESFeature): PreResult[Context, CAmkESFeature] = {
+      o match {
+        case o: Uses =>
+          val r: PreResult[Context, CAmkESFeature] = preUses(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CAmkESFeature)) => PreResult(preCtx, continu, Some[CAmkESFeature](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CAmkESFeature]())
+          }
+          return r
+        case o: Provides =>
+          val r: PreResult[Context, CAmkESFeature] = preProvides(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CAmkESFeature)) => PreResult(preCtx, continu, Some[CAmkESFeature](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CAmkESFeature]())
+          }
+          return r
+        case o: Emits =>
+          val r: PreResult[Context, CAmkESFeature] = preEmits(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CAmkESFeature)) => PreResult(preCtx, continu, Some[CAmkESFeature](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CAmkESFeature]())
+          }
+          return r
+        case o: Consumes =>
+          val r: PreResult[Context, CAmkESFeature] = preConsumes(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CAmkESFeature)) => PreResult(preCtx, continu, Some[CAmkESFeature](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CAmkESFeature]())
+          }
+          return r
+        case o: Dataport =>
+          val r: PreResult[Context, CAmkESFeature] = preDataport(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CAmkESFeature)) => PreResult(preCtx, continu, Some[CAmkESFeature](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CAmkESFeature]())
+          }
+          return r
+      }
+    }
+
     @pure def preUses(ctx: Context, o: Uses): PreResult[Context, Uses] = {
       return PreResult(ctx, T, None())
     }
@@ -430,6 +470,46 @@ object Transformer {
 
     @pure def postLibraryComponent(ctx: Context, o: LibraryComponent): TPostResult[Context, LibraryComponent] = {
       return TPostResult(ctx, None())
+    }
+
+    @pure def postCAmkESFeature(ctx: Context, o: CAmkESFeature): TPostResult[Context, CAmkESFeature] = {
+      o match {
+        case o: Uses =>
+          val r: TPostResult[Context, CAmkESFeature] = postUses(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CAmkESFeature)) => TPostResult(postCtx, Some[CAmkESFeature](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CAmkESFeature]())
+          }
+          return r
+        case o: Provides =>
+          val r: TPostResult[Context, CAmkESFeature] = postProvides(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CAmkESFeature)) => TPostResult(postCtx, Some[CAmkESFeature](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CAmkESFeature]())
+          }
+          return r
+        case o: Emits =>
+          val r: TPostResult[Context, CAmkESFeature] = postEmits(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CAmkESFeature)) => TPostResult(postCtx, Some[CAmkESFeature](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CAmkESFeature]())
+          }
+          return r
+        case o: Consumes =>
+          val r: TPostResult[Context, CAmkESFeature] = postConsumes(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CAmkESFeature)) => TPostResult(postCtx, Some[CAmkESFeature](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CAmkESFeature]())
+          }
+          return r
+        case o: Dataport =>
+          val r: TPostResult[Context, CAmkESFeature] = postDataport(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CAmkESFeature)) => TPostResult(postCtx, Some[CAmkESFeature](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CAmkESFeature")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CAmkESFeature]())
+          }
+          return r
+      }
     }
 
     @pure def postUses(ctx: Context, o: Uses): TPostResult[Context, Uses] = {
@@ -851,6 +931,56 @@ import Transformer._
     val hasChanged: B = r.resultOpt.nonEmpty
     val o2: LibraryComponent = r.resultOpt.getOrElse(o)
     val postR: TPostResult[Context, LibraryComponent] = pp.postLibraryComponent(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformCAmkESFeature(ctx: Context, o: CAmkESFeature): TPostResult[Context, CAmkESFeature] = {
+    val preR: PreResult[Context, CAmkESFeature] = pp.preCAmkESFeature(ctx, o)
+    val r: TPostResult[Context, CAmkESFeature] = if (preR.continu) {
+      val o2: CAmkESFeature = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: TPostResult[Context, CAmkESFeature] = o2 match {
+        case o2: Uses =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+        case o2: Provides =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+        case o2: Emits =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+        case o2: Consumes =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+        case o2: Dataport =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: CAmkESFeature = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, CAmkESFeature] = pp.postCAmkESFeature(r.ctx, o2)
     if (postR.resultOpt.nonEmpty) {
       return postR
     } else if (hasChanged) {

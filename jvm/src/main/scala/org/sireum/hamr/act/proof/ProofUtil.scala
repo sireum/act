@@ -9,6 +9,10 @@ import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlThre
 
 object ProofContainer {
 
+  @enum object CAmkESPortCategory {
+    "Refinement"
+  }
+
   @enum object CAmkESComponentCategory {
     "Refinement"
     "VM_Refinement"
@@ -60,7 +64,9 @@ object ProofContainer {
       camkesPortConnections = ISZ(),
       camkesConnections = ISZ(),
       componentRefinements = ISZ(),
-      portRefinements = ISZ()
+      portRefinements = ISZ(),
+
+      portRefinementsX = Map.empty
     )
   }
 }
@@ -87,7 +93,7 @@ object ProofUtil {
 
     ProofUtil.addCamkesPortI(proofPortId)
     ProofUtil.addCamkesPortConstraintI(camkesInstanceId, proofPortId)
-      ProofUtil.addPortRefinementI(aadlPort, proofPortId)
+    ProofUtil.addPortRefinementI(aadlPort, proofPortId)
   }
 
   def addAadlComponent(src: AadlThread, names: Names, symbolTable: SymbolTable): Unit = {
@@ -136,8 +142,24 @@ object ProofUtil {
     val p = (aadlPort, camkesPortPath)
     proofContainer.portRefinements = proofContainer.portRefinements :+ p
   }
+
+  def addPortRefinementX(camkesFeature: ast.CAmkESFeature, aadlThread: AadlThread, aadlPort: AadlPort, symbolTable: SymbolTable): Unit = {
+    val cin = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+
+    var map: Map[ast.CAmkESFeature, PortRefinement] = proofContainer.portRefinementsX.get(cin) match {
+      case Some(m) => m
+      case _ => Map.empty
+    }
+    assert(!map.contains(camkesFeature))
+
+    map = map + (camkesFeature ~> PortRefinement(aadlThread, aadlPort))
+
+    proofContainer.portRefinementsX = proofContainer.portRefinementsX + (cin ~> map)
+  }
 }
 
+@datatype class PortRefinement (aadlThead: AadlThread,
+                                aadlPort: AadlPort)
 
 @record class ProofContainer(var modelSchedulingType: SchedulingType.Type,
 
@@ -154,5 +176,7 @@ object ProofUtil {
                              var camkesConnections: ISZ[CAmkESConnection],
 
                              var componentRefinements: ISZ[(AadlThread, ComponentPath)],
-                             var portRefinements: ISZ[(AadlPort, PortPath)]
+                             var portRefinements: ISZ[(AadlPort, PortPath)],
+
+                             var portRefinementsX: Map[String, Map[ast.CAmkESFeature, PortRefinement]]
                             )

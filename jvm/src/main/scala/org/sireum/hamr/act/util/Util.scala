@@ -5,11 +5,11 @@ package org.sireum.hamr.act.util
 import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.ast.{BinarySemaphore, Consumes, Dataport, Emits, Mutex, Provides, Semaphore, TODO, Uses}
-import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
+import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType }
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
@@ -602,6 +602,57 @@ object Util {
       component = component)
 
     ProofUtil.addCAmkESInstance(originAadl, ret)
+
+    return ret
+  }
+
+  def createDataport_Refinement(aadlThread: AadlThread,
+                                aadlPort: AadlPort,
+                                symbolTable: SymbolTable,
+
+                                name: String,
+                                optional: B,
+                                typ: String): ast.Dataport = {
+
+    val ret: ast.Dataport = ast.Dataport(
+      name = name,
+      optional = optional,
+      typ = typ
+    )
+
+    ProofUtil.addPortRefinementX(ret, aadlThread, aadlPort, symbolTable)
+
+    return ret
+  }
+
+  def createConsumes_Refinement(aadlThread: AadlThread,
+                                aadlPort: AadlPort,
+                                symbolTable: SymbolTable,
+
+                                name: String,
+                                typ: String,
+                                optional: B): ast.Consumes = {
+    val ret: ast.Consumes = ast.Consumes(
+      name = name,
+      typ = typ,
+      optional = optional)
+
+    ProofUtil.addPortRefinementX(ret, aadlThread, aadlPort, symbolTable)
+
+    return ret
+  }
+
+  def createEmits_Refinement(aadlThread: AadlThread,
+                             aadlPort: AadlPort,
+                             symbolTable: SymbolTable,
+
+                             name: String,
+                             typ: String): ast.Emits = {
+    val ret: ast.Emits = ast.Emits(
+      name = name,
+      typ = typ)
+
+    ProofUtil.addPortRefinementX(ret, aadlThread, aadlPort, symbolTable)
 
     return ret
   }

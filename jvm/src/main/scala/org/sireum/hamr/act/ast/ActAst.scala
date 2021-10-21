@@ -54,24 +54,29 @@ import org.sireum._
 @datatype class LibraryComponent(val name: String,
                                  val ports: ISZ[String]) extends CamkesComponent
 
-@datatype class Uses(name: String,
-                     typ: String,
-                     optional: B)
+@sig trait CAmkESFeature {
+  def name: String
+  def typ: String
+}
 
-@datatype class Provides(name: String,
-                         typ: String)
+@datatype class Uses(val name: String,
+                     val typ: String,
+                     optional: B) extends CAmkESFeature
+
+@datatype class Provides(val name: String,
+                         val typ: String) extends CAmkESFeature
 
 
-@datatype class Emits(name: String,
-                      typ: String)
+@datatype class Emits(val name: String,
+                      val typ: String) extends CAmkESFeature
 
-@datatype class Consumes(name: String,
-                         typ: String,
-                         optional: B)
+@datatype class Consumes(val name: String,
+                         val typ: String,
+                         optional: B) extends CAmkESFeature
 
-@datatype class Dataport(name: String,
-                         typ: String,
-                         optional: B)
+@datatype class Dataport(val name: String,
+                         val typ: String,
+                         optional: B) extends CAmkESFeature
 
 @datatype class Connection(name : String,
                            connectionType: String,

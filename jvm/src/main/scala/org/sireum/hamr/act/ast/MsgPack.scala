@@ -170,6 +170,16 @@ object MsgPack {
       writer.writeISZ(o.ports, writer.writeString _)
     }
 
+    def writeCAmkESFeature(o: CAmkESFeature): Unit = {
+      o match {
+        case o: Uses => writeUses(o)
+        case o: Provides => writeProvides(o)
+        case o: Emits => writeEmits(o)
+        case o: Consumes => writeConsumes(o)
+        case o: Dataport => writeDataport(o)
+      }
+    }
+
     def writeUses(o: Uses): Unit = {
       writer.writeZ(Constants.Uses)
       writer.writeString(o.name)
@@ -457,6 +467,22 @@ object MsgPack {
       val name = reader.readString()
       val ports = reader.readISZ(reader.readString _)
       return LibraryComponent(name, ports)
+    }
+
+    def readCAmkESFeature(): CAmkESFeature = {
+      val i = reader.curr
+      val t = reader.readZ()
+      t match {
+        case Constants.Uses => val r = readUsesT(T); return r
+        case Constants.Provides => val r = readProvidesT(T); return r
+        case Constants.Emits => val r = readEmitsT(T); return r
+        case Constants.Consumes => val r = readConsumesT(T); return r
+        case Constants.Dataport => val r = readDataportT(T); return r
+        case _ =>
+          reader.error(i, s"$t is not a valid type of CAmkESFeature.")
+          val r = readDataportT(T)
+          return r
+      }
     }
 
     def readUses(): Uses = {
@@ -867,6 +893,21 @@ object MsgPack {
       return r
     }
     val r = to(data, fLibraryComponent _)
+    return r
+  }
+
+  def fromCAmkESFeature(o: CAmkESFeature, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeCAmkESFeature(o)
+    return w.result
+  }
+
+  def toCAmkESFeature(data: ISZ[U8]): Either[CAmkESFeature, MessagePack.ErrorMsg] = {
+    def fCAmkESFeature(reader: Reader): CAmkESFeature = {
+      val r = reader.readCAmkESFeature()
+      return r
+    }
+    val r = to(data, fCAmkESFeature _)
     return r
   }
 

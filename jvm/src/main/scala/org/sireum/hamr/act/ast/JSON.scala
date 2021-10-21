@@ -123,6 +123,16 @@ object JSON {
       ))
     }
 
+    @pure def printCAmkESFeature(o: CAmkESFeature): ST = {
+      o match {
+        case o: Uses => return printUses(o)
+        case o: Provides => return printProvides(o)
+        case o: Emits => return printEmits(o)
+        case o: Consumes => return printConsumes(o)
+        case o: Dataport => return printDataport(o)
+      }
+    }
+
     @pure def printUses(o: Uses): ST = {
       return printObject(ISZ(
         ("type", st""""Uses""""),
@@ -512,6 +522,18 @@ object JSON {
       val ports = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
       return LibraryComponent(name, ports)
+    }
+
+    def parseCAmkESFeature(): CAmkESFeature = {
+      val t = parser.parseObjectTypes(ISZ("Uses", "Provides", "Emits", "Consumes", "Dataport"))
+      t.native match {
+        case "Uses" => val r = parseUsesT(T); return r
+        case "Provides" => val r = parseProvidesT(T); return r
+        case "Emits" => val r = parseEmitsT(T); return r
+        case "Consumes" => val r = parseConsumesT(T); return r
+        case "Dataport" => val r = parseDataportT(T); return r
+        case _ => val r = parseDataportT(T); return r
+      }
     }
 
     def parseUses(): Uses = {
@@ -1092,6 +1114,24 @@ object JSON {
       return r
     }
     val r = to(s, fLibraryComponent _)
+    return r
+  }
+
+  def fromCAmkESFeature(o: CAmkESFeature, isCompact: B): String = {
+    val st = Printer.printCAmkESFeature(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toCAmkESFeature(s: String): Either[CAmkESFeature, Json.ErrorMsg] = {
+    def fCAmkESFeature(parser: Parser): CAmkESFeature = {
+      val r = parser.parseCAmkESFeature()
+      return r
+    }
+    val r = to(s, fCAmkESFeature _)
     return r
   }
 

@@ -447,7 +447,7 @@ import org.sireum.ops.ISZOps
     assert(c.subComponents.isEmpty)
     assert(c.connectionInstances.isEmpty)
 
-    val cid = Util.getCamkesComponentName(aadlThread, symbolTable)
+    val camkesComponentName = Util.getCamkesComponentName(aadlThread, symbolTable)
 
     var provides: ISZ[Provides] = ISZ()
     var uses: ISZ[Uses] = ISZ()
@@ -542,7 +542,12 @@ import org.sireum.ops.ISZOps
               gcImplMethods = StringTemplate.sbSamplingPortGlobalVarDecl(samplingPort, f.feature) +: gcImplMethods
 
               val camkesDataPortId = Util.brand(f.identifier)
-              dataports = dataports :+ Dataport(
+
+              dataports = dataports :+ Util.createDataport_Refinement(
+                aadlThread = aadlThread,
+                aadlPort = a,
+                symbolTable = symbolTable,
+
                 name = camkesDataPortId,
                 optional = F,
                 typ = samplingPort.structName
@@ -660,7 +665,7 @@ import org.sireum.ops.ISZOps
 
                     gcImplPostInits = gcImplPostInits :+ StringTemplate.cRegCallback(handlerName, regCallback, f.feature)
                   } else {
-                    reporter.warn(None(), Util.toolName, s"port: ${f.identifier} in thread: ${cid} does not have a compute entrypoint and will not be dispatched.")
+                    reporter.warn(None(), Util.toolName, s"port: ${f.identifier} in thread: ${camkesComponentName} does not have a compute entrypoint and will not be dispatched.")
                   }
 
                 case _ =>
@@ -692,7 +697,11 @@ import org.sireum.ops.ISZOps
 
                   if(!useCaseConnectors) {
                     val camkesEventPortId = Util.genSeL4NotificationName(f.feature, T)
-                    consumes = consumes :+ Consumes(
+                    consumes = consumes :+ Util.createConsumes_Refinement(
+                      aadlThread = aadlThread,
+                      aadlPort = a,
+                      symbolTable = symbolTable,
+
                       name = camkesEventPortId,
                       typ = Util.EVENT_NOTIFICATION_TYPE,
                       optional = isOptional)
@@ -701,7 +710,11 @@ import org.sireum.ops.ISZOps
                   }
 
                   val camkesDataPortId = Util.getEventDataSBQueueDestFeatureName(f.identifier)
-                  dataports = dataports :+ Dataport(
+                  dataports = dataports :+ Util.createDataport_Refinement(
+                    aadlThread = aadlThread,
+                    aadlPort = a,
+                    symbolTable = symbolTable,
+
                     name = camkesDataPortId,
                     typ = queueType,
                     optional = isOptional)
@@ -723,7 +736,11 @@ import org.sireum.ops.ISZOps
 
                     if(!useCaseConnectors) {
                       val camkesEventPortId = Util.genSeL4NotificationQueueName(f.feature, queueSize)
-                      emits = emits :+ Emits(
+                      emits = emits :+ Util.createEmits_Refinement(
+                        aadlThread = aadlThread,
+                        aadlPort = a,
+                        symbolTable = symbolTable,
+
                         name = camkesEventPortId,
                         typ = Util.EVENT_NOTIFICATION_TYPE)
 
@@ -731,7 +748,11 @@ import org.sireum.ops.ISZOps
                     }
 
                     val camkesDataPortId = Util.getEventDataSBQueueSrcFeatureName(f.identifier, queueSize)
-                    dataports = dataports :+ Dataport(
+                    dataports = dataports :+ Util.createDataport_Refinement(
+                      aadlThread = aadlThread,
+                      aadlPort = a,
+                      symbolTable = symbolTable,
+
                       name = camkesDataPortId,
                       typ = queueType,
                       optional = F)
@@ -807,7 +828,11 @@ import org.sireum.ops.ISZOps
               f.direction match {
                 case ir.Direction.In =>
                   val camkesEventPortId = Util.getEventSBNotificationName(f.identifier)
-                  consumes = consumes :+ Consumes(
+                  consumes = consumes :+ Util.createConsumes_Refinement(
+                    aadlThread = aadlThread,
+                    aadlPort = a,
+                    symbolTable = symbolTable,
+
                     name = camkesEventPortId,
                     typ = Util.EVENT_NOTIFICATION_TYPE,
                     optional = F)
@@ -815,7 +840,11 @@ import org.sireum.ops.ISZOps
                   ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
 
                   val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
-                  dataports = dataports :+ Dataport(
+                  dataports = dataports :+ Util.createDataport_Refinement(
+                    aadlThread = aadlThread,
+                    aadlPort = a,
+                    symbolTable = symbolTable,
+
                     name = camkesDataPortId,
                     typ = counterType,
                     optional = F)
@@ -824,14 +853,22 @@ import org.sireum.ops.ISZOps
 
                 case ir.Direction.Out =>
                   val camkesEventPortId = Util.getEventSBNotificationName(f.identifier)
-                  emits = emits :+ Emits(
+                  emits = emits :+ Util.createEmits_Refinement(
+                    aadlThread = aadlThread,
+                    aadlPort = a,
+                    symbolTable = symbolTable,
+
                     name = camkesEventPortId,
                     typ = Util.EVENT_NOTIFICATION_TYPE)
 
                   ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
 
                   val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
-                  dataports = dataports :+ Dataport(
+                  dataports = dataports :+ Util.createDataport_Refinement(
+                    aadlThread = aadlThread,
+                    aadlPort = a,
+                    symbolTable = symbolTable,
+
                     name = camkesDataPortId,
                     typ = counterType,
                     optional = F)
@@ -938,7 +975,7 @@ import org.sireum.ops.ISZOps
       PropertyUtil.getInitializeEntryPoint(c.properties) match {
         case Some(methodName) =>
           gcInterfaceStatements = gcInterfaceStatements :+ st"""void ${methodName}(const int64_t *arg);"""
-          val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(cid, methodName)
+          val (cimpl, runEntry) = StringTemplate.componentInitializeEntryPoint(camkesComponentName, methodName)
           gcImplMethods = gcImplMethods :+ cimpl
           gcRunInitStmts = gcRunInitStmts :+ runEntry
         case _ =>
@@ -951,13 +988,13 @@ import org.sireum.ops.ISZOps
 
       gcImplIncludes = gcImplIncludes :+ st"#include <${Util.genCHeaderFilename(names.cEntryPointAdapterName)}>"
 
-      gcImplPreInits = st"""printf("Entering pre-init of ${cid}\n");""" +: gcImplPreInits
+      gcImplPreInits = st"""printf("Entering pre-init of ${camkesComponentName}\n");""" +: gcImplPreInits
 
       gcImplPreInits = gcImplPreInits :+ SlangEmbeddedTemplate.hamrIntialiseArchitecture(names.cEntryPointAdapterQualifiedName)
 
       gcImplPreInits = gcImplPreInits :+ SlangEmbeddedTemplate.hamrInitialiseEntrypoint(names.cEntryPointAdapterQualifiedName)
 
-      gcImplPreInits = gcImplPreInits :+ st"""printf("Leaving pre-init of ${cid}\n");"""
+      gcImplPreInits = gcImplPreInits :+ st"""printf("Leaving pre-init of ${camkesComponentName}\n");"""
 
       val outgoingPorts: ISZ[ir.FeatureEnd] = CommonUtil.getOutPorts(c).filter(f =>
         symbolTable.outConnections.contains(CommonUtil.getName(f.identifier)))
@@ -1017,7 +1054,7 @@ import org.sireum.ops.ISZOps
 
     containers = containers :+ C_Container(
       instanceName = "UNNEEDED_VAR", //names.instanceName,
-      componentId = cid,
+      componentId = camkesComponentName,
 
       cSources = cSources,
       cIncludes = ISZ(genComponentTypeInterfaceFile(aadlThread, gcInterfaceStatements)),
@@ -1035,7 +1072,7 @@ import org.sireum.ops.ISZOps
 
       control = T,
       hardware = F,
-      name = cid,
+      name = camkesComponentName,
 
       mutexes = ISZ(),
       binarySemaphores = binarySemaphores,
