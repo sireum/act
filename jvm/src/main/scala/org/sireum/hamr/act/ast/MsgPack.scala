@@ -76,7 +76,11 @@ object MsgPack {
 
     val Attribute: Z = -13
 
-    val TODO: Z = -12
+    val GenericConfiguration: Z = -12
+
+    val DataPortAccessRestriction: Z = -11
+
+    val TODO: Z = -10
 
   }
 
@@ -112,7 +116,7 @@ object MsgPack {
 
     def writeAssembly(o: Assembly): Unit = {
       writer.writeZ(Constants.Assembly)
-      writer.writeISZ(o.configuration, writer.writeString _)
+      writer.writeISZ(o.configuration, writeConfiguration _)
       writer.writeISZ(o.configurationMacros, writer.writeString _)
       writeComposition(o.composition)
     }
@@ -280,6 +284,29 @@ object MsgPack {
       writer.writeString(o.value)
     }
 
+    def writeAccessTypeType(o: AccessType.Type): Unit = {
+      writer.writeZ(o.ordinal)
+    }
+
+    def writeConfiguration(o: Configuration): Unit = {
+      o match {
+        case o: GenericConfiguration => writeGenericConfiguration(o)
+        case o: DataPortAccessRestriction => writeDataPortAccessRestriction(o)
+      }
+    }
+
+    def writeGenericConfiguration(o: GenericConfiguration): Unit = {
+      writer.writeZ(Constants.GenericConfiguration)
+      writer.writeString(o.e)
+    }
+
+    def writeDataPortAccessRestriction(o: DataPortAccessRestriction): Unit = {
+      writer.writeZ(Constants.DataPortAccessRestriction)
+      writer.writeString(o.component)
+      writer.writeString(o.port)
+      writeAccessTypeType(o.accessType)
+    }
+
     def writeTODO(o: TODO): Unit = {
       writer.writeZ(Constants.TODO)
     }
@@ -339,7 +366,7 @@ object MsgPack {
       if (!typeParsed) {
         reader.expectZ(Constants.Assembly)
       }
-      val configuration = reader.readISZ(reader.readString _)
+      val configuration = reader.readISZ(readConfiguration _)
       val configurationMacros = reader.readISZ(reader.readString _)
       val composition = readComposition()
       return Assembly(configuration, configurationMacros, composition)
@@ -666,6 +693,52 @@ object MsgPack {
       val name = reader.readString()
       val value = reader.readString()
       return Attribute(typ, name, value)
+    }
+
+    def readAccessTypeType(): AccessType.Type = {
+      val r = reader.readZ()
+      return AccessType.byOrdinal(r).get
+    }
+
+    def readConfiguration(): Configuration = {
+      val i = reader.curr
+      val t = reader.readZ()
+      t match {
+        case Constants.GenericConfiguration => val r = readGenericConfigurationT(T); return r
+        case Constants.DataPortAccessRestriction => val r = readDataPortAccessRestrictionT(T); return r
+        case _ =>
+          reader.error(i, s"$t is not a valid type of Configuration.")
+          val r = readDataPortAccessRestrictionT(T)
+          return r
+      }
+    }
+
+    def readGenericConfiguration(): GenericConfiguration = {
+      val r = readGenericConfigurationT(F)
+      return r
+    }
+
+    def readGenericConfigurationT(typeParsed: B): GenericConfiguration = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.GenericConfiguration)
+      }
+      val e = reader.readString()
+      return GenericConfiguration(e)
+    }
+
+    def readDataPortAccessRestriction(): DataPortAccessRestriction = {
+      val r = readDataPortAccessRestrictionT(F)
+      return r
+    }
+
+    def readDataPortAccessRestrictionT(typeParsed: B): DataPortAccessRestriction = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.DataPortAccessRestriction)
+      }
+      val component = reader.readString()
+      val port = reader.readString()
+      val accessType = readAccessTypeType()
+      return DataPortAccessRestriction(component, port, accessType)
     }
 
     def readTODO(): TODO = {
@@ -1019,6 +1092,51 @@ object MsgPack {
       return r
     }
     val r = to(data, fAttribute _)
+    return r
+  }
+
+  def fromConfiguration(o: Configuration, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeConfiguration(o)
+    return w.result
+  }
+
+  def toConfiguration(data: ISZ[U8]): Either[Configuration, MessagePack.ErrorMsg] = {
+    def fConfiguration(reader: Reader): Configuration = {
+      val r = reader.readConfiguration()
+      return r
+    }
+    val r = to(data, fConfiguration _)
+    return r
+  }
+
+  def fromGenericConfiguration(o: GenericConfiguration, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeGenericConfiguration(o)
+    return w.result
+  }
+
+  def toGenericConfiguration(data: ISZ[U8]): Either[GenericConfiguration, MessagePack.ErrorMsg] = {
+    def fGenericConfiguration(reader: Reader): GenericConfiguration = {
+      val r = reader.readGenericConfiguration()
+      return r
+    }
+    val r = to(data, fGenericConfiguration _)
+    return r
+  }
+
+  def fromDataPortAccessRestriction(o: DataPortAccessRestriction, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeDataPortAccessRestriction(o)
+    return w.result
+  }
+
+  def toDataPortAccessRestriction(data: ISZ[U8]): Either[DataPortAccessRestriction, MessagePack.ErrorMsg] = {
+    def fDataPortAccessRestriction(reader: Reader): DataPortAccessRestriction = {
+      val r = reader.readDataPortAccessRestriction()
+      return r
+    }
+    val r = to(data, fDataPortAccessRestriction _)
     return r
   }
 

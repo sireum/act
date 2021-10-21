@@ -3,6 +3,7 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
+import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
@@ -103,13 +104,13 @@ object PeriodicDispatcherTemplate {
     return Util.brand(s"${prefix}periodic_dispatch_notification")
   }
 
-  def configurationTimerAttribute(instanceName: String, i: Z, isDispatcher: B): ST = {
+  def configurationTimerAttribute(instanceName: String, i: Z, isDispatcher: B): ast.Configuration = {
     val id: String = if(isDispatcher) {TIMER_ID_DISPATCHER} else {TIMER_ID}
-    return st"""${instanceName}.${id}_attributes = ${i};"""
+    return ast.GenericConfiguration(s"${instanceName}.${id}_attributes = ${i};")
   }
 
-  def configurationTimerGlobalEndpoint(instanceName: String, interfaceName: String, classifier: String, id: String): ST = {
-    return st"""${instanceName}.${interfaceName}_global_endpoint = "${classifier}_${id}";"""
+  def configurationTimerGlobalEndpoint(instanceName: String, interfaceName: String, classifier: String, id: String): ast.Configuration = {
+    return ast.GenericConfiguration(st"""${instanceName}.${interfaceName}_global_endpoint = "${classifier}_${id}";""".render)
   }
 
 

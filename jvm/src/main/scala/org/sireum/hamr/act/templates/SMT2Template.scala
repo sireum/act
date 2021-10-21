@@ -3,6 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
+import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection, SchedulingType}
 import org.sireum.hamr.act.util.Sel4ConnectorTypes
 import org.sireum.hamr.codegen.common.symbols.AadlThread
@@ -66,6 +67,7 @@ object SMT2Template {
             timeServerComponent: Option[ST],
 
             camkesPorts: ISZ[ST],
+            camkesDataPortAccessRestrictions: ISZ[ST],
             camkesPortComponents: ISZ[ST],
             camkesConnectionTypes: ISZ[ST],
             camkesConnectionFlowTos: ISZ[ST],
@@ -88,6 +90,8 @@ object SMT2Template {
       st"(and (= ${m.name} (select AADLPortType src)) (= ${m.name} (select AADLPortType dst)))")
 
     val schedulingTypes: ISZ[ST] = SchedulingType.elements.map((m: SchedulingType.Type) => st"(${m.name})")
+
+    val accessTypes: ISZ[ST] = ast.AccessType.elements.map((m: ast.AccessType.Type) => st"(${m.name})")
 
     val ret: ST =
       st"""(set-logic ALL)
@@ -156,6 +160,9 @@ object SMT2Template {
           |)
           |
           |
+          |(declare-datatypes ((AccessType 0)) ((
+          |  ${(accessTypes, "\n")})))
+          |
           |(declare-datatypes ((seL4PortType 0)) ((
           |  ${(sel4ConnEnums, "\n")})))
           |
@@ -183,6 +190,9 @@ object SMT2Template {
           |(declare-datatypes ((CAmkESPort 0)) ((
           |  ${(camkesPorts, "\n")}
           |)))
+          |
+          |(declare-const CAmkESAccessRestrictions (Array CAmkESPort AccessType))
+          |${(camkesDataPortAccessRestrictions, "\n")}
           |
           |; ${camkesConnections.size} CAmkESConnection
           |(declare-datatypes ((CAmkESConnection 0)) ((
@@ -271,6 +281,12 @@ object SMT2Template {
           |    (=> (CAmkESConnectionFlowTos _conn _p1 _p2)
           |        (not (= _p1 _p2)))))
           |
+          |(define-fun CAmkESDataPortAccess () Bool
+          |  (forall ((_conn CAmkESConnection) (_src CAmkESPort) (_dst CAmkESPort))
+          |    (=> (and (CAmkESConnectionFlowTos _conn _src _dst) (= seL4SharedData (select CAmkESConnectionType _conn)))
+          |      (and (= W (select CAmkESAccessRestrictions _src))
+          |           (= R (select CAmkESAccessRestrictions _dst))))))
+          |
           |(define-fun UniqueComponentRefinements () Bool
           |  (forall ((aadlComponent1 AADLComponent) (camkesComponent CAmkESComponent))
           |    (=> (ComponentRefinement aadlComponent1 camkesComponent)
@@ -287,6 +303,7 @@ object SMT2Template {
           |
           |(define-fun CAmkESWellFormedness () Bool
           |  (and
+          |    CAmkESDataPortAccess
           |    CAmkESFlowNoSelfConnection))
           |
           |(define-fun DataPortRefinement ((aadlSource AADLPort) (aadlDest AADLPort)) Bool

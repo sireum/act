@@ -33,7 +33,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
-    var configurations: ISZ[ST]= ISZ()
+    var configurations: ISZ[ast.Configuration]= ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
 
@@ -216,7 +216,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
-    var configurations: ISZ[ST]= ISZ()
+    var configurations: ISZ[ast.Configuration]= ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
 
@@ -298,13 +298,13 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
           holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
           holder = holder(configurationEntries = holder.configurationEntries :+
-            ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, T).render)
+            ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, T))
 
           holder = holder(configurationEntries = holder.configurationEntries :+
-            ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesVMFeatureQueueName, F).render)
+            ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesVMFeatureQueueName, F))
 
           holder = holder(configurationEntries = holder.configurationEntries :+
-            ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, T).render)
+            ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, T))
 
           updateHolder(srcConnectionEnd, holder)
 
@@ -398,8 +398,8 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         ISZ(fromEnd),
         holder.toConnectionEnds)
 
-      val filtered = Set.empty[String] ++ holder.configurationEntries
-      configurations = configurations ++ filtered.elements.map((m: String) => st"$m")
+      val filtered = Set.empty[ast.Configuration] ++ holder.configurationEntries
+      configurations = configurations ++ filtered.elements
     }
 
     return CamkesAssemblyContribution(imports, instances, connections, configurations, cContainers,

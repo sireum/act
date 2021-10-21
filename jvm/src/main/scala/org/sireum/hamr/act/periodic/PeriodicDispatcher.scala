@@ -29,7 +29,7 @@ import org.sireum.hamr.codegen.common.symbols._
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
-    var configurations: ISZ[ST]= ISZ()
+    var configurations: ISZ[ast.Configuration]= ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
     
@@ -120,7 +120,7 @@ import org.sireum.hamr.codegen.common.symbols._
         PeriodicDispatcherTemplate.TIMER_INSTANCE, PeriodicDispatcherTemplate.TIMER_SERVER_NOTIFICATION_ID,
         PeriodicDispatcherTemplate.DISPATCH_PERIODIC_INSTANCE, PeriodicDispatcherTemplate.TIMER_NOTIFICATION_DISPATCHER_ID)
 
-      configurations = configurations :+ st"${PeriodicDispatcherTemplate.TIMER_INSTANCE}.timers_per_client = 1;"
+      configurations = configurations :+ ast.GenericConfiguration(s"${PeriodicDispatcherTemplate.TIMER_INSTANCE}.timers_per_client = 1;")
 
       configurations = configurations :+ PeriodicDispatcherTemplate.configurationTimerAttribute(dispatchCamkesComponent.name,
         timerAttributeCounter.increment(), T)

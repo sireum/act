@@ -3,6 +3,7 @@
 package org.sireum.hamr.act.periodic
 
 import org.sireum._
+import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.templates.CAmkESTemplate.DOMAIN_FIELD
 import org.sireum.hamr.act.templates.EventDataQueueTemplate
 import org.sireum.hamr.act.util._
@@ -113,8 +114,8 @@ object PacerTemplate {
   }
 
 
-  def domainConfiguration(identifier: String, domain: Z): ST = {
-    return st"${identifier}.${DOMAIN_FIELD} = ${domain};"
+  def domainConfiguration(identifier: String, domain: Z): ast.Configuration = {
+    return ast.GenericConfiguration(s"${identifier}.${DOMAIN_FIELD} = ${domain};")
   }
 
   def pacerScheduleEntry(domain: Z,

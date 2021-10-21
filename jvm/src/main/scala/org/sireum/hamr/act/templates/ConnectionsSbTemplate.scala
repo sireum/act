@@ -3,6 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
+import org.sireum.hamr.act.ast
 
 object ConnectionsSbTemplate {
 
@@ -16,14 +17,14 @@ object ConnectionsSbTemplate {
     return "CASE_AADL_EventDataport-to.template.c"
   }
 
-  def caseConnectorConfig_with_signalling(connectionName: String, shouldSignal: B): ST = {
+  def caseConnectorConfig_with_signalling(connectionName: String, shouldSignal: B): ast.Configuration = {
     val text: String = if(shouldSignal) "true" else "false"
-    return st"${connectionName}.with_signalling = ${shouldSignal};"
+    return ast.GenericConfiguration(s"${connectionName}.with_signalling = ${shouldSignal};")
   }
 
-  def caseConnectorConfig_connection_type(componentName: String, featureName: String, isVMComponent: B) : ST = {
+  def caseConnectorConfig_connection_type(componentName: String, featureName: String, isVMComponent: B) : ast.Configuration = {
     val typ: String = if(isVMComponent) "vm" else "native"
-    return st"""${componentName}.${featureName}_type = "${typ}";"""
+    return ast.GenericConfiguration(st"""${componentName}.${featureName}_type = "${typ}";""".render)
   }
 
   def getCASE_AADL_EventDataport_From_Template(): ST = {

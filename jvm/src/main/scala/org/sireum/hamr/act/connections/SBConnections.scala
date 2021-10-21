@@ -23,7 +23,7 @@ import org.sireum.hamr.ir
 
   val platform: ActPlatform.Type = actOptions.platform
 
-  var configurationEntries: ISZ[ST] = ISZ()
+  var configurationEntries: ISZ[ast.Configuration] = ISZ()
 
   var connections: ISZ[ast.Connection] = ISZ()
 
@@ -103,17 +103,17 @@ import org.sireum.hamr.ir
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${holder.connectionName}.size = ${size};""".render)
+                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
                   }
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, F).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, F))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName_DP, srcToVM).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName_DP, srcToVM))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName_DP, dstToVM).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName_DP, dstToVM))
 
                   updateHolder(srcConnectionEnd_DP, holder)
 
@@ -136,16 +136,16 @@ import org.sireum.hamr.ir
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${holder.connectionName}.size = ${size};""".render)
+                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
                   }
 
-                  val producerPerms: String = if(srcToVM) "RW" else "W"
+                  val producerPerms: ast.AccessType.Type = if(srcToVM) ast.AccessType.RW else ast.AccessType.W
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName_DP}_access = "${producerPerms}";""".render)
+                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_DP, producerPerms))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName_DP}_access = "R";""".render)
+                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_DP, ast.AccessType.R))
 
                   updateHolder(srcConnectionEnd_DP, holder)
                 }
@@ -198,12 +198,12 @@ import org.sireum.hamr.ir
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${holder.connectionName}.size = ${size};""".render)
+                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
                   }
 
                   if(!srcToVM) {
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${srcCamkesComponentId}.${srcCamkesFeatureQueueName_ED}_access = "W";""".render)
+                      ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_ED, ast.AccessType.W))
                   } else {
                     // don't add access restrictions when component is in a vm, otherwise get errors like
                     //
@@ -214,7 +214,7 @@ import org.sireum.hamr.ir
 
                   if(!dstToVM) {
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${dstCamkesComponentId}.${dstCamkesFeatureQueueName_ED}_access = "R";""".render)
+                      ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_ED, ast.AccessType.R))
                   } else {
                     // don't add access restrictions since in a vm
 
@@ -223,7 +223,7 @@ import org.sireum.hamr.ir
                         // add the notification to the same domain as the component or will get an error like
                         // 'handle_event_bar_fault@cross_vm_connection.c:126 Connection is not configured with an emit function'
                         holder = holder(configurationEntries = holder.configurationEntries :+
-                          st"""${dstCamkesComponentId}.${dstCamkesFeatureNotificationName}_domain = ${d};""".render)
+                          ast.GenericConfiguration(s"${dstCamkesComponentId}.${dstCamkesFeatureNotificationName}_domain = ${d};"))
                       case _ =>
                     }
                   }
@@ -260,17 +260,17 @@ import org.sireum.hamr.ir
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      st"""${holder.connectionName}.size = ${size};""".render)
+                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
                   }
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, T).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_with_signalling(holder.connectionName, T))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName, srcToVM).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(srcCamkesComponentId, srcCamkesFeatureQueueName, srcToVM))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, dstToVM).render)
+                    ConnectionsSbTemplate.caseConnectorConfig_connection_type(dstCamkesComponentId, dstCamkesFeatureQueueName, dstToVM))
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -309,10 +309,10 @@ import org.sireum.hamr.ir
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${srcCamkesComponentId}.${srcCamkesFeatureName}_access = "W";""".render)
+                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureName, ast.AccessType.W))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    st"""${dstCamkesComponentId}.${dstCamkesFeatureName}_access = "R";""".render)
+                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureName, ast.AccessType.R))
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -340,8 +340,8 @@ import org.sireum.hamr.ir
         ISZ(fromEnd),
         holder.toConnectionEnds)
 
-      val filtered = Set.empty[String] ++ holder.configurationEntries
-      configurationEntries = configurationEntries ++ filtered.elements.map((m: String) => st"$m")
+      val filtered = Set.empty[ast.Configuration] ++ holder.configurationEntries
+      configurationEntries = configurationEntries ++ filtered.elements
     }
 
     var connectors: ISZ[ConnectorContainer] = ISZ()

@@ -6,7 +6,7 @@ import org.sireum._
 
 @sig trait ASTObject
 
-@datatype class Assembly(configuration: ISZ[String],
+@datatype class Assembly(configuration: ISZ[Configuration],
                          configurationMacros: ISZ[String],
                          composition: Composition) extends ASTObject
 
@@ -133,5 +133,19 @@ import org.sireum._
 @datatype class Attribute(typ: String,
                           name: String,
                           value: String)
+
+@enum object AccessType {
+  "R"
+  "W"
+  "RW"
+}
+
+@sig trait Configuration
+
+@datatype class GenericConfiguration(e: String) extends Configuration
+
+@datatype class DataPortAccessRestriction (component: String,
+                                           port: String,
+                                           accessType: AccessType.Type) extends Configuration
 
 @datatype class TODO () extends ASTObject

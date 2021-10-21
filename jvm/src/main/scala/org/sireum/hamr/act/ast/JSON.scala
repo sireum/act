@@ -60,7 +60,7 @@ object JSON {
     @pure def printAssembly(o: Assembly): ST = {
       return printObject(ISZ(
         ("type", st""""Assembly""""),
-        ("configuration", printISZ(T, o.configuration, printString _)),
+        ("configuration", printISZ(F, o.configuration, printConfiguration _)),
         ("configurationMacros", printISZ(T, o.configurationMacros, printString _)),
         ("composition", printComposition(o.composition))
       ))
@@ -286,6 +286,41 @@ object JSON {
       ))
     }
 
+    @pure def printAccessTypeType(o: AccessType.Type): ST = {
+      val value: String = o match {
+        case AccessType.R => "R"
+        case AccessType.W => "W"
+        case AccessType.RW => "RW"
+      }
+      return printObject(ISZ(
+        ("type", printString("AccessType")),
+        ("value", printString(value))
+      ))
+    }
+
+    @pure def printConfiguration(o: Configuration): ST = {
+      o match {
+        case o: GenericConfiguration => return printGenericConfiguration(o)
+        case o: DataPortAccessRestriction => return printDataPortAccessRestriction(o)
+      }
+    }
+
+    @pure def printGenericConfiguration(o: GenericConfiguration): ST = {
+      return printObject(ISZ(
+        ("type", st""""GenericConfiguration""""),
+        ("e", printString(o.e))
+      ))
+    }
+
+    @pure def printDataPortAccessRestriction(o: DataPortAccessRestriction): ST = {
+      return printObject(ISZ(
+        ("type", st""""DataPortAccessRestriction""""),
+        ("component", printString(o.component)),
+        ("port", printString(o.port)),
+        ("accessType", printAccessTypeType(o.accessType))
+      ))
+    }
+
     @pure def printTODO(o: TODO): ST = {
       return printObject(ISZ(
         ("type", st""""TODO"""")
@@ -333,7 +368,7 @@ object JSON {
         parser.parseObjectType("Assembly")
       }
       parser.parseObjectKey("configuration")
-      val configuration = parser.parseISZ(parser.parseString _)
+      val configuration = parser.parseISZ(parseConfiguration _)
       parser.parseObjectNext()
       parser.parseObjectKey("configurationMacros")
       val configurationMacros = parser.parseISZ(parser.parseString _)
@@ -839,6 +874,72 @@ object JSON {
       return Attribute(typ, name, value)
     }
 
+    def parseAccessTypeType(): AccessType.Type = {
+      val r = parseAccessTypeT(F)
+      return r
+    }
+
+    def parseAccessTypeT(typeParsed: B): AccessType.Type = {
+      if (!typeParsed) {
+        parser.parseObjectType("AccessType")
+      }
+      parser.parseObjectKey("value")
+      var i = parser.offset
+      val s = parser.parseString()
+      parser.parseObjectNext()
+      AccessType.byName(s) match {
+        case Some(r) => return r
+        case _ =>
+          parser.parseException(i, s"Invalid element name '$s' for AccessType.")
+          return AccessType.byOrdinal(0).get
+      }
+    }
+
+    def parseConfiguration(): Configuration = {
+      val t = parser.parseObjectTypes(ISZ("GenericConfiguration", "DataPortAccessRestriction"))
+      t.native match {
+        case "GenericConfiguration" => val r = parseGenericConfigurationT(T); return r
+        case "DataPortAccessRestriction" => val r = parseDataPortAccessRestrictionT(T); return r
+        case _ => val r = parseDataPortAccessRestrictionT(T); return r
+      }
+    }
+
+    def parseGenericConfiguration(): GenericConfiguration = {
+      val r = parseGenericConfigurationT(F)
+      return r
+    }
+
+    def parseGenericConfigurationT(typeParsed: B): GenericConfiguration = {
+      if (!typeParsed) {
+        parser.parseObjectType("GenericConfiguration")
+      }
+      parser.parseObjectKey("e")
+      val e = parser.parseString()
+      parser.parseObjectNext()
+      return GenericConfiguration(e)
+    }
+
+    def parseDataPortAccessRestriction(): DataPortAccessRestriction = {
+      val r = parseDataPortAccessRestrictionT(F)
+      return r
+    }
+
+    def parseDataPortAccessRestrictionT(typeParsed: B): DataPortAccessRestriction = {
+      if (!typeParsed) {
+        parser.parseObjectType("DataPortAccessRestriction")
+      }
+      parser.parseObjectKey("component")
+      val component = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("port")
+      val port = parser.parseString()
+      parser.parseObjectNext()
+      parser.parseObjectKey("accessType")
+      val accessType = parseAccessTypeType()
+      parser.parseObjectNext()
+      return DataPortAccessRestriction(component, port, accessType)
+    }
+
     def parseTODO(): TODO = {
       val r = parseTODOT(F)
       return r
@@ -1261,6 +1362,60 @@ object JSON {
       return r
     }
     val r = to(s, fAttribute _)
+    return r
+  }
+
+  def fromConfiguration(o: Configuration, isCompact: B): String = {
+    val st = Printer.printConfiguration(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toConfiguration(s: String): Either[Configuration, Json.ErrorMsg] = {
+    def fConfiguration(parser: Parser): Configuration = {
+      val r = parser.parseConfiguration()
+      return r
+    }
+    val r = to(s, fConfiguration _)
+    return r
+  }
+
+  def fromGenericConfiguration(o: GenericConfiguration, isCompact: B): String = {
+    val st = Printer.printGenericConfiguration(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toGenericConfiguration(s: String): Either[GenericConfiguration, Json.ErrorMsg] = {
+    def fGenericConfiguration(parser: Parser): GenericConfiguration = {
+      val r = parser.parseGenericConfiguration()
+      return r
+    }
+    val r = to(s, fGenericConfiguration _)
+    return r
+  }
+
+  def fromDataPortAccessRestriction(o: DataPortAccessRestriction, isCompact: B): String = {
+    val st = Printer.printDataPortAccessRestriction(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toDataPortAccessRestriction(s: String): Either[DataPortAccessRestriction, Json.ErrorMsg] = {
+    def fDataPortAccessRestriction(parser: Parser): DataPortAccessRestriction = {
+      val r = parser.parseDataPortAccessRestriction()
+      return r
+    }
+    val r = to(s, fDataPortAccessRestriction _)
     return r
   }
 

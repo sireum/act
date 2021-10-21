@@ -48,7 +48,7 @@ import org.sireum.ops.ISZOps
   var camkesConnections: ISZ[ast.Connection] = ISZ()
   var camkesConnectorContainers: ISZ[ConnectorContainer] = ISZ()
 
-  var camkesConfiguration: ISZ[ST] = ISZ()
+  var camkesConfiguration: ISZ[ast.Configuration] = ISZ()
   var camkesConfigurationMacros: Set[String] = Set.empty // same idea, just can't end with a semi-colon
 
   var auxCImplIncludes: ISZ[ST] = ISZ()
@@ -164,7 +164,7 @@ import org.sireum.ops.ISZOps
       )
 
       astObjects = ISZ(Assembly(
-        configuration = (Set.empty[String] ++ camkesConfiguration.map((m : ST) => m.render)).elements,
+        configuration = (Set.empty[ast.Configuration] ++ camkesConfiguration).elements,
         configurationMacros = camkesConfigurationMacros.elements,
         composition = composition))
 
@@ -2793,7 +2793,7 @@ import org.sireum.ops.ISZOps
     return sorted
   }
 
-  def processTBConnections(c: ir.Component): (ISZ[ast.Connection], ISZ[ST]) = {
+  def processTBConnections(c: ir.Component): (ISZ[ast.Connection], ISZ[ast.Configuration]) = {
     assert(platform == ActPlatform.SeL4_TB)
     val conn = TBConnections(monitors, sharedData, srcQueues, symbolTable, aadlTypes, actOptions)
     return conn.processConnections(c, connectionCounter)

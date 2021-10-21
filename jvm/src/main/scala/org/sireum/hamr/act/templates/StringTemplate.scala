@@ -3,8 +3,7 @@
 package org.sireum.hamr.act.templates
 
 import org.sireum._
-import org.sireum.hamr.act.ast._
-import org.sireum.hamr.act.templates.CakeMLTemplate
+import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
@@ -461,20 +460,20 @@ object StringTemplate {
     return ret
   }
 
-  def sbAccessRestrictionEntry(componentName: String, varName: String, permission: String): ST = {
-    return st"""${componentName}.${varName}_access = "${permission}";"""
+  def sbAccessRestrictionEntry(componentName: String, varName: String, permission: String): ast.Configuration = {
+    return ast.GenericConfiguration(st"""${componentName}.${varName}_access = "${permission}";""".render)
   }
 
-  def configurationPriority(name: String, priority: Z): ST = {
-    return st"${name}.priority = ${priority};"
+  def configurationPriority(name: String, priority: Z): ast.Configuration = {
+    return ast.GenericConfiguration(s"${name}.priority = ${priority};")
   }
 
-  def configurationControlStackSize(name: String, size: Z): ST = {
-    return st"${name}._control_stack_size = ${size};"
+  def configurationControlStackSize(name: String, size: Z): ast.Configuration = {
+    return ast.GenericConfiguration(s"${name}._control_stack_size = ${size};")
   }
 
-  def configurationStackSize(name: String, size: Z): ST = {
-    return st"${name}._stack_size = ${size};"
+  def configurationStackSize(name: String, size: Z): ast.Configuration = {
+    return ast.GenericConfiguration(s"${name}._stack_size = ${size};")
   }
 
   val SEM_WAIT: String = Util.brand("dispatch_sem_wait")
@@ -816,25 +815,25 @@ bool is_empty_${s.name}(${s.structName} *port) {
     return body
   }
   
-  def consumes(c: Consumes): ST = {
+  def consumes(c: ast.Consumes): ST = {
     val maybe: String = if(c.optional) "maybe " else ""
     return st"${maybe}consumes ${c.typ} ${c.name};"
   }
 
-  def dataport(d: Dataport): ST = {
+  def dataport(d: ast.Dataport): ST = {
     val maybe: String = if(d.optional) "maybe " else ""
     return st"${maybe}dataport ${d.typ} ${d.name};"
   }
   
-  def emits(e: Emits): ST = {
+  def emits(e: ast.Emits): ST = {
     return st"emits ${e.typ} ${e.name};"
   }
 
-  def provides(p: Provides): ST = {
+  def provides(p: ast.Provides): ST = {
     return st"provides ${p.typ} ${p.name};"
   }
 
-  def uses(u: Uses): ST = {
+  def uses(u: ast.Uses): ST = {
     val maybe: String = if(u.optional) "maybe " else ""
     return st"${maybe}uses ${u.typ} ${u.name};"
   }

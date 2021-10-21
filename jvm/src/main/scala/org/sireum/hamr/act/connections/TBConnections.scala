@@ -20,11 +20,11 @@ import org.sireum.hamr.ir
 
   val platform: ActPlatform.Type = actOptions.platform
 
-  var camkesConfiguration: ISZ[ST] = ISZ()
+  var camkesConfiguration: ISZ[ast.Configuration] = ISZ()
 
   var connections: ISZ[ast.Connection] = ISZ()
 
-  def processConnections(c: ir.Component, connectionCounter: Counter): (ISZ[ast.Connection], ISZ[ST]) = {
+  def processConnections(c: ir.Component, connectionCounter: Counter): (ISZ[ast.Connection], ISZ[ast.Configuration]) = {
     assert(platform == ActPlatform.SeL4_TB)
 
     val handledConns = c.connectionInstances.filter(conn => Connections.isHandledConnection(conn, symbolTable))
@@ -161,8 +161,8 @@ import org.sireum.hamr.ir
     val srcFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(srcFeature.identifier))
     val dstFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(dstFeature.identifier))
 
-    camkesConfiguration = camkesConfiguration :+ st"""${srcComponent}.${srcFeatureName}_access = "W";"""
-    camkesConfiguration = camkesConfiguration :+ st"""${dstComponent}.${dstFeatureName}_access = "R";"""
+    camkesConfiguration = camkesConfiguration :+ ast.DataPortAccessRestriction(srcComponent, srcFeatureName, ast.AccessType.W)
+    camkesConfiguration = camkesConfiguration :+ ast.DataPortAccessRestriction(dstComponent, dstFeatureName, ast.AccessType.R)
 
     return Util.createConnectionC(
       CAmkESConnectionType.Refinement,

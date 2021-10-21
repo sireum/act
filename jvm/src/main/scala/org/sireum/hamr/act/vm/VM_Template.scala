@@ -2,6 +2,7 @@
 package org.sireum.hamr.act.vm
 
 import org.sireum._
+import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.templates._
 import org.sireum.hamr.act.util.{CMakeOption, CMakeStandardOption}
 
@@ -22,15 +23,6 @@ object VM_Template {
     return ret
   }
 
-  def vm_composition_macros(processID: String): ISZ[String] = {
-    val ret: ISZ[String] = ISZ(
-      s"VM_GENERAL_COMPOSITION_DEF()",
-      s"VM_COMPONENT_CONNECTIONS_DEF(${processID})",
-      s"VM_VIRTUAL_SERIAL_COMPONENTS_DEF()",
-      s"PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF(${processID})"
-    )
-    return ret
-  }
 
   /*
   def vm_composition_macros_expanded(processID: String): ISZ[String] = {
@@ -51,23 +43,23 @@ object VM_Template {
   }
    */
 
-  def vm_assembly_configuration_entries(vmProcessID: String): ISZ[ST] = {
-    val ret: ISZ[ST] = ISZ(
-      st"${vmProcessID}.cnode_size_bits = 18;",
-      st"${vmProcessID}.simple_untyped21_pool = 12;",
-      st"${vmProcessID}.simple_untyped12_pool = 12;",
-      st"${vmProcessID}.num_extra_frame_caps = 0;",
-      st"${vmProcessID}.extra_frame_map_address = 0;"
+  def vm_assembly_configuration_entries(vmProcessID: String): ISZ[ast.Configuration] = {
+    val ret: ISZ[ast.Configuration] = ISZ(
+      ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 18;"),
+      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped21_pool = 12;"),
+      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped12_pool = 12;"),
+      ast.GenericConfiguration(s"${vmProcessID}.num_extra_frame_caps = 0;"),
+      ast.GenericConfiguration(s"${vmProcessID}.extra_frame_map_address = 0;")
     )
     return ret
   }
 
-  def vm_assembly_configuration_macros(vmProcessId: String): ISZ[String] = {
-    val ret: ISZ[String] = ISZ(
-      "VM_GENERAL_CONFIGURATION_DEF()",
-      s"VM_CONFIGURATION_DEF(${vmProcessId})",
-      s"VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF()",
-      s"PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(${vmProcessId})"
+  def vm_assembly_configuration_macros(vmProcessId: String): ISZ[ast.Configuration] = {
+    val ret: ISZ[ast.Configuration] = ISZ(
+      ast.GenericConfiguration("VM_GENERAL_CONFIGURATION_DEF()"),
+      ast.GenericConfiguration(s"VM_CONFIGURATION_DEF(${vmProcessId})"),
+      ast.GenericConfiguration(s"VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF()"),
+      ast.GenericConfiguration(s"PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(${vmProcessId})")
     )
     return ret
   }

@@ -72,7 +72,7 @@ import org.sireum.hamr.ir
 @datatype class CamkesAssemblyContribution(imports: ISZ[String],
                                            instances: ISZ[ast.Instance],
                                            connections: ISZ[ast.Connection],
-                                           configurations: ISZ[ST],
+                                           configurations: ISZ[ast.Configuration],
                                            cContainers: ISZ[C_Container],
                                            settingCmakeEntries: ISZ[ST],
                                            auxResourceFiles: ISZ[Resource])

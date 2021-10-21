@@ -23,7 +23,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
 
     val threads = symbolTable.getThreads()
 
-    var configurations: ISZ[ST] = ISZ()
+    var configurations: ISZ[ast.Configuration] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
 

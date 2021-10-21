@@ -252,6 +252,33 @@ object Transformer {
       return PreResult(ctx, T, None())
     }
 
+    @pure def preConfiguration(ctx: Context, o: Configuration): PreResult[Context, Configuration] = {
+      o match {
+        case o: GenericConfiguration =>
+          val r: PreResult[Context, Configuration] = preGenericConfiguration(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: Configuration)) => PreResult(preCtx, continu, Some[Configuration](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type Configuration")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[Configuration]())
+          }
+          return r
+        case o: DataPortAccessRestriction =>
+          val r: PreResult[Context, Configuration] = preDataPortAccessRestriction(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: Configuration)) => PreResult(preCtx, continu, Some[Configuration](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type Configuration")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[Configuration]())
+          }
+          return r
+      }
+    }
+
+    @pure def preGenericConfiguration(ctx: Context, o: GenericConfiguration): PreResult[Context, GenericConfiguration] = {
+      return PreResult(ctx, T, None())
+    }
+
+    @pure def preDataPortAccessRestriction(ctx: Context, o: DataPortAccessRestriction): PreResult[Context, DataPortAccessRestriction] = {
+      return PreResult(ctx, T, None())
+    }
+
     @pure def preTODO(ctx: Context, o: TODO): PreResult[Context, TODO] = {
       return PreResult(ctx, T, None())
     }
@@ -465,6 +492,33 @@ object Transformer {
       return TPostResult(ctx, None())
     }
 
+    @pure def postConfiguration(ctx: Context, o: Configuration): TPostResult[Context, Configuration] = {
+      o match {
+        case o: GenericConfiguration =>
+          val r: TPostResult[Context, Configuration] = postGenericConfiguration(ctx, o) match {
+           case TPostResult(postCtx, Some(result: Configuration)) => TPostResult(postCtx, Some[Configuration](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type Configuration")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[Configuration]())
+          }
+          return r
+        case o: DataPortAccessRestriction =>
+          val r: TPostResult[Context, Configuration] = postDataPortAccessRestriction(ctx, o) match {
+           case TPostResult(postCtx, Some(result: Configuration)) => TPostResult(postCtx, Some[Configuration](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type Configuration")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[Configuration]())
+          }
+          return r
+      }
+    }
+
+    @pure def postGenericConfiguration(ctx: Context, o: GenericConfiguration): TPostResult[Context, GenericConfiguration] = {
+      return TPostResult(ctx, None())
+    }
+
+    @pure def postDataPortAccessRestriction(ctx: Context, o: DataPortAccessRestriction): TPostResult[Context, DataPortAccessRestriction] = {
+      return TPostResult(ctx, None())
+    }
+
     @pure def postTODO(ctx: Context, o: TODO): TPostResult[Context, TODO] = {
       return TPostResult(ctx, None())
     }
@@ -502,11 +556,12 @@ import Transformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val rOpt: TPostResult[Context, ASTObject] = o2 match {
         case o2: Assembly =>
-          val r0: TPostResult[Context, Composition] = transformComposition(preR.ctx, o2.composition)
-          if (hasChanged || r0.resultOpt.nonEmpty)
-            TPostResult(r0.ctx, Some(o2(composition = r0.resultOpt.getOrElse(o2.composition))))
+          val r0: TPostResult[Context, IS[Z, Configuration]] = transformISZ(preR.ctx, o2.configuration, transformConfiguration _)
+          val r1: TPostResult[Context, Composition] = transformComposition(r0.ctx, o2.composition)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(configuration = r0.resultOpt.getOrElse(o2.configuration), composition = r1.resultOpt.getOrElse(o2.composition))))
           else
-            TPostResult(r0.ctx, None())
+            TPostResult(r1.ctx, None())
         case o2: Composition =>
           val r0: TPostResult[Context, IS[Z, TODO]] = transformISZ(preR.ctx, o2.groups, transformTODO _)
           val r1: TPostResult[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.exports, transformTODO _)
@@ -620,11 +675,12 @@ import Transformer._
     val r: TPostResult[Context, Assembly] = if (preR.continu) {
       val o2: Assembly = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: TPostResult[Context, Composition] = transformComposition(preR.ctx, o2.composition)
-      if (hasChanged || r0.resultOpt.nonEmpty)
-        TPostResult(r0.ctx, Some(o2(composition = r0.resultOpt.getOrElse(o2.composition))))
+      val r0: TPostResult[Context, IS[Z, Configuration]] = transformISZ(preR.ctx, o2.configuration, transformConfiguration _)
+      val r1: TPostResult[Context, Composition] = transformComposition(r0.ctx, o2.composition)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+        TPostResult(r1.ctx, Some(o2(configuration = r0.resultOpt.getOrElse(o2.configuration), composition = r1.resultOpt.getOrElse(o2.composition))))
       else
-        TPostResult(r0.ctx, None())
+        TPostResult(r1.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1190,6 +1246,93 @@ import Transformer._
     val hasChanged: B = r.resultOpt.nonEmpty
     val o2: Attribute = r.resultOpt.getOrElse(o)
     val postR: TPostResult[Context, Attribute] = pp.postAttribute(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformConfiguration(ctx: Context, o: Configuration): TPostResult[Context, Configuration] = {
+    val preR: PreResult[Context, Configuration] = pp.preConfiguration(ctx, o)
+    val r: TPostResult[Context, Configuration] = if (preR.continu) {
+      val o2: Configuration = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: TPostResult[Context, Configuration] = o2 match {
+        case o2: GenericConfiguration =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+        case o2: DataPortAccessRestriction =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: Configuration = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, Configuration] = pp.postConfiguration(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformGenericConfiguration(ctx: Context, o: GenericConfiguration): TPostResult[Context, GenericConfiguration] = {
+    val preR: PreResult[Context, GenericConfiguration] = pp.preGenericConfiguration(ctx, o)
+    val r: TPostResult[Context, GenericConfiguration] = if (preR.continu) {
+      val o2: GenericConfiguration = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        TPostResult(preR.ctx, Some(o2))
+      else
+        TPostResult(preR.ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: GenericConfiguration = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, GenericConfiguration] = pp.postGenericConfiguration(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformDataPortAccessRestriction(ctx: Context, o: DataPortAccessRestriction): TPostResult[Context, DataPortAccessRestriction] = {
+    val preR: PreResult[Context, DataPortAccessRestriction] = pp.preDataPortAccessRestriction(ctx, o)
+    val r: TPostResult[Context, DataPortAccessRestriction] = if (preR.continu) {
+      val o2: DataPortAccessRestriction = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        TPostResult(preR.ctx, Some(o2))
+      else
+        TPostResult(preR.ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: DataPortAccessRestriction = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, DataPortAccessRestriction] = pp.postDataPortAccessRestriction(r.ctx, o2)
     if (postR.resultOpt.nonEmpty) {
       return postR
     } else if (hasChanged) {

@@ -296,6 +296,17 @@ import org.sireum.ops.StringOps
           |"""
     })
 
+    val configuration: Option[ST] = {
+      val configs = a.configuration.map((m: Configuration) => visitConfiguration(m))
+      if(configs.nonEmpty || a.configurationMacros.nonEmpty) {
+        Some(
+          st"""configuration {
+              |  ${(configs, "\n")}
+              |  ${(a.configurationMacros, "\n")}
+              |}""")
+      } else { None()}
+    }
+
     val st =
       st"""${StringTemplate.doNotEditComment()}
           |
@@ -306,17 +317,21 @@ import org.sireum.ops.StringOps
           |assembly {
           |  ${comp.get}
           |
-          |  configuration {
-          |    ${(a.configuration, "\n")}
-          |
-          |    ${(a.configurationMacros, "\n")}
-          |  }
+          |  ${configuration}
           |}
           |"""
 
     add(s"${rootServer}.camkes", st)
 
     return None()
+  }
+
+  def visitConfiguration(o: Configuration): String = {
+    val ret: String = o match {
+      case ast.GenericConfiguration(e) => e
+      case ast.DataPortAccessRestriction(comp, port, v) => st"""${comp}.${port}_access = "${v.name}";""".render
+    }
+    return ret
   }
 
   def visitComposition(o: Composition) : Option[ST] = {

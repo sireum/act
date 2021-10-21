@@ -59,12 +59,6 @@ object Act {
       case _ => ISZ()
     }
 
-    if (ExperimentalOptions.generateRefinementProof(options.experimentalOptions)) {
-      //resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, symbolTable, options.outputDir)
-      ProofUtil.proofContainer.modelSchedulingType = PeriodicUtil.getSchedulingType(symbolTable, options.platform)
-      resources = resources ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, symbolTable, options.outputDir)
-    }
-
     container match {
       case Some(container) =>
         val rootDir: String = options.aadlRootDirectory match {
@@ -81,6 +75,12 @@ object Act {
           symbolTable = symbolTable,
           options = options
         )
+
+        if (ExperimentalOptions.generateRefinementProof(options.experimentalOptions)) {
+          //resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, symbolTable, options.outputDir)
+          ProofUtil.proofContainer.modelSchedulingType = PeriodicUtil.getSchedulingType(symbolTable, options.platform)
+          resources = resources ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, container, symbolTable, options.outputDir)
+        }
       case _ =>
     }
 

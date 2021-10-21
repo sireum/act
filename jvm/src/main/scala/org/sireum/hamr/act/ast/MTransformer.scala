@@ -133,6 +133,14 @@ object MTransformer {
 
   val PostResultAttribute: MOption[Attribute] = MNone()
 
+  val PreResultGenericConfiguration: PreResult[GenericConfiguration] = PreResult(T, MNone())
+
+  val PostResultGenericConfiguration: MOption[GenericConfiguration] = MNone()
+
+  val PreResultDataPortAccessRestriction: PreResult[DataPortAccessRestriction] = PreResult(T, MNone())
+
+  val PostResultDataPortAccessRestriction: MOption[DataPortAccessRestriction] = MNone()
+
   val PreResultTODO: PreResult[TODO] = PreResult(T, MNone())
 
   val PostResultTODO: MOption[TODO] = MNone()
@@ -352,6 +360,33 @@ import MTransformer._
     return PreResultAttribute
   }
 
+  def preConfiguration(o: Configuration): PreResult[Configuration] = {
+    o match {
+      case o: GenericConfiguration =>
+        val r: PreResult[Configuration] = preGenericConfiguration(o) match {
+         case PreResult(continu, MSome(r: Configuration)) => PreResult(continu, MSome[Configuration](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type Configuration")
+         case PreResult(continu, _) => PreResult(continu, MNone[Configuration]())
+        }
+        return r
+      case o: DataPortAccessRestriction =>
+        val r: PreResult[Configuration] = preDataPortAccessRestriction(o) match {
+         case PreResult(continu, MSome(r: Configuration)) => PreResult(continu, MSome[Configuration](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type Configuration")
+         case PreResult(continu, _) => PreResult(continu, MNone[Configuration]())
+        }
+        return r
+    }
+  }
+
+  def preGenericConfiguration(o: GenericConfiguration): PreResult[GenericConfiguration] = {
+    return PreResultGenericConfiguration
+  }
+
+  def preDataPortAccessRestriction(o: DataPortAccessRestriction): PreResult[DataPortAccessRestriction] = {
+    return PreResultDataPortAccessRestriction
+  }
+
   def preTODO(o: TODO): PreResult[TODO] = {
     return PreResultTODO
   }
@@ -565,6 +600,33 @@ import MTransformer._
     return PostResultAttribute
   }
 
+  def postConfiguration(o: Configuration): MOption[Configuration] = {
+    o match {
+      case o: GenericConfiguration =>
+        val r: MOption[Configuration] = postGenericConfiguration(o) match {
+         case MSome(result: Configuration) => MSome[Configuration](result)
+         case MSome(_) => halt("Can only produce object of type Configuration")
+         case _ => MNone[Configuration]()
+        }
+        return r
+      case o: DataPortAccessRestriction =>
+        val r: MOption[Configuration] = postDataPortAccessRestriction(o) match {
+         case MSome(result: Configuration) => MSome[Configuration](result)
+         case MSome(_) => halt("Can only produce object of type Configuration")
+         case _ => MNone[Configuration]()
+        }
+        return r
+    }
+  }
+
+  def postGenericConfiguration(o: GenericConfiguration): MOption[GenericConfiguration] = {
+    return PostResultGenericConfiguration
+  }
+
+  def postDataPortAccessRestriction(o: DataPortAccessRestriction): MOption[DataPortAccessRestriction] = {
+    return PostResultDataPortAccessRestriction
+  }
+
   def postTODO(o: TODO): MOption[TODO] = {
     return PostResultTODO
   }
@@ -576,9 +638,10 @@ import MTransformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val rOpt: MOption[ASTObject] = o2 match {
         case o2: Assembly =>
-          val r0: MOption[Composition] = transformComposition(o2.composition)
-          if (hasChanged || r0.nonEmpty)
-            MSome(o2(composition = r0.getOrElse(o2.composition)))
+          val r0: MOption[IS[Z, Configuration]] = transformISZ(o2.configuration, transformConfiguration _)
+          val r1: MOption[Composition] = transformComposition(o2.composition)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(configuration = r0.getOrElse(o2.configuration), composition = r1.getOrElse(o2.composition)))
           else
             MNone()
         case o2: Composition =>
@@ -694,9 +757,10 @@ import MTransformer._
     val r: MOption[Assembly] = if (preR.continu) {
       val o2: Assembly = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val r0: MOption[Composition] = transformComposition(o2.composition)
-      if (hasChanged || r0.nonEmpty)
-        MSome(o2(composition = r0.getOrElse(o2.composition)))
+      val r0: MOption[IS[Z, Configuration]] = transformISZ(o2.configuration, transformConfiguration _)
+      val r1: MOption[Composition] = transformComposition(o2.composition)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+        MSome(o2(configuration = r0.getOrElse(o2.configuration), composition = r1.getOrElse(o2.composition)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1264,6 +1328,93 @@ import MTransformer._
     val hasChanged: B = r.nonEmpty
     val o2: Attribute = r.getOrElse(o)
     val postR: MOption[Attribute] = postAttribute(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformConfiguration(o: Configuration): MOption[Configuration] = {
+    val preR: PreResult[Configuration] = preConfiguration(o)
+    val r: MOption[Configuration] = if (preR.continu) {
+      val o2: Configuration = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: MOption[Configuration] = o2 match {
+        case o2: GenericConfiguration =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+        case o2: DataPortAccessRestriction =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: Configuration = r.getOrElse(o)
+    val postR: MOption[Configuration] = postConfiguration(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformGenericConfiguration(o: GenericConfiguration): MOption[GenericConfiguration] = {
+    val preR: PreResult[GenericConfiguration] = preGenericConfiguration(o)
+    val r: MOption[GenericConfiguration] = if (preR.continu) {
+      val o2: GenericConfiguration = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: GenericConfiguration = r.getOrElse(o)
+    val postR: MOption[GenericConfiguration] = postGenericConfiguration(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformDataPortAccessRestriction(o: DataPortAccessRestriction): MOption[DataPortAccessRestriction] = {
+    val preR: PreResult[DataPortAccessRestriction] = preDataPortAccessRestriction(o)
+    val r: MOption[DataPortAccessRestriction] = if (preR.continu) {
+      val o2: DataPortAccessRestriction = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: DataPortAccessRestriction = r.getOrElse(o)
+    val postR: MOption[DataPortAccessRestriction] = postDataPortAccessRestriction(o2)
     if (postR.nonEmpty) {
       return postR
     } else if (hasChanged) {
