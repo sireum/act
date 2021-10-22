@@ -388,14 +388,20 @@ object SMT2Template {
           |          false))))
           |
           |
-          |(define-fun isAADLConnectionRefinement ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) Bool
-          |  (exists ((aadlSource AADLPort) (aadlDest AADLPort))
-          |    (and
-          |      (PortRefinement aadlSource camkesSource)
-          |      (PortRefinement aadlDest camkesDest)
-          |      (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
-          |      (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest))
-          |      (AADLConnectionFlowTos aadlSource aadlDest))))
+          |(define-fun isAADL_SB_ConnectionRefinement ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) Bool
+          |  (and (or (= CodegenMode SeL4) (= CodegenMode SeL4_Only) false)
+          |       (exists ((aadlSource AADLPort) (aadlDest AADLPort))
+          |         (and
+          |           (PortRefinement aadlSource camkesSource)
+          |           (PortRefinement aadlDest camkesDest)
+          |           (ComponentRefinement (select AADLPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
+          |           (ComponentRefinement (select AADLPortComponent aadlDest) (select CAmkESPortComponent camkesDest))
+          |           (AADLConnectionFlowTos aadlSource aadlDest)))))
+          |
+          |(define-fun isAADL_TB_ConnectionRefinement ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) Bool
+          |  (and (= CodegenMode SeL4_TB)
+          |       false)
+          |)
           |
           |(define-fun isCAmkESSchedulingConnection ((_conn CAmkESConnection)) Bool
           |  (or
@@ -408,7 +414,8 @@ object SMT2Template {
           |  (forall ((conn CAmkESConnection) (camkesSource CAmkESPort) (camkesDest CAmkESPort))
           |    (=> (CAmkESConnectionFlowTos conn camkesSource camkesDest)
           |      (or
-          |        (isAADLConnectionRefinement camkesSource camkesDest)
+          |        (isAADL_SB_ConnectionRefinement camkesSource camkesDest)
+          |        (isAADL_TB_ConnectionRefinement camkesSource camkesDest)
           |        (isCAmkESSchedulingConnection conn)
           |        false))))
           |
