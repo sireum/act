@@ -111,17 +111,18 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
       }
     }
 
-    emits = emits :+ ast.Emits(
+    emits = emits :+ Util.createEmits_SelfPacing(
+      aadlThread = aadlThread,
+      symbolTable = symbolTable,
       name = SelfPacerTemplate.selfPacerClientTickIdentifier(),
       typ = SelfPacerTemplate.selfPacerTickTockType())
 
-    consumes = consumes :+ ast.Consumes(
+    consumes = consumes :+ Util.createConsumes_SelfPacing(
+      aadlThread = aadlThread,
+      symbolTable = symbolTable,
       name = SelfPacerTemplate.selfPacerClientTockIdentifier(),
       typ = SelfPacerTemplate.selfPacerTickTockType(),
       optional = F)
-
-    ProofUtil.addCAmkESSelfPacerPort(aadlThread, SelfPacerTemplate.selfPacerClientTickIdentifier(), symbolTable)
-    ProofUtil.addCAmkESSelfPacerPort(aadlThread, SelfPacerTemplate.selfPacerClientTockIdentifier(), symbolTable)
 
     val shell = ast.Component(
       emits = emits,

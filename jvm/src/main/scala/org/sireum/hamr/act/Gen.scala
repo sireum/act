@@ -552,8 +552,6 @@ import org.sireum.ops.ISZOps
                 optional = F,
                 typ = samplingPort.structName
               )
-
-              ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
             }
 
             def dataPort_TB_Profile(): Unit = {
@@ -565,12 +563,20 @@ import org.sireum.ops.ISZOps
                     val monitor = Monitors.getMonitorForInPort(f.feature, monitors).get.asInstanceOf[TB_Monitor]
                     imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
-                    uses = uses :+ Uses(
+                    uses = uses :+ Util.createUses_Refinement(
+                      aadlThread = aadlThread,
+                      aadlPort = a,
+                      symbolTable = symbolTable,
+
                       name = Util.genMonitorFeatureName(f.feature, None[Z]()),
                       typ = monitor.interface.name,
                       optional = F)
 
-                    consumes = consumes :+ Consumes(
+                    consumes = consumes :+ Util.createConsumes_Refinement(
+                      aadlThread = aadlThread,
+                      aadlPort = a,
+                      symbolTable = symbolTable,
+
                       name = Util.genSeL4NotificationName(f.feature, T),
                       typ = Util.getMonitorNotificationType(f.feature.category),
                       optional = F)
@@ -584,7 +590,11 @@ import org.sireum.ops.ISZOps
                         val monitor = monitors.get(CommonUtil.getName(o.name)).get.asInstanceOf[TB_Monitor]
                         imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
-                        uses = uses :+ Uses(
+                        uses = uses :+ Util.createUses_Refinement(
+                          aadlThread = aadlThread,
+                          aadlPort = a,
+                          symbolTable = symbolTable,
+
                           name = Util.genMonitorFeatureName(f.feature, Some(i)),
                           typ = monitor.interface.name,
                           optional = F
@@ -616,12 +626,20 @@ import org.sireum.ops.ISZOps
                     val monitor = Monitors.getMonitorForInPort(f.feature, monitors).get.asInstanceOf[TB_Monitor]
                     imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
-                    uses = uses :+ Uses(
+                    uses = uses :+ Util.createUses_Refinement(
+                      aadlThread = aadlThread,
+                      aadlPort = a,
+                      symbolTable = symbolTable,
+
                       name = Util.genMonitorFeatureName(f.feature, None[Z]()),
                       typ = monitor.interface.name,
                       optional = F)
 
-                    consumes = consumes :+ Consumes(
+                    consumes = consumes :+ Util.createConsumes_Refinement(
+                      aadlThread = aadlThread,
+                      aadlPort = a,
+                      symbolTable = symbolTable,
+
                       name = Util.genSeL4NotificationName(f.feature, T),
                       typ = Util.getMonitorNotificationType(f.feature.category),
                       optional = F)
@@ -635,7 +653,11 @@ import org.sireum.ops.ISZOps
                         val monitor = monitors.get(CommonUtil.getName(o.name)).get.asInstanceOf[TB_Monitor]
                         imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
-                        uses = uses :+ Uses(
+                        uses = uses :+ Util.createUses_Refinement(
+                          aadlThread = aadlThread,
+                          aadlPort = a,
+                          symbolTable = symbolTable,
+
                           name = Util.genMonitorFeatureName(f.feature, Some(i)),
                           typ = monitor.interface.name,
                           optional = F
@@ -705,8 +727,6 @@ import org.sireum.ops.ISZOps
                       name = camkesEventPortId,
                       typ = Util.EVENT_NOTIFICATION_TYPE,
                       optional = isOptional)
-
-                    ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
                   }
 
                   val camkesDataPortId = Util.getEventDataSBQueueDestFeatureName(f.identifier)
@@ -718,8 +738,6 @@ import org.sireum.ops.ISZOps
                     name = camkesDataPortId,
                     typ = queueType,
                     optional = isOptional)
-
-                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
 
                 case ir.Direction.Out =>
 
@@ -743,8 +761,6 @@ import org.sireum.ops.ISZOps
 
                         name = camkesEventPortId,
                         typ = Util.EVENT_NOTIFICATION_TYPE)
-
-                      ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
                     }
 
                     val camkesDataPortId = Util.getEventDataSBQueueSrcFeatureName(f.identifier, queueSize)
@@ -756,8 +772,6 @@ import org.sireum.ops.ISZOps
                       name = camkesDataPortId,
                       typ = queueType,
                       optional = F)
-
-                    ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
                   }
                 case _ => halt(s"Unexpected port direction: ${f.direction}")
               }
@@ -778,14 +792,22 @@ import org.sireum.ops.ISZOps
                   imports = imports + s""""../../interfaces/${Util.MONITOR_INTERFACE_NAME_RECEIVER}.idl4""""
 
                   // uses
-                  uses = uses :+ Uses(
+                  uses = uses :+ Util.createUses_Refinement(
+                    aadlThread = aadlThread,
+                    aadlPort = a,
+                    symbolTable = symbolTable,
+
                     name = Util.genMonitorFeatureName(f.feature, None[Z]()),
                     typ = Util.MONITOR_INTERFACE_NAME_RECEIVER,
                     optional = F,
                   )
 
                   // consumes notification
-                  consumes = consumes :+ Consumes(
+                  consumes = consumes :+ Util.createConsumes_Refinement(
+                    aadlThread = aadlThread,
+                    aadlPort = a,
+                    symbolTable = symbolTable,
+
                     name = Util.genSeL4NotificationName(f.feature, T),
                     typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE,
                     optional = F)
@@ -799,7 +821,11 @@ import org.sireum.ops.ISZOps
                       var i: Z = 0
                       for (o <- outs) {
 
-                        uses = uses :+ Uses(
+                        uses = uses :+ Util.createUses_Refinement(
+                          aadlThread = aadlThread,
+                          aadlPort = a,
+                          symbolTable = symbolTable,
+
                           name = Util.genMonitorFeatureName(f.feature, Some(i)),
                           typ = Util.MONITOR_INTERFACE_NAME_SENDER,
                           optional = F
@@ -837,8 +863,6 @@ import org.sireum.ops.ISZOps
                     typ = Util.EVENT_NOTIFICATION_TYPE,
                     optional = F)
 
-                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
-
                   val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
                   dataports = dataports :+ Util.createDataport_Refinement(
                     aadlThread = aadlThread,
@@ -848,8 +872,6 @@ import org.sireum.ops.ISZOps
                     name = camkesDataPortId,
                     typ = counterType,
                     optional = F)
-
-                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
 
                 case ir.Direction.Out =>
                   val camkesEventPortId = Util.getEventSBNotificationName(f.identifier)
@@ -861,8 +883,6 @@ import org.sireum.ops.ISZOps
                     name = camkesEventPortId,
                     typ = Util.EVENT_NOTIFICATION_TYPE)
 
-                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesEventPortId, symbolTable)
-
                   val camkesDataPortId = Util.getEventSBCounterName(f.identifier)
                   dataports = dataports :+ Util.createDataport_Refinement(
                     aadlThread = aadlThread,
@@ -872,8 +892,6 @@ import org.sireum.ops.ISZOps
                     name = camkesDataPortId,
                     typ = counterType,
                     optional = F)
-
-                  ProofUtil.addCamkesPortRefinement(aadlThread, a, camkesDataPortId, symbolTable)
 
                 case _ => halt(s"Unexpected port direction: ${f.direction}")
               }
@@ -1324,6 +1342,7 @@ import org.sireum.ops.ISZOps
 
         def handleDataPort(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, f)
+          val instanceName = StringUtil.toLowerCase(monitorName)
           val interfaceName = Util.getInterfaceName(f)
 
           val typeName = Util.getClassifierFullyQualified(f.classifier.get)
@@ -1342,10 +1361,17 @@ import org.sireum.ops.ISZOps
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
             dataports = ISZ(),
-            emits = ISZ(Emits(name = "monsig", typ = Util.getMonitorNotificationType(f.category))),
+            emits = ISZ(
+              Util.createEmits_Monitor(
+                monitorName = instanceName,
+                name = "monsig",
+                typ = Util.getMonitorNotificationType(f.category))),
             uses = ISZ(),
             consumes = ISZ(),
-            provides = ISZ(Provides(name = providesVarName, typ = interfaceName)),
+            provides = ISZ(Util.createProvides_Monitor(
+              monitorName = instanceName,
+              name = providesVarName,
+              typ = interfaceName)),
             includes = ISZ(),
             attributes = ISZ(),
             preprocessorIncludes = ISZ(),
@@ -1356,7 +1382,7 @@ import org.sireum.ops.ISZOps
 
           val inst: Instance = Instance(
             address_space = "",
-            name = StringUtil.toLowerCase(monitorName),
+            name = instanceName,
             component = monitor)
 
           val paramType: ir.Component = typeMap.get(typeName).get
@@ -1400,6 +1426,7 @@ import org.sireum.ops.ISZOps
 
         def buildIhorMonitor(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, f)
+          val instanceName = StringUtil.toLowerCase(monitorName)
           val interfaceNameReceiver = Util.getInterfaceNameIhor(f, F)
           val interfaceNameSender = Util.getInterfaceNameIhor(f, T)
 
@@ -1424,12 +1451,15 @@ import org.sireum.ops.ISZOps
             semaphores = ISZ(),
             dataports = ISZ(),
             emits = ISZ(
-              Emits(name = "monsig", typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE)),
+              Util.createEmits_Monitor(
+                monitorName = instanceName,
+                name = "monsig",
+                typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE)),
             uses = ISZ(),
             consumes = ISZ(),
             provides = ISZ(
-              Provides(name = providesReceiverVarName, typ = interfaceNameReceiver),
-              Provides(name = providesSenderVarName, typ = interfaceNameSender)),
+              Util.createProvides_Monitor(monitorName = instanceName, name = providesReceiverVarName, typ = interfaceNameReceiver),
+              Util.createProvides_Monitor(monitorName = instanceName, name = providesSenderVarName, typ = interfaceNameSender)),
             includes = ISZ(),
             attributes = ISZ(),
             preprocessorIncludes = ISZ(),
@@ -1440,7 +1470,10 @@ import org.sireum.ops.ISZOps
             externalEntities = ISZ()
           )
 
-          val inst: Instance = Instance(address_space = "", name = StringUtil.toLowerCase(monitorName), component = monitor)
+          val inst: Instance = Instance(
+            address_space = "",
+            name = instanceName,
+            component = monitor)
 
           val receiveMethod = Method(
             name = "dequeue",
@@ -1493,6 +1526,7 @@ import org.sireum.ops.ISZOps
           assert(f.category == ir.FeatureCategory.EventPort)
 
           val monitorName = Util.getMonitorName(dst, f)
+          val instanceName = StringUtil.toLowerCase(monitorName)
           val interfaceNameReceiver = Util.getInterfaceNameIhor(f, F)
           val interfaceNameSender = Util.getInterfaceNameIhor(f, T)
 
@@ -1512,12 +1546,12 @@ import org.sireum.ops.ISZOps
             semaphores = ISZ(),
             dataports = ISZ(),
             emits = ISZ(
-              Emits(name = "monsig", typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE)),
+              Util.createEmits_Monitor(monitorName = instanceName, name = "monsig", typ = Util.MONITOR_EVENT_DATA_NOTIFICATION_TYPE)),
             uses = ISZ(),
             consumes = ISZ(),
             provides = ISZ(
-              Provides(name = providesReceiverVarName, typ = interfaceNameReceiver),
-              Provides(name = providesSenderVarName, typ = interfaceNameSender)),
+              Util.createProvides_Monitor(monitorName = instanceName, name = providesReceiverVarName, typ = interfaceNameReceiver),
+              Util.createProvides_Monitor(monitorName = instanceName, name = providesSenderVarName, typ = interfaceNameSender)),
             includes = ISZ(),
             attributes = ISZ(),
             preprocessorIncludes = ISZ(),
@@ -1528,7 +1562,7 @@ import org.sireum.ops.ISZOps
             externalEntities = ISZ()
           )
 
-          val inst: Instance = Instance(address_space = "", name = StringUtil.toLowerCase(monitorName), component = monitor)
+          val inst: Instance = Instance(address_space = "", name = instanceName, component = monitor)
 
           val isEmptyMethod = Method(
             name = "is_empty",

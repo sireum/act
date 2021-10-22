@@ -51,7 +51,8 @@ import org.sireum.hamr.ir
       val srcFeaturePath = entry._1
       val connections = entry._2
 
-      val handledConns: ISZ[ir.ConnectionInstance] = connections.filter(conn => Connections.isHandledConnection(conn, symbolTable))
+      val handledConns: ISZ[ir.ConnectionInstance] = connections.filter(conn =>
+        Connections.isHandledConnection(conn, symbolTable))
 
       for (conn <- handledConns) {
         assert(CommonUtil.getName(conn.src.feature.get) == srcFeaturePath)
@@ -63,8 +64,6 @@ import org.sireum.hamr.ir
 
         val srcAadlThread: AadlThread = symbolTable.getThreadByName(conn.src.component)
         val dstAadlThread: AadlThread = symbolTable.getThreadByName(conn.dst.component)
-
-        ProofUtil.addAadlConnection(srcFeaturePath, dstFeaturePath)
 
         val srcToVM: B = srcAadlThread.toVirtualMachine(symbolTable)
         val dstToVM: B = dstAadlThread.toVirtualMachine(symbolTable)

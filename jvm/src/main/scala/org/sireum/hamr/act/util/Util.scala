@@ -17,6 +17,7 @@ import org.sireum.hamr.ir.FeatureEnd
 import org.sireum.message.Reporter
 
 object Util {
+
   val reporter: Reporter = org.sireum.message.Reporter.create
 
   var verbose: B = T
@@ -620,8 +621,35 @@ object Util {
       typ = typ
     )
 
-    ProofUtil.addPortRefinementX(ret, aadlThread, aadlPort, symbolTable)
+    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
 
+    return ret
+  }
+
+  def createUses_Refinement(aadlThread: AadlThread,
+                            aadlPort: AadlPort,
+                            symbolTable: SymbolTable,
+
+                            name: String,
+                            typ: String,
+                            optional: B): ast.Uses = {
+    val ret: ast.Uses = ast.Uses(
+      name = name,
+      typ = typ,
+      optional = optional
+    )
+
+    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
+
+    return ret
+  }
+
+  def createUses_PeriodicDispatcher(aadlThread: AadlThread,
+                                    name: String,
+                                    typ: String,
+                                    optional: B): ast.Uses = {
+    val ret = ast.Uses(name = name, typ = typ, optional = optional)
+    ProofUtil.addPortPeriodicDispatcher(ret)
     return ret
   }
 
@@ -637,7 +665,50 @@ object Util {
       typ = typ,
       optional = optional)
 
-    ProofUtil.addPortRefinementX(ret, aadlThread, aadlPort, symbolTable)
+    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
+
+    return ret
+  }
+
+  def createConsumes_PeriodicDispatcher(aadlThread: AadlThread,
+
+                                        name: String,
+                                        typ: String,
+                                        optional: B): ast.Consumes = {
+    val ret: ast.Consumes = ast.Consumes(
+      name = name,
+      typ = typ,
+      optional = optional)
+
+    ProofUtil.addPortPeriodicDispatcher(ret)
+
+    return ret
+  }
+
+  def createConsumes_SelfPacing(aadlThread: AadlThread,
+                                symbolTable: SymbolTable,
+
+                                name: String,
+                                typ: String,
+                                optional: B): ast.Consumes = {
+    val ret: ast.Consumes = ast.Consumes(
+      name = name,
+      typ = typ,
+      optional = optional)
+
+    ProofUtil.addPortSelfPacing(aadlThread, ret, symbolTable)
+
+    return ret
+  }
+
+  def createProvides_Monitor(monitorName: String,
+                             name: String,
+                             typ: String): ast.Provides = {
+    val ret = ast.Provides(
+      name = name,
+      typ = typ)
+
+    ProofUtil.addPortMonitor(monitorName, ret)
 
     return ret
   }
@@ -652,7 +723,30 @@ object Util {
       name = name,
       typ = typ)
 
-    ProofUtil.addPortRefinementX(ret, aadlThread, aadlPort, symbolTable)
+    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
+
+    return ret
+  }
+
+  def createEmits_Monitor(monitorName: String,
+                          name: String,
+                          typ: String): ast.Emits = {
+    val ret: ast.Emits = ast.Emits(
+      name = name,
+      typ = typ)
+
+    ProofUtil.addPortMonitor(monitorName, ret)
+
+    return ret
+  }
+
+  def createEmits_SelfPacing(aadlThread: AadlThread,
+                             symbolTable: SymbolTable,
+                             name: String,
+                             typ: String): ast.Emits = {
+    val ret = ast.Emits(name = name, typ = typ)
+
+    ProofUtil.addPortSelfPacing(aadlThread, ret, symbolTable)
 
     return ret
   }

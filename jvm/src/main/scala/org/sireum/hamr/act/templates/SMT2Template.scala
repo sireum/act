@@ -30,7 +30,7 @@ object SMT2Template {
   }
 
   def camkesPortComponents(camkesComponent: String, camkesPort: String): ST = {
-    return st"(assert (= ${camkesPort} (select CAmkESPortComponent ${camkesComponent})))"
+    return st"(assert (= ${camkesComponent} (select CAmkESPortComponent ${camkesPort})))"
   }
 
   def aadlPortType(aadlPort: String, portType: String): ST = {
@@ -134,41 +134,48 @@ object SMT2Template {
           |(declare-const ModelSchedulingType SchedulingType)
           |(assert (= ModelSchedulingType ${modelSchedulingType}))
           |
-          |; ${aadlComponents.size} AADLComponent
           |(declare-datatypes ((AADLComponent 0)) ((
           |  ${(aadlComponents, "\n")}
           |)))
+          |(declare-const AADLComponent_count Int)
+          |(assert (= ${aadlComponents.size} AADLComponent_count))
           |
-          |; ${aadlDispatchProtocols.size} AADLDispatchProtocol
           |(declare-const AADLDispatchProtocol (Array AADLComponent DispatchProtocol))
-          |${(aadlDispatchProtocols, "\n")}
+          |  ${(aadlDispatchProtocols, "\n")}
+          |(declare-const AADLDispatchProtocol_size Int)
+          |(assert (= ${aadlDispatchProtocols.size} AADLDispatchProtocol_size))
           |
-          |; ${aadlDispatchProtocols.size} altAADLDispatchProtocol
           |(define-fun altAADLDispatchProtocol ((_comp AADLComponent)) DispatchProtocol
-          |  ${altAadlDispatchProtocols})
+          |  ${(altAadlDispatchProtocols, "\n")})
+          |(declare-const AADLDispatchProtocol_count Int)
+          |(assert (= ${aadlDispatchProtocols.size} AADLDispatchProtocol_count))
           |
-          |; ${aadlPorts.size} AADLPort
           |(declare-datatypes ((AADLPort 0)) ((
           |  ${(aadlPorts, "\n")})))
+          |(declare-const AADLPort_count Int)
+          |(assert (= ${aadlPorts.size} AADLPort_count))
           |
-          |; ${aadlPortComponents.size} AADLPortComponent
           |(declare-const AADLPortComponent (Array AADLPort AADLComponent))
-          |${(aadlPortComponents, "\n")}
+          |  ${(aadlPortComponents, "\n")}
+          |(declare-const AADLPortComponent_size Int)
+          |(assert (= ${aadlPortComponents.size} AADLPortComponent_size))
           |
-          |; ${aadlPortTypes.size} AADLPortType
           |(declare-const AADLPortType (Array AADLPort PortType))
-          |${(aadlPortTypes, "\n")}
+          |  ${(aadlPortTypes, "\n")}
+          |(declare-const AADLPortType_size Int)
+          |(assert (= ${aadlPortTypes.size} AADLPortType_size))
           |
-          |; ${aadlPortDirection.size} AADLPortDirection
           |(declare-const AADLPortDirection (Array AADLPort Direction))
-          |${(aadlPortDirection, "\n")}
+          |  ${(aadlPortDirection, "\n")}
+          |(declare-const AADLPortDirection_size Int)
+          |(assert (= ${aadlPortDirection.size} AADLPortDirection_size))
           |
-          |; ${aadlConnectionFlowTos.size} AADLConnectionFlowTos
           |(define-fun AADLConnectionFlowTos ((p1 AADLPort) (p2 AADLPort)) Bool
           |  (or
           |    ${(aadlConnectionFlowTos, "\n")}
-          |    false)
-          |)
+          |    false))
+          |(declare-const AADLConnectionFlowsTos_count Int)
+          |(assert (= ${aadlConnectionFlowTos.size} AADLConnectionFlowsTos_count))
           |
           |
           |(declare-datatypes ((AccessType 0)) ((
@@ -177,10 +184,10 @@ object SMT2Template {
           |(declare-datatypes ((seL4PortType 0)) ((
           |  ${(sel4ConnEnums, "\n")})))
           |
-          |; ${camkesComponents.size} CAmkESComponent
           |(declare-datatypes ((CAmkESComponent 0)) ((
-          |  ${(camkesComponents, "\n")}
-          |)))
+          |  ${(camkesComponents, "\n")})))
+          |(declare-const CAmkESComponent_count Int)
+          |(assert (= ${camkesComponents.size} CAmkESComponent_count))
           |
           |(define-fun isPeriodicDispatcher ((_component CAmkESComponent)) Bool
           |  (and (= ModelSchedulingType PeriodicDispatching)
@@ -200,20 +207,23 @@ object SMT2Template {
           |(define-fun isMonitor ((_component CAmkESComponent)) Bool
           |  (or ${(monitors, "\n")}
           |      false))
+          |(declare-const Monitor_count Int)
+          |(assert (= ${monitors.size} Monitor_count))
           |
-          |
-          |; ${camkesPorts.size} CAmkESPort
           |(declare-datatypes ((CAmkESPort 0)) ((
-          |  ${(camkesPorts, "\n")}
-          |)))
+          |  ${(camkesPorts, "\n")})))
+          |(declare-const CAmkESPort_count Int)
+          |(assert (= ${camkesPorts.size} CAmkESPort_count))
           |
           |(declare-const CAmkESAccessRestrictions (Array CAmkESPort AccessType))
-          |${(camkesDataPortAccessRestrictions, "\n")}
+          |  ${(camkesDataPortAccessRestrictions, "\n")}
+          |(declare-const CAmkESAccessRestrictions_size Int)
+          |(assert (= ${camkesDataPortAccessRestrictions.size} CAmkESAccessRestrictions_size))
           |
-          |; ${camkesConnections.size} CAmkESConnection
           |(declare-datatypes ((CAmkESConnection 0)) ((
-          |  ${(camkesConnections, "\n")}
-          |)))
+          |  ${(camkesConnections, "\n")})))
+          |(declare-const CAmkESConnection_count Int)
+          |(assert (= ${camkesConnections.size} CAmkESConnection_count))
           |
           |(define-fun isSelfPacingConnection ((_conn CAmkESConnection)) Bool
           |  (and (= ModelSchedulingType SelfPacing)
@@ -229,33 +239,39 @@ object SMT2Template {
           |  (and (= ModelSchedulingType PeriodicDispatching)
           |       (or ${(periodicDispatchingConnections, "\n")}
           |           false)))
+          |(declare-const PeriodicDispatchingConnection_count Int)
+          |(assert (= ${periodicDispatchingConnections.size} PeriodicDispatchingConnection_count))
           |
-          |; ${camkesConnectionTypes.size} CAmkESConnectionType
           |(declare-const CAmkESConnectionType (Array CAmkESConnection seL4PortType))
-          |${(camkesConnectionTypes, "\n")}
+          |  ${(camkesConnectionTypes, "\n")}
+          |(declare-const CAmkESConnectionType_count Int)
+          |(assert (= ${camkesConnectionTypes.size} CAmkESConnectionType_count))
           |
-          |; ${camkesPortComponents.size} CAmkESPortComponent
           |(declare-const CAmkESPortComponent (Array CAmkESPort CAmkESComponent))
-          |${(camkesPortComponents, "\n")}
+          |  ${(camkesPortComponents, "\n")}
+          |(declare-const CAmkESPortComponent_size Int)
+          |(assert (= ${camkesPortComponents.size} CAmkESPortComponent_size))
           |
-          |; ${camkesConnectionFlowTos.size} CAmkESConnectionFlowTos
           |(define-fun CAmkESConnectionFlowTos ((_conn CAmkESConnection) (_p1 CAmkESPort) (_p2 CAmkESPort)) Bool
           |  (or
           |    ${(camkesConnectionFlowTos, "\n")}
           |    false))
+          |(declare-const CAmkESConnectionFlowTos_count Int)
+          |(assert (= ${camkesConnectionFlowTos.size} CAmkESConnectionFlowTos_count))
           |
-          |
-          |; ${componentRefinements.size} ComponentRefinement
           |(define-fun ComponentRefinement ((ac AADLComponent) (cc CAmkESComponent)) Bool
           |  (or
           |    ${(componentRefinements, "\n")}
           |    false))
+          |(declare-const ComponentRefinement_count Int)
+          |(assert (= ${componentRefinements.size} ComponentRefinement_count))
           |
-          |; ${portRefinements.size} PortRefinement
           |(define-fun PortRefinement ((ap AADLPort) (cp CAmkESPort)) Bool
           |  (or
           |    ${(portRefinements, "\n")}
           |    false))
+          |(declare-const PortRefinement_count Int)
+          |(assert (= ${portRefinements.size} PortRefinement_count))
           |
           |
           |(define-fun AADLFlowDirectionality () Bool
@@ -271,9 +287,10 @@ object SMT2Template {
           |(define-fun AADLConnectedPortTypeMatch () Bool
           |  (forall ((src AADLPort) (dst AADLPort))
           |    (=> (AADLConnectionFlowTos src dst)
-          |        (or
-          |          ${portMatches}
-          |          false))))
+          |        (or ${(portMatches, "\n")}
+          |             false))))
+          |(declare-const AADLConnectedPortTypeMatch_count Int)
+          |(assert (= ${portMatches.size} AADLConnectedPortTypeMatch_count))
           |
           |(define-fun AADLDispatchProtocolSpecified () Bool
           |  (forall ((_comp AADLComponent))
@@ -285,6 +302,7 @@ object SMT2Template {
           |
           |(define-fun AADLWellFormedness () Bool
           |  (and
+          |    (= AADLPort_count AADLPortComponent_size) ; all AADL ports belong to an AADL component
           |    altAADLDispatchProtocolSpecified
           |    AADLDispatchProtocolSpecified
           |    AADLFlowDirectionality
@@ -319,6 +337,7 @@ object SMT2Template {
           |
           |(define-fun CAmkESWellFormedness () Bool
           |  (and
+          |    (= CAmkESPort_count CAmkESPortComponent_size) ; all CAmkES ports belong to a CAmkES component
           |    CAmkESDataPortAccess
           |    CAmkESFlowNoSelfConnection))
           |

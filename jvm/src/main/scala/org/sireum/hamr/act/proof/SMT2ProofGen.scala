@@ -4,13 +4,15 @@ package org.sireum.hamr.act.proof
 
 import org.sireum._
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESComponentCategory, CAmkESConnectionType, CAmkESPortType, ComponentPath, Direction, PortPath, SchedulingType}
+import org.sireum.hamr.act.connections.Connections
+import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.templates.SMT2Template
 import org.sireum.hamr.act.util.{ActContainer, ActPlatform, Sel4ConnectorTypes}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlEventPort, AadlPort, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlEventPort, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
+import org.sireum.hamr.ir.ConnectionInstance
 
 object SMT2ProofGen {
   var resources: ISZ[Resource] = ISZ()
@@ -69,8 +71,20 @@ object SMT2ProofGen {
       (ports, portComponents, portTypes, portDirs)
     }
 
-    val aadlConnectionFlowTos: ISZ[ST] = proofContainer.aadlConnections.
-      map((r: (String, String)) => SMT2Template.flowsTo(r._1, r._2))
+    val aadlConnectionFlowTos: ISZ[ST] = {
+      var ret: ISZ[ST] = ISZ()
+      for (entry <- symbolTable.outConnections.entries) {
+        val srcPath = entry._1
+
+        val handledConns = entry._2.filter((conn: ConnectionInstance) => Connections.isHandledConnection(conn, symbolTable))
+
+        for (conn <- handledConns) {
+          val dstPath = CommonUtil.getName(conn.dst.feature.get)
+          ret = ret :+ SMT2Template.flowsTo(srcPath, dstPath)
+        }
+      }
+      ret
+    }
 
     var timeServer: Option[ST] = None()
     var periodicDispatcher: Option[ST] = None()
@@ -93,7 +107,7 @@ object SMT2ProofGen {
       for(i <- camkesInstances){
         ret = ret :+ st"(${i.name})"
 
-        proofContainer.camkesComponents.get(i.component) match {
+        proofContainer.camkesComponentTypes.get(i.component) match {
           case Some(CAmkESComponentCategory.TimeServer) => timeServer = Some(st"(= _component ${i.name})")
           case Some(CAmkESComponentCategory.PeriodicDispatcher) => periodicDispatcher = Some(st"(= _component ${i.name})")
           case Some(CAmkESComponentCategory.Pacer) => pacer = Some(st"(= _component ${i.name})")
@@ -107,6 +121,7 @@ object SMT2ProofGen {
       ret
     }
 
+    var camkesPortComponents: ISZ[ST] = ISZ()
     var portRefinements: ISZ[ST] = ISZ()
     val camkesPorts: ISZ[ST] = {
       var _camkesPorts: ISZ[ST]= ISZ()
@@ -116,15 +131,18 @@ object SMT2ProofGen {
             def process(f: ast.CAmkESFeature): ST = {
               val portName = s"${i.name}_${f.name}"
 
-              proofContainer.portRefinementsX.get(i.name) match {
+              proofContainer.portRefinementTypes.get(i.name) match {
                 case Some(featureMap) =>
+                  camkesPortComponents = camkesPortComponents :+ SMT2Template.camkesPortComponents(i.name, portName)
+
                   featureMap.get(f) match {
-                    case Some(refinement) => portRefinements = portRefinements :+ SMT2Template.portRefinement(refinement.aadlPort.path, portName)
+                    case Some(refinement) =>
+                      portRefinements = portRefinements :+ SMT2Template.portRefinement(refinement.aadlPort.path, portName)
                     case _ =>
                   }
                 case _ =>
                   // TODO: handle VMs, TB
-                  //eprintln(s"Couldn't find ${i.name} in ${proofContainer.portRefinementsX.keys}")
+                  eprintln(s"Couldn't find ${i.name} in ${proofContainer.portRefinementTypes.keys}")
               }
 
               return st"($portName)"
@@ -137,7 +155,11 @@ object SMT2ProofGen {
               (for(z <- c.consumes) yield process(z)) ++
               (for(z <- c.provides) yield process(z))
           case c: ast.LibraryComponent =>
-            _camkesPorts = _camkesPorts ++ (for(d <- c.ports) yield st"(${i.name}_${d})")
+            for(portName <- c.ports) {
+              val qportName = s"${i.name}_${portName}"
+              _camkesPorts = _camkesPorts :+ st"(${qportName})"
+              camkesPortComponents = camkesPortComponents :+ SMT2Template.camkesPortComponents(i.name, qportName)
+            }
         }
       }
       _camkesPorts
@@ -158,9 +180,6 @@ object SMT2ProofGen {
         case _ =>
       }
     }
-
-    val camkesPortComponents: ISZ[ST] = proofContainer.camkesPortConstraints.
-      map((r : (ComponentPath, PortPath)) => SMT2Template.camkesPortComponents(r._2, r._1) )
 
     val (camkesRefinementConnections,
          camkesRefinementConnectionTypes,
@@ -208,9 +227,6 @@ object SMT2ProofGen {
 
     val componentRefinements: ISZ[ST] = proofContainer.camkesInstances.filter((f: (Option[AadlComponent], ast.Instance)) => f._1.nonEmpty).
       map((r: (Option[AadlComponent], ast.Instance)) => SMT2Template.componentRefinement(r._1.get.path, r._2.name))
-
-    //val portRefinements: ISZ[ST] = proofContainer.portRefinements.
-    //  map((r: (AadlPort, String)) => SMT2Template.portRefinement(r._1.path, r._2))
 
 
     val proof = SMT2Template.proof(

@@ -158,14 +158,16 @@ import org.sireum.hamr.codegen.common.symbols._
 
     if(hookupPeriodicComponentsToTimeServer) {
       // uses Timer tb_timer;
-      uses = uses :+ Uses(
+      uses = uses :+ Util.createUses_PeriodicDispatcher(
+        aadlThread = aadlThread,
         name = PeriodicDispatcherTemplate.TIMER_ID,
         typ = PeriodicDispatcherTemplate.TIMER_TYPE,
         optional = F)
     }
 
     // consumes Notification from periodic dispatcher
-    consumes = consumes :+ Consumes(
+    consumes = consumes :+ Util.createConsumes_PeriodicDispatcher(
+      aadlThread = aadlThread,
       name = PeriodicDispatcherTemplate.componentNotificationName(None()),
       typ = Util.NOTIFICATION_TYPE,
       optional = F)
