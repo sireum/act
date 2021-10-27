@@ -713,6 +713,18 @@ object Util {
     return ret
   }
 
+  def createProvides_VM(
+                             name: String,
+                             typ: String): ast.Provides = {
+    val ret = ast.Provides(
+      name = name,
+      typ = typ)
+
+    //ProofUtil.addPortMonitor(monitorName, ret)
+
+    return ret
+  }
+
   def createEmits_Refinement(aadlThread: AadlThread,
                              aadlPort: AadlPort,
                              symbolTable: SymbolTable,

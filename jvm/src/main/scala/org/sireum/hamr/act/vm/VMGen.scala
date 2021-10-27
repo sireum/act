@@ -3,10 +3,9 @@ package org.sireum.hamr.act.vm
 
 import org.sireum._
 import org.sireum.hamr.act.ast._
-import org.sireum.hamr.act.connections.Connections
+import org.sireum.hamr.act.connections.{Connections, SBConnectionContainer}
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.proof.ProofContainer.CAmkESComponentCategory
-import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
@@ -21,17 +20,17 @@ object VMGen {
   val VM_COMPONENT_TYPE_NAME: String = "VM"
   val VM_ID_PREFIX: String = "vm" // has to be 'vm' as per data61 macros in https://github.com/SEL4PROJ/camkes-arm-vm/blob/6c77a2734ea4c77035f2c3cca5ca7fa72f1f2890/components/VM/configurations/vm.h#L93
 
-  val DIR_VM: String =                           VM_COMPONENT_TYPE_NAME
-  val DIR_VM_APPS: String =                      "apps"
-  val DIR_VM_EXYNOS5422: String =                "exynos5422"
-  val DIR_VM_OVERLAY_FILES: String =             "overlay_files"
+  val DIR_VM: String = VM_COMPONENT_TYPE_NAME
+  val DIR_VM_APPS: String = "apps"
+  val DIR_VM_EXYNOS5422: String = "exynos5422"
+  val DIR_VM_OVERLAY_FILES: String = "overlay_files"
   val DIR_VM_OVERLAY_FILES_INIT_SCRIPT: String = s"${DIR_VM_OVERLAY_FILES}/init_scripts"
-  val DIR_VM_QEMU_ARM_VIRT: String =             "qemu-arm-virt"
-  val DIR_VM_SRC: String =                       "src"
+  val DIR_VM_QEMU_ARM_VIRT: String = "qemu-arm-virt"
+  val DIR_VM_SRC: String = "src"
 
   val CAMKES_PREPROCESSOR_INCLUDES: String = "<configurations/vm.h>" // see https://github.com/SEL4PROJ/camkes-arm-vm/blob/6c77a2734ea4c77035f2c3cca5ca7fa72f1f2890/components/VM/configurations/vm.h
 
-  def getRootVMDir() : String= {
+  def getRootVMDir(): String = {
     return s"${Util.DIR_COMPONENTS}/${DIR_VM}"
   }
 
@@ -47,14 +46,14 @@ object VMGen {
 
     var vmVars: ISZ[ST] = ISZ(
       VM_Template.vm_cmake_var(
-          VM_Template.makeDirVariable(Util.SBTypeLibrary),s"${projectRoot}/${Util.getTypeRootPath()}"))
+        VM_Template.makeDirVariable(Util.SBTypeLibrary), s"${projectRoot}/${Util.getTypeRootPath()}"))
 
     var appAddSubdirs: ISZ[ST] = ISZ(
       CMakeTemplate.cmake_add_subdirectory_binned(
         VM_Template.cmakeReferenceVar(VM_Template.makeDirVariable(Util.SBTypeLibrary)),
         Some(Util.SBTypeLibrary)))
 
-    if(platform == ActPlatform.SeL4) {
+    if (platform == ActPlatform.SeL4) {
       libNames = libNames :+ Util.SlangTypeLibrary
 
       appAddSubdirs = CMakeTemplate.cmake_add_subdirectory_binned(
@@ -62,8 +61,8 @@ object VMGen {
         Some(Util.SlangTypeLibrary)) +: appAddSubdirs
 
       vmVars = VM_Template.vm_cmake_var(
-          VM_Template.makeDirVariable(Util.SlangTypeLibrary),
-          s"${projectRoot}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${Util.SlangTypeLibrary}") +: vmVars
+        VM_Template.makeDirVariable(Util.SlangTypeLibrary),
+        s"${projectRoot}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${Util.SlangTypeLibrary}") +: vmVars
     }
 
     val vmThreadIds = threadsToVMs.map((m: AadlThread) => Util.getCamkesComponentIdentifier(m, symbolTable))
@@ -99,7 +98,7 @@ object VMGen {
       content = VM_Template.vm_overlay_script__init_scripts__inittab_hvc0(),
       overwrite = F)
 
-    for(vmProcessID <- vmThreadIds) {
+    for (vmProcessID <- vmThreadIds) {
 
       auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
         path = s"${getRootVMDir()}/${DIR_VM_APPS}/${vmProcessID}/CMakeLists.txt",
@@ -143,7 +142,7 @@ object VMGen {
       ops.ISZOps(_assembly.composition.instances).exists(_instance =>
         _instance.component.name == VMGen.VM_COMPONENT_TYPE_NAME))
 
-    if(vmAssemblies.size > 1) {
+    if (vmAssemblies.size > 1) {
       // a few sanity checks
       assert(vmAssemblies.size == 2, s"Currently only expecting 2 VMs but given ${vmAssemblies.size}") // TODO: currently only expected a sender/receiver vm
       assert(
@@ -189,7 +188,7 @@ object VMGen {
       // the first instances with the merged vms, the other with the second
       // entry w/o any compositions
 
-      val assemblyConfigs =  vmAssemblies(0).configuration ++ vmAssemblies(1).configuration
+      val assemblyConfigs = vmAssemblies(0).configuration ++ vmAssemblies(1).configuration
       val assemblyConfigMacros = vmAssemblies(0).configurationMacros ++ vmAssemblies(1).configurationMacros
 
       val newAssemblyA = Assembly(
@@ -240,7 +239,6 @@ object VMGen {
 }
 
 @record class VMGen(useDomainScheduling: B,
-                    symbolTable: SymbolTable,
                     typeMap: HashSMap[String, ir.Component],
                     samplingPorts: HashMap[String, SamplingPortInterface],
                     srcQueues: Map[String, Map[String, QueueObject]],
@@ -253,7 +251,7 @@ object VMGen {
   val KERNELARMPLATFORM_EXYNOS5410: B = F
 
   var dataports: ISZ[Dataport] = VM_INIT_DEF.dataports(KERNELARMPLATFORM_EXYNOS5410)
-  var emits: ISZ[Emits]= VM_INIT_DEF.emits()
+  var emits: ISZ[Emits] = VM_INIT_DEF.emits()
   var uses: ISZ[Uses] = VM_INIT_DEF.uses(TK1DEVICEFWD, KERNELARMPLATFORM_EXYNOS5410)
   var consumes: ISZ[Consumes] = VM_INIT_DEF.consumes()
   var provides: ISZ[Provides] = VM_INIT_DEF.provides()
@@ -274,7 +272,31 @@ object VMGen {
 
   val useCaseConnectors: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
 
-  def genThread(aadlThread: AadlThread): (Component, ISZ[Resource]) = {
+  def genProcess(aadlProcess: AadlProcess, symbolTable: SymbolTable, sbConnections: ISZ[SBConnectionContainer]): Unit = {
+    assert(aadlProcess.toVirtualMachine(symbolTable))
+
+    var conns: ISZ[SBConnectionContainer] = ISZ()
+    for(conn <- sbConnections) {
+      if(conn.srcComponent == aadlProcess) {
+        conns = conns :+ conn
+      }
+      if(conn.dstComponent == aadlProcess) {
+        conns = conns :+ conn
+      }
+    }
+    for(sb <- conns){
+      val p =
+        st"""${sb.srcComponent.identifier}.${sb.srcPort.identifier} -> ${sb.dstComponent.identifier}.${sb.dstPort.identifier}
+            |Source is VM: ${sb.srcComponent.isInstanceOf[AadlProcess]}
+            |Dest is VM: ${sb.dstComponent.isInstanceOf[AadlProcess]}"""
+
+      println(p.render)
+      println()
+    }
+
+  }
+
+  def genThread(aadlThread: AadlThread, symbolTable: SymbolTable): (Component, ISZ[Resource]) = {
 
     assert(aadlThread.toVirtualMachine(symbolTable), s"Thread is not in a vm bound process ${aadlThread.identifier}")
 
@@ -298,15 +320,15 @@ object VMGen {
     includes = includes + Util.getSbTypeHeaderFilenameForIncludes()
 
     val connectedPorts = aadlThread.getPorts().filter(f => symbolTable.isConnected(f.feature))
-    for(port <- connectedPorts) {
+    for (port <- connectedPorts) {
 
       port match {
         case a: AadlEventDataPort if !useCaseConnectors => {
           actOptions.platform match {
             case ActPlatform.SeL4_Only =>
-              handleEventDataPort(port, aadlThread)
+              handleEventDataPort(port, aadlThread, symbolTable)
             case ActPlatform.SeL4 =>
-              handleEventDataPort(port, aadlThread)
+              handleEventDataPort(port, aadlThread, symbolTable)
 
             case notyet =>
               // TODO
@@ -316,9 +338,9 @@ object VMGen {
         case a: AadlEventDataPort if useCaseConnectors => {
           actOptions.platform match {
             case ActPlatform.SeL4_Only =>
-              handleEventDataPort_CASE_Connectors(port, aadlThread)
+              handleEventDataPort_CASE_Connectors(port, aadlThread, symbolTable)
             case ActPlatform.SeL4 =>
-              handleEventDataPort_CASE_Connectors(port, aadlThread)
+              handleEventDataPort_CASE_Connectors(port, aadlThread, symbolTable)
 
             case notyet =>
               // TODO
@@ -336,19 +358,19 @@ object VMGen {
 
     aadlThread.dispatchProtocol match {
       case Dispatch_Protocol.Periodic =>
-        val (componentContributions, glueCodeContributions) =
+        val (periodicDispatcherComponentContributions, glueCodeContributions) =
           Dispatcher.handlePeriodicComponent(useDomainScheduling, symbolTable, actOptions, aadlThread)
 
-        consumes = consumes ++ componentContributions.shell.consumes
+        consumes = consumes ++ periodicDispatcherComponentContributions.shell.consumes
 
-        dataports = dataports ++ componentContributions.shell.dataports
+        dataports = dataports ++ periodicDispatcherComponentContributions.shell.dataports
 
         // extern method name for pacer dataport queue
         crossConnGCMethods = crossConnGCMethods :+
           VM_Template.vm_cross_conn_extern_dataport_method(PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
 
         val notificationPrefix: String =
-          if(useCaseConnectors) PacerTemplate.pacerVM_ClientPeriodDataportIdentifier()
+          if (useCaseConnectors) PacerTemplate.pacerVM_ClientPeriodDataportIdentifier()
           else PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier()
 
         // extern method name for pacer notification
@@ -434,7 +456,7 @@ object VMGen {
         counter = crossConnConnections.size)
   }
 
-  def handleEventDataPort(aadlPort: AadlPort, aadlThread: AadlThread): Unit = {
+  def handleEventDataPort(aadlPort: AadlPort, aadlThread: AadlThread, symbolTable: SymbolTable): Unit = {
     assert(!useCaseConnectors)
 
     val fid = aadlPort.identifier
@@ -544,7 +566,7 @@ object VMGen {
     }
   }
 
-  def handleEventDataPort_CASE_Connectors(aadlPort: AadlPort, aadlThread: AadlThread): Unit = {
+  def handleEventDataPort_CASE_Connectors(aadlPort: AadlPort, aadlThread: AadlThread, symbolTable: SymbolTable): Unit = {
     assert(useCaseConnectors)
 
     val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(aadlPort.feature.classifier.get)).get

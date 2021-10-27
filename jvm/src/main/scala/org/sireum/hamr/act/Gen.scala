@@ -3,7 +3,6 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
@@ -67,6 +66,11 @@ import org.sireum.ops.ISZOps
   val useCaseConnectors: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
   val useDomainScheduling: B = PeriodicUtil.useDomainScheduling(symbolTable, actOptions.platform)
 
+  val sbConnectionContainer: ISZ[SBConnectionContainer] = {
+    if(platform != ActPlatform.SeL4_TB) SBConnections.preprocessConnectionInstances(symbolTable)
+    else ISZ()
+  }
+
   def hasErrors: B = {
     return reporter.hasError
   }
@@ -99,11 +103,12 @@ import org.sireum.ops.ISZOps
     }
 
     if(!hasErrors) {
+      // build CAmkES components
       gen(symbolTable.rootSystem)
     }
 
-    // build connections
     if(!hasErrors && platform != ActPlatform.SeL4_TB) {
+      // build CAmkES connections
       val connContainer: ConnectionContainer = processSBConnections()
       camkesConnections = camkesConnections ++ connContainer.connections
       camkesConfiguration = camkesConfiguration ++ connContainer.configurationEntries
@@ -250,58 +255,77 @@ import org.sireum.ops.ISZOps
     var connections: ISZ[Connection] = ISZ()
     var instances: ISZ[Instance] = ISZ()
 
-    for(sc <- aadlProcess.subComponents) {
-      sc match {
-        case aadlThread: AadlThread => {
-          val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+    if(aadlProcess.toVirtualMachine(symbolTable)) {
+      val vmGen = VMGen(useDomainScheduling, typeMap, samplingPorts, srcQueues, actOptions)
+      vmGen.genProcess(aadlProcess, symbolTable, sbConnectionContainer)
 
-          if (aadlThread.toVirtualMachine(symbolTable)) {
-            val processId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+      for(aadlThread <- aadlProcess.getThreads()) {
+        val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+        val processId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
-            val (component, auxResources) =
-              VMGen(useDomainScheduling, symbolTable, typeMap, samplingPorts, srcQueues, actOptions).genThread(aadlThread)
+        val (component, auxResources) =
+          VMGen(useDomainScheduling, typeMap, samplingPorts, srcQueues, actOptions).genThread(aadlThread, symbolTable)
 
-            instances = instances :+ Util.createCAmkESInstance(
-              originAadl = None(),
-                address_space = "",
-                name = processId,
-                component = component
-              )
+        instances = instances :+ Util.createCAmkESInstance(
+          originAadl = None(),
+          address_space = "",
+          name = processId,
+          component = component
+        )
 
-            instances = instances ++ VM_GENERAL_COMPOSITION_DEF.instances()
-            instances = instances ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.instances()
+        instances = instances ++ VM_GENERAL_COMPOSITION_DEF.instances()
+        instances = instances ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.instances()
 
-            auxResourceFiles = auxResourceFiles ++ auxResources
+        auxResourceFiles = auxResourceFiles ++ auxResources
 
-            connections = connections :+ Util.createConnectionC(
-              CAmkESConnectionType.VM,
-              connectionCounter,
-              Sel4ConnectorTypes.seL4VMDTBPassthrough,
-              processId, "dtb_self",
-              processId, "dtb"
-            )
+        connections = connections :+ Util.createConnectionC(
+          CAmkESConnectionType.VM,
+          connectionCounter,
+          Sel4ConnectorTypes.seL4VMDTBPassthrough,
+          processId, "dtb_self",
+          processId, "dtb"
+        )
 
-            connections = connections ++ VM_COMPONENT_CONNECTIONS_DEF.connections(processId)
-            connections = connections ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.connections()
-            connections = connections ++ PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF.connections(processId)
+        connections = connections ++ VM_COMPONENT_CONNECTIONS_DEF.connections(processId)
+        connections = connections ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.connections()
+        connections = connections ++ PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF.connections(processId)
 
-            globalImports = globalImports ++ VM_Template.vm_assembly_imports()
+        globalImports = globalImports ++ VM_Template.vm_assembly_imports()
 
-            camkesConfiguration = camkesConfiguration ++
-              VM_Template.vm_assembly_configuration_entries(processId)
+        camkesConfiguration = camkesConfiguration ++
+          VM_Template.vm_assembly_configuration_entries(processId)
 
-            camkesConfigurationMacros = camkesConfigurationMacros ++
-              VM_GENERAL_CONFIGURATION_DEF.entries() ++
-              VM_CONFIGURATION_DEF.entries(processId) ++
-              VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF.entries() ++
-              PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF.entries(processId)
+        camkesConfigurationMacros = camkesConfigurationMacros ++
+          VM_GENERAL_CONFIGURATION_DEF.entries() ++
+          VM_CONFIGURATION_DEF.entries(processId) ++
+          VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF.entries() ++
+          PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF.entries(processId)
 
 
-            settingsCmakeEntries = settingsCmakeEntries ++ VM_Template.settings_cmake_entries()
+        settingsCmakeEntries = settingsCmakeEntries ++ VM_Template.settings_cmake_entries()
 
-            auxResourceFiles = auxResourceFiles :+ Util.sbCounterTypeDeclResource()
+        auxResourceFiles = auxResourceFiles :+ Util.sbCounterTypeDeclResource()
 
-          } else {
+        PropertyUtil.getStackSizeInBytes(aadlThread.component) match {
+          case Some(bytes) =>
+            camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(camkesComponentId, bytes)
+          case _ =>
+        }
+
+        if (useDomainScheduling && (platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)) {
+          aadlThread.getDomain(symbolTable) match {
+            case Some(domain) =>
+              camkesConfiguration = camkesConfiguration :+ PacerTemplate.domainConfiguration(camkesComponentId, domain)
+            case _ =>
+          }
+        }
+      }
+    } else {
+      for (sc <- aadlProcess.subComponents) {
+        sc match {
+          case aadlThread: AadlThread => {
+
+            val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
             instances = instances :+ Util.createCAmkESInstance(
               originAadl = Some(aadlThread),
 
@@ -309,114 +333,113 @@ import org.sireum.ops.ISZOps
               name = camkesComponentId,
               component = genThread(aadlThread)
             )
-          }
 
-          PropertyUtil.getStackSizeInBytes(sc.component) match {
-            case Some(bytes) =>
-              camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(camkesComponentId, bytes)
-            case _ =>
-          }
-
-          if(useDomainScheduling && (platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)) {
-            aadlThread.getDomain(symbolTable) match {
-              case Some(domain) =>
-                camkesConfiguration = camkesConfiguration :+ PacerTemplate.domainConfiguration(camkesComponentId, domain)
+            PropertyUtil.getStackSizeInBytes(sc.component) match {
+              case Some(bytes) =>
+                camkesConfiguration = camkesConfiguration :+ StringTemplate.configurationStackSize(camkesComponentId, bytes)
               case _ =>
             }
+
+            if (useDomainScheduling && (platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)) {
+              aadlThread.getDomain(symbolTable) match {
+                case Some(domain) =>
+                  camkesConfiguration = camkesConfiguration :+ PacerTemplate.domainConfiguration(camkesComponentId, domain)
+                case _ =>
+              }
+            }
           }
-        }
-        case aadlSubprogram: AadlSubprogram => {
-          var params: ISZ[Parameter] = ISZ()
-          for (f <- aadlSubprogram.parameters) {
-            params = params :+ Parameter(
-              array = F,
-              direction = if (f.direction == ir.Direction.In) Direction.In else Direction.Out,
-              name = f.getName(),
-              typ = Util.getClassifier(f.feature.classifier.get))
+          case aadlSubprogram: AadlSubprogram => {
+            var params: ISZ[Parameter] = ISZ()
+            for (f <- aadlSubprogram.parameters) {
+              params = params :+ Parameter(
+                array = F,
+                direction = if (f.direction == ir.Direction.In) Direction.In else Direction.Out,
+                name = f.getName(),
+                typ = Util.getClassifier(f.feature.classifier.get))
+            }
+
+            val method = Method(
+              name = aadlSubprogram.identifier,
+              parameters = params,
+              returnType = None[String]()
+            )
+
+            val procName = aadlSubprogram.getClassifier()
+            astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
           }
+          case spg: AadlSubprogramGroup => {
+            var methods: ISZ[Method] = ISZ()
 
-          val method = Method(
-            name = aadlSubprogram.identifier,
-            parameters = params,
-            returnType = None[String]()
-          )
+            for (m <- spg.component.features) {
+              m match {
+                case spa: ir.FeatureAccess =>
+                  if (spa.classifier.nonEmpty) {
+                    val spComp = symbolTable.airClassifierMap.get(spa.classifier.get.name).get
+                    assert(spComp.category == ir.ComponentCategory.Subprogram)
 
-          val procName = aadlSubprogram.getClassifier()
-          astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
-        }
-        case spg: AadlSubprogramGroup => {
-          var methods: ISZ[Method] = ISZ()
+                    val methodName = CommonUtil.getLastName(spa.identifier)
+                    var params: ISZ[Parameter] = ISZ()
+                    for (param <- spComp.features) {
+                      param match {
+                        case p: ir.FeatureEnd =>
+                          assert(param.category == ir.FeatureCategory.Parameter)
 
-          for (m <- spg.component.features) {
-            m match {
-              case spa: ir.FeatureAccess =>
-                if (spa.classifier.nonEmpty) {
-                  val spComp = symbolTable.airClassifierMap.get(spa.classifier.get.name).get
-                  assert(spComp.category == ir.ComponentCategory.Subprogram)
+                          val paramName = CommonUtil.getLastName(param.identifier)
+                          val dir: Direction.Type = p.direction match {
+                            case ir.Direction.In => Direction.In
+                            case ir.Direction.Out => Direction.Out
+                            case x => halt(s"Unexpected direction ${x}")
+                          }
+                          val typName = Util.getClassifierFullyQualified(p.classifier.get)
 
-                  val methodName = CommonUtil.getLastName(spa.identifier)
-                  var params: ISZ[Parameter] = ISZ()
-                  for (param <- spComp.features) {
-                    param match {
-                      case p: ir.FeatureEnd =>
-                        assert(param.category == ir.FeatureCategory.Parameter)
+                          params = params :+ Parameter(array = F, direction = dir, name = paramName, typ = typName)
 
-                        val paramName = CommonUtil.getLastName(param.identifier)
-                        val dir: Direction.Type = p.direction match {
-                          case ir.Direction.In => Direction.In
-                          case ir.Direction.Out => Direction.Out
-                          case x => halt(s"Unexpected direction ${x}")
-                        }
-                        val typName = Util.getClassifierFullyQualified(p.classifier.get)
-
-                        params = params :+ Parameter(array = F, direction = dir, name = paramName, typ = typName)
-
+                      }
                     }
+
+                    methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String]())
+                  } else {
+                    reporter.error(None(), Util.toolName, s"Could not resolve feature ${CommonUtil.getName(spa.identifier)} from ${sc.path}")
                   }
-
-                  methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String]())
-                } else {
-                  reporter.error(None(), Util.toolName, s"Could not resolve feature ${CommonUtil.getName(spa.identifier)} from ${sc.path}")
-                }
-              case _ =>
+                case _ =>
+              }
             }
+
+            if (sc.subComponents.nonEmpty) {
+              halt(s"Subprogram group subcomponents not currently handled: ${sc}")
+            }
+
+            val procName = Util.getClassifier(spg.component.classifier.get)
+            astObjects = astObjects :+ Procedure(name = procName, methods = methods, includes = ISZ())
           }
+          case aadlData: AadlData => {
+            val classifier = aadlData.component.classifier.get
+            val typeName = Util.getClassifierFullyQualified(classifier)
 
-          if (sc.subComponents.nonEmpty) {
-            halt(s"Subprogram group subcomponents not currently handled: ${sc}")
+            val readMethod = Method(
+              name = s"read_${typeName}",
+              parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "arg", typ = typeName)),
+              returnType = None[String]()
+            )
+
+            val writeMethod = Method(
+              name = s"write_${typeName}",
+              parameters = ISZ(Parameter(array = F, direction = Direction.Refin, name = "arg", typ = typeName)),
+              returnType = None[String]()
+            )
+
+            val procName = Util.getSharedDataInterfaceName(classifier)
+            astObjects = astObjects :+ Procedure(
+              name = procName,
+              methods = ISZ(readMethod, writeMethod),
+              includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
+            )
           }
-
-          val procName = Util.getClassifier(spg.component.classifier.get)
-          astObjects = astObjects :+ Procedure(name = procName, methods = methods, includes = ISZ())
+          case _ =>
+            halt(s"Not handling: subcomponent of type '${sc.component.category}'.  ${sc.path}")
         }
-        case aadlData: AadlData => {
-          val classifier = aadlData.component.classifier.get
-          val typeName = Util.getClassifierFullyQualified(classifier)
-
-          val readMethod = Method(
-            name = s"read_${typeName}",
-            parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "arg", typ = typeName)),
-            returnType = None[String]()
-          )
-
-          val writeMethod = Method(
-            name = s"write_${typeName}",
-            parameters = ISZ(Parameter(array = F, direction = Direction.Refin, name = "arg", typ = typeName)),
-            returnType = None[String]()
-          )
-
-          val procName = Util.getSharedDataInterfaceName(classifier)
-          astObjects = astObjects :+ Procedure(
-            name = procName,
-            methods = ISZ(readMethod, writeMethod),
-            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
-          )
-        }
-        case _ =>
-          halt(s"Not handling: subcomponent of type '${sc.component.category}'.  ${sc.path}")
       }
     }
-
     val monInstances = monitors.values.map((m: Monitor) => m.i)
 
     if(platform == ActPlatform.SeL4_TB) {

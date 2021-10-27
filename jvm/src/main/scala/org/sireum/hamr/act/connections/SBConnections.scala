@@ -3,16 +3,91 @@
 package org.sireum.hamr.act.connections
 
 import org.sireum._
-import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.ast.{Attribute, ConnectionEnd, ConnectorType}
-import org.sireum.hamr.act.proof.ProofContainer.{CAmkESConnectionType}
+import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.templates.ConnectionsSbTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
-import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil => CommonTypeUtil}
 import org.sireum.hamr.ir
+
+@datatype class VMConnectionInfo(aadlThread: AadlThread,
+                                 aadlThreadPort: AadlPort)
+
+@datatype class SBConnectionContainer(connectionOrigin: ir.ConnectionInstance,
+
+                                      srcComponent: AadlComponent,
+                                      srcPort: AadlPort,
+
+                                      dstComponent: AadlComponent,
+                                      dstPort: AadlPort,
+
+                                      srcVMInfo: Option[VMConnectionInfo],
+                                      dstVMInfo: Option[VMConnectionInfo]
+                                     )
+
+object SBConnections {
+
+  def preprocessConnectionInstances(symbolTable: SymbolTable): ISZ[SBConnectionContainer] = {
+    var conns: ISZ[SBConnectionContainer] = ISZ()
+
+    for (connections <- symbolTable.outConnections.values) {
+
+      val handledConns: ISZ[ir.ConnectionInstance] = connections.filter(conn =>
+        Connections.isHandledConnection(conn, symbolTable))
+
+      for (conn <- handledConns) {
+        val srcThread = symbolTable.componentMap.get(CommonUtil.getName(conn.src.component)).get.asInstanceOf[AadlThread]
+        val srcProcess = srcThread.getParent(symbolTable)
+
+        val dstThread = symbolTable.componentMap.get(CommonUtil.getName(conn.dst.component)).get.asInstanceOf[AadlThread]
+        val dstProcess = dstThread.getParent(symbolTable)
+
+        val srcThreadPort = symbolTable.featureMap.get(CommonUtil.getName(conn.src.feature.get)).get.asInstanceOf[AadlPort]
+        val dstThreadPort = symbolTable.featureMap.get(CommonUtil.getName(conn.dst.feature.get)).get.asInstanceOf[AadlPort]
+
+        val (srcComponent, srcPort, srcVMInfo): (AadlComponent, AadlPort, Option[VMConnectionInfo]) = {
+          if(srcProcess.toVirtualMachine(symbolTable)) {
+            val connRef: ir.ConnectionReference = conn.connectionRefs(0)
+            val connection: ir.Connection = symbolTable.aadlMaps.connectionsMap.get(connRef.name.name).get
+            val featureName = CommonUtil.getName(connection.dst(0).feature.get)
+            val srcProcessPort = symbolTable.featureMap.get(featureName).get.asInstanceOf[AadlPort]
+
+            (srcProcess, srcProcessPort, Some(VMConnectionInfo(srcThread, srcThreadPort)))
+          } else {
+            (srcThread, srcThreadPort, None())
+          }
+        }
+
+        val (dstComponent, dstPort, dstVMInfo): (AadlComponent, AadlPort, Option[VMConnectionInfo]) = {
+          if(dstProcess.toVirtualMachine(symbolTable)) {
+            val connRef: ir.ConnectionReference = ops.ISZOps(conn.connectionRefs).last
+            val connection: ir.Connection = symbolTable.aadlMaps.connectionsMap.get(connRef.name.name).get
+            val featureName = CommonUtil.getName(connection.src(0).feature.get)
+            val dstProcessPort = symbolTable.featureMap.get(featureName).get.asInstanceOf[AadlPort]
+
+            (dstProcess, dstProcessPort, Some(VMConnectionInfo(dstThread, dstThreadPort)))
+          } else {
+            (dstThread, dstThreadPort, None())
+          }
+        }
+
+        val connconn: SBConnectionContainer = SBConnectionContainer(connectionOrigin = conn,
+          srcComponent = srcComponent,
+          srcPort = srcPort,
+          dstComponent = dstComponent,
+          dstPort = dstPort,
+          srcVMInfo = srcVMInfo,
+          dstVMInfo = dstVMInfo)
+
+        conns = conns :+ connconn
+      }
+    }
+    return conns
+  }
+}
 
 @record class SBConnections(monitors: HashSMap[String, Monitor],
                           sharedData: HashMap[String, SharedData],

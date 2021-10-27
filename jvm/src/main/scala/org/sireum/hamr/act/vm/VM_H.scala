@@ -4,6 +4,7 @@ package org.sireum.hamr.act.vm
 
 import org.sireum._
 import org.sireum.hamr.act.ast._
+import org.sireum.hamr.act.util.Util
 
 /**
 * Original location of vm.h
@@ -66,7 +67,8 @@ object VM_INIT_DEF {
 
   def provides(): ISZ[Provides] = {
     val ret: ISZ[Provides] = ISZ(
-      Provides(
+      Util.createProvides_VM(
+
         name = "dtb",
         typ = "VMDTBPassthrough")
     )
