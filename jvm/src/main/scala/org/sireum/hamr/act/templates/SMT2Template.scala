@@ -14,7 +14,7 @@ object SMT2Template {
   }
 
   def componentRefinement(aadlComponent: String, camkesComponent: String): ST = {
-    return st"(and (= ac ${aadlComponent}) (= cc ${camkesComponent}))"
+    return st"(and (= ac (Some ${aadlComponent})) (= cc ${camkesComponent}))"
   }
 
   def flowsTo(srcPort: String, dstPort: String): ST = {
@@ -22,11 +22,11 @@ object SMT2Template {
   }
 
   def aadlPortComponents(aadlComponent: String, aadlPort: String): ST = {
-    return st"(assert (= ${aadlPort} (select AADLPortComponent ${aadlComponent})))"
+    return st"(assert (= (Some ${aadlComponent}) (select AADLPortComponent ${aadlPort})))"
   }
 
   def aadlDispatchProtocol(aadlThread: AadlThread): ST = {
-    return st"(assert (= ${aadlThread.dispatchProtocol.name} (select AADLDispatchProtocol ${aadlThread.path})))"
+    return st"(assert (= (Some ${aadlThread.dispatchProtocol.name}) (select AADLDispatchProtocol ${aadlThread.path})))"
   }
 
   def camkesPortComponents(camkesComponent: String, camkesPort: String): ST = {
@@ -60,8 +60,6 @@ object SMT2Template {
             aadlPortDirection: ISZ[ST],
             aadlConnectionFlowTos: ISZ[ST],
             aadlDispatchProtocols: ISZ[ST],
-
-            altAadlDispatchProtocols: ST,
 
             camkesComponents: ISZ[ST],
 
@@ -102,6 +100,10 @@ object SMT2Template {
     val ret: ST =
       st"""(set-logic ALL)
           |
+          |(declare-datatypes ((Option 1))
+          |  ((par (T) ((Some (value T))
+          |             (None)))))
+          |
           |(declare-datatypes ((Mode 0)) ((
           |  ${(modes, "\n")})))
           |
@@ -113,8 +115,7 @@ object SMT2Template {
           |
           |(declare-datatypes ((DispatchProtocol 0)) ((
           |  (Periodic)
-          |  (Sporadic)
-          |  (UNSPECIFIED_DISPATCH_PROTOCOL))))
+          |  (Sporadic))))
           |
           |(declare-datatypes ((SchedulingType 0)) ((
           |  ${(schedulingTypes, "\n")}
@@ -140,22 +141,17 @@ object SMT2Template {
           |(declare-const AADLComponent_count Int)
           |(assert (= ${aadlComponents.size} AADLComponent_count))
           |
-          |(declare-const AADLDispatchProtocol (Array AADLComponent DispatchProtocol))
+          |(declare-const AADLDispatchProtocol (Array AADLComponent (Option DispatchProtocol)))
           |  ${(aadlDispatchProtocols, "\n")}
           |(declare-const AADLDispatchProtocol_size Int)
           |(assert (= ${aadlDispatchProtocols.size} AADLDispatchProtocol_size))
-          |
-          |(define-fun altAADLDispatchProtocol ((_comp AADLComponent)) DispatchProtocol
-          |  ${(altAadlDispatchProtocols, "\n")})
-          |(declare-const AADLDispatchProtocol_count Int)
-          |(assert (= ${aadlDispatchProtocols.size} AADLDispatchProtocol_count))
           |
           |(declare-datatypes ((AADLPort 0)) ((
           |  ${(aadlPorts, "\n")})))
           |(declare-const AADLPort_count Int)
           |(assert (= ${aadlPorts.size} AADLPort_count))
           |
-          |(declare-const AADLPortComponent (Array AADLPort AADLComponent))
+          |(declare-const AADLPortComponent (Array AADLPort (Option AADLComponent)))
           |  ${(aadlPortComponents, "\n")}
           |(declare-const AADLPortComponent_size Int)
           |(assert (= ${aadlPortComponents.size} AADLPortComponent_size))
@@ -259,7 +255,7 @@ object SMT2Template {
           |(declare-const CAmkESConnectionFlowTos_count Int)
           |(assert (= ${camkesConnectionFlowTos.size} CAmkESConnectionFlowTos_count))
           |
-          |(define-fun ComponentRefinement ((ac AADLComponent) (cc CAmkESComponent)) Bool
+          |(define-fun ComponentRefinement ((ac (Option AADLComponent)) (cc CAmkESComponent)) Bool
           |  (or
           |    ${(componentRefinements, "\n")}
           |    false))
@@ -294,16 +290,16 @@ object SMT2Template {
           |
           |(define-fun AADLDispatchProtocolSpecified () Bool
           |  (forall ((_comp AADLComponent))
-          |    (not (= UNSPECIFIED_DISPATCH_PROTOCOL (select AADLDispatchProtocol _comp)))))
+          |    (not (= (as None (Option DispatchProtocol)) (select AADLDispatchProtocol _comp)))))
           |
-          |(define-fun altAADLDispatchProtocolSpecified () Bool
-          |  (forall ((_comp AADLComponent))
-          |    (not (= UNSPECIFIED_DISPATCH_PROTOCOL (altAADLDispatchProtocol _comp)))))
+          |(define-fun AADLAllPortsAssigned () Bool
+          |  (forall ((_p AADLPort))
+          |    (not (= (as None (Option AADLComponent)) (select AADLPortComponent _p)))))
           |
           |(define-fun AADLWellFormedness () Bool
           |  (and
           |    (= AADLPort_count AADLPortComponent_size) ; all AADL ports belong to an AADL component
-          |    altAADLDispatchProtocolSpecified
+          |    AADLAllPortsAssigned
           |    AADLDispatchProtocolSpecified
           |    AADLFlowDirectionality
           |    AADLFlowNoSelfConnection
@@ -323,10 +319,10 @@ object SMT2Template {
           |
           |(define-fun UniqueComponentRefinements () Bool
           |  (forall ((aadlComponent1 AADLComponent) (camkesComponent CAmkESComponent))
-          |    (=> (ComponentRefinement aadlComponent1 camkesComponent)
+          |    (=> (ComponentRefinement (Some aadlComponent1) camkesComponent)
           |        (not (exists ((aadlComponent2 AADLComponent))
           |               (and (not (= aadlComponent1 aadlComponent2))
-          |                    (ComponentRefinement aadlComponent2 camkesComponent)))))))
+          |                    (ComponentRefinement (Some aadlComponent2) camkesComponent)))))))
           |
           |(define-fun UniquePortRefinements () Bool
           |  (forall ((aadlPort1 AADLPort) (camkesPort CAmkESPort))

@@ -27,10 +27,9 @@ object SMT2ProofGen {
     val aadlInstances: ISZ[AadlThread] = symbolTable.getThreads()
 
 
-    val (aadlComponents, aadlDispatchProtocols, altAadlDispatchProtocols): (ISZ[ST], ISZ[ST], ST) = {
+    val (aadlComponents, aadlDispatchProtocols): (ISZ[ST], ISZ[ST]) = {
       var aadlComps: ISZ[ST] = ISZ()
       var aadlDPs: ISZ[ST] = ISZ()
-      var altAadlDPEntries: ISZ[ST] = ISZ()
       for(t <- aadlInstances) {
         val pos: Option[ST] =
           t.component.identifier.pos match {
@@ -39,12 +38,8 @@ object SMT2ProofGen {
           }
         aadlComps = aadlComps :+ st"(${t.path}); Instance of ${t.component.classifier.get.name}${pos}"
         aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(t)
-        altAadlDPEntries = altAadlDPEntries :+ st"(ite (= _comp ${t.path}) ${t.dispatchProtocol.name}"
       }
-      val cparens = altAadlDPEntries.map((m: ST) => ")")
-      val x = st"""${(altAadlDPEntries, "\n")}
-                  |UNSPECIFIED_DISPATCH_PROTOCOL${(cparens, "")}"""
-      (aadlComps, aadlDPs, x)
+      (aadlComps, aadlDPs)
     }
 
     val (aadlPorts, aadlPortComponents, aadlPortTypes, aadlPortDirection): (ISZ[String], ISZ[ST], ISZ[ST], ISZ[ST]) = {
@@ -56,7 +51,7 @@ object SMT2ProofGen {
       for(thread <- aadlInstances;
         port <- thread.getPorts() if symbolTable.isConnected(port.feature)) {
         ports = ports :+ s"(${port.path})"
-        portComponents = portComponents :+ SMT2Template.aadlPortComponents(port.path, thread.path)
+        portComponents = portComponents :+ SMT2Template.aadlPortComponents(thread.path, port.path)
         val portType: String = port match {
           case a: AadlDataPort => AadlPortType.AadlDataPort.name
           case a: AadlEventDataPort => AadlPortType.AadlEventDataPort.name
@@ -239,7 +234,6 @@ object SMT2ProofGen {
       aadlPortDirection = aadlPortDirection,
       aadlConnectionFlowTos = aadlConnectionFlowTos,
       aadlDispatchProtocols = aadlDispatchProtocols,
-      altAadlDispatchProtocols = altAadlDispatchProtocols,
 
       camkesComponents = camkesComponents,
       camkesDataPortAccessRestrictions = camkesDataPortAccessRestrictions,
