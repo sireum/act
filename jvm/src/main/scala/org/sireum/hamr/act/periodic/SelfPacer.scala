@@ -5,21 +5,20 @@ package org.sireum.hamr.act.periodic
 import org.sireum._
 import org.sireum.hamr.act._
 import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
-import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDispatchableComponent, AadlProcess, AadlThread, AadlVirtualProcessor, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 
-@datatype class SelfPacer (val symbolTable: SymbolTable,
-                           val actOptions: ActOptions) extends PeriodicImpl {
+@datatype class SelfPacer (val actOptions: ActOptions) extends PeriodicImpl {
 
   val performHamrIntegration: B = Util.hamrIntegration(actOptions.platform)
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String): CamkesAssemblyContribution = {
+                               headerInclude: String,
+                               symbolTable: SymbolTable): CamkesAssemblyContribution = {
 
     val threads = symbolTable.getThreads()
 
@@ -28,7 +27,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     var auxResources: ISZ[Resource] = ISZ()
 
     if(threads.nonEmpty) {
-      auxResources = auxResources ++ getSchedule(threads)
+      auxResources = auxResources ++ getSchedule(threads, symbolTable)
     }
 
     val periodicThreads = symbolTable.getPeriodicThreads()
@@ -69,11 +68,16 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
       cContainers = ISZ())
   }
 
-  def handlePeriodicComponent(aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+  def handlePeriodicComponent(aadlComponent: AadlComponent, symbolTable: SymbolTable): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+    val dispatchableComponent: AadlDispatchableComponent = aadlComponent match {
+      case t: AadlThread => t
+      case p: AadlProcess => p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
+      case _ => halt("Unexpected: ")
+    }
 
-    assert(aadlThread.isPeriodic())
+    assert(dispatchableComponent.isPeriodic())
 
-    val classifier = Util.getClassifier(aadlThread.component.classifier.get)
+    val classifier = Util.getClassifier(aadlComponent.component.classifier.get)
 
     var emits: ISZ[ast.Emits] = ISZ()
     var consumes: ISZ[ast.Consumes] = ISZ()
@@ -97,7 +101,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
 
     if(!performHamrIntegration) {
       // get user defined time triggered method
-      Util.getComputeEntrypointSourceText(aadlThread.component.properties) match {
+      Util.getComputeEntrypointSourceText(aadlComponent.component.properties) match {
         case Some(handler) =>
           // header method so developer knows required signature
           gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t * in_arg);"
@@ -112,13 +116,13 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     }
 
     emits = emits :+ Util.createEmits_SelfPacing(
-      aadlThread = aadlThread,
+      aadlComponent = aadlComponent,
       symbolTable = symbolTable,
       name = SelfPacerTemplate.selfPacerClientTickIdentifier(),
       typ = SelfPacerTemplate.selfPacerTickTockType())
 
     consumes = consumes :+ Util.createConsumes_SelfPacing(
-      aadlThread = aadlThread,
+      aadlComponent = aadlComponent,
       symbolTable = symbolTable,
       name = SelfPacerTemplate.selfPacerClientTockIdentifier(),
       typ = SelfPacerTemplate.selfPacerTickTockType(),
@@ -152,7 +156,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     return (componentContributions, glueCodeContributions)
   }
 
-  def getSchedule(allThreads: ISZ[AadlThread]): ISZ[Resource] = {
+  def getSchedule(allThreads: ISZ[AadlThread], symbolTable: SymbolTable): ISZ[Resource] = {
 
     val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
 

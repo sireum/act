@@ -15,14 +15,14 @@ import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
 
-@datatype class PeriodicDispatcher(val symbolTable: SymbolTable,
-                                   val actOptions: ActOptions) extends PeriodicImpl {
+@datatype class PeriodicDispatcher(val actOptions: ActOptions) extends PeriodicImpl {
   
   val hookupPeriodicComponentsToTimeServer: B = F
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String): CamkesAssemblyContribution = {
+                               headerInclude: String,
+                               symbolTable: SymbolTable): CamkesAssemblyContribution = {
 
     val components: ISZ[AadlComponent] = symbolTable.componentMap.values
     
@@ -136,8 +136,8 @@ import org.sireum.hamr.codegen.common.symbols._
   }
 
 
-  def handlePeriodicComponent(aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
-    val component = aadlThread.component
+  def handlePeriodicComponent(aadlComponent: AadlComponent, symbolTable: SymbolTable): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+    val component = aadlComponent.component
     val classifier = Util.getClassifier(component.classifier.get)
 
     var imports: ISZ[String] = ISZ()
@@ -159,7 +159,7 @@ import org.sireum.hamr.codegen.common.symbols._
     if(hookupPeriodicComponentsToTimeServer) {
       // uses Timer tb_timer;
       uses = uses :+ Util.createUses_PeriodicDispatcher(
-        aadlThread = aadlThread,
+        aadlComponent = aadlComponent,
         name = PeriodicDispatcherTemplate.TIMER_ID,
         typ = PeriodicDispatcherTemplate.TIMER_TYPE,
         optional = F)
@@ -167,7 +167,7 @@ import org.sireum.hamr.codegen.common.symbols._
 
     // consumes Notification from periodic dispatcher
     consumes = consumes :+ Util.createConsumes_PeriodicDispatcher(
-      aadlThread = aadlThread,
+      aadlComponent = aadlComponent,
       name = PeriodicDispatcherTemplate.componentNotificationName(None()),
       typ = Util.NOTIFICATION_TYPE,
       optional = F)

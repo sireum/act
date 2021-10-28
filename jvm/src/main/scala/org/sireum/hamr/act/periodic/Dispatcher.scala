@@ -20,22 +20,25 @@ object Dispatcher {
 
     val ret: CamkesAssemblyContribution = PeriodicUtil.getDispatchingType(symbolTable, useDomainScheduling) match {
       case PeriodicDispatchingType.Pacer =>
-        Pacer(symbolTable, actOptions).handlePeriodicComponents(
+        Pacer(actOptions).handlePeriodicComponents(
           connectionCounter,
           timerAttributeCounter,
-          headerInclude)
+          headerInclude,
+          symbolTable)
 
       case PeriodicDispatchingType.SelfPacer =>
-        SelfPacer(symbolTable, actOptions).handlePeriodicComponents(
+        SelfPacer(actOptions).handlePeriodicComponents(
           connectionCounter,
           timerAttributeCounter,
-          headerInclude)
+          headerInclude,
+          symbolTable)
 
       case PeriodicDispatchingType.PeriodicDispatcher =>
-        PeriodicDispatcher(symbolTable, actOptions).handlePeriodicComponents(
+        PeriodicDispatcher(actOptions).handlePeriodicComponents(
           connectionCounter,
           timerAttributeCounter,
-          headerInclude)
+          headerInclude,
+          symbolTable)
     }
     return ret
   }
@@ -44,18 +47,18 @@ object Dispatcher {
                               symbolTable: SymbolTable,
                               actOptions: ActOptions,
 
-                              aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+                              aadlComponent: AadlComponent): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
     
     val ret: (CamkesComponentContributions, CamkesGlueCodeContributions) =
       PeriodicUtil.getDispatchingType(symbolTable, useDomainScheduling) match {
         case PeriodicDispatchingType.Pacer =>
-          Pacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread)
+          Pacer(actOptions).handlePeriodicComponent(aadlComponent, symbolTable)
 
         case PeriodicDispatchingType.SelfPacer =>
-          SelfPacer(symbolTable, actOptions).handlePeriodicComponent(aadlThread)
+          SelfPacer(actOptions).handlePeriodicComponent(aadlComponent, symbolTable)
 
         case PeriodicDispatchingType.PeriodicDispatcher =>
-          PeriodicDispatcher(symbolTable, actOptions).handlePeriodicComponent(aadlThread)
+          PeriodicDispatcher(actOptions).handlePeriodicComponent(aadlComponent, symbolTable)
       }
 
     return ret

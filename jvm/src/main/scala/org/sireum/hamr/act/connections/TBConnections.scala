@@ -206,8 +206,8 @@ import org.sireum.hamr.ir
     val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
     val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
 
-    val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
-    val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
+    val srcFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(srcFeature.identifier), Some(monitor.index))
+    val dstFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(dstFeature.identifier), None[Z]())
 
     var ret: ISZ[ast.Connection] = ISZ()
 
@@ -233,7 +233,7 @@ import org.sireum.hamr.ir
       srcComponent = monitor.i.name,
       srcFeature = "monsig",
       dstComponent = dstCamkesComponentId,
-      dstFeature = Util.genSeL4NotificationName(dstFeature, T)
+      dstFeature = Util.genSeL4NotificationName(CommonUtil.getLastName(dstFeature.identifier), T)
     )
   }
 
@@ -250,8 +250,8 @@ import org.sireum.hamr.ir
     val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
     val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
 
-    val srcFeatureName = Util.genMonitorFeatureName(srcFeature, Some(monitor.index))
-    val dstFeatureName = Util.genMonitorFeatureName(dstFeature, None[Z]())
+    val srcFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(srcFeature.identifier), Some(monitor.index))
+    val dstFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(dstFeature.identifier), None[Z]())
 
     var ret: ISZ[ast.Connection] = ISZ()
 
@@ -277,7 +277,7 @@ import org.sireum.hamr.ir
       srcComponent = monitor.i.name,
       srcFeature = "monsig",
       dstComponent = dstCamkesComponentId,
-      dstFeature = Util.genSeL4NotificationName(dstFeature, T)
+      dstFeature = Util.genSeL4NotificationName(CommonUtil.getLastName(dstFeature.identifier), T)
     )
   }
 }

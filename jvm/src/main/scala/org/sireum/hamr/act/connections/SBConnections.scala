@@ -9,7 +9,7 @@ import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.templates.ConnectionsSbTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlEventPort, AadlPort, AadlProcess, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil => CommonTypeUtil}
 import org.sireum.hamr.ir
 
@@ -30,8 +30,8 @@ import org.sireum.hamr.ir
 
 object SBConnections {
 
-  def preprocessConnectionInstances(symbolTable: SymbolTable): ISZ[SBConnectionContainer] = {
-    var conns: ISZ[SBConnectionContainer] = ISZ()
+  def preprocessConnectionInstances(symbolTable: SymbolTable): Map[String, SBConnectionContainer] = {
+    var conns: Map[String, SBConnectionContainer] = Map.empty
 
     for (connections <- symbolTable.outConnections.values) {
 
@@ -82,7 +82,7 @@ object SBConnections {
           srcVMInfo = srcVMInfo,
           dstVMInfo = dstVMInfo)
 
-        conns = conns :+ connconn
+        conns = conns + (CommonUtil.getName(conn.name) ~> connconn)
       }
     }
     return conns
@@ -92,7 +92,6 @@ object SBConnections {
 @record class SBConnections(monitors: HashSMap[String, Monitor],
                           sharedData: HashMap[String, SharedData],
                           srcQueues: Map[String, Map[String, QueueObject]],
-                          symbolTable: SymbolTable,
                           aadlTypes: AadlTypes,
                           actOptions: ActOptions) {
 
@@ -104,7 +103,7 @@ object SBConnections {
 
   val useCaseConnections: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
 
-  def processConnectionInstances(connectionCounter: Counter): ConnectionContainer = {
+  def processConnectionInstances(sbConnectionContainer: ISZ[SBConnectionContainer], connectionCounter: Counter, symbolTable: SymbolTable): ConnectionContainer = {
     assert(platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only)
 
     var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
@@ -122,41 +121,25 @@ object SBConnections {
       map = map + (end ~> holder)
     }
 
-    for (entry <- symbolTable.outConnections.entries) {
-      val srcFeaturePath = entry._1
-      val connections = entry._2
+      for (conn <- sbConnectionContainer) {
 
-      val handledConns: ISZ[ir.ConnectionInstance] = connections.filter(conn =>
-        Connections.isHandledConnection(conn, symbolTable))
+        val srcToVM: B = conn.srcComponent.isInstanceOf[AadlProcess]
+        val dstToVM: B = conn.dstComponent.isInstanceOf[AadlProcess]
 
-      for (conn <- handledConns) {
-        assert(CommonUtil.getName(conn.src.feature.get) == srcFeaturePath)
+        val srcCamkesComponentId: String = Util.getCamkesComponentIdentifier(conn.srcComponent, symbolTable)
+        val dstCamkesComponentId: String = Util.getCamkesComponentIdentifier(conn.dstComponent, symbolTable)
 
-        val srcFeature: ir.Feature = symbolTable.getFeatureFromName(conn.src.feature.get)
-
-        val dstFeaturePath: String = CommonUtil.getName(conn.dst.feature.get)
-        val dstFeature: ir.Feature = symbolTable.getFeatureFromName(conn.dst.feature.get)
-
-        val srcAadlThread: AadlThread = symbolTable.getThreadByName(conn.src.component)
-        val dstAadlThread: AadlThread = symbolTable.getThreadByName(conn.dst.component)
-
-        val srcToVM: B = srcAadlThread.toVirtualMachine(symbolTable)
-        val dstToVM: B = dstAadlThread.toVirtualMachine(symbolTable)
-
-        val srcCamkesComponentId: String = Util.getCamkesComponentIdentifier(srcAadlThread, symbolTable)
-        val dstCamkesComponentId: String = Util.getCamkesComponentIdentifier(dstAadlThread, symbolTable)
-
-        conn.kind match {
+        conn.connectionOrigin.kind match {
           case ir.ConnectionKind.Port => {
-            assert(srcFeature.category == dstFeature.category,
-              s"Not currently handling mixed feature types: Source is ${srcFeature.category}, destination is ${dstFeature.category} for ${conn}")
+            assert(conn.srcPort.feature.category == conn.dstPort.feature.category,
+              s"Not currently handling mixed feature types: Source is ${conn.srcPort.feature.category}, destination is ${conn.srcPort.feature.category} for ${conn.connectionOrigin}")
 
-            dstFeature.category match {
-              case ir.FeatureCategory.DataPort => {
+            conn.dstPort match {
+              case a: AadlDataPort => {
                 // dataport connection
 
-                val srcCamkesFeatureQueueName_DP: String = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
-                val dstCamkesFeatureQueueName_DP: String = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
+                val srcCamkesFeatureQueueName_DP: String = Util.brand(conn.srcPort.identifier)
+                val dstCamkesFeatureQueueName_DP: String = Util.brand(conn.dstPort.identifier)
 
                 val srcConnectionEnd_DP = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName_DP)
                 val dstConnectionEnd_DP = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName_DP)
@@ -225,13 +208,13 @@ object SBConnections {
                 }
               }
 
-              case ir.FeatureCategory.EventDataPort if !useCaseConnections => {
+              case edp: AadlEventDataPort if !useCaseConnections => {
                 // sel4 notification plus shared queue
 
-                val queueSize: Z = srcQueues.get(srcFeaturePath).get.get(dstFeaturePath).get.queueSize
+                val queueSize: Z = srcQueues.get(conn.srcPort.path).get.get(conn.dstPort.path).get.queueSize
 
-                val srcCamkesFeatureNotificationName = Util.genSeL4NotificationQueueName(srcFeature, queueSize)
-                val dstCamkesFeatureNotificationName = Util.genSeL4NotificationName(dstFeature, T)
+                val srcCamkesFeatureNotificationName = Util.genSeL4NotificationQueueName(conn.srcPort.identifier, queueSize)
+                val dstCamkesFeatureNotificationName = Util.genSeL4NotificationName(conn.dstPort.identifier, T)
 
                 { // notification connections
                   val notificationConnectorType: Sel4ConnectorTypes.Type =
@@ -253,8 +236,8 @@ object SBConnections {
                     if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
                     else Sel4ConnectorTypes.seL4SharedData
 
-                  val srcCamkesFeatureQueueName_ED: String = Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
-                  val dstCamkesFeatureQueueName_ED: String = Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
+                  val srcCamkesFeatureQueueName_ED: String = Util.getEventDataSBQueueSrcFeatureName(conn.srcPort.identifier, queueSize)
+                  val dstCamkesFeatureQueueName_ED: String = Util.getEventDataSBQueueDestFeatureName(conn.dstPort.identifier)
 
                   val srcConnectionEnd_ED = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName_ED)
                   val dstConnectionEnd_ED = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName_ED)
@@ -292,7 +275,7 @@ object SBConnections {
                   } else {
                     // don't add access restrictions since in a vm
 
-                    dstAadlThread.getDomain(symbolTable) match {
+                    conn.dstComponent.asInstanceOf[AadlProcess].getDomain() match {
                       case Some(d) =>
                         // add the notification to the same domain as the component or will get an error like
                         // 'handle_event_bar_fault@cross_vm_connection.c:126 Connection is not configured with an emit function'
@@ -307,16 +290,16 @@ object SBConnections {
                 }
               }
 
-              case ir.FeatureCategory.EventDataPort if useCaseConnections => {
+              case edp: AadlEventDataPort if useCaseConnections => {
                 // shared queue -- custom CAmkES template handles notification
 
-                val queueSize: Z = srcQueues.get(srcFeaturePath).get.get(dstFeaturePath).get.queueSize
+                val queueSize: Z = srcQueues.get(conn.srcPort.path).get.get(conn.dstPort.path).get.queueSize
 
                 { // queue dataport connection
                   val queueConnectorType: Sel4ConnectorTypes.Type = Sel4ConnectorTypes.CASE_AADL_EventDataport
 
-                  val srcCamkesFeatureQueueName: String = Util.getEventDataSBQueueSrcFeatureName(CommonUtil.getLastName(srcFeature.identifier), queueSize)
-                  val dstCamkesFeatureQueueName: String = Util.getEventDataSBQueueDestFeatureName(CommonUtil.getLastName(dstFeature.identifier))
+                  val srcCamkesFeatureQueueName: String = Util.getEventDataSBQueueSrcFeatureName(conn.srcPort.identifier, queueSize)
+                  val dstCamkesFeatureQueueName: String = Util.getEventDataSBQueueDestFeatureName(conn.dstPort.identifier)
 
                   val srcConnectionEnd: ast.ConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
                   val dstConnectionEnd: ast.ConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
@@ -350,12 +333,12 @@ object SBConnections {
                 }
               }
 
-              case ir.FeatureCategory.EventPort => {
+              case e: AadlEventPort => {
                 // sel4 notification plus shared counter
 
                 { // notification connection
-                  val srcCAmkESFeatureName = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
-                  val dstCAmkESFeatureName = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
+                  val srcCAmkESFeatureName = Util.brand(conn.srcPort.identifier)
+                  val dstCAmkESFeatureName = Util.brand(conn.dstPort.identifier)
 
                   val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCAmkESFeatureName)
                   val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCAmkESFeatureName)
@@ -370,8 +353,8 @@ object SBConnections {
                 }
 
                 { // shared data connection for counter
-                  val srcCamkesFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(srcFeature.identifier))
-                  val dstCamkesFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(dstFeature.identifier))
+                  val srcCamkesFeatureName = Util.getEventSBCounterName(conn.srcPort.identifier)
+                  val dstCamkesFeatureName = Util.getEventSBCounterName(conn.dstPort.identifier)
 
                   val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureName)
                   val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureName)
@@ -398,10 +381,10 @@ object SBConnections {
           case ir.ConnectionKind.Access => {
             assert(F, s"Not handling access connections for ${platform} platform")
           }
-          case x => halt(s"Not expecting connection type ${conn.kind}: ${conn}")
+          case x => halt(s"Not expecting connection type ${x}: ${conn.connectionOrigin}")
         }
       }
-    }
+
 
     for (connectionHolderEntry <- map.entries) {
       val fromEnd: ConnectionEnd = connectionHolderEntry._1

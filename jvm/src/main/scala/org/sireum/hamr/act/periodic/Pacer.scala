@@ -10,12 +10,12 @@ import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkES
 import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
+import org.sireum.hamr.act.vm.VMUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
-@datatype class Pacer(val symbolTable: SymbolTable,
-                      val actOptions: ActOptions) extends PeriodicImpl {
+@datatype class Pacer(val actOptions: ActOptions) extends PeriodicImpl {
 
   val performHamrIntegration: B = Util.hamrIntegration(actOptions.platform)
 
@@ -23,9 +23,10 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
   def handlePeriodicComponents(connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                               headerInclude: String): CamkesAssemblyContribution = {
+                               headerInclude: String,
+                               symbolTable: SymbolTable): CamkesAssemblyContribution = {
     if(useCaseConnectors) {
-      return handlePeriodicComponents_CASE_Connector(connectionCounter, timerAttributeCounter, headerInclude)
+      return handlePeriodicComponents_CASE_Connector(connectionCounter, timerAttributeCounter, headerInclude, symbolTable)
     }
 
     assert(!useCaseConnectors)
@@ -39,11 +40,11 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
     imports = imports :+ PacerTemplate.pacerImport()
 
-    val threads = symbolTable.getPeriodicThreads()
+    val periodicComponents = VMUtil.getPeriodicComponents(symbolTable)
     
-    if(threads.nonEmpty) {
+    if(periodicComponents.nonEmpty) {
 
-      auxResources = auxResources ++ getSchedule(threads)
+      auxResources = auxResources ++ getSchedule(periodicComponents, symbolTable)
       
       // TODO handle components with different periods
       var emits: ISZ[ast.Emits] = ISZ()
@@ -69,10 +70,10 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       var requiresEmits = F
       var requiresDataportVMs = F
 
-      for (aadlThread <- threads) {
-        val componentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+      for (component <- periodicComponents) {
+        val componentId = Util.getCamkesComponentIdentifier(component, symbolTable)
 
-        val isVM = aadlThread.toVirtualMachine(symbolTable)
+        val isVM = component.isInstanceOf[AadlProcess]
 
         requiresDataportVMs = requiresDataportVMs | isVM
         requiresEmits = requiresEmits | !isVM
@@ -209,8 +210,9 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
   }
 
   def handlePeriodicComponents_CASE_Connector(connectionCounter: Counter,
-                               timerAttributeCounter: Counter,
-                               headerInclude: String): CamkesAssemblyContribution = {
+                                              timerAttributeCounter: Counter,
+                                              headerInclude: String,
+                                              symbolTable: SymbolTable): CamkesAssemblyContribution = {
     assert(useCaseConnectors)
 
     var imports: ISZ[String] = ISZ()
@@ -222,7 +224,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
     imports = imports :+ PacerTemplate.pacerImport()
 
-    val threads = symbolTable.getPeriodicThreads()
+    val periodicComponents = VMUtil.getPeriodicComponents(symbolTable)
 
     var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
 
@@ -239,9 +241,9 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       map = map + (end ~> holder)
     }
 
-    if(threads.nonEmpty) {
+    if(periodicComponents.nonEmpty) {
 
-      auxResources = auxResources ++ getSchedule(threads)
+      auxResources = auxResources ++ getSchedule(periodicComponents, symbolTable)
 
       // TODO handle components with different periods
       var emits: ISZ[ast.Emits] = ISZ()
@@ -272,14 +274,14 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
       var hasPeriodicVMComponents: B = F
 
-      for (aadlThread <- threads) {
+      for (aadlComponent <- periodicComponents) {
 
-        val dstCamkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+        val dstCamkesComponentId = Util.getCamkesComponentIdentifier(aadlComponent, symbolTable)
 
-        val isVM = aadlThread.toVirtualMachine(symbolTable)
+        val isVM = aadlComponent.isInstanceOf[AadlProcess]
 
         requiresDataportVMs = requiresDataportVMs | isVM
-        requiresEmits = requiresEmits | !aadlThread.toVirtualMachine(symbolTable)
+        requiresEmits = requiresEmits | !isVM
 
         if(isVM) {
           // CASE eventdata port connector
@@ -406,10 +408,16 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       settingCmakeEntries, auxResources)
   }
 
-  def handlePeriodicComponent(aadlThread: AadlThread): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
-    assert(aadlThread.isPeriodic())
+  def handlePeriodicComponent(aadlComponent: AadlComponent, symbolTable: SymbolTable): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
+    val dispatchableComponent: AadlDispatchableComponent = aadlComponent match {
+      case t: AadlThread => t
+      case p: AadlProcess => p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
+      case _ => halt("Unexpected: ")
+    }
+
+    assert(dispatchableComponent.isPeriodic())
     
-    val component = aadlThread.component
+    val component = aadlComponent.component
     val classifier = Util.getClassifier(component.classifier.get)
 
     var consumes: ISZ[ast.Consumes] = ISZ()
@@ -445,7 +453,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       }
     }
 
-    if(aadlThread.toVirtualMachine(symbolTable)) {
+    if(aadlComponent.isInstanceOf[AadlProcess]) {
 
       // TODO: any reason not to use int8 with size 1 ??
       val queueType = Util.getEventDataSBQueueTypeName(
@@ -577,7 +585,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     return ResourceUtil.createResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
   }
   
-  def getSchedule(allThreads: ISZ[AadlThread]): ISZ[Resource] = {
+  def getSchedule(allComponents: ISZ[AadlComponent], symbolTable: SymbolTable): ISZ[Resource] = {
 
     val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
 
@@ -624,14 +632,19 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         
         var threadComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(p <- allThreads) {
-          val domain = p.getDomain(symbolTable).get
-          val computeExecutionTime = p.getMaxComputeExecutionTime()
+        for(p <- allComponents) {
+          val (domain, computeExecutionTime, dispatchProtocol, period): (Z, Z, Dispatch_Protocol.Type, Option[Z]) = p match {
+            case p: AadlProcess =>
+              val dc = p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
+              (p.getDomain().get, -1, dc.dispatchProtocol, dc.period)
+            case t: AadlThread => (t.getDomain(symbolTable).get, t.getMaxComputeExecutionTime(), t.dispatchProtocol, t.period)
+          }
+
           val comment = Some(st" // ${p.identifier}  ${computeExecutionTime}ms")
 
           threadComments = threadComments :+ 
             PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier,
-              domain, p.dispatchProtocol, computeExecutionTime, p.period)
+              domain, dispatchProtocol, computeExecutionTime, period)
 
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
           

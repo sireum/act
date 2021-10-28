@@ -5,11 +5,11 @@ package org.sireum.hamr.act.util
 import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.ast.{BinarySemaphore, Consumes, Dataport, Emits, Mutex, Provides, Semaphore, TODO, Uses}
-import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType }
+import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlProcess, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
@@ -132,34 +132,41 @@ object Util {
     return StringUtil.replaceAll(s.s, ".", "_")
   }
 
-  def getShortPath(aadlThread: AadlThread): String = {
-    val componentName = aadlThread.component.identifier.name
+  def getShortPath(aadlComponent: AadlComponent): String = {
+    val componentName = aadlComponent.component.identifier.name
     assert(ops.StringOps(componentName(0)).endsWith("Instance"))
     val p = ops.ISZOps(componentName).tail
     return st"${(p, "_")}".render
   }
 
-  def getCamkesComponentName(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
-    val shortPath = getShortPath(aadlThread)
-    val name = s"${Util.getClassifier(aadlThread.component.classifier.get)}_${shortPath}"
+  def getCamkesComponentName(aadlComponent: AadlComponent, symbolTable: SymbolTable): String = {
+    val shortPath = getShortPath(aadlComponent)
+    val name = s"${Util.getClassifier(aadlComponent.component.classifier.get)}_${shortPath}"
 
-    return if (aadlThread.toVirtualMachine(symbolTable)) s"VM_${name}"
-    else name
-  }
-
-  def getCamkesComponentIdentifier(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
-    val ret: String = if (aadlThread.toVirtualMachine(symbolTable)) {
-      val parentProcess = aadlThread.getParent(symbolTable)
-      s"vm${parentProcess.identifier}"
-    } else {
-      getShortPath(aadlThread)
+    val ret: String = aadlComponent match {
+      case p: AadlProcess =>
+        assert(p.toVirtualMachine(symbolTable))
+        return s"VM_${name}"
+      case t: AadlThread => name
+      case _ => halt(s"Unexpected: ${aadlComponent}")
     }
     return ret
   }
 
-  def getEventPortSendReceiveMethodName(feature: FeatureEnd): String = {
-    val featureName = CommonUtil.getLastName(feature.identifier)
-    val direction: String = feature.direction match {
+  def getCamkesComponentIdentifier(aadlComponent: AadlComponent, symbolTable: SymbolTable): String = {
+    val ret: String = aadlComponent match {
+      case p: AadlProcess =>
+        assert(p.toVirtualMachine(symbolTable))
+        s"vm${p.identifier}"
+      case t: AadlThread => getShortPath(t)
+      case _ => halt(s"Unexpected: ${aadlComponent}")
+    }
+    return ret
+  }
+
+  def getEventPortSendReceiveMethodName(aadlPort: AadlPort): String = {
+    val featureName = aadlPort.identifier
+    val direction: String = aadlPort.direction match {
       case ir.Direction.In => "dequeue"
       case ir.Direction.Out => "enqueue"
       case x => halt(s"Unexpected direction ${x}")
@@ -188,17 +195,17 @@ object Util {
     return ret
   }
 
-  def genMonitorFeatureName(f: ir.Feature, num: Option[Z]): String = {
-    return brand(s"${CommonUtil.getLastName(f.identifier)}${if (num.nonEmpty) num.get else ""}")
+  def genMonitorFeatureName(featureSimpleName: String, num: Option[Z]): String = {
+    return brand(s"${featureSimpleName}${if (num.nonEmpty) num.get else ""}")
   }
 
-  def genSeL4NotificationName(f: ir.Feature, isDataPort: B): String = {
-    val name = s"${CommonUtil.getLastName(f.identifier)}${if (isDataPort) "_notification" else ""}"
+  def genSeL4NotificationName(featureSimpleName: String, isDataPort: B): String = {
+    val name = s"${featureSimpleName}${if (isDataPort) "_notification" else ""}"
     return brand(name)
   }
 
-  def genSeL4NotificationQueueName(f: ir.Feature, queueSize: Z): String = {
-    val name = s"${CommonUtil.getLastName(f.identifier)}_${queueSize}_notification"
+  def genSeL4NotificationQueueName(featureSimpleName: String, queueSize: Z): String = {
+    val name = s"${featureSimpleName}_${queueSize}_notification"
     return brand(name)
   }
 
@@ -401,8 +408,8 @@ object Util {
     return s"${s}.c"
   }
 
-  def getUserEventEntrypointMethodName(component: ir.Component, feature: ir.FeatureEnd): String = {
-    val fid = CommonUtil.getLastName(feature.identifier)
+  def getUserEventEntrypointMethodName(component: ir.Component, aadlPort: AadlPort): String = {
+    val fid = aadlPort.identifier
     val cid = Util.getClassifier(component.classifier.get)
     return Util.brand(s"entrypoint_${cid}_${fid}")
   }
@@ -607,7 +614,7 @@ object Util {
     return ret
   }
 
-  def createDataport_Refinement(aadlThread: AadlThread,
+  def createDataport_Refinement(aadlComponent: AadlComponent,
                                 aadlPort: AadlPort,
                                 symbolTable: SymbolTable,
 
@@ -621,12 +628,12 @@ object Util {
       typ = typ
     )
 
-    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
+    ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
     return ret
   }
 
-  def createUses_Refinement(aadlThread: AadlThread,
+  def createUses_Refinement(aadlComponent: AadlComponent,
                             aadlPort: AadlPort,
                             symbolTable: SymbolTable,
 
@@ -639,12 +646,12 @@ object Util {
       optional = optional
     )
 
-    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
+    ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
     return ret
   }
 
-  def createUses_PeriodicDispatcher(aadlThread: AadlThread,
+  def createUses_PeriodicDispatcher(aadlComponent: AadlComponent,
                                     name: String,
                                     typ: String,
                                     optional: B): ast.Uses = {
@@ -653,7 +660,7 @@ object Util {
     return ret
   }
 
-  def createConsumes_Refinement(aadlThread: AadlThread,
+  def createConsumes_Refinement(aadlComponent: AadlComponent,
                                 aadlPort: AadlPort,
                                 symbolTable: SymbolTable,
 
@@ -665,12 +672,12 @@ object Util {
       typ = typ,
       optional = optional)
 
-    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
+    ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
     return ret
   }
 
-  def createConsumes_PeriodicDispatcher(aadlThread: AadlThread,
+  def createConsumes_PeriodicDispatcher(aadlComponent: AadlComponent,
 
                                         name: String,
                                         typ: String,
@@ -685,7 +692,7 @@ object Util {
     return ret
   }
 
-  def createConsumes_SelfPacing(aadlThread: AadlThread,
+  def createConsumes_SelfPacing(aadlComponent: AadlComponent,
                                 symbolTable: SymbolTable,
 
                                 name: String,
@@ -696,7 +703,7 @@ object Util {
       typ = typ,
       optional = optional)
 
-    ProofUtil.addPortSelfPacing(aadlThread, ret, symbolTable)
+    ProofUtil.addPortSelfPacing(aadlComponent, ret, symbolTable)
 
     return ret
   }
@@ -725,7 +732,7 @@ object Util {
     return ret
   }
 
-  def createEmits_Refinement(aadlThread: AadlThread,
+  def createEmits_Refinement(aadlComponent: AadlComponent,
                              aadlPort: AadlPort,
                              symbolTable: SymbolTable,
 
@@ -735,7 +742,7 @@ object Util {
       name = name,
       typ = typ)
 
-    ProofUtil.addPortRefinement(ret, aadlThread, aadlPort, symbolTable)
+    ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
     return ret
   }
@@ -752,13 +759,13 @@ object Util {
     return ret
   }
 
-  def createEmits_SelfPacing(aadlThread: AadlThread,
+  def createEmits_SelfPacing(aadlComponent: AadlComponent,
                              symbolTable: SymbolTable,
                              name: String,
                              typ: String): ast.Emits = {
     val ret = ast.Emits(name = name, typ = typ)
 
-    ProofUtil.addPortSelfPacing(aadlThread, ret, symbolTable)
+    ProofUtil.addPortSelfPacing(aadlComponent, ret, symbolTable)
 
     return ret
   }

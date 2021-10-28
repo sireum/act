@@ -6,6 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
+import org.sireum.hamr.codegen.common.symbols.{AadlDataPort, AadlPort}
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
@@ -358,32 +359,25 @@ object StringTemplate {
                |#endif"""
   }
   
-  def sbSamplingPortGlobalVar(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    val portName = CommonUtil.getLastName(f.identifier)
-    val globalVarName = s"${Util.brand(portName)}_seqNum"
+  def sbSamplingPortGlobalVar(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
+    val globalVarName = s"${Util.brand(aadlPort.identifier)}_seqNum"
     return st"$globalVarName"
   }
   
-  def sbSamplingPortGlobalVarDecl(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    return st"${StringTemplate.SeqNumType} ${sbSamplingPortGlobalVar(spi, f)};"
+  def sbSamplingPortGlobalVarDecl(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
+    return st"${StringTemplate.SeqNumType} ${sbSamplingPortGlobalVar(spi, aadlPort)};"
   }
 
-  def sbSamplingPortGetterInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    assert(f.category == ir.FeatureCategory.DataPort)
-
-    val portName = CommonUtil.getLastName(f.identifier)
-    val methodNamePrefix = Util.brand(portName)
+  def sbSamplingPortGetterInterface(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
+    val methodNamePrefix = Util.brand(aadlPort.identifier)
 
     val ret: ST = st"bool ${methodNamePrefix}_read(${spi.sel4TypeName} * value);"
 
     return ret
   }
   
-  def sbSamplingPortSetterInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    assert(f.category == ir.FeatureCategory.DataPort)
-
-    val portName = CommonUtil.getLastName(f.identifier)
-    val methodNamePrefix = Util.brand(portName)
+  def sbSamplingPortSetterInterface(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
+    val methodNamePrefix = Util.brand(aadlPort.identifier)
 
     val ret: ST = st"bool ${methodNamePrefix}_write(const ${spi.sel4TypeName} * value);"
 
@@ -404,11 +398,9 @@ object StringTemplate {
     return ret
   }
 
-  def sbSamplingPortGetterImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    assert(f.category == ir.FeatureCategory.DataPort)
-
-    val sharedDataVarName = Util.brand(CommonUtil.getLastName(f.identifier))
-    val globalVarName = sbSamplingPortGlobalVar(spi, f)
+  def sbSamplingPortGetterImplementation(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
+    val sharedDataVarName = Util.brand(aadlPort.identifier)
+    val globalVarName = sbSamplingPortGlobalVar(spi, aadlPort)
 
     val isEmptyMethodName = s"${sharedDataVarName}_is_empty"
 
@@ -435,11 +427,10 @@ object StringTemplate {
     return ret
   }
 
-  def sbSamplingPortInitialise(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    assert(f.category == ir.FeatureCategory.DataPort)
-    val featureName = CommonUtil.getLastName(f.identifier)
-    val sharedDataVarName = Util.brand(CommonUtil.getLastName(f.identifier))
-    val globalVarName = sbSamplingPortGlobalVar(spi, f)
+  def sbSamplingPortInitialise(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
+    val featureName = aadlPort.identifier
+    val sharedDataVarName = Util.brand(aadlPort.identifier)
+    val globalVarName = sbSamplingPortGlobalVar(spi, aadlPort)
     
     val initMethodName = s"init_${spi.name}"
     
@@ -447,11 +438,9 @@ object StringTemplate {
                |${initMethodName}(${sharedDataVarName}, &${globalVarName});"""
   }
   
-  def sbSamplingPortSetterImplementation(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
-    assert(f.category == ir.FeatureCategory.DataPort)
-
-    val sharedDataVarName = Util.brand(CommonUtil.getLastName(f.identifier))
-    val globalVarName = sbSamplingPortGlobalVar(spi, f)
+  def sbSamplingPortSetterImplementation(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
+    val sharedDataVarName = Util.brand(aadlPort.identifier)
+    val globalVarName = sbSamplingPortGlobalVar(spi, aadlPort)
 
     val ret: ST = st"""bool ${sharedDataVarName}_write(const ${spi.sel4TypeName} * value) {
                       |  return write_${spi.name}(${sharedDataVarName}, value, &${globalVarName});
@@ -633,16 +622,16 @@ object StringTemplate {
     return ret
   }
 
-  def cRegCallback(handlerName: String, regCallback: String, feature: ir.FeatureEnd): ST = {
-    val portType = feature.category.string
-    val featureName = CommonUtil.getLastName(feature.identifier)
+  def cRegCallback(handlerName: String, regCallback: String, aadlPort: AadlPort): ST = {
+    val portType = aadlPort.feature.category.string
+    val featureName = aadlPort.identifier
     val ret: ST = st"""// register callback for ${portType} port ${featureName}
                       |CALLBACKOP(${regCallback}(${handlerName}, NULL));"""
     return ret
   }
 
-  def samplingPortFreezeMethodName(feature: ir.FeatureEnd): String = {
-    return Util.brand(s"freeze_event_port_${CommonUtil.getLastName(feature.identifier)}")
+  def samplingPortFreezeMethodName(aadlPort: AadlPort): String = {
+    return Util.brand(s"freeze_event_port_${aadlPort.identifier}")
   }
   
   def samplingPortHeader(s: SamplingPortInterface): ST = {

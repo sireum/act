@@ -16,10 +16,9 @@ object Monitors {
     return None[Monitor]()
   }
 
-  def getMonitorForInPort(end: ir.FeatureEnd,
+  def getMonitorForInPort(featurePath: String,
                           monitors: HashSMap[String, Monitor]): Option[Monitor] = {
-    val n = CommonUtil.getName(end.identifier)
-    for(m <- monitors.values if CommonUtil.getName(m.ci.dst.feature.get) == n) {
+    for(m <- monitors.values if CommonUtil.getName(m.ci.dst.feature.get) == featurePath) {
       return Some(m)
     }
     return None[Monitor]()

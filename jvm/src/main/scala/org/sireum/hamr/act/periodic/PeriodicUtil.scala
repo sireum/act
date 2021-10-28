@@ -5,10 +5,9 @@ package org.sireum.hamr.act.periodic
 import org.sireum._
 import org.sireum.hamr.act.proof.ProofContainer.SchedulingType
 import org.sireum.hamr.act.util.{ActPlatform, Util}
-import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
-import org.sireum.hamr.codegen.common.symbols.{AadlProcessor, AadlThread, PacerUtil, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlDispatchableComponent, AadlProcessor, AadlVirtualProcessor, PacerUtil, SymbolTable}
 import org.sireum.hamr.codegen.common.util.CodeGenPlatform
 
 object PeriodicUtil {
@@ -35,8 +34,8 @@ object PeriodicUtil {
     return symbolTable.hasPeriodicThreads() && !usingPacer
   }
 
-  def requiresPacerArtifacts(aadlThread: AadlThread, symbolTable: SymbolTable, usingPacer: B): B = {
-    return CommonUtil.isPeriodic(aadlThread) && usingPacer
+  def requiresPacerArtifacts(aadlComponent: AadlDispatchableComponent, symbolTable: SymbolTable, usingPacer: B): B = {
+    return aadlComponent.isPeriodic() && usingPacer
   }
 
   def getBoundProcessor(symbolTable: SymbolTable): AadlProcessor = {
@@ -46,7 +45,12 @@ object PeriodicUtil {
 
     val aadlThread = symbolTable.getThreads()(0)
     val aadlProcess = aadlThread.getParent(symbolTable)
-    return symbolTable.getBoundProcessor(aadlProcess).get
+    val ret: AadlProcessor = symbolTable.getBoundProcessor(aadlProcess) match {
+      case Some(p: AadlProcessor) => p
+      case Some(p: AadlVirtualProcessor) => symbolTable.getActualBoundProcess(p).get
+      case _ => halt("Unexpected")
+    }
+    return ret
   }
 
   def getSchedulingType(symbolTable: SymbolTable, platform: ActPlatform.Type): SchedulingType.Type = {

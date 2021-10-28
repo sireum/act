@@ -94,17 +94,17 @@ object ProofUtil {
     }
   }
 
-  def addPortSelfPacing(aadlThread: AadlThread,
+  def addPortSelfPacing(aadlComponent: AadlComponent,
                         port: ast.CAmkESFeature,
                         symbolTable: SymbolTable): Unit = {
-    val ci = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+    val ci = Util.getCamkesComponentIdentifier(aadlComponent, symbolTable)
     if(!proofContainer.portRefinementTypes.contains(ci)) {
       proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (ci ~> Map.empty)
     }
   }
 
-  def addPortRefinement(camkesFeature: ast.CAmkESFeature, aadlThread: AadlThread, aadlPort: AadlPort, symbolTable: SymbolTable): Unit = {
-    val cin = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
+  def addPortRefinement(camkesFeature: ast.CAmkESFeature, aadlComponent: AadlComponent, aadlPort: AadlPort, symbolTable: SymbolTable): Unit = {
+    val cin = Util.getCamkesComponentIdentifier(aadlComponent, symbolTable)
 
     var map: Map[ast.CAmkESFeature, PortRefinement] = proofContainer.portRefinementTypes.get(cin) match {
       case Some(m) => m
@@ -112,7 +112,7 @@ object ProofUtil {
     }
     assert(!map.contains(camkesFeature))
 
-    map = map + (camkesFeature ~> PortRefinement(aadlThread, aadlPort))
+    map = map + (camkesFeature ~> PortRefinement(aadlComponent, aadlPort))
 
     proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (cin ~> map)
   }
@@ -120,7 +120,7 @@ object ProofUtil {
 
 @sig trait PortInfo
 
-@datatype class PortRefinement (aadlThead: AadlThread,
+@datatype class PortRefinement (aadlComponent: AadlComponent,
                                 aadlPort: AadlPort) extends PortInfo
 
 @record class ProofContainer(var modelSchedulingType: SchedulingType.Type,
