@@ -5,8 +5,8 @@ import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.periodic.PeriodicDispatcherTemplate.DISPATCH_PERIODIC_INSTANCE
 import org.sireum.hamr.act.util.Util
-import org.sireum.hamr.codegen.common.Names
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlThread, SymbolTable}
+import org.sireum.hamr.act.vm.MetaPort
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlProcess, SymbolTable}
 
 object ProofContainer {
 
@@ -25,9 +25,12 @@ object ProofContainer {
 
   @enum object CAmkESConnectionType {
     "Refinement"
+    "VMRefinement"
+
     "SelfPacing"
     "Pacing"
     "PeriodicDispatching"
+
     "VM"
   }
 
@@ -103,10 +106,25 @@ object ProofUtil {
     }
   }
 
+  def addVMPortRefinement(camkesFeature: ast.CAmkESFeature, aadlComponent: AadlProcess, metaPort: MetaPort, symbolTable: SymbolTable): Unit = {
+    val cin = Util.getCamkesComponentIdentifier(aadlComponent, symbolTable)
+
+    var map: Map[ast.CAmkESFeature, PortInfo] = proofContainer.portRefinementTypes.get(cin) match {
+      case Some(m) => m
+      case _ => Map.empty
+    }
+    assert(!map.contains(camkesFeature))
+
+    map = map + (camkesFeature ~> PortVMRefinement(aadlComponent, metaPort))
+
+    proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (cin ~> map)
+
+  }
+
   def addPortRefinement(camkesFeature: ast.CAmkESFeature, aadlComponent: AadlComponent, aadlPort: AadlPort, symbolTable: SymbolTable): Unit = {
     val cin = Util.getCamkesComponentIdentifier(aadlComponent, symbolTable)
 
-    var map: Map[ast.CAmkESFeature, PortRefinement] = proofContainer.portRefinementTypes.get(cin) match {
+    var map: Map[ast.CAmkESFeature, PortInfo] = proofContainer.portRefinementTypes.get(cin) match {
       case Some(m) => m
       case _ => Map.empty
     }
@@ -123,6 +141,9 @@ object ProofUtil {
 @datatype class PortRefinement (aadlComponent: AadlComponent,
                                 aadlPort: AadlPort) extends PortInfo
 
+@datatype class PortVMRefinement (aadlProcess: AadlProcess,
+                                  metaPort: MetaPort) extends PortInfo
+
 @record class ProofContainer(var modelSchedulingType: SchedulingType.Type,
 
                              var camkesComponentTypes: Map[ast.CamkesComponent, CAmkESComponentCategory.Type],
@@ -130,5 +151,5 @@ object ProofUtil {
 
                              var camkesConnections: ISZ[CAmkESConnection],
 
-                             var portRefinementTypes: Map[String, Map[ast.CAmkESFeature, PortRefinement]]
+                             var portRefinementTypes: Map[String, Map[ast.CAmkESFeature, PortInfo]]
                             )

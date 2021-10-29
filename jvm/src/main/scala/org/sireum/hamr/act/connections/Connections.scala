@@ -4,6 +4,7 @@ package org.sireum.hamr.act.connections
 
 import org.sireum._
 import org.sireum.hamr.act.ast
+import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
@@ -12,6 +13,7 @@ import org.sireum.hamr.ir
 
 @datatype class ConnectionHolder(connectionName: String,
                                  connectionType: Sel4ConnectorTypes.Type,
+                                 connectionCategory: CAmkESConnectionType.Type,
                                  toConnectionEnds: ISZ[ast.ConnectionEnd],
                                  configurationEntries: ISZ[ast.Configuration])
 

@@ -4,9 +4,9 @@ package org.sireum.hamr.act.templates
 
 import org.sireum._
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESConnection, SchedulingType}
+import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, SchedulingType}
 import org.sireum.hamr.act.util.{ActPlatform, Sel4ConnectorTypes}
-import org.sireum.hamr.codegen.common.symbols.AadlThread
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDispatchableComponent}
 
 object SMT2Template {
   def portRefinement(aadlPort: String, camkesPort: String): ST = {
@@ -25,8 +25,8 @@ object SMT2Template {
     return st"(assert (= (Some ${aadlComponent}) (select AADLPortComponent ${aadlPort})))"
   }
 
-  def aadlDispatchProtocol(aadlThread: AadlThread): ST = {
-    return st"(assert (= (Some ${aadlThread.dispatchProtocol.name}) (select AADLDispatchProtocol ${aadlThread.path})))"
+  def aadlDispatchProtocol(aadlComponent: AadlComponent, aadlDispatchableComponent: AadlDispatchableComponent): ST = {
+    return st"(assert (= (Some ${aadlDispatchableComponent.dispatchProtocol.name}) (select AADLDispatchProtocol ${aadlComponent.path})))"
   }
 
   def camkesPortComponents(camkesComponent: String, camkesPort: String): ST = {
@@ -79,6 +79,7 @@ object SMT2Template {
             selfPacingConnections: ISZ[ST],
             pacingConnections: ISZ[ST],
             periodicDispatchingConnections: ISZ[ST],
+            vmConnections: ISZ[ST],
 
             componentRefinements: ISZ[ST],
             portRefinements: ISZ[ST],
@@ -237,6 +238,11 @@ object SMT2Template {
           |           false)))
           |(declare-const PeriodicDispatchingConnection_count Int)
           |(assert (= ${periodicDispatchingConnections.size} PeriodicDispatchingConnection_count))
+          |
+          |; non AADL connection refinement connections required by a VM
+          |(define-fun isVMAuxConnection ((_conn CAmkESConnection)) Bool
+          |  (or ${(vmConnections, "\n")}
+          |      false))
           |
           |(declare-const CAmkESConnectionType (Array CAmkESConnection seL4PortType))
           |  ${(camkesConnectionTypes, "\n")}
@@ -404,6 +410,7 @@ object SMT2Template {
           |    (isSelfPacingConnection _conn)
           |    (isPacingConnection _conn)
           |    (isPeriodicDispatchingConnection _conn)
+          |    (isVMAuxConnection _conn)
           |    false))
           |
           |(define-fun NoNewConnections () Bool

@@ -7,13 +7,13 @@ import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.ast.{BinarySemaphore, Consumes, Dataport, Emits, Mutex, Provides, Semaphore, TODO, Uses}
 import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.proof.ProofUtil
+import org.sireum.hamr.act.vm.MetaPort
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlProcess, AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
-import org.sireum.hamr.ir.FeatureEnd
 import org.sireum.message.Reporter
 
 object Util {
@@ -614,6 +614,25 @@ object Util {
     return ret
   }
 
+  def createDataport_VMRefinement(aadlComponent: AadlProcess,
+                        metaPort: MetaPort,
+                        symbolTable: SymbolTable,
+
+                        name: String,
+                        optional: B,
+                        typ: String): ast.Dataport = {
+
+    val ret: ast.Dataport = ast.Dataport(
+      name = name,
+      optional = optional,
+      typ = typ
+    )
+
+    ProofUtil.addVMPortRefinement(ret, aadlComponent, metaPort, symbolTable)
+
+    return ret
+  }
+
   def createDataport_Refinement(aadlComponent: AadlComponent,
                                 aadlPort: AadlPort,
                                 symbolTable: SymbolTable,
@@ -673,6 +692,23 @@ object Util {
       optional = optional)
 
     ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
+
+    return ret
+  }
+
+  def createConsumes_VMRefinement(aadlComponent: AadlProcess,
+                                  metaPort: MetaPort,
+                                  symbolTable: SymbolTable,
+
+                                  name: String,
+                                  typ: String,
+                                  optional: B): ast.Consumes = {
+    val ret: ast.Consumes = ast.Consumes(
+      name = name,
+      typ = typ,
+      optional = optional)
+
+    ProofUtil.addVMPortRefinement(ret, aadlComponent, metaPort, symbolTable)
 
     return ret
   }
@@ -743,6 +779,21 @@ object Util {
       typ = typ)
 
     ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
+
+    return ret
+  }
+
+  def createEmits_VMRefinement(aadlComponent: AadlProcess,
+                               metaPort: MetaPort,
+                               symbolTable: SymbolTable,
+
+                               name: String,
+                               typ: String): ast.Emits = {
+    val ret: ast.Emits = ast.Emits(
+      name = name,
+      typ = typ)
+
+    ProofUtil.addVMPortRefinement(ret, aadlComponent, metaPort, symbolTable)
 
     return ret
   }

@@ -332,7 +332,7 @@ object VMGen {
           }
         }
         case a: AadlDataPort =>
-          handleDataPort(port, aadlProcess)
+          handleDataPort(port, aadlProcess, symbolTable)
 
         case _ =>
           // TODO
@@ -415,141 +415,8 @@ object VMGen {
 
 
   }
-/*
-  def genThread(aadlThread: AadlThread, symbolTable: SymbolTable): (Component, ISZ[Resource]) = {
 
-    assert(aadlThread.toVirtualMachine(symbolTable), s"Thread is not in a vm bound process ${aadlThread.identifier}")
-
-    val parent: AadlProcess = aadlThread.getParent(symbolTable)
-
-    // TODO: not currently expecting feature access
-    assert(aadlThread.getFeatureAccesses().isEmpty, s"Not currently handling feature accesses in vm bound thread ${aadlThread.identifier}")
-
-    // TODO: currently expecting exactly 1 thread per vm isolated process
-    assert(parent.subComponents.filter(c => CommonUtil.isThread(c.component)).size == 1, s"Expecting exactly one thread per vm bound process ${parent.identifier}")
-
-    // TODO: currently only supporting SeL4_Only, and SeL4; SeL4_TB will not be supported
-    assert(platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4, s"Platform ${platform} is not supported for vm bound processes")
-
-    // TODO: will we ever process models where a sporadic thread is isolated in the vm
-    // or we're not using the pacer
-    assert(PeriodicUtil.requiresPacerArtifacts(aadlThread, symbolTable, useDomainScheduling),
-      s"Expecting a periodic thread that will be triggered via a Pacer: ${aadlThread.identifier}"
-    )
-
-    includes = includes + Util.getSbTypeHeaderFilenameForIncludes()
-
-    val connectedPorts = aadlThread.getPorts().filter(f => symbolTable.isConnected(f.feature))
-    for (port <- connectedPorts) {
-
-      port match {
-        case a: AadlEventDataPort if !useCaseConnectors => {
-          actOptions.platform match {
-            case ActPlatform.SeL4_Only =>
-              handleEventDataPort(port, aadlThread, symbolTable)
-            case ActPlatform.SeL4 =>
-              handleEventDataPort(port, aadlThread, symbolTable)
-
-            case notyet =>
-              // TODO
-              halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${port.identifier}")
-          }
-        }
-        case a: AadlEventDataPort if useCaseConnectors => {
-          actOptions.platform match {
-            case ActPlatform.SeL4_Only =>
-              handleEventDataPort_CASE_Connectors(port, aadlThread, symbolTable)
-            case ActPlatform.SeL4 =>
-              handleEventDataPort_CASE_Connectors(port, aadlThread, symbolTable)
-
-            case notyet =>
-              // TODO
-              halt(s"Platform ${notyet} is not currently handled for vm isolated threads: ${aadlThread.identifier}.${port.identifier}")
-          }
-        }
-        case a: AadlDataPort =>
-          handleDataPort(port, aadlThread)
-
-        case _ =>
-          // TODO
-          halt(s"Currently expecting vm isolated threads to have only event data ports: ${aadlThread.identifier}.${port.identifier}")
-      }
-    }
-
-    aadlThread.dispatchProtocol match {
-      case Dispatch_Protocol.Periodic =>
-        val (periodicDispatcherComponentContributions, glueCodeContributions) =
-          Dispatcher.handlePeriodicComponent(useDomainScheduling, symbolTable, actOptions, aadlThread)
-
-        consumes = consumes ++ periodicDispatcherComponentContributions.shell.consumes
-
-        dataports = dataports ++ periodicDispatcherComponentContributions.shell.dataports
-
-        // extern method name for pacer dataport queue
-        crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_dataport_method(PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
-
-        val notificationPrefix: String =
-          if (useCaseConnectors) PacerTemplate.pacerVM_ClientPeriodDataportIdentifier()
-          else PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier()
-
-        // extern method name for pacer notification
-        crossConnGCMethods = crossConnGCMethods :+
-          VM_Template.vm_cross_conn_extern_notification_methods(notificationPrefix)
-
-        // connection creation for pacer dataport/notification
-        crossConnConnections = crossConnConnections :+
-          VM_Template.vm_cross_conn_Connections(
-            methodNamePrefix = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(),
-            emitMethodNamePrefix = None(),
-            notificationNamePrefix = Some(notificationPrefix),
-            counter = crossConnConnections.size)
-
-      case x =>
-        halt(s"Not currently supporting VMs containing ${x} dispatch protocol")
-    }
-
-    val vmCrossConns: ST = VM_Template.vm_cross_vm_connections(crossConnGCMethods, crossConnConnections)
-    auxResources = auxResources :+ ResourceUtil.createResource(
-      path = s"${VMGen.getRootVMDir()}/${VMGen.DIR_VM_SRC}/${VMGen.getCrossVMConnectionsFilename(aadlThread, symbolTable)}",
-      content = vmCrossConns,
-      overwrite = T)
-
-    includes = includes + PacerTemplate.pacerDataportFilenameForIncludes()
-
-    val c = Util.createCAmkESComponent(
-      aadlThread = None(),
-      componentCategory = CAmkESComponentCategory.VM_Refinement,
-
-      control = T,
-      hardware = F,
-      name = Util.getCamkesComponentName(aadlThread, symbolTable),
-      mutexes = ISZ(),
-      binarySemaphores = ISZ(),
-      semaphores = semaphores,
-      dataports = dataports,
-      emits = emits,
-      uses = uses,
-      consumes = consumes,
-      provides = provides,
-      includes = includes.elements,
-      attributes = ISZ(),
-
-      preprocessorIncludes = preprocessorIncludes,
-      imports = imports,
-
-      externalEntities = externalEntities
-    )
-
-    auxResources = auxResources :+ ResourceUtil.createExeResource(
-      path = PathUtil.CAMKES_ARM_VM_SCRIPT_PATH,
-      content = VM_Template.setup_camkes_vm_Script(),
-      overwrite = T)
-
-    return (c, auxResources)
-  }
-*/
-  def handleDataPort(port: MetaPort, aadlProcess: AadlProcess): Unit = {
+  def handleDataPort(port: MetaPort, aadlProcess: AadlProcess, symbolTable: SymbolTable): Unit = {
     val aadlPort = port.aadlPort
     val aadlPortType: ir.Component = typeMap.get(Util.getClassifierFullyQualified(aadlPort.feature.classifier.get)).get
     val sel4TypeName: String = Util.getSel4TypeName(aadlPortType, performHamrIntegration)
@@ -560,7 +427,11 @@ object VMGen {
 
     val camkesDataPortId = Util.brand(aadlPort.identifier)
 
-    dataports = dataports :+ Dataport(
+    dataports = dataports :+ Util.createDataport_VMRefinement(
+      aadlComponent = aadlProcess,
+      metaPort = port,
+      symbolTable = symbolTable,
+
       name = camkesDataPortId,
       typ = spi.structName,
       optional = F)
@@ -609,9 +480,9 @@ object VMGen {
 
         val camkesEventPortId: String = {
           val name = Util.genSeL4NotificationName(aadlPort.identifier, T)
-          consumes = consumes :+ Util.createConsumes_Refinement(
+          consumes = consumes :+ Util.createConsumes_VMRefinement(
             aadlComponent = aadlProcess,
-            aadlPort = aadlPort,
+            metaPort = metaPort,
             symbolTable = symbolTable,
 
             name = name,
@@ -620,9 +491,9 @@ object VMGen {
           name
         }
 
-        dataports = dataports :+ Util.createDataport_Refinement(
+        dataports = dataports :+ Util.createDataport_VMRefinement(
           aadlComponent = aadlProcess,
-          aadlPort = aadlPort,
+          metaPort = metaPort,
           symbolTable = symbolTable,
 
           name = camkesDataPortId,
@@ -656,9 +527,9 @@ object VMGen {
 
         val camkesEventPortId = Util.genSeL4NotificationQueueName(aadlPort.identifier, queueSize)
 
-        emits = emits :+ Util.createEmits_Refinement(
+        emits = emits :+ Util.createEmits_VMRefinement(
           aadlComponent = aadlProcess,
-          aadlPort = aadlPort,
+          metaPort = metaPort,
           symbolTable = symbolTable,
 
           name = camkesEventPortId,
@@ -666,9 +537,9 @@ object VMGen {
 
         val camkesDataPortId = Util.getEventDataSBQueueSrcFeatureName(fid, queueSize)
 
-        dataports = dataports :+ Util.createDataport_Refinement(
+        dataports = dataports :+ Util.createDataport_VMRefinement(
           aadlComponent = aadlProcess,
-          aadlPort = aadlPort,
+          metaPort = metaPort,
           symbolTable = symbolTable,
 
           name = camkesDataPortId,
@@ -720,9 +591,9 @@ object VMGen {
 
         val notificationName: String = dataportName
 
-        dataports = dataports :+ Util.createDataport_Refinement(
+        dataports = dataports :+ Util.createDataport_VMRefinement(
           aadlComponent = aadlProcess,
-          aadlPort = aadlPort,
+          metaPort = metaPort,
           symbolTable = symbolTable,
 
           name = dataportName,
@@ -756,9 +627,9 @@ object VMGen {
 
         val emitsName = dataPortName //Util.genSeL4NotificationQueueName(f, queueSize)
 
-        dataports = dataports :+ Util.createDataport_Refinement(
+        dataports = dataports :+ Util.createDataport_VMRefinement(
           aadlComponent = aadlProcess,
-          aadlPort = aadlPort,
+          metaPort = metaPort,
           symbolTable = symbolTable,
 
           name = dataPortName,

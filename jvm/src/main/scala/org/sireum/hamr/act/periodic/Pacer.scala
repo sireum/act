@@ -228,10 +228,10 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
     var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
 
-    def getConnectionHolder(connectionEnd: ast.ConnectionEnd, connectionType: Sel4ConnectorTypes.Type): ConnectionHolder = {
+    def getConnectionHolder(connectionEnd: ast.ConnectionEnd, connectionType: Sel4ConnectorTypes.Type, connectionCategory: CAmkESConnectionType.Type): ConnectionHolder = {
       if (!map.contains(connectionEnd)) {
         val connectionName = Util.getConnectionName(connectionCounter.increment())
-        map = map + (connectionEnd ~> ConnectionHolder(connectionName, connectionType, ISZ(), ISZ()))
+        map = map + (connectionEnd ~> ConnectionHolder(connectionName, connectionType, connectionCategory, ISZ(), ISZ()))
       }
 
       return map.get(connectionEnd).get
@@ -295,7 +295,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
           val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesVMFeatureQueueName)
           val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
 
-          var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+          var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType, CAmkESConnectionType.Pacing)
 
           holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
@@ -320,7 +320,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
           val srcConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcFeatureName)
           val dstConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstFeatureName)
 
-          var holder = getConnectionHolder(srcConnectionEnd, connectionType)
+          var holder = getConnectionHolder(srcConnectionEnd, connectionType, CAmkESConnectionType.Pacing)
 
           holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 

@@ -108,10 +108,10 @@ object SBConnections {
 
     var map: HashSMap[ast.ConnectionEnd, ConnectionHolder] = HashSMap.empty
 
-    def getConnectionHolder(connectionEnd: ast.ConnectionEnd, connectionType: Sel4ConnectorTypes.Type): ConnectionHolder = {
+    def getConnectionHolder(connectionEnd: ast.ConnectionEnd, connectionType: Sel4ConnectorTypes.Type, connectionCategory: CAmkESConnectionType.Type): ConnectionHolder = {
       if (!map.contains(connectionEnd)) {
         val connectionName = Util.getConnectionName(connectionCounter.increment())
-        map = map + (connectionEnd ~> ConnectionHolder(connectionName, connectionType, ISZ(), ISZ()))
+        map = map + (connectionEnd ~> ConnectionHolder(connectionName, connectionType, connectionCategory, ISZ(), ISZ()))
       }
 
       return map.get(connectionEnd).get
@@ -129,7 +129,9 @@ object SBConnections {
         val srcCamkesComponentId: String = Util.getCamkesComponentIdentifier(conn.srcComponent, symbolTable)
         val dstCamkesComponentId: String = Util.getCamkesComponentIdentifier(conn.dstComponent, symbolTable)
 
-        conn.connectionOrigin.kind match {
+        val connectionCategory: CAmkESConnectionType.Type = if(srcToVM || dstToVM) CAmkESConnectionType.VMRefinement else CAmkESConnectionType.Refinement
+
+          conn.connectionOrigin.kind match {
           case ir.ConnectionKind.Port => {
             assert(conn.srcPort.feature.category == conn.dstPort.feature.category,
               s"Not currently handling mixed feature types: Source is ${conn.srcPort.feature.category}, destination is ${conn.srcPort.feature.category} for ${conn.connectionOrigin}")
@@ -147,7 +149,7 @@ object SBConnections {
                 if(useCaseConnections) {
                   val queueConnectorType = Sel4ConnectorTypes.CASE_AADL_EventDataport
 
-                  var holder = getConnectionHolder(srcConnectionEnd_DP, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_DP, queueConnectorType, connectionCategory)
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_DP)
 
@@ -180,7 +182,7 @@ object SBConnections {
                     if (srcToVM || dstToVM) Sel4ConnectorTypes.seL4SharedDataWithCaps
                     else Sel4ConnectorTypes.seL4SharedData
 
-                  var holder = getConnectionHolder(srcConnectionEnd_DP, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_DP, queueConnectorType, connectionCategory)
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_DP)
 
@@ -224,7 +226,7 @@ object SBConnections {
                   val srcConnectionEnd_ED = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureNotificationName)
                   val dstConnectionEnd_ED = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureNotificationName)
 
-                  var holder = getConnectionHolder(srcConnectionEnd_ED, notificationConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_ED, notificationConnectorType, connectionCategory)
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_ED)
 
@@ -242,7 +244,7 @@ object SBConnections {
                   val srcConnectionEnd_ED = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName_ED)
                   val dstConnectionEnd_ED = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName_ED)
 
-                  var holder = getConnectionHolder(srcConnectionEnd_ED, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd_ED, queueConnectorType, connectionCategory)
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd_ED)
 
@@ -304,7 +306,7 @@ object SBConnections {
                   val srcConnectionEnd: ast.ConnectionEnd = Util.createConnectionEnd(T, srcCamkesComponentId, srcCamkesFeatureQueueName)
                   val dstConnectionEnd: ast.ConnectionEnd = Util.createConnectionEnd(F, dstCamkesComponentId, dstCamkesFeatureQueueName)
 
-                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType)
+                  var holder = getConnectionHolder(srcConnectionEnd, queueConnectorType, connectionCategory)
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
@@ -345,7 +347,7 @@ object SBConnections {
 
                   val connectionType = Sel4ConnectorTypes.seL4Notification
 
-                  var holder = getConnectionHolder(srcConnectionEnd, connectionType)
+                  var holder = getConnectionHolder(srcConnectionEnd, connectionType, connectionCategory)
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
@@ -361,7 +363,7 @@ object SBConnections {
 
                   val connectionType = Sel4ConnectorTypes.seL4SharedData
 
-                  var holder = getConnectionHolder(srcConnectionEnd, connectionType)
+                  var holder = getConnectionHolder(srcConnectionEnd, connectionType, connectionCategory)
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
