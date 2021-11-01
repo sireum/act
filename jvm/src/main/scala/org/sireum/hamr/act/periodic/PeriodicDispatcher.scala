@@ -50,7 +50,8 @@ import org.sireum.hamr.codegen.common.symbols._
             Util.getConnectionName(connectionCounter.increment()),
             Sel4ConnectorTypes.seL4TimeServer,
             camkesComponentId, PeriodicDispatcherTemplate.TIMER_ID,
-            PeriodicDispatcherTemplate.TIMER_INSTANCE, PeriodicDispatcherTemplate.TIMER_SERVER_TIMER_ID)
+            PeriodicDispatcherTemplate.TIMER_INSTANCE,
+            PeriodicDispatcherTemplate.TIMER_SERVER_TIMER_ID)
 
           // timer attribute
           configurations = configurations :+

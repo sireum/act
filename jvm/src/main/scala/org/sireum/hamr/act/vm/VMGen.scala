@@ -257,10 +257,10 @@ object VMGen {
   val KERNELARMPLATFORM_EXYNOS5410: B = F
 
   var dataports: ISZ[Dataport] = VM_INIT_DEF.dataports(KERNELARMPLATFORM_EXYNOS5410)
-  var emits: ISZ[Emits] = VM_INIT_DEF.emits()
-  var uses: ISZ[Uses] = VM_INIT_DEF.uses(TK1DEVICEFWD, KERNELARMPLATFORM_EXYNOS5410)
-  var consumes: ISZ[Consumes] = VM_INIT_DEF.consumes()
-  var provides: ISZ[Provides] = VM_INIT_DEF.provides()
+  var emits: ISZ[Emits] = ISZ()
+  var uses: ISZ[Uses] = ISZ()
+  var consumes: ISZ[Consumes] = ISZ()
+  var provides: ISZ[Provides] = ISZ()
   var includes: Set[String] = Set.empty[String]
   var imports: ISZ[String] = ISZ()
   var semaphores: ISZ[Semaphore] = VM_INIT_DEF.semaphores()
@@ -280,6 +280,11 @@ object VMGen {
 
   def genProcess(aadlProcess: AadlProcess, symbolTable: SymbolTable, sbConnections: ISZ[SBConnectionContainer]): (Component, ISZ[Resource]) = {
     val boundProcessor: AadlVirtualProcessor = aadlProcess.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
+
+    provides = VM_INIT_DEF.provides(aadlProcess, symbolTable)
+    emits = VM_INIT_DEF.emits(aadlProcess, symbolTable)
+    consumes = VM_INIT_DEF.consumes(aadlProcess, symbolTable)
+    uses = VM_INIT_DEF.uses(TK1DEVICEFWD, KERNELARMPLATFORM_EXYNOS5410, aadlProcess, symbolTable)
 
     assert(aadlProcess.toVirtualMachine(symbolTable), s"Process is not in a vm bound process ${aadlProcess.identifier}")
 

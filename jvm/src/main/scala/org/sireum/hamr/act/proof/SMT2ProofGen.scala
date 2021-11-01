@@ -5,12 +5,12 @@ package org.sireum.hamr.act.proof
 import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.connections.{Connections, SBConnectionContainer}
-import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESComponentCategory, CAmkESConnectionType}
+import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESComponentCategory, CAmkESConnection, CAmkESConnectionType}
 import org.sireum.hamr.act.templates.SMT2Template
 import org.sireum.hamr.act.util.{ActPlatform, Sel4ConnectorTypes}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlDispatchableComponent, AadlEventDataPort, AadlEventPort, AadlPort, AadlProcess, AadlThread, AadlVirtualProcessor, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlDispatchableComponent, AadlEventDataPort, AadlEventPort, AadlPort, AadlProcess, AadlThread, AadlVirtualProcessor, Processor, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.ir.ConnectionInstance
 
@@ -31,8 +31,10 @@ object SMT2ProofGen {
       (Set.empty[AadlComponent] ++ x).elements
     }
 
-    val (aadlComponents, aadlDispatchProtocols): (ISZ[ST], ISZ[ST]) = {
+    val (aadlComponents, aadlBoundProcessors, aadlComponentCategories, aadlDispatchProtocols): (ISZ[ST], ISZ[ST], ISZ[ST], ISZ[ST]) = {
       var aadlComps: ISZ[ST] = ISZ()
+      var aadlCategories: ISZ[ST] = ISZ()
+      var aadlBPs: ISZ[ST] = ISZ()
       var aadlDPs: ISZ[ST] = ISZ()
       for(t <- aadlInstances) {
         val pos: Option[ST] =
@@ -40,15 +42,31 @@ object SMT2ProofGen {
             case Some(pos) => Some(st" declared at ${pos.uriOpt} (${pos.beginLine}, ${pos.beginColumn})")
             case _ => None()
           }
-        aadlComps = aadlComps :+ st"(${t.path}); Instance of ${t.component.classifier.get.name}${pos}"
+        aadlComps = aadlComps :+ st"(${t.path})"
         val dp: AadlDispatchableComponent = t match {
           case a:AadlThread => a
           case p:AadlProcess => p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
           case _ => halt("Infeasible")
         }
         aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(t, dp)
+        aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(t)
+
+        val bp: Option[Processor] = t match {
+          case at: AadlThread => at.getParent(symbolTable).getBoundProcessor(symbolTable)
+          case ap: AadlProcess => ap.getBoundProcessor(symbolTable)
+          case _ => halt("infeasible")
+        }
+
+        bp match {
+          case Some (boundProcessor) =>
+            aadlComps = aadlComps :+ st"(${boundProcessor.path})"
+            aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(boundProcessor)
+            aadlBPs = aadlBPs :+ SMT2Template.aadlBoundProcessor(t, boundProcessor)
+          case _ =>
+        }
       }
-      (aadlComps, aadlDPs)
+
+      (aadlComps, aadlBPs, aadlCategories, aadlDPs)
     }
 
     val (aadlPorts, aadlPortComponents, aadlPortTypes, aadlPortDirection): (ISZ[String], ISZ[ST], ISZ[ST], ISZ[ST]) = {
@@ -86,18 +104,7 @@ object SMT2ProofGen {
     }
 
     val aadlConnectionFlowTos: ISZ[ST] = {
-      var ret: ISZ[ST] = ISZ()
-      for (entry <- symbolTable.outConnections.entries) {
-        val srcPath = entry._1
-
-        val handledConns = entry._2.filter((conn: ConnectionInstance) => Connections.isHandledConnection(conn, symbolTable))
-
-        for (conn <- handledConns) {
-          val dstPath = CommonUtil.getName(conn.dst.feature.get)
-          ret = ret :+ SMT2Template.flowsTo(srcPath, dstPath)
-        }
-      }
-      ret
+      sbConnectionContainer.values.map((m: SBConnectionContainer) => SMT2Template.flowsTo(m.srcPort.path, m.dstPort.path))
     }
 
     var timeServer: Option[ST] = None()
@@ -137,6 +144,8 @@ object SMT2ProofGen {
 
     var camkesPortComponents: ISZ[ST] = ISZ()
     var portRefinements: ISZ[ST] = ISZ()
+    var portVMAuxsEntries: Map[String, ISZ[ST]] = Map.empty
+
     val camkesPorts: ISZ[ST] = {
       var _camkesPorts: ISZ[ST]= ISZ()
       for(i <- camkesInstances) {
@@ -145,15 +154,20 @@ object SMT2ProofGen {
             def process(f: ast.CAmkESFeature): ST = {
               val portName = s"${i.name}_${f.name}"
 
+              camkesPortComponents = camkesPortComponents :+ SMT2Template.camkesPortComponents(i.name, portName)
+
               proofContainer.portRefinementTypes.get(i.name) match {
                 case Some(featureMap) =>
-                  camkesPortComponents = camkesPortComponents :+ SMT2Template.camkesPortComponents(i.name, portName)
 
                   featureMap.get(f) match {
                     case Some(pf: PortRefinement) =>
                       portRefinements = portRefinements :+ SMT2Template.portRefinement(pf.aadlPort.path, portName)
                     case Some(vmpf: PortVMRefinement) =>
                       portRefinements = portRefinements :+ SMT2Template.portRefinement(vmpf.metaPort.aadlPort.path, portName)
+                    case Some(pvma: PortVMAux) =>
+                      var entries = portVMAuxsEntries.getOrElse(i.name, ISZ[ST]())
+                      entries = entries :+ st"(= cp ${portName})"
+                      portVMAuxsEntries = portVMAuxsEntries + (i.name ~> entries)
                     case _ =>
                   }
                 case _ =>
@@ -180,6 +194,9 @@ object SMT2ProofGen {
       }
       _camkesPorts
     }
+
+    val portVMAuxs: ISZ[ST] =
+      portVMAuxsEntries.entries.map(x => st"(or (= cc ${x._1}) ${(x._2, " ")} false)")
 
     var camkesDataPortAccessRestrictions: ISZ[ST] = ISZ()
     for(m <- astObjects) {
@@ -213,8 +230,11 @@ object SMT2ProofGen {
       var _camkesPDConns: ISZ[ST]= ISZ()
       var _camkesVMConns: ISZ[ST]= ISZ()
 
-      for(holder <- proofContainer.camkesConnections) {
+      var seenConns: Set[CAmkESConnection] = Set.empty
+      for(holder <- proofContainer.camkesConnections if !seenConns.contains(holder)) {
         assert(holder.connection.from_ends.size == 1)
+
+        seenConns = seenConns + holder
 
         val fromEnd: ast.ConnectionEnd = holder.connection.from_ends(0)
 
@@ -252,10 +272,16 @@ object SMT2ProofGen {
       map((r: (Option[AadlComponent], ast.Instance)) => SMT2Template.componentRefinement(r._1.get.path, r._2.name))
 
 
+    def uniquiIfy(sts: ISZ[ST]): ISZ[ST] = {
+      return (Set.empty[String] ++ sts.map((st: ST) => st.render)).elements.map((s: String) => st"$s")
+    }
+
     val proof = SMT2Template.proof(
       mode = hamrPlatform,
 
-      aadlComponents = aadlComponents,
+      aadlComponents = uniquiIfy(aadlComponents),
+      aadlBoundProcessors = aadlBoundProcessors,
+      aadlComponentCategories = aadlComponentCategories,
       aadlPorts = aadlPorts,
       aadlPortComponents = aadlPortComponents,
       aadlPortTypes = aadlPortTypes,
@@ -285,6 +311,7 @@ object SMT2ProofGen {
 
       componentRefinements = componentRefinements,
       portRefinements = portRefinements,
+      portVMAuxs = portVMAuxs,
 
       modelSchedulingType = proofContainer.modelSchedulingType
     )

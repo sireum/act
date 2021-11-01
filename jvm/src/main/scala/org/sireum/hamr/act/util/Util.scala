@@ -679,6 +679,16 @@ object Util {
     return ret
   }
 
+  def createUses_VMAux(aadlProcess: AadlProcess,
+                       symbolTable: SymbolTable,
+                       name: String,
+                       typ: String,
+                       optional: B): ast.Uses = {
+    val ret = ast.Uses(name = name, typ = typ, optional = optional)
+    ProofUtil.addVMPortAux(ret, aadlProcess,symbolTable)
+    return ret
+  }
+
   def createConsumes_Refinement(aadlComponent: AadlComponent,
                                 aadlPort: AadlPort,
                                 symbolTable: SymbolTable,
@@ -709,6 +719,22 @@ object Util {
       optional = optional)
 
     ProofUtil.addVMPortRefinement(ret, aadlComponent, metaPort, symbolTable)
+
+    return ret
+  }
+
+  def createConsumes_VMAux(aadlProcess: AadlProcess,
+                           symbolTable: SymbolTable,
+
+                           name: String,
+                           typ: String,
+                           optional: B): ast.Consumes = {
+    val ret: ast.Consumes = ast.Consumes(
+      name = name,
+      typ = typ,
+      optional = optional)
+
+    ProofUtil.addVMPortAux(ret, aadlProcess, symbolTable)
 
     return ret
   }
@@ -756,14 +782,15 @@ object Util {
     return ret
   }
 
-  def createProvides_VM(
-                             name: String,
-                             typ: String): ast.Provides = {
+  def createProvides_VMAux(aadlProcess: AadlProcess,
+                           symbolTable: SymbolTable,
+                           name: String,
+                           typ: String): ast.Provides = {
     val ret = ast.Provides(
       name = name,
       typ = typ)
 
-    //ProofUtil.addPortMonitor(monitorName, ret)
+    ProofUtil.addVMPortAux(ret, aadlProcess, symbolTable)
 
     return ret
   }
@@ -798,6 +825,19 @@ object Util {
     return ret
   }
 
+  def createEmits_VMAux(aadlProcess: AadlProcess,
+                        symbolTable: SymbolTable,
+
+                        name: String,
+                        typ: String): ast.Emits = {
+    val ret: ast.Emits = ast.Emits(
+      name = name,
+      typ = typ)
+
+    ProofUtil.addVMPortAux(ret, aadlProcess, symbolTable)
+
+    return ret
+  }
   def createEmits_Monitor(monitorName: String,
                           name: String,
                           typ: String): ast.Emits = {

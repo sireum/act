@@ -128,6 +128,7 @@ import org.sireum.hamr.ir
   'seL4RPCCall
   'seL4SharedData
   'seL4SharedDataWithCaps
+  'seL4SerialServer
   'seL4TimeServer
   'seL4VMDTBPassthrough
 

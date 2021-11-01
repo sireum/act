@@ -4,7 +4,8 @@ package org.sireum.hamr.act.vm
 
 import org.sireum._
 import org.sireum.hamr.act.ast._
-import org.sireum.hamr.act.util.Util
+import org.sireum.hamr.act.util.{Util}
+import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
 
 /**
 * Original location of vm.h
@@ -65,32 +66,39 @@ object VM_INIT_DEF {
     return ret
   }
 
-  def provides(): ISZ[Provides] = {
+  def provides(aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Provides] = {
     val ret: ISZ[Provides] = ISZ(
-      Util.createProvides_VM(
-
+      Util.createProvides_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "dtb",
         typ = "VMDTBPassthrough")
     )
     return ret
   }
 
-  def emits(): ISZ[Emits] = {
+  def emits(aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Emits] = {
     val ret: ISZ[Emits] = ISZ(
-      Emits(
+      Util.createEmits_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "notification_ready_connector",
         typ = "HaveNotification")
     )
     return ret
   }
 
-  def consumes(): ISZ[Consumes] = {
+  def consumes(aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Consumes] = {
     val ret: ISZ[Consumes] = ISZ(
-      Consumes(
+      Util.createConsumes_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "restart_event",
         typ = "restart",
         optional = T),
-      Consumes(
+      Util.createConsumes_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "notification_ready",
         typ = "HaveNotification",
         optional = F)
@@ -124,33 +132,47 @@ object VM_INIT_DEF {
     return ret
   }
 
-  def uses(TK1DEVICEFWD: B, KERNELARMPLATFORM_EXYNOS5410: B): ISZ[Uses] = {
+  def uses(TK1DEVICEFWD: B, KERNELARMPLATFORM_EXYNOS5410: B, aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Uses] = {
     var ret: ISZ[Uses] = ISZ(
-      Uses(
+      Util.createUses_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "fs",
         typ = "FileServerInterface",
         optional = F),
-      Uses(
+      Util.createUses_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "batch",
         typ = "Batch",
         optional = T),
-      Uses(
+      Util.createUses_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "guest_putchar",
         typ = "PutChar",
         optional = T),
-      Uses(
+      Util.createUses_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "serial_getchar",
         typ = "GetChar",
         optional = T),
-      Uses(
+      Util.createUses_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "recv",
         typ = "VirtQueueDev",
         optional = T),
-      Uses(
+      Util.createUses_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "send",
         typ = "VirtQueueDrv",
         optional = T),
-      Uses(
+      Util.createUses_VMAux(
+        aadlProcess = aadlProcess,
+        symbolTable = symbolTable,
         name = "dtb_self",
         typ = "VMDTBPassthrough",
         optional = T)
@@ -159,11 +181,15 @@ object VM_INIT_DEF {
     if (TK1DEVICEFWD) {
       // https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L32-L34
       ret = ret ++ ISZ(
-        Uses(
+        Util.createUses_VMAux(
+          aadlProcess = aadlProcess,
+          symbolTable = symbolTable,
           name = "uartfwd",
           typ = "gen_fwd_inf",
           optional = F),
-        Uses(
+        Util.createUses_VMAux(
+          aadlProcess = aadlProcess,
+          symbolTable = symbolTable,
           name = "clkcarfwd",
           typ = "gen_fwd_inf",
           optional = F)
@@ -173,7 +199,9 @@ object VM_INIT_DEF {
     if (KERNELARMPLATFORM_EXYNOS5410) {
       //https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L40-L46
       ret = ret ++ ISZ(
-        Uses(
+        Util.createUses_VMAux(
+          aadlProcess = aadlProcess,
+          symbolTable = symbolTable,
           name = "pwm",
           typ = "pwm_inf",
           optional = F)
@@ -236,104 +264,6 @@ object VM_COMPONENT_CONNECTIONS_DEF {
             component = componentId,
             end = "notification_ready")
         ))
-    )
-    return ret
-  }
-}
-
-// expansion of objects in macro https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L122-L125
-//
-// #define VM_VIRTUAL_SERIAL_COMPONENTS_DEF() \
-//    component SerialServer serial; \
-//    component TimeServer time_server; \
-//    connection seL4TimeServer serialserver_timer(from serial.timeout, to time_server.the_timer); \
-object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
-  val seL4TimeServer: String = "seL4TimeServer"
-  val serial: String = "serial"
-  val time_server: String = "time_server"
-
-  def instances(): ISZ[Instance] = {
-    val ret: ISZ[Instance] = ISZ(
-      Instance(
-        address_space = "",
-        name = serial,
-        component = LibraryComponent(name = "SerialServer", ports = ISZ())),
-      Instance(
-        address_space = "",
-        name = time_server,
-        component = LibraryComponent(name = "TimeServer", ports = ISZ()))
-    )
-    return ret
-  }
-
-  def connections(): ISZ[Connection] = {
-    val ret: ISZ[Connection] = ISZ(
-      Connection(
-        name = "serialserver_timer",
-        connectionType = seL4TimeServer,
-        from_ends = ISZ(
-          ConnectionEnd(
-            isFrom = T,
-            component = serial,
-            end = "timeout")
-        ),
-        to_ends = ISZ(
-          ConnectionEnd(
-            isFrom = F,
-            component = time_server,
-            end = "the_timer")
-        )
-      )
-    )
-    return ret
-  }
-}
-
-// expansion of objects in macro https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L127-L129
-//
-// #define PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF(num) \
-//    connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
-//    connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
-object PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF {
-  val seL4SerialServer: String = "seL4SerialServer"
-  val serial: String = "serial"
-
-  def connections(componentId: String): ISZ[Connection] = {
-    val ret: ISZ[Connection] = ISZ(
-      // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
-      Connection(
-        name = s"serial_${componentId}",
-        connectionType = seL4SerialServer,
-        from_ends = ISZ(
-          ConnectionEnd(
-            isFrom = T,
-            component = componentId,
-            end = "batch")
-        ),
-        to_ends = ISZ(
-          ConnectionEnd(
-            isFrom = F,
-            component = serial,
-            end = "processed_batch")
-        )
-      ),
-      // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
-      Connection(
-        name = s"serial_input_${componentId}",
-        connectionType = seL4SerialServer,
-        from_ends = ISZ(
-          ConnectionEnd(
-            isFrom = T,
-            component = componentId,
-            end = "serial_getchar")
-        ),
-        to_ends = ISZ(
-          ConnectionEnd(
-            isFrom = F,
-            component = serial,
-            end = "getchar")
-        )
-      )
     )
     return ret
   }

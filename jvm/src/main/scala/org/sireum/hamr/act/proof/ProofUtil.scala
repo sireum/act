@@ -17,6 +17,7 @@ object ProofContainer {
   @enum object CAmkESComponentCategory {
     "Refinement"
     "VM_Refinement"
+
     "Pacer"
     "TimeServer"
     "PeriodicDispatcher"
@@ -32,6 +33,8 @@ object ProofContainer {
     "PeriodicDispatching"
 
     "VM"
+
+    "TimeServer"
   }
 
   @datatype class CAmkESConnection(connType: CAmkESConnectionType.Type,
@@ -106,6 +109,22 @@ object ProofUtil {
     }
   }
 
+  def addVMPortAux(camkesFeature: ast.CAmkESFeature, aadlProcess: AadlProcess, symbolTable: SymbolTable): Unit = {
+    val cin = Util.getCamkesComponentIdentifier(aadlProcess, symbolTable)
+
+    var map: Map[ast.CAmkESFeature, PortInfo] = proofContainer.portRefinementTypes.get(cin) match {
+      case Some(m) => m
+      case _ => Map.empty
+    }
+    assert(!map.contains(camkesFeature))
+
+    map = map + (camkesFeature ~> PortVMAux(aadlProcess))
+
+    proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (cin ~> map)
+
+
+  }
+
   def addVMPortRefinement(camkesFeature: ast.CAmkESFeature, aadlComponent: AadlProcess, metaPort: MetaPort, symbolTable: SymbolTable): Unit = {
     val cin = Util.getCamkesComponentIdentifier(aadlComponent, symbolTable)
 
@@ -143,6 +162,8 @@ object ProofUtil {
 
 @datatype class PortVMRefinement (aadlProcess: AadlProcess,
                                   metaPort: MetaPort) extends PortInfo
+
+@datatype class PortVMAux(aadlProcess: AadlProcess) extends PortInfo
 
 @record class ProofContainer(var modelSchedulingType: SchedulingType.Type,
 

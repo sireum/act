@@ -68,6 +68,7 @@ import org.sireum.ops.ISZOps
   val useDomainScheduling: B = PeriodicUtil.useDomainScheduling(symbolTable, actOptions.platform)
 
   var sbConnectionContainer: Map[String, SBConnectionContainer] = Map.empty // connection_instance_path ~> refinements
+  var timeServerIntroduced: B = F
 
   def hasErrors: B = {
     return reporter.hasError
@@ -280,21 +281,57 @@ import org.sireum.ops.ISZOps
       )
 
       instances = instances ++ VM_GENERAL_COMPOSITION_DEF.instances()
-      instances = instances ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.instances()
 
       auxResourceFiles = auxResourceFiles ++ auxResources
 
       connections = connections :+ Util.createConnectionC(
-        CAmkESConnectionType.VM,
-        connectionCounter,
-        Sel4ConnectorTypes.seL4VMDTBPassthrough,
-        processId, "dtb_self",
-        processId, "dtb"
+        connectionCategory = CAmkESConnectionType.VM,
+        connectionCounter = connectionCounter,
+        connectionType = Sel4ConnectorTypes.seL4VMDTBPassthrough,
+        srcComponent = processId, srcFeature = "dtb_self",
+        dstComponent = processId, dstFeature ="dtb"
       )
 
       connections = connections ++ VM_COMPONENT_CONNECTIONS_DEF.connections(processId)
-      connections = connections ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.connections()
-      connections = connections ++ PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF.connections(processId)
+
+      // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
+      connections = connections :+ Util.createConnectionC(
+        connectionCategory = CAmkESConnectionType.VM,
+        connectionCounter = connectionCounter,
+        connectionType = Sel4ConnectorTypes.seL4SerialServer,
+        srcComponent = processId,
+        srcFeature = "batch",
+        dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+        dstFeature = LibraryComponents.SerialServer.processed_batch_Port
+      )
+
+      // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
+      connections = connections :+ Util.createConnectionC(
+        connectionCategory = CAmkESConnectionType.VM,
+        connectionCounter = connectionCounter,
+        connectionType = Sel4ConnectorTypes.seL4SerialServer,
+        srcComponent = processId,
+        srcFeature = "serial_getchar",
+        dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+        dstFeature = LibraryComponents.SerialServer.getchar_Port
+      )
+
+      if(!timeServerIntroduced) {
+        timeServerIntroduced = T
+        val timeServer = LibraryComponents.TimeServer.defaultTimeServerInstance
+        val serialServer = LibraryComponents.SerialServer.defaultSerialServerInstance
+
+        instances = instances :+ serialServer :+ timeServer
+
+        camkesConnections = camkesConnections :+ Util.createConnectionC(
+          connectionCategory = CAmkESConnectionType.TimeServer,
+          connectionCounter = connectionCounter,
+          connectionType = Sel4ConnectorTypes.seL4TimeServer,
+          srcComponent = serialServer.name,
+          srcFeature = LibraryComponents.SerialServer.timeout_Port,
+          dstComponent = timeServer.name,
+          dstFeature = LibraryComponents.TimeServer.the_timer_port)
+      }
 
       globalImports = globalImports ++ VM_Template.vm_assembly_imports()
 
