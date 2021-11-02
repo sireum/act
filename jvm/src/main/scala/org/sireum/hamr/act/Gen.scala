@@ -202,8 +202,7 @@ import org.sireum.ops.ISZOps
       } // end sb type library
 
 
-      if (ExperimentalOptions.generateRefinementProof(actOptions.experimentalOptions)) {
-        //resources = resources ++ AlloyProofGen.genAlloyProof(ProofUtil.proofContainer, symbolTable, options.outputDir)
+      if (ExperimentalOptions.generateRefinementProof(actOptions.experimentalOptions) && actOptions.platform != ActPlatform.SeL4_TB) {
         ProofUtil.proofContainer.modelSchedulingType = PeriodicUtil.getSchedulingType(symbolTable, actOptions.platform)
         auxResourceFiles = auxResourceFiles ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, astObjects, sbConnectionContainer, symbolTable, actOptions.outputDir, actOptions.platform)
       }
