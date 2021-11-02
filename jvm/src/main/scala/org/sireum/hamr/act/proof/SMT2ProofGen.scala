@@ -4,15 +4,14 @@ package org.sireum.hamr.act.proof
 
 import org.sireum._
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.connections.{Connections, SBConnectionContainer}
+import org.sireum.hamr.act.connections.{SBConnectionContainer}
 import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, CAmkESComponentCategory, CAmkESConnection, CAmkESConnectionType}
 import org.sireum.hamr.act.templates.SMT2Template
 import org.sireum.hamr.act.util.{ActPlatform, Sel4ConnectorTypes}
 import org.sireum.hamr.codegen.common.CommonUtil
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlDispatchableComponent, AadlEventDataPort, AadlEventPort, AadlPort, AadlProcess, AadlThread, AadlVirtualProcessor, Processor, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlEventPort, AadlPort, AadlProcess, AadlProcessor, AadlThread, AadlVirtualProcessor, SymbolTable}
 import org.sireum.hamr.codegen.common.util.ResourceUtil
-import org.sireum.hamr.ir.ConnectionInstance
 
 object SMT2ProofGen {
   var resources: ISZ[Resource] = ISZ()
@@ -43,25 +42,31 @@ object SMT2ProofGen {
             case _ => None()
           }
         aadlComps = aadlComps :+ st"(${t.path})"
-        val dp: AadlDispatchableComponent = t match {
-          case a:AadlThread => a
-          case p:AadlProcess => p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
-          case _ => halt("Infeasible")
-        }
-        aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(t, dp)
         aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(t)
 
-        val bp: Option[Processor] = t match {
-          case at: AadlThread => at.getParent(symbolTable).getBoundProcessor(symbolTable)
-          case ap: AadlProcess => ap.getBoundProcessor(symbolTable)
-          case _ => halt("infeasible")
-        }
+        t match {
+          case a: AadlThread =>
+            aadlDPs=  aadlDPs :+ SMT2Template.aadlDispatchProtocol(t.path, a)
 
-        bp match {
-          case Some (boundProcessor) =>
+            a.getParent(symbolTable).getBoundProcessor(symbolTable) match {
+              case Some(boundProcessor) =>
+                assert(boundProcessor.isInstanceOf[AadlProcessor])
+
+                aadlComps = aadlComps :+ st"(${boundProcessor.path})"
+                aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(boundProcessor)
+                aadlBPs = aadlBPs :+ SMT2Template.aadlBoundProcessor(a, boundProcessor)
+              case _ =>
+            }
+
+          case p: AadlProcess =>
+
+            val boundProcessor = p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
+
+            aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(boundProcessor.path, boundProcessor)
             aadlComps = aadlComps :+ st"(${boundProcessor.path})"
             aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(boundProcessor)
-            aadlBPs = aadlBPs :+ SMT2Template.aadlBoundProcessor(t, boundProcessor)
+            aadlBPs = aadlBPs :+ SMT2Template.aadlBoundProcessor(p, boundProcessor)
+
           case _ =>
         }
       }
@@ -108,6 +113,7 @@ object SMT2ProofGen {
     }
 
     var timeServer: Option[ST] = None()
+    var serialServer: Option[ST] = None()
     var periodicDispatcher: Option[ST] = None()
     var pacer: Option[ST] = None()
     var monitors: ISZ[ST] = ISZ()
@@ -129,6 +135,7 @@ object SMT2ProofGen {
         ret = ret :+ st"(${i.name})"
 
         proofContainer.camkesComponentTypes.get(i.component) match {
+          case Some(CAmkESComponentCategory.SerialServer) => serialServer = Some(st"(= _component ${i.name})")
           case Some(CAmkESComponentCategory.TimeServer) => timeServer = Some(st"(= _component ${i.name})")
           case Some(CAmkESComponentCategory.PeriodicDispatcher) => periodicDispatcher = Some(st"(= _component ${i.name})")
           case Some(CAmkESComponentCategory.Pacer) => pacer = Some(st"(= _component ${i.name})")
@@ -196,7 +203,8 @@ object SMT2ProofGen {
     }
 
     val portVMAuxs: ISZ[ST] =
-      portVMAuxsEntries.entries.map(x => st"(or (= cc ${x._1}) ${(x._2, " ")} false)")
+      portVMAuxsEntries.entries.map(x => st"""(and (= cc ${x._1})
+                                             |     (or ${(x._2, " ")} false))""")
 
     var camkesDataPortAccessRestrictions: ISZ[ST] = ISZ()
     for(m <- astObjects) {
@@ -262,7 +270,8 @@ object SMT2ProofGen {
 
           case CAmkESConnectionType.Refinement =>
           case CAmkESConnectionType.VMRefinement =>
-          case _ =>
+
+          case x => halt(s"Unexpected ${x}")
         }
       }
       (_camkesCons, _camkesConTypes, _camkesFlowsTo, _camkesPacingConns, _camkesSelfPacingConns, _camkesPDConns, _camkesVMConns)
@@ -294,6 +303,7 @@ object SMT2ProofGen {
       periodicDispatcherComponent = periodicDispatcher,
       pacerComponent = pacer,
       timeServerComponent = timeServer,
+      serialServerComponent = serialServer,
       monitors = monitors,
 
       camkesPorts = camkesPorts,

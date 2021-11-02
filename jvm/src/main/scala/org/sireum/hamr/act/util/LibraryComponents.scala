@@ -4,6 +4,7 @@ package org.sireum.hamr.act.util
 import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.ast.LibraryComponent
+import org.sireum.hamr.act.proof.ProofContainer.CAmkESComponentCategory
 
 object LibraryComponents {
 
@@ -16,32 +17,62 @@ object LibraryComponents {
 
     val ports: ISZ[String] = ISZ(getchar_Port, processed_batch_Port, timeout_Port)
 
-    val defaultSerialServerInstance: ast.Instance = createInstance(defaultSerialServerName)
+    def defaultSerialServerInstance: ast.Instance = { return createInstance(defaultSerialServerName) }
+
+    def libraryComponent: LibraryComponent = { return Util.createCAmkESLibraryComponent(
+      componentCategory = CAmkESComponentCategory.SerialServer, name = "SerialServer", ports = ports) }
 
     def createInstance(instanceName: String): ast.Instance = {
-      Util.createCAmkESInstance(
+      return Util.createCAmkESInstance(
         originAadl = None(),
 
         address_space = "",
         name = instanceName,
-        component = LibraryComponent(name = "SerialServer", ports = ports))
+        component = libraryComponent)
     }
   }
 
   object TimeServer {
+    val defaultTimeServerName: String = "time_server"
+
     val the_timer_port: String = "the_timer"
 
     val ports: ISZ[String] = ISZ(the_timer_port)
 
-    val defaultTimeServerInstance: ast.Instance = createInstance("time_server")
+    def defaultTimeServerInstance: ast.Instance = { return createInstance(defaultTimeServerName) }
+
+    def libraryComponent: LibraryComponent = { return Util.createCAmkESLibraryComponent(
+      componentCategory = CAmkESComponentCategory.TimeServer, name = "TimeServer", ports = ports) }
 
     def createInstance(instanceName: String): ast.Instance = {
-      Util.createCAmkESInstance(
+      return Util.createCAmkESInstance(
         originAadl = None(),
 
         address_space = "",
         name = instanceName,
-        component = LibraryComponent(name = "TimeServer", ports = ports))
+        component = libraryComponent)
+    }
+  }
+
+  object FileServer {
+    val defaultFileServerName: String = "fserv"
+
+    val fs_ctrl_port: String = "fs_ctrl"
+
+    val ports: ISZ[String] = ISZ(fs_ctrl_port)
+
+    def defaultFileServerInstance: ast.Instance = { return createInstance(defaultFileServerName) }
+
+    def libraryComponent: LibraryComponent = { return Util.createCAmkESLibraryComponent(
+      componentCategory = CAmkESComponentCategory.FileServer, name = "FileServer", ports = ports) }
+
+    def createInstance(instanceName: String): ast.Instance = {
+      return Util.createCAmkESInstance(
+        originAadl = None(),
+
+        address_space = "",
+        name = instanceName,
+        component = libraryComponent)
     }
   }
 }

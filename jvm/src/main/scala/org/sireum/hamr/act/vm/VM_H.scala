@@ -4,7 +4,8 @@ package org.sireum.hamr.act.vm
 
 import org.sireum._
 import org.sireum.hamr.act.ast._
-import org.sireum.hamr.act.util.{Util}
+import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
+import org.sireum.hamr.act.util.{Counter, LibraryComponents, Sel4ConnectorTypes, Util}
 import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
 
 /**
@@ -211,61 +212,66 @@ object VM_INIT_DEF {
   }
 }
 
-// expansion of objects in macro https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L97-L98
-// #define VM_GENERAL_COMPOSITION_DEF() \
-//    component FileServer fserv; \
-object VM_GENERAL_COMPOSITION_DEF {
-  def instances: ISZ[Instance] = {
-    val ret: ISZ[Instance] = ISZ(
-      Instance(
-        address_space = "",
-        name = "fserv",
-        component = LibraryComponent(name = "FileServer", ports = ISZ())
-      )
-    )
-    return ret
-  }
-}
-
 // expansion of objects in macro https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L93-L95
 
 // #define VM_COMPONENT_CONNECTIONS_DEF(num) \
 //    connection seL4RPCDataport fs##num(from vm##num.fs, to fserv.fs_ctrl); \
 //    connection seL4GlobalAsynch notify_ready_vm##num(from vm##num.notification_ready_connector, to vm##num.notification_ready); \
 object VM_COMPONENT_CONNECTIONS_DEF {
-  def connections(componentId: String): ISZ[Connection] = {
-    val ret: ISZ[Connection] = ISZ(
-      Connection(
-        name = s"fs${componentId}",
-        connectionType = "seL4RPCDataport",
-        from_ends = ISZ(
-          ConnectionEnd(
-            isFrom = T,
-            component = componentId,
-            end = "fs")
-        ),
-        to_ends = ISZ(
-          ConnectionEnd(
-            isFrom = F,
-            component = "fserv",
-            end = "fs_ctrl")
-        )),
-      Connection(
-        name = s"notify_ready_${componentId}",
-        connectionType = "seL4GlobalAsynch",
-        from_ends = ISZ(
-          ConnectionEnd(
-            isFrom = T,
-            component = componentId,
-            end = "notification_ready_connector")),
-        to_ends = ISZ(
-          ConnectionEnd(
-            isFrom = F,
-            component = componentId,
-            end = "notification_ready")
-        ))
+
+  def connections(processId: String, connectionCounter: Counter): ISZ[Connection] = {
+    var connections: ISZ[Connection] = ISZ()
+
+    connections = connections :+ Util.createConnectionC(
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4VMDTBPassthrough,
+      srcComponent = processId, srcFeature = "dtb_self",
+      dstComponent = processId, dstFeature ="dtb"
     )
-    return ret
+
+    // #define VM_COMPONENT_CONNECTIONS_DEF(num) \
+    //    connection seL4RPCDataport fs##num(from vm##num.fs, to fserv.fs_ctrl); \
+    //    connection seL4GlobalAsynch notify_ready_vm##num(from vm##num.notification_ready_connector, to vm##num.notification_ready); \
+
+    connections = connections :+ Util.createConnectionC(
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4RPCDataport,
+      srcComponent = processId, srcFeature = "fs",
+      dstComponent = LibraryComponents.FileServer.defaultFileServerName,
+      dstFeature = LibraryComponents.FileServer.fs_ctrl_port)
+
+    connections = connections :+ Util.createConnectionC(
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4GlobalAsynch,
+      srcComponent = processId, srcFeature = "notification_ready_connector",
+      dstComponent = processId, dstFeature = "notification_ready")
+
+    // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
+    connections = connections :+ Util.createConnectionC(
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4SerialServer,
+      srcComponent = processId,
+      srcFeature = "batch",
+      dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+      dstFeature = LibraryComponents.SerialServer.processed_batch_Port
+    )
+
+    // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
+    connections = connections :+ Util.createConnectionC(
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4SerialServer,
+      srcComponent = processId,
+      srcFeature = "serial_getchar",
+      dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+      dstFeature = LibraryComponents.SerialServer.getchar_Port
+    )
+
+    return connections
   }
 }
 

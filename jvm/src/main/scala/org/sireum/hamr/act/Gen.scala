@@ -274,57 +274,27 @@ import org.sireum.ops.ISZOps
 
 
       instances = instances :+ Util.createCAmkESInstance(
-        originAadl = None(),
+        originAadl = Some(aadlProcess),
         address_space = "",
         name = processId,
         component = component
       )
 
-      instances = instances ++ VM_GENERAL_COMPOSITION_DEF.instances()
-
       auxResourceFiles = auxResourceFiles ++ auxResources
 
-      connections = connections :+ Util.createConnectionC(
-        connectionCategory = CAmkESConnectionType.VM,
-        connectionCounter = connectionCounter,
-        connectionType = Sel4ConnectorTypes.seL4VMDTBPassthrough,
-        srcComponent = processId, srcFeature = "dtb_self",
-        dstComponent = processId, dstFeature ="dtb"
-      )
-
-      connections = connections ++ VM_COMPONENT_CONNECTIONS_DEF.connections(processId)
-
-      // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
-      connections = connections :+ Util.createConnectionC(
-        connectionCategory = CAmkESConnectionType.VM,
-        connectionCounter = connectionCounter,
-        connectionType = Sel4ConnectorTypes.seL4SerialServer,
-        srcComponent = processId,
-        srcFeature = "batch",
-        dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
-        dstFeature = LibraryComponents.SerialServer.processed_batch_Port
-      )
-
-      // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
-      connections = connections :+ Util.createConnectionC(
-        connectionCategory = CAmkESConnectionType.VM,
-        connectionCounter = connectionCounter,
-        connectionType = Sel4ConnectorTypes.seL4SerialServer,
-        srcComponent = processId,
-        srcFeature = "serial_getchar",
-        dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
-        dstFeature = LibraryComponents.SerialServer.getchar_Port
-      )
+      connections = connections ++ VM_COMPONENT_CONNECTIONS_DEF.connections(processId, connectionCounter)
 
       if(!timeServerIntroduced) {
         timeServerIntroduced = T
         val timeServer = LibraryComponents.TimeServer.defaultTimeServerInstance
         val serialServer = LibraryComponents.SerialServer.defaultSerialServerInstance
+        val fileServer = LibraryComponents.FileServer.defaultFileServerInstance
 
-        instances = instances :+ serialServer :+ timeServer
+        instances = instances :+ fileServer :+ serialServer :+ timeServer
 
-        camkesConnections = camkesConnections :+ Util.createConnectionC(
-          connectionCategory = CAmkESConnectionType.TimeServer,
+        connections = connections :+ Util.createConnectionC(
+          //connectionCategory = CAmkESConnectionType.TimeServer,
+          connectionCategory = CAmkESConnectionType.VM,
           connectionCounter = connectionCounter,
           connectionType = Sel4ConnectorTypes.seL4TimeServer,
           srcComponent = serialServer.name,

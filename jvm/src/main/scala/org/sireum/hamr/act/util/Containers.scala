@@ -126,6 +126,7 @@ import org.sireum.hamr.ir
   'seL4GlobalAsynchCallback
   'seL4Notification
   'seL4RPCCall
+  'seL4RPCDataport
   'seL4SharedData
   'seL4SharedDataWithCaps
   'seL4SerialServer

@@ -19,7 +19,9 @@ object ProofContainer {
     "VM_Refinement"
 
     "Pacer"
+    "FileServer"
     "TimeServer"
+    "SerialServer"
     "PeriodicDispatcher"
     "Monitor"
   }
