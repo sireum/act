@@ -4,10 +4,10 @@ package org.sireum.hamr.act.templates
 
 import org.sireum._
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.proof.ProofContainer.{AadlPortType, SchedulingType}
+import org.sireum.hamr.act.proof.ProofContainer.SchedulingType
 import org.sireum.hamr.act.util.{ActPlatform, Sel4ConnectorTypes}
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDispatchableComponent, Processor}
-import org.sireum.hamr.ir.{ComponentCategory}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDispatchableComponent, Dispatch_Protocol, Processor}
+import org.sireum.hamr.ir.{ComponentCategory, Direction, FeatureCategory}
 
 object SMT2Template {
   def portRefinement(aadlPort: String, camkesPort: String): ST = {
@@ -42,8 +42,8 @@ object SMT2Template {
     return st"(assert (= ${camkesComponent} (select CAmkESPortComponent ${camkesPort})))"
   }
 
-  def aadlPortType(aadlPort: String, portType: String): ST = {
-    return st"(assert (= ${portType} (select AadlPortType ${aadlPort})))"
+  def aadlFeatureCategory(aadlPort: String, portType: String): ST = {
+    return st"(assert (= ${portType} (select AadlFeatureCategory ${aadlPort})))"
   }
 
   def aadlPortDirection(aadlPort: String, direction: String): ST = {
@@ -67,7 +67,7 @@ object SMT2Template {
             aadlComponentCategories: ISZ[ST],
             aadlPorts: ISZ[String],
             aadlPortComponents: ISZ[ST],
-            aadlPortTypes: ISZ[ST],
+            aadlFeatureCategories: ISZ[ST],
             aadlPortDirection: ISZ[ST],
             aadlConnectionFlowTos: ISZ[ST],
             aadlDispatchProtocols: ISZ[ST],
@@ -76,9 +76,9 @@ object SMT2Template {
 
             periodicDispatcherComponent: Option[ST],
             pacerComponent: Option[ST],
+            fileServerComponent: Option[ST],
             timeServerComponent: Option[ST],
             serialServerComponent: Option[ST],
-            monitors: ISZ[ST],
 
             camkesPorts: ISZ[ST],
             camkesDataPortAccessRestrictions: ISZ[ST],
@@ -102,9 +102,12 @@ object SMT2Template {
 
     val sel4ConnEnums = Sel4ConnectorTypes.elements.map((m: Sel4ConnectorTypes.Type) => st"(${m.name})")
 
-    val aadlPortEnums = AadlPortType.elements.map((m: AadlPortType.Type) => st"(${m.name})")
-    val portMatches = AadlPortType.elements.map((m: AadlPortType.Type) =>
-      st"(and (= ${m.name} (select AadlPortType src)) (= ${m.name} (select AadlPortType dst)))")
+    val dispatchProtocols = Dispatch_Protocol.elements.map((m: Dispatch_Protocol.Type) => st"(${m.name})")
+    val featureCategories = FeatureCategory.elements.map((m: FeatureCategory.Type) => st"(${m.name})")
+    val directions = Direction.elements.filter((f:Direction.Type) => f != Direction.None).map((m: Direction.Type) => st"(${m.name})")
+
+    val portMatches = FeatureCategory.elements.map((m: FeatureCategory.Type) =>
+      st"(and (= ${m.name} (select AadlFeatureCategory src)) (= ${m.name} (select AadlFeatureCategory dst)))")
 
     val schedulingTypes: ISZ[ST] = SchedulingType.elements.map((m: SchedulingType.Type) => st"(${m.name})")
 
@@ -128,19 +131,17 @@ object SMT2Template {
           |  ${(componentCategories, "\n")})))
           |
           |(declare-datatypes ((DispatchProtocol 0)) ((
-          |  (Periodic)
-          |  (Sporadic))))
+          |  ${(dispatchProtocols, "\n")})))
           |
           |(declare-datatypes ((SchedulingType 0)) ((
           |  ${(schedulingTypes, "\n")}
           |  (UNSPECIFIED_SCHEDULING_TYPE))))
           |
           |(declare-datatypes ((Direction 0)) ((
-          |  (In)
-          |  (Out))))
+          |  ${(directions, "\n")})))
           |
-          |(declare-datatypes ((PortType 0)) ((
-          |  ${(aadlPortEnums, "\n")})))
+          |(declare-datatypes ((FeatureCategory 0)) ((
+          |  ${(featureCategories, "\n")})))
           |
           |
           |(declare-const CodegenMode Mode)
@@ -182,10 +183,10 @@ object SMT2Template {
           |(declare-const AadlPortComponent_size Int)
           |(assert (= ${aadlPortComponents.size} AadlPortComponent_size))
           |
-          |(declare-const AadlPortType (Array AadlPort PortType))
-          |  ${(aadlPortTypes, "\n")}
-          |(declare-const AadlPortType_size Int)
-          |(assert (= ${aadlPortTypes.size} AadlPortType_size))
+          |(declare-const AadlFeatureCategory (Array AadlPort FeatureCategory))
+          |  ${(aadlFeatureCategories, "\n")}
+          |(declare-const AadlFeatureCategory_size Int)
+          |(assert (= ${aadlFeatureCategories.size} AadlFeatureCategory_size))
           |
           |(declare-const AadlPortDirection (Array AadlPort Direction))
           |  ${(aadlPortDirection, "\n")}
@@ -209,7 +210,7 @@ object SMT2Template {
           |(declare-datatypes ((AccessType 0)) ((
           |  ${(accessTypes, "\n")})))
           |
-          |(declare-datatypes ((seL4PortType 0)) ((
+          |(declare-datatypes ((seL4ConnectorType 0)) ((
           |  ${(sel4ConnEnums, "\n")})))
           |
           |(declare-datatypes ((CAmkESComponent 0)) ((
@@ -225,19 +226,17 @@ object SMT2Template {
           |  (and (= ModelSchedulingType Pacing)
           |       ${pacerComponent.getOrElse(st"false")}))
           |
+          |(define-fun isFileServer ((_component CAmkESComponent)) Bool
+          |  (and ; TODO: list scenarios where a file server is expected
+          |       ${fileServerComponent.getOrElse(st"false")}))
+          |
           |(define-fun isTimeServer ((_component CAmkESComponent)) Bool
-          |  (and
+          |  (and ; TODO: list scenarios where a time server is expected
           |       ${timeServerComponent.getOrElse(st"false")}))
           |
           |(define-fun isSerialServer ((_component CAmkESComponent)) Bool
-          |  (and
+          |  (and ; TODO: list scenarios where a serial server is expected
           |       ${serialServerComponent.getOrElse(st"false")}))
-          |
-          |(define-fun isMonitor ((_component CAmkESComponent)) Bool
-          |  (or ${(monitors, "\n")}
-          |      false))
-          |(declare-const Monitor_count Int)
-          |(assert (= ${monitors.size} Monitor_count))
           |
           |(declare-datatypes ((CAmkESPort 0)) ((
           |  ${(camkesPorts, "\n")})))
@@ -276,7 +275,7 @@ object SMT2Template {
           |  (or ${(vmConnections, "\n")}
           |      false))
           |
-          |(declare-const CAmkESConnectionType (Array CAmkESConnection seL4PortType))
+          |(declare-const CAmkESConnectionType (Array CAmkESConnection seL4ConnectorType))
           |  ${(camkesConnectionTypes, "\n")}
           |(declare-const CAmkESConnectionType_count Int)
           |(assert (= ${camkesConnectionTypes.size} CAmkESConnectionType_count))
@@ -380,10 +379,16 @@ object SMT2Template {
           |
           |(define-fun CAmkESDataPortAccess () Bool
           |  (forall ((_conn CAmkESConnection) (_src CAmkESPort) (_dst CAmkESPort))
-          |    (=> (and (CAmkESConnectionFlowTos _conn _src _dst)
-          |             (= ${Sel4ConnectorTypes.seL4SharedData.name} (select CAmkESConnectionType _conn)))
-          |      (and (= W (select CAmkESAccessRestrictions _src))
-          |           (= R (select CAmkESAccessRestrictions _dst))))))
+          |    (=> (CAmkESConnectionFlowTos _conn _src _dst)
+          |        (and
+          |             (=> (= ${Sel4ConnectorTypes.seL4SharedData} (select CAmkESConnectionType _conn))
+          |                 (and (= W (select CAmkESAccessRestrictions _src))
+          |                      (= R (select CAmkESAccessRestrictions _dst))))
+          |             (=> (= ${Sel4ConnectorTypes.seL4SharedDataWithCaps} (select CAmkESConnectionType _conn))
+          |                 (and (ite (isVMComponent (select CAmkESPortComponent _src))
+          |                           (= RW (select CAmkESAccessRestrictions _src))
+          |                           (= W (select CAmkESAccessRestrictions _src)))
+          |                      (= R (select CAmkESAccessRestrictions _dst))))))))
           |
           |(define-fun UniqueComponentRefinements () Bool
           |  (forall ((aadlComponent1 AadlComponent) (camkesComponent CAmkESComponent))
@@ -407,7 +412,7 @@ object SMT2Template {
           |
           |; helper method: if either port belongs to a VM component then any data connection between the two of them
           |; must be seL4SharedDataWithCaps, seL4SharedData otherwise
-          |(define-fun getExpectedDataConnectionType ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) seL4PortType
+          |(define-fun getExpectedDataConnectionType ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) seL4ConnectorType
           |  (ite (or (isVMComponent (select CAmkESPortComponent camkesSource))
           |           (isVMComponent (select CAmkESPortComponent camkesDest))
           |           false)
@@ -416,7 +421,7 @@ object SMT2Template {
           |
           |; helper method: if the destination port belongs to a VM component than any event connection between the two ports
           |; must be seL4GlobalAsynch, seL4Notification otherwise
-          |(define-fun getExpectedEventConnectionType ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) seL4PortType
+          |(define-fun getExpectedEventConnectionType ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) seL4ConnectorType
           |  (ite (isVMComponent (select CAmkESPortComponent camkesDest))
           |       ${Sel4ConnectorTypes.seL4GlobalAsynch.name}
           |       ${Sel4ConnectorTypes.seL4Notification.name}))
@@ -444,28 +449,23 @@ object SMT2Template {
           |  (and (or (= CodegenMode ${ActPlatform.SeL4.name}) (= CodegenMode ${ActPlatform.SeL4_Only.name}) false)
           |       (or
           |         (and
-          |           (= ${AadlPortType.AadlDataPort.name} (select AadlPortType aadlSource))
+          |           (= ${FeatureCategory.DataPort.name} (select AadlFeatureCategory aadlSource))
           |           (SB_DataPortRefinement aadlSource aadlDest)) ; payload
           |         (and
-          |           (= ${AadlPortType.AadlEventPort.name} (select AadlPortType aadlSource))
+          |           (= ${FeatureCategory.EventPort.name} (select AadlFeatureCategory aadlSource))
           |           (SB_DataPortRefinement aadlSource aadlDest)   ; event counter
           |           (SB_EventPortRefinement aadlSource aadlDest)) ; event
           |         (and
-          |           (= ${AadlPortType.AadlEventDataPort.name} (select AadlPortType aadlSource))
+          |           (= ${FeatureCategory.EventDataPort.name} (select AadlFeatureCategory aadlSource))
           |           (SB_DataPortRefinement aadlSource aadlDest)   ; payload
           |           (SB_EventPortRefinement aadlSource aadlDest)) ; event
           |         false)))
           |
-          |(define-fun TB_Refinement ((aadlSource AadlPort) (aadlDest AadlPort)) Bool
-          |  (and (= CodegenMode ${ActPlatform.SeL4_TB.name})
-          |       false))
-          |
           |(define-fun ConnectionPreservation () Bool
           |  (forall ((aadlSource AadlPort) (aadlDest AadlPort))
           |    (=> (AadlConnectionFlowTos aadlSource aadlDest)
-          |      (or (SB_Refinement aadlSource aadlDest)
-          |          (TB_Refinement aadlSource aadlDest)
-          |          false))))
+          |        (and (or (= CodegenMode SeL4) (= CodegenMode SeL4_Only) false)
+          |             (SB_Refinement aadlSource aadlDest)))))
           |
           |
           |(define-fun isAadl_SB_ConnectionRefinement ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) Bool
@@ -477,11 +477,6 @@ object SMT2Template {
           |           (ComponentRefinement (select AadlPortComponent aadlSource) (select CAmkESPortComponent camkesSource))
           |           (ComponentRefinement (select AadlPortComponent aadlDest) (select CAmkESPortComponent camkesDest))
           |           (AadlConnectionFlowTos aadlSource aadlDest)))))
-          |
-          |(define-fun isAadl_TB_ConnectionRefinement ((camkesSource CAmkESPort) (camkesDest CAmkESPort)) Bool
-          |  (and (= CodegenMode SeL4_TB)
-          |       false)
-          |)
           |
           |(define-fun isCAmkESSchedulingConnection ((_conn CAmkESConnection)) Bool
           |  (or
@@ -496,7 +491,7 @@ object SMT2Template {
           |         (or (isVMAuxPort camkesSource)
           |             (isVMAuxPort camkesDest)
           |             false))
-          |    (and (isSerialServer (select CAmkESPortComponent camkesSource))
+          |    (and (isSerialServer (select CAmkESPortComponent camkesSource)) ; connection b/w serial and time server
           |         (isTimeServer (select CAmkESPortComponent camkesDest)))
           |    false))
           |
@@ -505,7 +500,6 @@ object SMT2Template {
           |    (=> (CAmkESConnectionFlowTos conn camkesSource camkesDest)
           |      (or
           |        (isAadl_SB_ConnectionRefinement camkesSource camkesDest)
-          |        (isAadl_TB_ConnectionRefinement camkesSource camkesDest)
           |        (isCAmkESSchedulingConnection conn)
           |        (isVirtualMachineInducedConnection conn camkesSource camkesDest)
           |        false))))

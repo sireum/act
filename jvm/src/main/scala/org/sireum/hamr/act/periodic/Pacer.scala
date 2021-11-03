@@ -140,6 +140,10 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
             dstComponent = componentId,
             dstFeature = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
 
+          configurations = configurations :+
+            ast.DataPortAccessRestriction(PacerTemplate.PACER_IDENTIFIER, pacerDataportName, ast.AccessType.W) :+
+            ast.DataPortAccessRestriction(componentId, PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(), ast.AccessType.R)
+
           if(useCaseConnectors) {
             configurations = configurations :+
               ConnectionsSbTemplate.caseConnectorConfig_with_signalling(connectionName, T)

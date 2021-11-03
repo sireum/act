@@ -48,12 +48,6 @@ object ProofContainer {
     "PeriodicDispatching"
   }
 
-  @enum object AadlPortType {
-    "AadlDataPort"
-    "AadlEventPort"
-    "AadlEventDataPort"
-  }
-
   def empty(): ProofContainer = {
     return ProofContainer(
       modelSchedulingType = SchedulingType.PeriodicDispatching,

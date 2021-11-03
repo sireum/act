@@ -260,22 +260,14 @@ object SBConnections {
                       ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
                   }
 
-                  if(!srcToVM) {
-                    holder = holder(configurationEntries = holder.configurationEntries :+
-                      ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_ED, ast.AccessType.W))
-                  } else {
-                    // don't add access restrictions when component is in a vm, otherwise get errors like
-                    //
-                    // default_error_fault_callback@guest_memory_helpers.c:19 Failed to handle fault addr: 0xdf001000
-                    // --------
-                    // Pagefault from [Linux]: write fault @ PC: 0x4008a4 IPA: 0xdf001000, FSR:
-                  }
+                  val srcAccessType: ast.AccessType.Type = if(srcToVM) ast.AccessType.RW else ast.AccessType.W
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_ED, srcAccessType))
 
-                  if(!dstToVM) {
-                    holder = holder(configurationEntries = holder.configurationEntries :+
-                      ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_ED, ast.AccessType.R))
-                  } else {
-                    // don't add access restrictions since in a vm
+                  holder = holder(configurationEntries = holder.configurationEntries :+
+                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_ED, ast.AccessType.R))
+
+                  if(dstToVM) {
 
                     conn.dstComponent.asInstanceOf[AadlProcess].getDomain() match {
                       case Some(d) =>
@@ -367,8 +359,9 @@ object SBConnections {
 
                   holder = holder(toConnectionEnds = holder.toConnectionEnds :+ dstConnectionEnd)
 
+                  val srcAccessType: ast.AccessType.Type = if(srcToVM) ast.AccessType.RW else ast.AccessType.W
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureName, ast.AccessType.W))
+                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureName, srcAccessType))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
                     ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureName, ast.AccessType.R))
