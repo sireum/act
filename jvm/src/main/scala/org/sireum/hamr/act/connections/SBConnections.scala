@@ -9,7 +9,7 @@ import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.templates.ConnectionsSbTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlEventPort, AadlPort, AadlProcess, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlEventPort, AadlPort, AadlProcess, AadlThread, AadlVirtualProcessor, SymbolTable}
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil => CommonTypeUtil}
 import org.sireum.hamr.ir
 
@@ -49,7 +49,7 @@ object SBConnections {
         val dstThreadPort = symbolTable.featureMap.get(CommonUtil.getName(conn.dst.feature.get)).get.asInstanceOf[AadlPort]
 
         val (srcComponent, srcPort, srcVMInfo): (AadlComponent, AadlPort, Option[VMConnectionInfo]) = {
-          if(srcProcess.toVirtualMachine(symbolTable)) {
+          if (srcProcess.toVirtualMachine(symbolTable)) {
             val connRef: ir.ConnectionReference = conn.connectionRefs(0)
             val connection: ir.Connection = symbolTable.aadlMaps.connectionsMap.get(connRef.name.name).get
             val featureName = CommonUtil.getName(connection.dst(0).feature.get)
@@ -62,7 +62,7 @@ object SBConnections {
         }
 
         val (dstComponent, dstPort, dstVMInfo): (AadlComponent, AadlPort, Option[VMConnectionInfo]) = {
-          if(dstProcess.toVirtualMachine(symbolTable)) {
+          if (dstProcess.toVirtualMachine(symbolTable)) {
             val connRef: ir.ConnectionReference = ops.ISZOps(conn.connectionRefs).last
             val connection: ir.Connection = symbolTable.aadlMaps.connectionsMap.get(connRef.name.name).get
             val featureName = CommonUtil.getName(connection.src(0).feature.get)
@@ -74,15 +74,21 @@ object SBConnections {
           }
         }
 
-        val connconn: SBConnectionContainer = SBConnectionContainer(connectionOrigin = conn,
-          srcComponent = srcComponent,
-          srcPort = srcPort,
-          dstComponent = dstComponent,
-          dstPort = dstPort,
-          srcVMInfo = srcVMInfo,
-          dstVMInfo = dstVMInfo)
+        if (srcProcess == dstProcess && srcProcess.toVirtualMachine(symbolTable)) {
+          val mesg = s"Ignoring internal connection ${CommonUtil.getLastName(conn.name)} since the parent process ${srcProcess.identifier} is going to a VM"
+          Util.reporter.info(conn.name.pos, Util.toolName, mesg)
+        } else {
 
-        conns = conns + (CommonUtil.getName(conn.name) ~> connconn)
+          val connconn: SBConnectionContainer = SBConnectionContainer(connectionOrigin = conn,
+            srcComponent = srcComponent,
+            srcPort = srcPort,
+            dstComponent = dstComponent,
+            dstPort = dstPort,
+            srcVMInfo = srcVMInfo,
+            dstVMInfo = dstVMInfo)
+
+          conns = conns + (CommonUtil.getName(conn.name) ~> connconn)
+        }
       }
     }
     return conns

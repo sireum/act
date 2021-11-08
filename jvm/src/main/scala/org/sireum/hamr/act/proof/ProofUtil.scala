@@ -117,8 +117,6 @@ object ProofUtil {
     map = map + (camkesFeature ~> PortVMAux(aadlProcess))
 
     proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (cin ~> map)
-
-
   }
 
   def addVMPortRefinement(camkesFeature: ast.CAmkESFeature, aadlComponent: AadlProcess, metaPort: MetaPort, symbolTable: SymbolTable): Unit = {
@@ -128,12 +126,11 @@ object ProofUtil {
       case Some(m) => m
       case _ => Map.empty
     }
-    assert(!map.contains(camkesFeature))
+    assert(!map.contains(camkesFeature), s"${camkesFeature.name} already in map for ${cin}")
 
     map = map + (camkesFeature ~> PortVMRefinement(aadlComponent, metaPort))
 
     proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (cin ~> map)
-
   }
 
   def addPortRefinement(camkesFeature: ast.CAmkESFeature, aadlComponent: AadlComponent, aadlPort: AadlPort, symbolTable: SymbolTable): Unit = {

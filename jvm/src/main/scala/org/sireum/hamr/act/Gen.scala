@@ -239,14 +239,6 @@ import org.sireum.ops.ISZOps
         }
       case aadlProcess: AadlProcess =>
 
-        if (aadlProcess.toVirtualMachine(symbolTable)) {
-          val threads = aadlProcess.subComponents.filter(c => CommonUtil.isThread(c.component))
-
-          // sanity check: currently expecting exactly one thread per process when virtualizing
-          // TODO: move this to common sym resolver?
-          assert(threads.size == 1, s"Only expecting one thread per process going to VM: ${aadlProcess.identifier}")
-        }
-
         val g: Composition = genProcess(aadlProcess)
 
         astObjects = astObjects :+ Assembly(
@@ -1332,7 +1324,8 @@ import org.sireum.ops.ISZOps
     val entries = symbolTable.inConnections.entries.filter(p => p._2.size > 0)
 
     for (in <- entries) {
-      for (connInst <- in._2) {
+      for (connInst <- in._2 if sbConnectionContainer.contains(CommonUtil.getName(connInst.name))) {
+
         val sbcc = sbConnectionContainer.get(CommonUtil.getName(connInst.name)).get
 
         if (sbcc.dstPort.isInstanceOf[AadlEventDataPort]) {
