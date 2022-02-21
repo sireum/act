@@ -450,19 +450,19 @@ object StringTemplate {
   }
 
   def sbAccessRestrictionEntry(componentName: String, varName: String, permission: String): ast.Configuration = {
-    return ast.GenericConfiguration(st"""${componentName}.${varName}_access = "${permission}";""".render)
+    return ast.GenericConfiguration(st"""${componentName}.${varName}_access = "${permission}";""".render, ISZ())
   }
 
   def configurationPriority(name: String, priority: Z): ast.Configuration = {
-    return ast.GenericConfiguration(s"${name}.priority = ${priority};")
+    return ast.GenericConfiguration(s"${name}.priority = ${priority};", ISZ())
   }
 
   def configurationControlStackSize(name: String, size: Z): ast.Configuration = {
-    return ast.GenericConfiguration(s"${name}._control_stack_size = ${size};")
+    return ast.GenericConfiguration(s"${name}._control_stack_size = ${size};", ISZ())
   }
 
   def configurationStackSize(name: String, size: Z): ast.Configuration = {
-    return ast.GenericConfiguration(s"${name}._stack_size = ${size};")
+    return ast.GenericConfiguration(s"${name}._stack_size = ${size};", ISZ())
   }
 
   val SEM_WAIT: String = Util.brand("dispatch_sem_wait")

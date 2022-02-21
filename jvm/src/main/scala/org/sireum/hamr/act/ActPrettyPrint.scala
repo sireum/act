@@ -326,10 +326,11 @@ import org.sireum.ops.StringOps
     return None()
   }
 
-  def visitConfiguration(o: Configuration): String = {
-    val ret: String = o match {
-      case ast.GenericConfiguration(e) => e
-      case ast.DataPortAccessRestriction(comp, port, v) => st"""${comp}.${port}_access = "${v.name}";""".render
+  def visitConfiguration(o: Configuration): ST = {
+    val ret: ST = o match {
+      case ast.GenericConfiguration(e, _) => processCommentsString(e, o)
+      case ast.DataPortAccessRestriction(comp, port, v, _) =>
+        processComments(st"""${comp}.${port}_access = "${v.name}";""", o)
     }
     return ret
   }
@@ -362,12 +363,6 @@ import org.sireum.ops.StringOps
           |  ${(connections, "\n")}
           |  ${(o.externalEntities, "\n")}
           |}"""
-
-    /*
-    println("--------")
-    println(st.render)
-    println("--------")
-    */
 
     return Some(st)
   }
@@ -419,7 +414,7 @@ import org.sireum.ops.StringOps
           |  ${(methods, "\n")}
           |};"""
 
-    add(s"${Util.DIR_INTERFACES}/${o.name}.idl4", st)
+    add(s"${Util.DIR_INTERFACES}/${o.name}.idl4", processComments(st, o))
 
     return None()
   }
@@ -470,5 +465,47 @@ import org.sireum.ops.StringOps
         componentName
       }
     return if(platform == ActPlatform.SeL4) Some(libName) else None()
+  }
+
+  def processCommentsString(s: String, commentProvider: CommentProvider): ST = {
+    return processComments(st"$s", commentProvider)
+  }
+
+  def processComments(st: ST, commentProvider: CommentProvider): ST = {
+    if(commentProvider.comments.isEmpty) {
+      return st
+    } else {
+      val comments = commentProvider.comments
+
+      assert(ops.ISZOps(comments).forall((e: AstComment) => e.isInstanceOf[AstBasicComment]), "Only expecting basic comments for now")
+
+      val basicComments: ISZ[AstBasicComment] = comments.map((c: AstComment) => c.asInstanceOf[AstBasicComment])
+
+      val pres: ISZ[AstBasicComment] = basicComments.filter((c: AstBasicComment) => c.location == CommentLocation.PRE)
+      val posts: ISZ[AstBasicComment] = basicComments.filter((c: AstBasicComment) => c.location == CommentLocation.POST)
+      val inline: ISZ[AstBasicComment] = basicComments.filter((c: AstBasicComment) => c.location == CommentLocation.INLINE)
+
+      assert(inline.size < 1, "Can have at most 1 inline comment")
+
+      val optPres: Option[ST] = {
+        if(pres.isEmpty) None()
+        else Some(st"${(pres, "\n")}")
+      }
+      val optPosts: Option[ST] = {
+        if(posts.isEmpty) None()
+        else Some(st"${(posts, "\n")}")
+      }
+      val optInline: Option[ST] = {
+        if(inline.isEmpty) None()
+        else Some(st"${inline(0).comment}")
+      }
+
+      val ret: ST =
+        st"""${optPres}
+            |${st}${optInline}
+            |${optPosts}"""
+
+      return ret
+    }
   }
 }

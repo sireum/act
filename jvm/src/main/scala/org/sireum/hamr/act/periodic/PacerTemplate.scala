@@ -115,7 +115,7 @@ object PacerTemplate {
 
 
   def domainConfiguration(identifier: String, domain: Z): ast.Configuration = {
-    return ast.GenericConfiguration(s"${identifier}.${DOMAIN_FIELD} = ${domain};")
+    return ast.GenericConfiguration(s"${identifier}.${DOMAIN_FIELD} = ${domain};", ISZ())
   }
 
   def pacerScheduleEntry(domain: Z,

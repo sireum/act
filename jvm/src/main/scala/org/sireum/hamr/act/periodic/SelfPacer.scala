@@ -136,7 +136,8 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
       control = F, hardware = F, name = "",
       dataports = ISZ(), includes = ISZ(), mutexes = ISZ(), binarySemaphores = ISZ(), semaphores = ISZ(),
       imports = ISZ(), uses = ISZ(), provides = ISZ(), attributes = ISZ(),
-      preprocessorIncludes = ISZ(), externalEntities = ISZ()
+      preprocessorIncludes = ISZ(), externalEntities = ISZ(),
+      comments = ISZ()
     )
 
     val componentContributions = CamkesComponentContributions(shell)

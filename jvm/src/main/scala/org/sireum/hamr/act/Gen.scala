@@ -168,13 +168,15 @@ import org.sireum.ops.ISZOps
         exports = ISZ(),
         instances = instances.elements,
         connections = connections.elements,
-        externalEntities = compositionMacros.elements
+        externalEntities = compositionMacros.elements,
+        comments = ISZ()
       )
 
       astObjects = ISZ(Assembly(
         configuration = (Set.empty[ast.Configuration] ++ camkesConfiguration).elements,
         configurationMacros = camkesConfigurationMacros.elements,
-        composition = composition))
+        composition = composition,
+        comments = ISZ()))
 
       astObjects = astObjects ++ otherAstObjects
 
@@ -244,7 +246,8 @@ import org.sireum.ops.ISZOps
         astObjects = astObjects :+ Assembly(
           configuration = ISZ(),
           configurationMacros = ISZ(),
-          composition = g)
+          composition = g,
+          comments = ISZ())
 
       case _ =>
     }
@@ -261,8 +264,7 @@ import org.sireum.ops.ISZOps
       val processId = Util.getCamkesComponentIdentifier(aadlProcess, symbolTable)
 
       val vmGen = VMGen(useDomainScheduling, typeMap, samplingPorts, srcQueues, actOptions)
-      val (component, auxResources) = vmGen.genProcess(aadlProcess, symbolTable, sbConnectionContainer.values)
-
+      val (component, auxResources): (Component, ISZ[Resource])  = vmGen.genProcess(aadlProcess, symbolTable, sbConnectionContainer.values)
 
       instances = instances :+ Util.createCAmkESInstance(
         originAadl = Some(aadlProcess),
@@ -359,17 +361,19 @@ import org.sireum.ops.ISZOps
                 array = F,
                 direction = if (f.direction == ir.Direction.In) Direction.In else Direction.Out,
                 name = f.getName(),
-                typ = Util.getClassifier(f.feature.classifier.get))
+                typ = Util.getClassifier(f.feature.classifier.get),
+                comments = ISZ())
             }
 
             val method = Method(
               name = aadlSubprogram.identifier,
               parameters = params,
-              returnType = None[String]()
+              returnType = None[String](),
+              comments = ISZ()
             )
 
             val procName = aadlSubprogram.getClassifier()
-            astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ())
+            astObjects = astObjects :+ Procedure(name = procName, methods = ISZ(method), includes = ISZ(), comments = ISZ())
           }
           case spg: AadlSubprogramGroup => {
             var methods: ISZ[Method] = ISZ()
@@ -396,12 +400,16 @@ import org.sireum.ops.ISZOps
                           }
                           val typName = Util.getClassifierFullyQualified(p.classifier.get)
 
-                          params = params :+ Parameter(array = F, direction = dir, name = paramName, typ = typName)
-
+                          params = params :+ Parameter(
+                            array = F,
+                            direction = dir,
+                            name = paramName,
+                            typ = typName,
+                            comments = ISZ())
                       }
                     }
 
-                    methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String]())
+                    methods = methods :+ Method(name = methodName, parameters = params, returnType = None[String](), comments = ISZ())
                   } else {
                     reporter.error(None(), Util.toolName, s"Could not resolve feature ${CommonUtil.getName(spa.identifier)} from ${sc.path}")
                   }
@@ -414,7 +422,7 @@ import org.sireum.ops.ISZOps
             }
 
             val procName = Util.getClassifier(spg.component.classifier.get)
-            astObjects = astObjects :+ Procedure(name = procName, methods = methods, includes = ISZ())
+            astObjects = astObjects :+ Procedure(name = procName, methods = methods, includes = ISZ(), comments = ISZ())
           }
           case aadlData: AadlData => {
             val classifier = aadlData.component.classifier.get
@@ -422,21 +430,24 @@ import org.sireum.ops.ISZOps
 
             val readMethod = Method(
               name = s"read_${typeName}",
-              parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "arg", typ = typeName)),
-              returnType = None[String]()
+              parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "arg", typ = typeName, comments = ISZ())),
+              returnType = None[String](),
+              comments = ISZ()
             )
 
             val writeMethod = Method(
               name = s"write_${typeName}",
-              parameters = ISZ(Parameter(array = F, direction = Direction.Refin, name = "arg", typ = typeName)),
-              returnType = None[String]()
+              parameters = ISZ(Parameter(array = F, direction = Direction.Refin, name = "arg", typ = typeName, comments = ISZ())),
+              returnType = None[String](),
+              comments = ISZ()
             )
 
             val procName = Util.getSharedDataInterfaceName(classifier)
             astObjects = astObjects :+ Procedure(
               name = procName,
               methods = ISZ(readMethod, writeMethod),
-              includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
+              includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
+              comments = ISZ()
             )
           }
           case _ =>
@@ -457,7 +468,8 @@ import org.sireum.ops.ISZOps
       exports = ISZ(),
       instances = instances ++ monInstances,
       connections = connections,
-      externalEntities = compositionMacros
+      externalEntities = compositionMacros,
+      comments = ISZ()
     )
   }
 
@@ -508,12 +520,14 @@ import org.sireum.ops.ISZOps
             uses = uses :+ Uses(
               name = f.identifier,
               optional = F,
-              typ = proc)
+              typ = proc,
+              comments = ISZ())
           case ir.AccessType.Provides =>
             imports = imports + Util.getInterfaceFilename(proc)
             provides = provides :+ Provides(
               name = f.identifier,
-              typ = proc)
+              typ = proc,
+              comments = ISZ())
         }
       }
 
@@ -527,13 +541,15 @@ import org.sireum.ops.ISZOps
             dataports = dataports :+ Dataport(
               name = f.identifier,
               optional = F,
-              typ = typeName)
+              typ = typeName,
+              comments = ISZ())
           case ir.AccessType.Provides =>
             imports = imports + Util.getInterfaceFilename(interfaceName)
             dataports = dataports :+ Dataport(
               name = f.identifier,
               optional = F,
-              typ = typeName)
+              typ = typeName,
+              comments = ISZ())
         }
       }
 
@@ -966,7 +982,7 @@ import org.sireum.ops.ISZOps
 
     PropertyUtil.getDiscreetPropertyValue(c.properties, "camkes::Binary_Semaphore") match {
       case Some(v: ir.ValueProp) =>
-        binarySemaphores = binarySemaphores :+ BinarySemaphore(v.value)
+        binarySemaphores = binarySemaphores :+ BinarySemaphore(v.value, comments = ISZ())
       case _ =>
     }
 
@@ -978,7 +994,7 @@ import org.sireum.ops.ISZOps
     var gcRunLoopEndStmts: ISZ[ST] = ISZ()
 
     if (!PeriodicUtil.requiresPacerArtifacts(aadlThread, symbolTable, useDomainScheduling)) {
-      semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH)
+      semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH, comments = ISZ())
 
       val semWait: ST = st"MUTEXOP(${StringTemplate.SEM_WAIT}())"
 
@@ -1409,7 +1425,7 @@ import org.sireum.ops.ISZOps
           val inst: Instance = Instance(
             address_space = "",
             name = instanceName,
-            component = monitor)
+            component = monitor, comments = ISZ())
 
           val paramType: ir.Component = typeMap.get(typeName).get
           val paramTypeName: String = Util.getSel4TypeName(paramType, performHamrIntegration)
@@ -1424,8 +1440,8 @@ import org.sireum.ops.ISZOps
           val interface: Procedure = Procedure(
             name = interfaceName,
             methods = methods,
-            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
-          )
+            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
+            comments = ISZ())
 
           val connInstName = CommonUtil.getName(connInst.name)
 
@@ -1472,7 +1488,7 @@ import org.sireum.ops.ISZOps
             hardware = F,
             name = monitorName,
 
-            mutexes = ISZ(Mutex("m")),
+            mutexes = ISZ(Mutex("m", comments = ISZ())),
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
             dataports = ISZ(),
@@ -1499,30 +1515,35 @@ import org.sireum.ops.ISZOps
           val inst: Instance = Instance(
             address_space = "",
             name = instanceName,
-            component = monitor)
+            component = monitor,
+            comments = ISZ())
 
           val receiveMethod = Method(
             name = "dequeue",
             parameters = ISZ(
-              Parameter(F, Direction.Out, "m", paramTypeName)),
-            returnType = Some("bool"))
+              Parameter(F, Direction.Out, "m", paramTypeName, comments = ISZ())),
+            returnType = Some("bool"),
+            comments = ISZ())
 
           val interfaceReceiver: Procedure = Procedure(
             name = interfaceNameReceiver,
             methods = ISZ(receiveMethod),
-            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
+            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
+            comments = ISZ()
           )
 
           val sendMethod = Method(
             name = "enqueue",
             parameters = ISZ(
-              Parameter(F, Direction.Refin, "m", paramTypeName)),
-            returnType = Some("bool"))
+              Parameter(F, Direction.Refin, "m", paramTypeName, comments = ISZ())),
+            returnType = Some("bool"),
+            comments = ISZ())
 
           val interfaceSender: Procedure = Procedure(
             name = interfaceNameSender,
             methods = ISZ(sendMethod),
-            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
+            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
+            comments = ISZ()
           )
 
           val connInstName = CommonUtil.getName(connInst.name)
@@ -1567,7 +1588,7 @@ import org.sireum.ops.ISZOps
             hardware = F,
             name = monitorName,
 
-            mutexes = ISZ(Mutex("m")),
+            mutexes = ISZ(Mutex("m", comments = ISZ())),
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
             dataports = ISZ(),
@@ -1588,34 +1609,38 @@ import org.sireum.ops.ISZOps
             externalEntities = ISZ()
           )
 
-          val inst: Instance = Instance(address_space = "", name = instanceName, component = monitor)
+          val inst: Instance = Instance(address_space = "", name = instanceName, component = monitor, comments = ISZ())
 
           val isEmptyMethod = Method(
             name = "is_empty",
             parameters = ISZ(),
-            returnType = Some("bool"))
+            returnType = Some("bool"),
+            comments = ISZ())
 
           val receiveMethod = Method(
             name = "dequeue",
             parameters = ISZ(),
-            returnType = Some("bool"))
+            returnType = Some("bool"),
+            comments = ISZ())
 
           val interfaceReceiver: Procedure = Procedure(
             name = interfaceNameReceiver,
             methods = ISZ(isEmptyMethod, receiveMethod),
-            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
+            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
+            comments = ISZ()
           )
 
           val sendMethod = Method(
             name = "enqueue",
             parameters = ISZ(),
-            returnType = Some("bool"))
+            returnType = Some("bool"),
+            comments = ISZ())
 
           val interfaceSender: Procedure = Procedure(
             name = interfaceNameSender,
             methods = ISZ(sendMethod),
-            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes())
-          )
+            includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
+            comments = ISZ())
 
           val connInstName = CommonUtil.getName(connInst.name)
 
@@ -1686,16 +1711,16 @@ import org.sireum.ops.ISZOps
 
   def createReadWriteMethods(typeName: String): ISZ[Method] = {
     return ISZ(
-      Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool")),
-      Method(name = "read", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")),
-      Method(name = "write", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")))
+      Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool"), comments = ISZ()),
+      Method(name = "read", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()),
+      Method(name = "write", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
   }
 
   def createQueueMethods(typeName: String): ISZ[Method] = {
     return ISZ(
-      Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool")),
-      Method(name = "enqueue", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName)), returnType = Some("bool")),
-      Method(name = "dequeue", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName)), returnType = Some("bool")))
+      Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool"), comments = ISZ()),
+      Method(name = "enqueue", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()),
+      Method(name = "dequeue", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
   }
 
   def processDataTypes(values: ISZ[ir.Component]): ST = {

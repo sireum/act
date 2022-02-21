@@ -106,11 +106,11 @@ object PeriodicDispatcherTemplate {
 
   def configurationTimerAttribute(instanceName: String, i: Z, isDispatcher: B): ast.Configuration = {
     val id: String = if(isDispatcher) {TIMER_ID_DISPATCHER} else {TIMER_ID}
-    return ast.GenericConfiguration(s"${instanceName}.${id}_attributes = ${i};")
+    return ast.GenericConfiguration(s"${instanceName}.${id}_attributes = ${i};", ISZ())
   }
 
   def configurationTimerGlobalEndpoint(instanceName: String, interfaceName: String, classifier: String, id: String): ast.Configuration = {
-    return ast.GenericConfiguration(st"""${instanceName}.${interfaceName}_global_endpoint = "${classifier}_${id}";""".render)
+    return ast.GenericConfiguration(st"""${instanceName}.${interfaceName}_global_endpoint = "${classifier}_${id}";""".render, ISZ())
   }
 
 

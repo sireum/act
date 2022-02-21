@@ -37,6 +37,59 @@ object JSON {
 
   object Printer {
 
+    @pure def printAstComment(o: AstComment): ST = {
+      o match {
+        case o: AstBasicComment => return printAstBasicComment(o)
+      }
+    }
+
+    @pure def printCommentLocationType(o: CommentLocation.Type): ST = {
+      val value: String = o match {
+        case CommentLocation.PRE => "PRE"
+        case CommentLocation.INLINE => "INLINE"
+        case CommentLocation.POST => "POST"
+      }
+      return printObject(ISZ(
+        ("type", printString("CommentLocation")),
+        ("value", printString(value))
+      ))
+    }
+
+    @pure def printAstBasicComment(o: AstBasicComment): ST = {
+      return printObject(ISZ(
+        ("type", st""""AstBasicComment""""),
+        ("location", printCommentLocationType(o.location)),
+        ("comment", printString(o.comment))
+      ))
+    }
+
+    @pure def printCommentProvider(o: CommentProvider): ST = {
+      o match {
+        case o: Assembly => return printAssembly(o)
+        case o: Composition => return printComposition(o)
+        case o: Instance => return printInstance(o)
+        case o: Component => return printComponent(o)
+        case o: LibraryComponent => return printLibraryComponent(o)
+        case o: Uses => return printUses(o)
+        case o: Provides => return printProvides(o)
+        case o: Emits => return printEmits(o)
+        case o: Consumes => return printConsumes(o)
+        case o: Dataport => return printDataport(o)
+        case o: Connection => return printConnection(o)
+        case o: ConnectionEnd => return printConnectionEnd(o)
+        case o: Connector => return printConnector(o)
+        case o: Procedure => return printProcedure(o)
+        case o: Method => return printMethod(o)
+        case o: Parameter => return printParameter(o)
+        case o: BinarySemaphore => return printBinarySemaphore(o)
+        case o: Semaphore => return printSemaphore(o)
+        case o: Mutex => return printMutex(o)
+        case o: GenericConfiguration => return printGenericConfiguration(o)
+        case o: DataPortAccessRestriction => return printDataPortAccessRestriction(o)
+        case o: TODO => return printTODO(o)
+      }
+    }
+
     @pure def printASTObject(o: ASTObject): ST = {
       o match {
         case o: Assembly => return printAssembly(o)
@@ -62,7 +115,8 @@ object JSON {
         ("type", st""""Assembly""""),
         ("configuration", printISZ(F, o.configuration, printConfiguration _)),
         ("configurationMacros", printISZ(T, o.configurationMacros, printString _)),
-        ("composition", printComposition(o.composition))
+        ("composition", printComposition(o.composition)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -73,7 +127,8 @@ object JSON {
         ("exports", printISZ(F, o.exports, printTODO _)),
         ("instances", printISZ(F, o.instances, printInstance _)),
         ("connections", printISZ(F, o.connections, printConnection _)),
-        ("externalEntities", printISZ(T, o.externalEntities, printString _))
+        ("externalEntities", printISZ(T, o.externalEntities, printString _)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -82,7 +137,8 @@ object JSON {
         ("type", st""""Instance""""),
         ("address_space", printString(o.address_space)),
         ("name", printString(o.name)),
-        ("component", printCamkesComponent(o.component))
+        ("component", printCamkesComponent(o.component)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -111,7 +167,8 @@ object JSON {
         ("attributes", printISZ(F, o.attributes, printTODO _)),
         ("imports", printISZ(T, o.imports, printString _)),
         ("preprocessorIncludes", printISZ(T, o.preprocessorIncludes, printString _)),
-        ("externalEntities", printISZ(T, o.externalEntities, printString _))
+        ("externalEntities", printISZ(T, o.externalEntities, printString _)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -119,7 +176,8 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""LibraryComponent""""),
         ("name", printString(o.name)),
-        ("ports", printISZ(T, o.ports, printString _))
+        ("ports", printISZ(T, o.ports, printString _)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -138,7 +196,8 @@ object JSON {
         ("type", st""""Uses""""),
         ("name", printString(o.name)),
         ("typ", printString(o.typ)),
-        ("optional", printB(o.optional))
+        ("optional", printB(o.optional)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -146,7 +205,8 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Provides""""),
         ("name", printString(o.name)),
-        ("typ", printString(o.typ))
+        ("typ", printString(o.typ)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -154,7 +214,8 @@ object JSON {
       return printObject(ISZ(
         ("type", st""""Emits""""),
         ("name", printString(o.name)),
-        ("typ", printString(o.typ))
+        ("typ", printString(o.typ)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -163,7 +224,8 @@ object JSON {
         ("type", st""""Consumes""""),
         ("name", printString(o.name)),
         ("typ", printString(o.typ)),
-        ("optional", printB(o.optional))
+        ("optional", printB(o.optional)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -172,7 +234,8 @@ object JSON {
         ("type", st""""Dataport""""),
         ("name", printString(o.name)),
         ("typ", printString(o.typ)),
-        ("optional", printB(o.optional))
+        ("optional", printB(o.optional)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -182,7 +245,8 @@ object JSON {
         ("name", printString(o.name)),
         ("connectionType", printString(o.connectionType)),
         ("from_ends", printISZ(F, o.from_ends, printConnectionEnd _)),
-        ("to_ends", printISZ(F, o.to_ends, printConnectionEnd _))
+        ("to_ends", printISZ(F, o.to_ends, printConnectionEnd _)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -191,7 +255,8 @@ object JSON {
         ("type", st""""ConnectionEnd""""),
         ("isFrom", printB(o.isFrom)),
         ("component", printString(o.component)),
-        ("end", printString(o.end))
+        ("end", printString(o.end)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -222,7 +287,8 @@ object JSON {
         ("to_template", printOption(T, o.to_template, printString _)),
         ("to_threads", printZ(o.to_threads)),
         ("to_hardware", printB(o.to_hardware)),
-        ("attributes", printISZ(F, o.attributes, printAttribute _))
+        ("attributes", printISZ(F, o.attributes, printAttribute _)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -231,7 +297,8 @@ object JSON {
         ("type", st""""Procedure""""),
         ("name", printString(o.name)),
         ("methods", printISZ(F, o.methods, printMethod _)),
-        ("includes", printISZ(T, o.includes, printString _))
+        ("includes", printISZ(T, o.includes, printString _)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -240,7 +307,8 @@ object JSON {
         ("type", st""""Method""""),
         ("name", printString(o.name)),
         ("parameters", printISZ(F, o.parameters, printParameter _)),
-        ("returnType", printOption(T, o.returnType, printString _))
+        ("returnType", printOption(T, o.returnType, printString _)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -250,7 +318,8 @@ object JSON {
         ("array", printB(o.array)),
         ("direction", printDirectionType(o.direction)),
         ("name", printString(o.name)),
-        ("typ", printString(o.typ))
+        ("typ", printString(o.typ)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -269,21 +338,24 @@ object JSON {
     @pure def printBinarySemaphore(o: BinarySemaphore): ST = {
       return printObject(ISZ(
         ("type", st""""BinarySemaphore""""),
-        ("name", printString(o.name))
+        ("name", printString(o.name)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
     @pure def printSemaphore(o: Semaphore): ST = {
       return printObject(ISZ(
         ("type", st""""Semaphore""""),
-        ("name", printString(o.name))
+        ("name", printString(o.name)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
     @pure def printMutex(o: Mutex): ST = {
       return printObject(ISZ(
         ("type", st""""Mutex""""),
-        ("name", printString(o.name))
+        ("name", printString(o.name)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -292,7 +364,8 @@ object JSON {
         ("type", st""""Attribute""""),
         ("typ", printString(o.typ)),
         ("name", printString(o.name)),
-        ("value", printString(o.value))
+        ("value", printString(o.value)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -318,7 +391,8 @@ object JSON {
     @pure def printGenericConfiguration(o: GenericConfiguration): ST = {
       return printObject(ISZ(
         ("type", st""""GenericConfiguration""""),
-        ("e", printString(o.e))
+        ("e", printString(o.e)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -327,13 +401,15 @@ object JSON {
         ("type", st""""DataPortAccessRestriction""""),
         ("component", printString(o.component)),
         ("port", printString(o.port)),
-        ("accessType", printAccessTypeType(o.accessType))
+        ("accessType", printAccessTypeType(o.accessType)),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
     @pure def printTODO(o: TODO): ST = {
       return printObject(ISZ(
-        ("type", st""""TODO"""")
+        ("type", st""""TODO""""),
+        ("comments", printISZ(F, o.comments, printAstComment _))
       ))
     }
 
@@ -344,6 +420,82 @@ object JSON {
 
     def errorOpt: Option[Json.ErrorMsg] = {
       return parser.errorOpt
+    }
+
+    def parseAstComment(): AstComment = {
+      val t = parser.parseObjectTypes(ISZ("AstBasicComment"))
+      t.native match {
+        case "AstBasicComment" => val r = parseAstBasicCommentT(T); return r
+        case _ => val r = parseAstBasicCommentT(T); return r
+      }
+    }
+
+    def parseCommentLocationType(): CommentLocation.Type = {
+      val r = parseCommentLocationT(F)
+      return r
+    }
+
+    def parseCommentLocationT(typeParsed: B): CommentLocation.Type = {
+      if (!typeParsed) {
+        parser.parseObjectType("CommentLocation")
+      }
+      parser.parseObjectKey("value")
+      var i = parser.offset
+      val s = parser.parseString()
+      parser.parseObjectNext()
+      CommentLocation.byName(s) match {
+        case Some(r) => return r
+        case _ =>
+          parser.parseException(i, s"Invalid element name '$s' for CommentLocation.")
+          return CommentLocation.byOrdinal(0).get
+      }
+    }
+
+    def parseAstBasicComment(): AstBasicComment = {
+      val r = parseAstBasicCommentT(F)
+      return r
+    }
+
+    def parseAstBasicCommentT(typeParsed: B): AstBasicComment = {
+      if (!typeParsed) {
+        parser.parseObjectType("AstBasicComment")
+      }
+      parser.parseObjectKey("location")
+      val location = parseCommentLocationType()
+      parser.parseObjectNext()
+      parser.parseObjectKey("comment")
+      val comment = parser.parseString()
+      parser.parseObjectNext()
+      return AstBasicComment(location, comment)
+    }
+
+    def parseCommentProvider(): CommentProvider = {
+      val t = parser.parseObjectTypes(ISZ("Assembly", "Composition", "Instance", "Component", "LibraryComponent", "Uses", "Provides", "Emits", "Consumes", "Dataport", "Connection", "ConnectionEnd", "Connector", "Procedure", "Method", "Parameter", "BinarySemaphore", "Semaphore", "Mutex", "GenericConfiguration", "DataPortAccessRestriction", "TODO"))
+      t.native match {
+        case "Assembly" => val r = parseAssemblyT(T); return r
+        case "Composition" => val r = parseCompositionT(T); return r
+        case "Instance" => val r = parseInstanceT(T); return r
+        case "Component" => val r = parseComponentT(T); return r
+        case "LibraryComponent" => val r = parseLibraryComponentT(T); return r
+        case "Uses" => val r = parseUsesT(T); return r
+        case "Provides" => val r = parseProvidesT(T); return r
+        case "Emits" => val r = parseEmitsT(T); return r
+        case "Consumes" => val r = parseConsumesT(T); return r
+        case "Dataport" => val r = parseDataportT(T); return r
+        case "Connection" => val r = parseConnectionT(T); return r
+        case "ConnectionEnd" => val r = parseConnectionEndT(T); return r
+        case "Connector" => val r = parseConnectorT(T); return r
+        case "Procedure" => val r = parseProcedureT(T); return r
+        case "Method" => val r = parseMethodT(T); return r
+        case "Parameter" => val r = parseParameterT(T); return r
+        case "BinarySemaphore" => val r = parseBinarySemaphoreT(T); return r
+        case "Semaphore" => val r = parseSemaphoreT(T); return r
+        case "Mutex" => val r = parseMutexT(T); return r
+        case "GenericConfiguration" => val r = parseGenericConfigurationT(T); return r
+        case "DataPortAccessRestriction" => val r = parseDataPortAccessRestrictionT(T); return r
+        case "TODO" => val r = parseTODOT(T); return r
+        case _ => val r = parseTODOT(T); return r
+      }
     }
 
     def parseASTObject(): ASTObject = {
@@ -386,7 +538,10 @@ object JSON {
       parser.parseObjectKey("composition")
       val composition = parseComposition()
       parser.parseObjectNext()
-      return Assembly(configuration, configurationMacros, composition)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Assembly(configuration, configurationMacros, composition, comments)
     }
 
     def parseComposition(): Composition = {
@@ -413,7 +568,10 @@ object JSON {
       parser.parseObjectKey("externalEntities")
       val externalEntities = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
-      return Composition(groups, exports, instances, connections, externalEntities)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Composition(groups, exports, instances, connections, externalEntities, comments)
     }
 
     def parseInstance(): Instance = {
@@ -434,7 +592,10 @@ object JSON {
       parser.parseObjectKey("component")
       val component = parseCamkesComponent()
       parser.parseObjectNext()
-      return Instance(address_space, name, component)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Instance(address_space, name, component, comments)
     }
 
     def parseCamkesComponent(): CamkesComponent = {
@@ -503,7 +664,10 @@ object JSON {
       parser.parseObjectKey("externalEntities")
       val externalEntities = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
-      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities, comments)
     }
 
     def parseLibraryComponent(): LibraryComponent = {
@@ -521,7 +685,10 @@ object JSON {
       parser.parseObjectKey("ports")
       val ports = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
-      return LibraryComponent(name, ports)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return LibraryComponent(name, ports, comments)
     }
 
     def parseCAmkESFeature(): CAmkESFeature = {
@@ -554,7 +721,10 @@ object JSON {
       parser.parseObjectKey("optional")
       val optional = parser.parseB()
       parser.parseObjectNext()
-      return Uses(name, typ, optional)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Uses(name, typ, optional, comments)
     }
 
     def parseProvides(): Provides = {
@@ -572,7 +742,10 @@ object JSON {
       parser.parseObjectKey("typ")
       val typ = parser.parseString()
       parser.parseObjectNext()
-      return Provides(name, typ)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Provides(name, typ, comments)
     }
 
     def parseEmits(): Emits = {
@@ -590,7 +763,10 @@ object JSON {
       parser.parseObjectKey("typ")
       val typ = parser.parseString()
       parser.parseObjectNext()
-      return Emits(name, typ)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Emits(name, typ, comments)
     }
 
     def parseConsumes(): Consumes = {
@@ -611,7 +787,10 @@ object JSON {
       parser.parseObjectKey("optional")
       val optional = parser.parseB()
       parser.parseObjectNext()
-      return Consumes(name, typ, optional)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Consumes(name, typ, optional, comments)
     }
 
     def parseDataport(): Dataport = {
@@ -632,7 +811,10 @@ object JSON {
       parser.parseObjectKey("optional")
       val optional = parser.parseB()
       parser.parseObjectNext()
-      return Dataport(name, typ, optional)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Dataport(name, typ, optional, comments)
     }
 
     def parseConnection(): Connection = {
@@ -656,7 +838,10 @@ object JSON {
       parser.parseObjectKey("to_ends")
       val to_ends = parser.parseISZ(parseConnectionEnd _)
       parser.parseObjectNext()
-      return Connection(name, connectionType, from_ends, to_ends)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Connection(name, connectionType, from_ends, to_ends, comments)
     }
 
     def parseConnectionEnd(): ConnectionEnd = {
@@ -677,7 +862,10 @@ object JSON {
       parser.parseObjectKey("end")
       val end = parser.parseString()
       parser.parseObjectNext()
-      return ConnectionEnd(isFrom, component, end)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return ConnectionEnd(isFrom, component, end, comments)
     }
 
     def parseConnectorTypeType(): ConnectorType.Type = {
@@ -740,7 +928,10 @@ object JSON {
       parser.parseObjectKey("attributes")
       val attributes = parser.parseISZ(parseAttribute _)
       parser.parseObjectNext()
-      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware, attributes)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware, attributes, comments)
     }
 
     def parseProcedure(): Procedure = {
@@ -761,7 +952,10 @@ object JSON {
       parser.parseObjectKey("includes")
       val includes = parser.parseISZ(parser.parseString _)
       parser.parseObjectNext()
-      return Procedure(name, methods, includes)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Procedure(name, methods, includes, comments)
     }
 
     def parseMethod(): Method = {
@@ -782,7 +976,10 @@ object JSON {
       parser.parseObjectKey("returnType")
       val returnType = parser.parseOption(parser.parseString _)
       parser.parseObjectNext()
-      return Method(name, parameters, returnType)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Method(name, parameters, returnType, comments)
     }
 
     def parseParameter(): Parameter = {
@@ -806,7 +1003,10 @@ object JSON {
       parser.parseObjectKey("typ")
       val typ = parser.parseString()
       parser.parseObjectNext()
-      return Parameter(array, direction, name, typ)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Parameter(array, direction, name, typ, comments)
     }
 
     def parseDirectionType(): Direction.Type = {
@@ -842,7 +1042,10 @@ object JSON {
       parser.parseObjectKey("name")
       val name = parser.parseString()
       parser.parseObjectNext()
-      return BinarySemaphore(name)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return BinarySemaphore(name, comments)
     }
 
     def parseSemaphore(): Semaphore = {
@@ -857,7 +1060,10 @@ object JSON {
       parser.parseObjectKey("name")
       val name = parser.parseString()
       parser.parseObjectNext()
-      return Semaphore(name)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Semaphore(name, comments)
     }
 
     def parseMutex(): Mutex = {
@@ -872,7 +1078,10 @@ object JSON {
       parser.parseObjectKey("name")
       val name = parser.parseString()
       parser.parseObjectNext()
-      return Mutex(name)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Mutex(name, comments)
     }
 
     def parseAttribute(): Attribute = {
@@ -893,7 +1102,10 @@ object JSON {
       parser.parseObjectKey("value")
       val value = parser.parseString()
       parser.parseObjectNext()
-      return Attribute(typ, name, value)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return Attribute(typ, name, value, comments)
     }
 
     def parseAccessTypeType(): AccessType.Type = {
@@ -938,7 +1150,10 @@ object JSON {
       parser.parseObjectKey("e")
       val e = parser.parseString()
       parser.parseObjectNext()
-      return GenericConfiguration(e)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return GenericConfiguration(e, comments)
     }
 
     def parseDataPortAccessRestriction(): DataPortAccessRestriction = {
@@ -959,7 +1174,10 @@ object JSON {
       parser.parseObjectKey("accessType")
       val accessType = parseAccessTypeType()
       parser.parseObjectNext()
-      return DataPortAccessRestriction(component, port, accessType)
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return DataPortAccessRestriction(component, port, accessType, comments)
     }
 
     def parseTODO(): TODO = {
@@ -971,7 +1189,10 @@ object JSON {
       if (!typeParsed) {
         parser.parseObjectType("TODO")
       }
-      return TODO()
+      parser.parseObjectKey("comments")
+      val comments = parser.parseISZ(parseAstComment _)
+      parser.parseObjectNext()
+      return TODO(comments)
     }
 
     def eof(): B = {
@@ -989,6 +1210,60 @@ object JSON {
       case Some(e) => return Either.Right(e)
       case _ => return Either.Left(r)
     }
+  }
+
+  def fromAstComment(o: AstComment, isCompact: B): String = {
+    val st = Printer.printAstComment(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toAstComment(s: String): Either[AstComment, Json.ErrorMsg] = {
+    def fAstComment(parser: Parser): AstComment = {
+      val r = parser.parseAstComment()
+      return r
+    }
+    val r = to(s, fAstComment _)
+    return r
+  }
+
+  def fromAstBasicComment(o: AstBasicComment, isCompact: B): String = {
+    val st = Printer.printAstBasicComment(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toAstBasicComment(s: String): Either[AstBasicComment, Json.ErrorMsg] = {
+    def fAstBasicComment(parser: Parser): AstBasicComment = {
+      val r = parser.parseAstBasicComment()
+      return r
+    }
+    val r = to(s, fAstBasicComment _)
+    return r
+  }
+
+  def fromCommentProvider(o: CommentProvider, isCompact: B): String = {
+    val st = Printer.printCommentProvider(o)
+    if (isCompact) {
+      return st.renderCompact
+    } else {
+      return st.render
+    }
+  }
+
+  def toCommentProvider(s: String): Either[CommentProvider, Json.ErrorMsg] = {
+    def fCommentProvider(parser: Parser): CommentProvider = {
+      val r = parser.parseCommentProvider()
+      return r
+    }
+    val r = to(s, fCommentProvider _)
+    return r
   }
 
   def fromASTObject(o: ASTObject, isCompact: B): String = {

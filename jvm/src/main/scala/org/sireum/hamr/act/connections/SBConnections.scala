@@ -168,7 +168,7 @@ object SBConnections {
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
+                      ast.GenericConfiguration(e = s"${holder.connectionName}.size = ${size};", comments = ISZ()))
                   }
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
@@ -201,16 +201,16 @@ object SBConnections {
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
+                      ast.GenericConfiguration(e = s"${holder.connectionName}.size = ${size};", comments = ISZ()))
                   }
 
                   val producerPerms: ast.AccessType.Type = if(srcToVM) ast.AccessType.RW else ast.AccessType.W
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_DP, producerPerms))
+                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_DP, producerPerms, ISZ()))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_DP, ast.AccessType.R))
+                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_DP, ast.AccessType.R, ISZ()))
 
                   updateHolder(srcConnectionEnd_DP, holder)
                 }
@@ -263,15 +263,15 @@ object SBConnections {
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
+                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};", ISZ()))
                   }
 
                   val srcAccessType: ast.AccessType.Type = if(srcToVM) ast.AccessType.RW else ast.AccessType.W
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_ED, srcAccessType))
+                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureQueueName_ED, srcAccessType, ISZ()))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_ED, ast.AccessType.R))
+                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureQueueName_ED, ast.AccessType.R, ISZ()))
 
                   if(dstToVM) {
 
@@ -280,7 +280,7 @@ object SBConnections {
                         // add the notification to the same domain as the component or will get an error like
                         // 'handle_event_bar_fault@cross_vm_connection.c:126 Connection is not configured with an emit function'
                         holder = holder(configurationEntries = holder.configurationEntries :+
-                          ast.GenericConfiguration(s"${dstCamkesComponentId}.${dstCamkesFeatureNotificationName}_domain = ${d};"))
+                          ast.GenericConfiguration(s"${dstCamkesComponentId}.${dstCamkesFeatureNotificationName}_domain = ${d};", ISZ()))
                       case _ =>
                     }
                   }
@@ -317,7 +317,7 @@ object SBConnections {
                     }
 
                     holder = holder(configurationEntries = holder.configurationEntries :+
-                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};"))
+                      ast.GenericConfiguration(s"${holder.connectionName}.size = ${size};", ISZ()))
                   }
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
@@ -367,10 +367,10 @@ object SBConnections {
 
                   val srcAccessType: ast.AccessType.Type = if(srcToVM) ast.AccessType.RW else ast.AccessType.W
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureName, srcAccessType))
+                    ast.DataPortAccessRestriction(srcCamkesComponentId, srcCamkesFeatureName, srcAccessType, ISZ()))
 
                   holder = holder(configurationEntries = holder.configurationEntries :+
-                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureName, ast.AccessType.R))
+                    ast.DataPortAccessRestriction(dstCamkesComponentId, dstCamkesFeatureName, ast.AccessType.R, ISZ()))
 
                   updateHolder(srcConnectionEnd, holder)
                 }
@@ -418,7 +418,9 @@ object SBConnections {
         to_threads = z"-1",
         to_hardware = F,
 
-        attributes = ISZ(Attribute(typ = "bool", name = "to_global_endpoint", value = "True"))
+        attributes = ISZ(Attribute(typ = "bool", name = "to_global_endpoint", value = "True", comments = ISZ())),
+
+        comments = ISZ()
       )
 
       val connectorTemplate: ConnectorTemplate = ConnectorTemplate(

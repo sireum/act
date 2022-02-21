@@ -45,21 +45,21 @@ object VM_Template {
 
   def vm_assembly_configuration_entries(vmProcessID: String): ISZ[ast.Configuration] = {
     val ret: ISZ[ast.Configuration] = ISZ(
-      ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 18;"),
-      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped21_pool = 12;"),
-      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped12_pool = 12;"),
-      ast.GenericConfiguration(s"${vmProcessID}.num_extra_frame_caps = 0;"),
-      ast.GenericConfiguration(s"${vmProcessID}.extra_frame_map_address = 0;")
+      ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 18;", ISZ()),
+      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped21_pool = 12;", ISZ()),
+      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped12_pool = 12;", ISZ()),
+      ast.GenericConfiguration(s"${vmProcessID}.num_extra_frame_caps = 0;", ISZ()),
+      ast.GenericConfiguration(s"${vmProcessID}.extra_frame_map_address = 0;", ISZ())
     )
     return ret
   }
 
   def vm_assembly_configuration_macros(vmProcessId: String): ISZ[ast.Configuration] = {
     val ret: ISZ[ast.Configuration] = ISZ(
-      ast.GenericConfiguration("VM_GENERAL_CONFIGURATION_DEF()"),
-      ast.GenericConfiguration(s"VM_CONFIGURATION_DEF(${vmProcessId})"),
-      ast.GenericConfiguration(s"VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF()"),
-      ast.GenericConfiguration(s"PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(${vmProcessId})")
+      ast.GenericConfiguration("VM_GENERAL_CONFIGURATION_DEF()", ISZ()),
+      ast.GenericConfiguration(s"VM_CONFIGURATION_DEF(${vmProcessId})", ISZ()),
+      ast.GenericConfiguration(s"VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF()", ISZ()),
+      ast.GenericConfiguration(s"PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(${vmProcessId})", ISZ())
     )
     return ret
   }

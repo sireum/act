@@ -37,6 +37,10 @@ object MTransformer {
   @record class PreResult[T](val continu: B,
                              val resultOpt: MOption[T])
 
+  val PreResultAstBasicComment: PreResult[AstBasicComment] = PreResult(T, MNone())
+
+  val PostResultAstBasicComment: MOption[AstBasicComment] = MNone()
+
   def transformISZ[T](s: IS[Z, T], f: T => MOption[T]): MOption[IS[Z, T]] = {
     val s2: MS[Z, T] = s.toMS
     var changed: B = F
@@ -150,6 +154,181 @@ object MTransformer {
 import MTransformer._
 
 @msig trait MTransformer {
+
+  def preAstComment(o: AstComment): PreResult[AstComment] = {
+    o match {
+      case o: AstBasicComment =>
+        val r: PreResult[AstComment] = preAstBasicComment(o) match {
+         case PreResult(continu, MSome(r: AstComment)) => PreResult(continu, MSome[AstComment](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type AstComment")
+         case PreResult(continu, _) => PreResult(continu, MNone[AstComment]())
+        }
+        return r
+    }
+  }
+
+  def preAstBasicComment(o: AstBasicComment): PreResult[AstBasicComment] = {
+    return PreResultAstBasicComment
+  }
+
+  def preCommentProvider(o: CommentProvider): PreResult[CommentProvider] = {
+    o match {
+      case o: Assembly =>
+        val r: PreResult[CommentProvider] = preAssembly(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Composition =>
+        val r: PreResult[CommentProvider] = preComposition(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Instance =>
+        val r: PreResult[CommentProvider] = preInstance(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Component =>
+        val r: PreResult[CommentProvider] = preComponent(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: LibraryComponent =>
+        val r: PreResult[CommentProvider] = preLibraryComponent(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Uses =>
+        val r: PreResult[CommentProvider] = preUses(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Provides =>
+        val r: PreResult[CommentProvider] = preProvides(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Emits =>
+        val r: PreResult[CommentProvider] = preEmits(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Consumes =>
+        val r: PreResult[CommentProvider] = preConsumes(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Dataport =>
+        val r: PreResult[CommentProvider] = preDataport(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Connection =>
+        val r: PreResult[CommentProvider] = preConnection(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: ConnectionEnd =>
+        val r: PreResult[CommentProvider] = preConnectionEnd(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Connector =>
+        val r: PreResult[CommentProvider] = preConnector(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Procedure =>
+        val r: PreResult[CommentProvider] = preProcedure(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Method =>
+        val r: PreResult[CommentProvider] = preMethod(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Parameter =>
+        val r: PreResult[CommentProvider] = preParameter(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: BinarySemaphore =>
+        val r: PreResult[CommentProvider] = preBinarySemaphore(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Semaphore =>
+        val r: PreResult[CommentProvider] = preSemaphore(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: Mutex =>
+        val r: PreResult[CommentProvider] = preMutex(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: GenericConfiguration =>
+        val r: PreResult[CommentProvider] = preGenericConfiguration(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: DataPortAccessRestriction =>
+        val r: PreResult[CommentProvider] = preDataPortAccessRestriction(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+      case o: TODO =>
+        val r: PreResult[CommentProvider] = preTODO(o) match {
+         case PreResult(continu, MSome(r: CommentProvider)) => PreResult(continu, MSome[CommentProvider](r))
+         case PreResult(_, MSome(_)) => halt("Can only produce object of type CommentProvider")
+         case PreResult(continu, _) => PreResult(continu, MNone[CommentProvider]())
+        }
+        return r
+    }
+  }
 
   def preASTObject(o: ASTObject): PreResult[ASTObject] = {
     o match {
@@ -429,6 +608,181 @@ import MTransformer._
 
   def preTODO(o: TODO): PreResult[TODO] = {
     return PreResultTODO
+  }
+
+  def postAstComment(o: AstComment): MOption[AstComment] = {
+    o match {
+      case o: AstBasicComment =>
+        val r: MOption[AstComment] = postAstBasicComment(o) match {
+         case MSome(result: AstComment) => MSome[AstComment](result)
+         case MSome(_) => halt("Can only produce object of type AstComment")
+         case _ => MNone[AstComment]()
+        }
+        return r
+    }
+  }
+
+  def postAstBasicComment(o: AstBasicComment): MOption[AstBasicComment] = {
+    return PostResultAstBasicComment
+  }
+
+  def postCommentProvider(o: CommentProvider): MOption[CommentProvider] = {
+    o match {
+      case o: Assembly =>
+        val r: MOption[CommentProvider] = postAssembly(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Composition =>
+        val r: MOption[CommentProvider] = postComposition(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Instance =>
+        val r: MOption[CommentProvider] = postInstance(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Component =>
+        val r: MOption[CommentProvider] = postComponent(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: LibraryComponent =>
+        val r: MOption[CommentProvider] = postLibraryComponent(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Uses =>
+        val r: MOption[CommentProvider] = postUses(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Provides =>
+        val r: MOption[CommentProvider] = postProvides(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Emits =>
+        val r: MOption[CommentProvider] = postEmits(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Consumes =>
+        val r: MOption[CommentProvider] = postConsumes(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Dataport =>
+        val r: MOption[CommentProvider] = postDataport(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Connection =>
+        val r: MOption[CommentProvider] = postConnection(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: ConnectionEnd =>
+        val r: MOption[CommentProvider] = postConnectionEnd(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Connector =>
+        val r: MOption[CommentProvider] = postConnector(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Procedure =>
+        val r: MOption[CommentProvider] = postProcedure(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Method =>
+        val r: MOption[CommentProvider] = postMethod(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Parameter =>
+        val r: MOption[CommentProvider] = postParameter(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: BinarySemaphore =>
+        val r: MOption[CommentProvider] = postBinarySemaphore(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Semaphore =>
+        val r: MOption[CommentProvider] = postSemaphore(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: Mutex =>
+        val r: MOption[CommentProvider] = postMutex(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: GenericConfiguration =>
+        val r: MOption[CommentProvider] = postGenericConfiguration(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: DataPortAccessRestriction =>
+        val r: MOption[CommentProvider] = postDataPortAccessRestriction(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+      case o: TODO =>
+        val r: MOption[CommentProvider] = postTODO(o) match {
+         case MSome(result: CommentProvider) => MSome[CommentProvider](result)
+         case MSome(_) => halt("Can only produce object of type CommentProvider")
+         case _ => MNone[CommentProvider]()
+        }
+        return r
+    }
   }
 
   def postASTObject(o: ASTObject): MOption[ASTObject] = {
@@ -711,17 +1065,74 @@ import MTransformer._
     return PostResultTODO
   }
 
-  def transformASTObject(o: ASTObject): MOption[ASTObject] = {
-    val preR: PreResult[ASTObject] = preASTObject(o)
-    val r: MOption[ASTObject] = if (preR.continu) {
-      val o2: ASTObject = preR.resultOpt.getOrElse(o)
+  def transformAstComment(o: AstComment): MOption[AstComment] = {
+    val preR: PreResult[AstComment] = preAstComment(o)
+    val r: MOption[AstComment] = if (preR.continu) {
+      val o2: AstComment = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val rOpt: MOption[ASTObject] = o2 match {
+      val rOpt: MOption[AstComment] = o2 match {
+        case o2: AstBasicComment =>
+          if (hasChanged)
+            MSome(o2)
+          else
+            MNone()
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: AstComment = r.getOrElse(o)
+    val postR: MOption[AstComment] = postAstComment(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformAstBasicComment(o: AstBasicComment): MOption[AstBasicComment] = {
+    val preR: PreResult[AstBasicComment] = preAstBasicComment(o)
+    val r: MOption[AstBasicComment] = if (preR.continu) {
+      val o2: AstBasicComment = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        MSome(o2)
+      else
+        MNone()
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: AstBasicComment = r.getOrElse(o)
+    val postR: MOption[AstBasicComment] = postAstBasicComment(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformCommentProvider(o: CommentProvider): MOption[CommentProvider] = {
+    val preR: PreResult[CommentProvider] = preCommentProvider(o)
+    val r: MOption[CommentProvider] = if (preR.continu) {
+      val o2: CommentProvider = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: MOption[CommentProvider] = o2 match {
         case o2: Assembly =>
           val r0: MOption[IS[Z, Configuration]] = transformISZ(o2.configuration, transformConfiguration _)
           val r1: MOption[Composition] = transformComposition(o2.composition)
-          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
-            MSome(o2(configuration = r0.getOrElse(o2.configuration), composition = r1.getOrElse(o2.composition)))
+          val r2: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
+            MSome(o2(configuration = r0.getOrElse(o2.configuration), composition = r1.getOrElse(o2.composition), comments = r2.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Composition =>
@@ -729,14 +1140,16 @@ import MTransformer._
           val r1: MOption[IS[Z, TODO]] = transformISZ(o2.exports, transformTODO _)
           val r2: MOption[IS[Z, Instance]] = transformISZ(o2.instances, transformInstance _)
           val r3: MOption[IS[Z, Connection]] = transformISZ(o2.connections, transformConnection _)
-          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty)
-            MSome(o2(groups = r0.getOrElse(o2.groups), exports = r1.getOrElse(o2.exports), instances = r2.getOrElse(o2.instances), connections = r3.getOrElse(o2.connections)))
+          val r4: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty)
+            MSome(o2(groups = r0.getOrElse(o2.groups), exports = r1.getOrElse(o2.exports), instances = r2.getOrElse(o2.instances), connections = r3.getOrElse(o2.connections), comments = r4.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Instance =>
           val r0: MOption[CamkesComponent] = transformCamkesComponent(o2.component)
-          if (hasChanged || r0.nonEmpty)
-            MSome(o2(component = r0.getOrElse(o2.component)))
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(component = r0.getOrElse(o2.component), comments = r1.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Component =>
@@ -749,68 +1162,258 @@ import MTransformer._
           val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
           val r7: MOption[IS[Z, Provides]] = transformISZ(o2.provides, transformProvides _)
           val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
-          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty)
-            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes)))
+          val r9: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
+            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes), comments = r9.getOrElse(o2.comments)))
           else
             MNone()
         case o2: LibraryComponent =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Uses =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Provides =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Emits =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Consumes =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Dataport =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Connection =>
           val r0: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.from_ends, transformConnectionEnd _)
           val r1: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.to_ends, transformConnectionEnd _)
-          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
-            MSome(o2(from_ends = r0.getOrElse(o2.from_ends), to_ends = r1.getOrElse(o2.to_ends)))
+          val r2: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
+            MSome(o2(from_ends = r0.getOrElse(o2.from_ends), to_ends = r1.getOrElse(o2.to_ends), comments = r2.getOrElse(o2.comments)))
           else
             MNone()
         case o2: ConnectionEnd =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Connector =>
           val r0: MOption[IS[Z, Attribute]] = transformISZ(o2.attributes, transformAttribute _)
-          if (hasChanged || r0.nonEmpty)
-            MSome(o2(attributes = r0.getOrElse(o2.attributes)))
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(attributes = r0.getOrElse(o2.attributes), comments = r1.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Procedure =>
           val r0: MOption[IS[Z, Method]] = transformISZ(o2.methods, transformMethod _)
-          if (hasChanged || r0.nonEmpty)
-            MSome(o2(methods = r0.getOrElse(o2.methods)))
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(methods = r0.getOrElse(o2.methods), comments = r1.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Method =>
           val r0: MOption[IS[Z, Parameter]] = transformISZ(o2.parameters, transformParameter _)
-          if (hasChanged || r0.nonEmpty)
-            MSome(o2(parameters = r0.getOrElse(o2.parameters)))
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(parameters = r0.getOrElse(o2.parameters), comments = r1.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Parameter =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: BinarySemaphore =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Semaphore =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Mutex =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: GenericConfiguration =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: DataPortAccessRestriction =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: TODO =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      MSome(preR.resultOpt.getOrElse(o))
+    } else {
+      MNone()
+    }
+    val hasChanged: B = r.nonEmpty
+    val o2: CommentProvider = r.getOrElse(o)
+    val postR: MOption[CommentProvider] = postCommentProvider(o2)
+    if (postR.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return MSome(o2)
+    } else {
+      return MNone()
+    }
+  }
+
+  def transformASTObject(o: ASTObject): MOption[ASTObject] = {
+    val preR: PreResult[ASTObject] = preASTObject(o)
+    val r: MOption[ASTObject] = if (preR.continu) {
+      val o2: ASTObject = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: MOption[ASTObject] = o2 match {
+        case o2: Assembly =>
+          val r0: MOption[IS[Z, Configuration]] = transformISZ(o2.configuration, transformConfiguration _)
+          val r1: MOption[Composition] = transformComposition(o2.composition)
+          val r2: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
+            MSome(o2(configuration = r0.getOrElse(o2.configuration), composition = r1.getOrElse(o2.composition), comments = r2.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Composition =>
+          val r0: MOption[IS[Z, TODO]] = transformISZ(o2.groups, transformTODO _)
+          val r1: MOption[IS[Z, TODO]] = transformISZ(o2.exports, transformTODO _)
+          val r2: MOption[IS[Z, Instance]] = transformISZ(o2.instances, transformInstance _)
+          val r3: MOption[IS[Z, Connection]] = transformISZ(o2.connections, transformConnection _)
+          val r4: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty)
+            MSome(o2(groups = r0.getOrElse(o2.groups), exports = r1.getOrElse(o2.exports), instances = r2.getOrElse(o2.instances), connections = r3.getOrElse(o2.connections), comments = r4.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Instance =>
+          val r0: MOption[CamkesComponent] = transformCamkesComponent(o2.component)
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(component = r0.getOrElse(o2.component), comments = r1.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Component =>
+          val r0: MOption[IS[Z, Mutex]] = transformISZ(o2.mutexes, transformMutex _)
+          val r1: MOption[IS[Z, BinarySemaphore]] = transformISZ(o2.binarySemaphores, transformBinarySemaphore _)
+          val r2: MOption[IS[Z, Semaphore]] = transformISZ(o2.semaphores, transformSemaphore _)
+          val r3: MOption[IS[Z, Dataport]] = transformISZ(o2.dataports, transformDataport _)
+          val r4: MOption[IS[Z, Emits]] = transformISZ(o2.emits, transformEmits _)
+          val r5: MOption[IS[Z, Uses]] = transformISZ(o2.uses, transformUses _)
+          val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
+          val r7: MOption[IS[Z, Provides]] = transformISZ(o2.provides, transformProvides _)
+          val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
+          val r9: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
+            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes), comments = r9.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: LibraryComponent =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Connection =>
+          val r0: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.from_ends, transformConnectionEnd _)
+          val r1: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.to_ends, transformConnectionEnd _)
+          val r2: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
+            MSome(o2(from_ends = r0.getOrElse(o2.from_ends), to_ends = r1.getOrElse(o2.to_ends), comments = r2.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: ConnectionEnd =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Connector =>
+          val r0: MOption[IS[Z, Attribute]] = transformISZ(o2.attributes, transformAttribute _)
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(attributes = r0.getOrElse(o2.attributes), comments = r1.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Procedure =>
+          val r0: MOption[IS[Z, Method]] = transformISZ(o2.methods, transformMethod _)
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(methods = r0.getOrElse(o2.methods), comments = r1.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Method =>
+          val r0: MOption[IS[Z, Parameter]] = transformISZ(o2.parameters, transformParameter _)
+          val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+            MSome(o2(parameters = r0.getOrElse(o2.parameters), comments = r1.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Parameter =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: BinarySemaphore =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Semaphore =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: Mutex =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
+          else
+            MNone()
+        case o2: TODO =>
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
       }
@@ -839,8 +1442,9 @@ import MTransformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: MOption[IS[Z, Configuration]] = transformISZ(o2.configuration, transformConfiguration _)
       val r1: MOption[Composition] = transformComposition(o2.composition)
-      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
-        MSome(o2(configuration = r0.getOrElse(o2.configuration), composition = r1.getOrElse(o2.composition)))
+      val r2: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
+        MSome(o2(configuration = r0.getOrElse(o2.configuration), composition = r1.getOrElse(o2.composition), comments = r2.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -869,8 +1473,9 @@ import MTransformer._
       val r1: MOption[IS[Z, TODO]] = transformISZ(o2.exports, transformTODO _)
       val r2: MOption[IS[Z, Instance]] = transformISZ(o2.instances, transformInstance _)
       val r3: MOption[IS[Z, Connection]] = transformISZ(o2.connections, transformConnection _)
-      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty)
-        MSome(o2(groups = r0.getOrElse(o2.groups), exports = r1.getOrElse(o2.exports), instances = r2.getOrElse(o2.instances), connections = r3.getOrElse(o2.connections)))
+      val r4: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty)
+        MSome(o2(groups = r0.getOrElse(o2.groups), exports = r1.getOrElse(o2.exports), instances = r2.getOrElse(o2.instances), connections = r3.getOrElse(o2.connections), comments = r4.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -896,8 +1501,9 @@ import MTransformer._
       val o2: Instance = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: MOption[CamkesComponent] = transformCamkesComponent(o2.component)
-      if (hasChanged || r0.nonEmpty)
-        MSome(o2(component = r0.getOrElse(o2.component)))
+      val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+        MSome(o2(component = r0.getOrElse(o2.component), comments = r1.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -933,13 +1539,15 @@ import MTransformer._
           val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
           val r7: MOption[IS[Z, Provides]] = transformISZ(o2.provides, transformProvides _)
           val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
-          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty)
-            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes)))
+          val r9: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
+            MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes), comments = r9.getOrElse(o2.comments)))
           else
             MNone()
         case o2: LibraryComponent =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
       }
@@ -975,8 +1583,9 @@ import MTransformer._
       val r6: MOption[IS[Z, Consumes]] = transformISZ(o2.consumes, transformConsumes _)
       val r7: MOption[IS[Z, Provides]] = transformISZ(o2.provides, transformProvides _)
       val r8: MOption[IS[Z, TODO]] = transformISZ(o2.attributes, transformTODO _)
-      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty)
-        MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes)))
+      val r9: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty || r3.nonEmpty || r4.nonEmpty || r5.nonEmpty || r6.nonEmpty || r7.nonEmpty || r8.nonEmpty || r9.nonEmpty)
+        MSome(o2(mutexes = r0.getOrElse(o2.mutexes), binarySemaphores = r1.getOrElse(o2.binarySemaphores), semaphores = r2.getOrElse(o2.semaphores), dataports = r3.getOrElse(o2.dataports), emits = r4.getOrElse(o2.emits), uses = r5.getOrElse(o2.uses), consumes = r6.getOrElse(o2.consumes), provides = r7.getOrElse(o2.provides), attributes = r8.getOrElse(o2.attributes), comments = r9.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1001,8 +1610,9 @@ import MTransformer._
     val r: MOption[LibraryComponent] = if (preR.continu) {
       val o2: LibraryComponent = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1029,28 +1639,33 @@ import MTransformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val rOpt: MOption[CAmkESFeature] = o2 match {
         case o2: Uses =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Provides =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Emits =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Consumes =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: Dataport =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
       }
@@ -1077,8 +1692,9 @@ import MTransformer._
     val r: MOption[Uses] = if (preR.continu) {
       val o2: Uses = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1103,8 +1719,9 @@ import MTransformer._
     val r: MOption[Provides] = if (preR.continu) {
       val o2: Provides = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1129,8 +1746,9 @@ import MTransformer._
     val r: MOption[Emits] = if (preR.continu) {
       val o2: Emits = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1155,8 +1773,9 @@ import MTransformer._
     val r: MOption[Consumes] = if (preR.continu) {
       val o2: Consumes = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1181,8 +1800,9 @@ import MTransformer._
     val r: MOption[Dataport] = if (preR.continu) {
       val o2: Dataport = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1209,8 +1829,9 @@ import MTransformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.from_ends, transformConnectionEnd _)
       val r1: MOption[IS[Z, ConnectionEnd]] = transformISZ(o2.to_ends, transformConnectionEnd _)
-      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
-        MSome(o2(from_ends = r0.getOrElse(o2.from_ends), to_ends = r1.getOrElse(o2.to_ends)))
+      val r2: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty || r2.nonEmpty)
+        MSome(o2(from_ends = r0.getOrElse(o2.from_ends), to_ends = r1.getOrElse(o2.to_ends), comments = r2.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1235,8 +1856,9 @@ import MTransformer._
     val r: MOption[ConnectionEnd] = if (preR.continu) {
       val o2: ConnectionEnd = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1262,8 +1884,9 @@ import MTransformer._
       val o2: Connector = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: MOption[IS[Z, Attribute]] = transformISZ(o2.attributes, transformAttribute _)
-      if (hasChanged || r0.nonEmpty)
-        MSome(o2(attributes = r0.getOrElse(o2.attributes)))
+      val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+        MSome(o2(attributes = r0.getOrElse(o2.attributes), comments = r1.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1289,8 +1912,9 @@ import MTransformer._
       val o2: Procedure = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: MOption[IS[Z, Method]] = transformISZ(o2.methods, transformMethod _)
-      if (hasChanged || r0.nonEmpty)
-        MSome(o2(methods = r0.getOrElse(o2.methods)))
+      val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+        MSome(o2(methods = r0.getOrElse(o2.methods), comments = r1.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1316,8 +1940,9 @@ import MTransformer._
       val o2: Method = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: MOption[IS[Z, Parameter]] = transformISZ(o2.parameters, transformParameter _)
-      if (hasChanged || r0.nonEmpty)
-        MSome(o2(parameters = r0.getOrElse(o2.parameters)))
+      val r1: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty || r1.nonEmpty)
+        MSome(o2(parameters = r0.getOrElse(o2.parameters), comments = r1.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1342,8 +1967,9 @@ import MTransformer._
     val r: MOption[Parameter] = if (preR.continu) {
       val o2: Parameter = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1368,8 +1994,9 @@ import MTransformer._
     val r: MOption[BinarySemaphore] = if (preR.continu) {
       val o2: BinarySemaphore = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1394,8 +2021,9 @@ import MTransformer._
     val r: MOption[Semaphore] = if (preR.continu) {
       val o2: Semaphore = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1420,8 +2048,9 @@ import MTransformer._
     val r: MOption[Mutex] = if (preR.continu) {
       val o2: Mutex = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1446,8 +2075,9 @@ import MTransformer._
     val r: MOption[Attribute] = if (preR.continu) {
       val o2: Attribute = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1474,13 +2104,15 @@ import MTransformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val rOpt: MOption[Configuration] = o2 match {
         case o2: GenericConfiguration =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
         case o2: DataPortAccessRestriction =>
-          if (hasChanged)
-            MSome(o2)
+          val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+          if (hasChanged || r0.nonEmpty)
+            MSome(o2(comments = r0.getOrElse(o2.comments)))
           else
             MNone()
       }
@@ -1507,8 +2139,9 @@ import MTransformer._
     val r: MOption[GenericConfiguration] = if (preR.continu) {
       val o2: GenericConfiguration = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1533,8 +2166,9 @@ import MTransformer._
     val r: MOption[DataPortAccessRestriction] = if (preR.continu) {
       val o2: DataPortAccessRestriction = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {
@@ -1559,8 +2193,9 @@ import MTransformer._
     val r: MOption[TODO] = if (preR.continu) {
       val o2: TODO = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        MSome(o2)
+      val r0: MOption[IS[Z, AstComment]] = transformISZ(o2.comments, transformAstComment _)
+      if (hasChanged || r0.nonEmpty)
+        MSome(o2(comments = r0.getOrElse(o2.comments)))
       else
         MNone()
     } else if (preR.resultOpt.nonEmpty) {

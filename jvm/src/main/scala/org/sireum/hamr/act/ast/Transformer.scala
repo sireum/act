@@ -43,6 +43,181 @@ object Transformer {
 
   @sig trait PrePost[Context] {
 
+    @pure def preAstComment(ctx: Context, o: AstComment): PreResult[Context, AstComment] = {
+      o match {
+        case o: AstBasicComment =>
+          val r: PreResult[Context, AstComment] = preAstBasicComment(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: AstComment)) => PreResult(preCtx, continu, Some[AstComment](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type AstComment")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[AstComment]())
+          }
+          return r
+      }
+    }
+
+    @pure def preAstBasicComment(ctx: Context, o: AstBasicComment): PreResult[Context, AstBasicComment] = {
+      return PreResult(ctx, T, None())
+    }
+
+    @pure def preCommentProvider(ctx: Context, o: CommentProvider): PreResult[Context, CommentProvider] = {
+      o match {
+        case o: Assembly =>
+          val r: PreResult[Context, CommentProvider] = preAssembly(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Composition =>
+          val r: PreResult[Context, CommentProvider] = preComposition(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Instance =>
+          val r: PreResult[Context, CommentProvider] = preInstance(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Component =>
+          val r: PreResult[Context, CommentProvider] = preComponent(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: LibraryComponent =>
+          val r: PreResult[Context, CommentProvider] = preLibraryComponent(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Uses =>
+          val r: PreResult[Context, CommentProvider] = preUses(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Provides =>
+          val r: PreResult[Context, CommentProvider] = preProvides(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Emits =>
+          val r: PreResult[Context, CommentProvider] = preEmits(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Consumes =>
+          val r: PreResult[Context, CommentProvider] = preConsumes(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Dataport =>
+          val r: PreResult[Context, CommentProvider] = preDataport(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Connection =>
+          val r: PreResult[Context, CommentProvider] = preConnection(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: ConnectionEnd =>
+          val r: PreResult[Context, CommentProvider] = preConnectionEnd(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Connector =>
+          val r: PreResult[Context, CommentProvider] = preConnector(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Procedure =>
+          val r: PreResult[Context, CommentProvider] = preProcedure(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Method =>
+          val r: PreResult[Context, CommentProvider] = preMethod(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Parameter =>
+          val r: PreResult[Context, CommentProvider] = preParameter(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: BinarySemaphore =>
+          val r: PreResult[Context, CommentProvider] = preBinarySemaphore(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Semaphore =>
+          val r: PreResult[Context, CommentProvider] = preSemaphore(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: Mutex =>
+          val r: PreResult[Context, CommentProvider] = preMutex(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: GenericConfiguration =>
+          val r: PreResult[Context, CommentProvider] = preGenericConfiguration(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: DataPortAccessRestriction =>
+          val r: PreResult[Context, CommentProvider] = preDataPortAccessRestriction(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+        case o: TODO =>
+          val r: PreResult[Context, CommentProvider] = preTODO(ctx, o) match {
+           case PreResult(preCtx, continu, Some(r: CommentProvider)) => PreResult(preCtx, continu, Some[CommentProvider](r))
+           case PreResult(_, _, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case PreResult(preCtx, continu, _) => PreResult(preCtx, continu, None[CommentProvider]())
+          }
+          return r
+      }
+    }
+
     @pure def preASTObject(ctx: Context, o: ASTObject): PreResult[Context, ASTObject] = {
       o match {
         case o: Assembly =>
@@ -321,6 +496,181 @@ object Transformer {
 
     @pure def preTODO(ctx: Context, o: TODO): PreResult[Context, TODO] = {
       return PreResult(ctx, T, None())
+    }
+
+    @pure def postAstComment(ctx: Context, o: AstComment): TPostResult[Context, AstComment] = {
+      o match {
+        case o: AstBasicComment =>
+          val r: TPostResult[Context, AstComment] = postAstBasicComment(ctx, o) match {
+           case TPostResult(postCtx, Some(result: AstComment)) => TPostResult(postCtx, Some[AstComment](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type AstComment")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[AstComment]())
+          }
+          return r
+      }
+    }
+
+    @pure def postAstBasicComment(ctx: Context, o: AstBasicComment): TPostResult[Context, AstBasicComment] = {
+      return TPostResult(ctx, None())
+    }
+
+    @pure def postCommentProvider(ctx: Context, o: CommentProvider): TPostResult[Context, CommentProvider] = {
+      o match {
+        case o: Assembly =>
+          val r: TPostResult[Context, CommentProvider] = postAssembly(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Composition =>
+          val r: TPostResult[Context, CommentProvider] = postComposition(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Instance =>
+          val r: TPostResult[Context, CommentProvider] = postInstance(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Component =>
+          val r: TPostResult[Context, CommentProvider] = postComponent(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: LibraryComponent =>
+          val r: TPostResult[Context, CommentProvider] = postLibraryComponent(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Uses =>
+          val r: TPostResult[Context, CommentProvider] = postUses(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Provides =>
+          val r: TPostResult[Context, CommentProvider] = postProvides(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Emits =>
+          val r: TPostResult[Context, CommentProvider] = postEmits(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Consumes =>
+          val r: TPostResult[Context, CommentProvider] = postConsumes(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Dataport =>
+          val r: TPostResult[Context, CommentProvider] = postDataport(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Connection =>
+          val r: TPostResult[Context, CommentProvider] = postConnection(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: ConnectionEnd =>
+          val r: TPostResult[Context, CommentProvider] = postConnectionEnd(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Connector =>
+          val r: TPostResult[Context, CommentProvider] = postConnector(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Procedure =>
+          val r: TPostResult[Context, CommentProvider] = postProcedure(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Method =>
+          val r: TPostResult[Context, CommentProvider] = postMethod(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Parameter =>
+          val r: TPostResult[Context, CommentProvider] = postParameter(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: BinarySemaphore =>
+          val r: TPostResult[Context, CommentProvider] = postBinarySemaphore(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Semaphore =>
+          val r: TPostResult[Context, CommentProvider] = postSemaphore(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: Mutex =>
+          val r: TPostResult[Context, CommentProvider] = postMutex(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: GenericConfiguration =>
+          val r: TPostResult[Context, CommentProvider] = postGenericConfiguration(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: DataPortAccessRestriction =>
+          val r: TPostResult[Context, CommentProvider] = postDataPortAccessRestriction(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+        case o: TODO =>
+          val r: TPostResult[Context, CommentProvider] = postTODO(ctx, o) match {
+           case TPostResult(postCtx, Some(result: CommentProvider)) => TPostResult(postCtx, Some[CommentProvider](result))
+           case TPostResult(_, Some(_)) => halt("Can only produce object of type CommentProvider")
+           case TPostResult(postCtx, _) => TPostResult(postCtx, None[CommentProvider]())
+          }
+          return r
+      }
     }
 
     @pure def postASTObject(ctx: Context, o: ASTObject): TPostResult[Context, ASTObject] = {
@@ -629,34 +979,93 @@ import Transformer._
 
 @datatype class Transformer[Context](val pp: PrePost[Context]) {
 
-  @pure def transformASTObject(ctx: Context, o: ASTObject): TPostResult[Context, ASTObject] = {
-    val preR: PreResult[Context, ASTObject] = pp.preASTObject(ctx, o)
-    val r: TPostResult[Context, ASTObject] = if (preR.continu) {
-      val o2: ASTObject = preR.resultOpt.getOrElse(o)
+  @pure def transformAstComment(ctx: Context, o: AstComment): TPostResult[Context, AstComment] = {
+    val preR: PreResult[Context, AstComment] = pp.preAstComment(ctx, o)
+    val r: TPostResult[Context, AstComment] = if (preR.continu) {
+      val o2: AstComment = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      val rOpt: TPostResult[Context, ASTObject] = o2 match {
+      val rOpt: TPostResult[Context, AstComment] = o2 match {
+        case o2: AstBasicComment =>
+          if (hasChanged)
+            TPostResult(preR.ctx, Some(o2))
+          else
+            TPostResult(preR.ctx, None())
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: AstComment = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, AstComment] = pp.postAstComment(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformAstBasicComment(ctx: Context, o: AstBasicComment): TPostResult[Context, AstBasicComment] = {
+    val preR: PreResult[Context, AstBasicComment] = pp.preAstBasicComment(ctx, o)
+    val r: TPostResult[Context, AstBasicComment] = if (preR.continu) {
+      val o2: AstBasicComment = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      if (hasChanged)
+        TPostResult(preR.ctx, Some(o2))
+      else
+        TPostResult(preR.ctx, None())
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: AstBasicComment = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, AstBasicComment] = pp.postAstBasicComment(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformCommentProvider(ctx: Context, o: CommentProvider): TPostResult[Context, CommentProvider] = {
+    val preR: PreResult[Context, CommentProvider] = pp.preCommentProvider(ctx, o)
+    val r: TPostResult[Context, CommentProvider] = if (preR.continu) {
+      val o2: CommentProvider = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: TPostResult[Context, CommentProvider] = o2 match {
         case o2: Assembly =>
           val r0: TPostResult[Context, IS[Z, Configuration]] = transformISZ(preR.ctx, o2.configuration, transformConfiguration _)
           val r1: TPostResult[Context, Composition] = transformComposition(r0.ctx, o2.composition)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-            TPostResult(r1.ctx, Some(o2(configuration = r0.resultOpt.getOrElse(o2.configuration), composition = r1.resultOpt.getOrElse(o2.composition))))
+          val r2: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r1.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
+            TPostResult(r2.ctx, Some(o2(configuration = r0.resultOpt.getOrElse(o2.configuration), composition = r1.resultOpt.getOrElse(o2.composition), comments = r2.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r1.ctx, None())
+            TPostResult(r2.ctx, None())
         case o2: Composition =>
           val r0: TPostResult[Context, IS[Z, TODO]] = transformISZ(preR.ctx, o2.groups, transformTODO _)
           val r1: TPostResult[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.exports, transformTODO _)
           val r2: TPostResult[Context, IS[Z, Instance]] = transformISZ(r1.ctx, o2.instances, transformInstance _)
           val r3: TPostResult[Context, IS[Z, Connection]] = transformISZ(r2.ctx, o2.connections, transformConnection _)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty)
-            TPostResult(r3.ctx, Some(o2(groups = r0.resultOpt.getOrElse(o2.groups), exports = r1.resultOpt.getOrElse(o2.exports), instances = r2.resultOpt.getOrElse(o2.instances), connections = r3.resultOpt.getOrElse(o2.connections))))
+          val r4: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r3.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty)
+            TPostResult(r4.ctx, Some(o2(groups = r0.resultOpt.getOrElse(o2.groups), exports = r1.resultOpt.getOrElse(o2.exports), instances = r2.resultOpt.getOrElse(o2.instances), connections = r3.resultOpt.getOrElse(o2.connections), comments = r4.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r3.ctx, None())
+            TPostResult(r4.ctx, None())
         case o2: Instance =>
           val r0: TPostResult[Context, CamkesComponent] = transformCamkesComponent(preR.ctx, o2.component)
-          if (hasChanged || r0.resultOpt.nonEmpty)
-            TPostResult(r0.ctx, Some(o2(component = r0.resultOpt.getOrElse(o2.component))))
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(component = r0.resultOpt.getOrElse(o2.component), comments = r1.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r0.ctx, None())
+            TPostResult(r1.ctx, None())
         case o2: Component =>
           val r0: TPostResult[Context, IS[Z, Mutex]] = transformISZ(preR.ctx, o2.mutexes, transformMutex _)
           val r1: TPostResult[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
@@ -667,70 +1076,260 @@ import Transformer._
           val r6: TPostResult[Context, IS[Z, Consumes]] = transformISZ(r5.ctx, o2.consumes, transformConsumes _)
           val r7: TPostResult[Context, IS[Z, Provides]] = transformISZ(r6.ctx, o2.provides, transformProvides _)
           val r8: TPostResult[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.attributes, transformTODO _)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty)
-            TPostResult(r8.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), attributes = r8.resultOpt.getOrElse(o2.attributes))))
+          val r9: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r8.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
+            TPostResult(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), attributes = r8.resultOpt.getOrElse(o2.attributes), comments = r9.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r8.ctx, None())
+            TPostResult(r9.ctx, None())
         case o2: LibraryComponent =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
+        case o2: Uses =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Provides =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Emits =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Consumes =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Dataport =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
         case o2: Connection =>
           val r0: TPostResult[Context, IS[Z, ConnectionEnd]] = transformISZ(preR.ctx, o2.from_ends, transformConnectionEnd _)
           val r1: TPostResult[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.to_ends, transformConnectionEnd _)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-            TPostResult(r1.ctx, Some(o2(from_ends = r0.resultOpt.getOrElse(o2.from_ends), to_ends = r1.resultOpt.getOrElse(o2.to_ends))))
+          val r2: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r1.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
+            TPostResult(r2.ctx, Some(o2(from_ends = r0.resultOpt.getOrElse(o2.from_ends), to_ends = r1.resultOpt.getOrElse(o2.to_ends), comments = r2.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r1.ctx, None())
+            TPostResult(r2.ctx, None())
         case o2: ConnectionEnd =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Connector =>
           val r0: TPostResult[Context, IS[Z, Attribute]] = transformISZ(preR.ctx, o2.attributes, transformAttribute _)
-          if (hasChanged || r0.resultOpt.nonEmpty)
-            TPostResult(r0.ctx, Some(o2(attributes = r0.resultOpt.getOrElse(o2.attributes))))
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(attributes = r0.resultOpt.getOrElse(o2.attributes), comments = r1.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r0.ctx, None())
+            TPostResult(r1.ctx, None())
         case o2: Procedure =>
           val r0: TPostResult[Context, IS[Z, Method]] = transformISZ(preR.ctx, o2.methods, transformMethod _)
-          if (hasChanged || r0.resultOpt.nonEmpty)
-            TPostResult(r0.ctx, Some(o2(methods = r0.resultOpt.getOrElse(o2.methods))))
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(methods = r0.resultOpt.getOrElse(o2.methods), comments = r1.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r0.ctx, None())
+            TPostResult(r1.ctx, None())
         case o2: Method =>
           val r0: TPostResult[Context, IS[Z, Parameter]] = transformISZ(preR.ctx, o2.parameters, transformParameter _)
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(parameters = r0.resultOpt.getOrElse(o2.parameters), comments = r1.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r1.ctx, None())
+        case o2: Parameter =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
           if (hasChanged || r0.resultOpt.nonEmpty)
-            TPostResult(r0.ctx, Some(o2(parameters = r0.resultOpt.getOrElse(o2.parameters))))
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
             TPostResult(r0.ctx, None())
-        case o2: Parameter =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
-          else
-            TPostResult(preR.ctx, None())
         case o2: BinarySemaphore =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Semaphore =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Mutex =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
+        case o2: GenericConfiguration =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: DataPortAccessRestriction =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
         case o2: TODO =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
+      }
+      rOpt
+    } else if (preR.resultOpt.nonEmpty) {
+      TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
+    } else {
+      TPostResult(preR.ctx, None())
+    }
+    val hasChanged: B = r.resultOpt.nonEmpty
+    val o2: CommentProvider = r.resultOpt.getOrElse(o)
+    val postR: TPostResult[Context, CommentProvider] = pp.postCommentProvider(r.ctx, o2)
+    if (postR.resultOpt.nonEmpty) {
+      return postR
+    } else if (hasChanged) {
+      return TPostResult(postR.ctx, Some(o2))
+    } else {
+      return TPostResult(postR.ctx, None())
+    }
+  }
+
+  @pure def transformASTObject(ctx: Context, o: ASTObject): TPostResult[Context, ASTObject] = {
+    val preR: PreResult[Context, ASTObject] = pp.preASTObject(ctx, o)
+    val r: TPostResult[Context, ASTObject] = if (preR.continu) {
+      val o2: ASTObject = preR.resultOpt.getOrElse(o)
+      val hasChanged: B = preR.resultOpt.nonEmpty
+      val rOpt: TPostResult[Context, ASTObject] = o2 match {
+        case o2: Assembly =>
+          val r0: TPostResult[Context, IS[Z, Configuration]] = transformISZ(preR.ctx, o2.configuration, transformConfiguration _)
+          val r1: TPostResult[Context, Composition] = transformComposition(r0.ctx, o2.composition)
+          val r2: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r1.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
+            TPostResult(r2.ctx, Some(o2(configuration = r0.resultOpt.getOrElse(o2.configuration), composition = r1.resultOpt.getOrElse(o2.composition), comments = r2.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r2.ctx, None())
+        case o2: Composition =>
+          val r0: TPostResult[Context, IS[Z, TODO]] = transformISZ(preR.ctx, o2.groups, transformTODO _)
+          val r1: TPostResult[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.exports, transformTODO _)
+          val r2: TPostResult[Context, IS[Z, Instance]] = transformISZ(r1.ctx, o2.instances, transformInstance _)
+          val r3: TPostResult[Context, IS[Z, Connection]] = transformISZ(r2.ctx, o2.connections, transformConnection _)
+          val r4: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r3.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty)
+            TPostResult(r4.ctx, Some(o2(groups = r0.resultOpt.getOrElse(o2.groups), exports = r1.resultOpt.getOrElse(o2.exports), instances = r2.resultOpt.getOrElse(o2.instances), connections = r3.resultOpt.getOrElse(o2.connections), comments = r4.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r4.ctx, None())
+        case o2: Instance =>
+          val r0: TPostResult[Context, CamkesComponent] = transformCamkesComponent(preR.ctx, o2.component)
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(component = r0.resultOpt.getOrElse(o2.component), comments = r1.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r1.ctx, None())
+        case o2: Component =>
+          val r0: TPostResult[Context, IS[Z, Mutex]] = transformISZ(preR.ctx, o2.mutexes, transformMutex _)
+          val r1: TPostResult[Context, IS[Z, BinarySemaphore]] = transformISZ(r0.ctx, o2.binarySemaphores, transformBinarySemaphore _)
+          val r2: TPostResult[Context, IS[Z, Semaphore]] = transformISZ(r1.ctx, o2.semaphores, transformSemaphore _)
+          val r3: TPostResult[Context, IS[Z, Dataport]] = transformISZ(r2.ctx, o2.dataports, transformDataport _)
+          val r4: TPostResult[Context, IS[Z, Emits]] = transformISZ(r3.ctx, o2.emits, transformEmits _)
+          val r5: TPostResult[Context, IS[Z, Uses]] = transformISZ(r4.ctx, o2.uses, transformUses _)
+          val r6: TPostResult[Context, IS[Z, Consumes]] = transformISZ(r5.ctx, o2.consumes, transformConsumes _)
+          val r7: TPostResult[Context, IS[Z, Provides]] = transformISZ(r6.ctx, o2.provides, transformProvides _)
+          val r8: TPostResult[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.attributes, transformTODO _)
+          val r9: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r8.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
+            TPostResult(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), attributes = r8.resultOpt.getOrElse(o2.attributes), comments = r9.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r9.ctx, None())
+        case o2: LibraryComponent =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Connection =>
+          val r0: TPostResult[Context, IS[Z, ConnectionEnd]] = transformISZ(preR.ctx, o2.from_ends, transformConnectionEnd _)
+          val r1: TPostResult[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.to_ends, transformConnectionEnd _)
+          val r2: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r1.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
+            TPostResult(r2.ctx, Some(o2(from_ends = r0.resultOpt.getOrElse(o2.from_ends), to_ends = r1.resultOpt.getOrElse(o2.to_ends), comments = r2.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r2.ctx, None())
+        case o2: ConnectionEnd =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Connector =>
+          val r0: TPostResult[Context, IS[Z, Attribute]] = transformISZ(preR.ctx, o2.attributes, transformAttribute _)
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(attributes = r0.resultOpt.getOrElse(o2.attributes), comments = r1.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r1.ctx, None())
+        case o2: Procedure =>
+          val r0: TPostResult[Context, IS[Z, Method]] = transformISZ(preR.ctx, o2.methods, transformMethod _)
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(methods = r0.resultOpt.getOrElse(o2.methods), comments = r1.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r1.ctx, None())
+        case o2: Method =>
+          val r0: TPostResult[Context, IS[Z, Parameter]] = transformISZ(preR.ctx, o2.parameters, transformParameter _)
+          val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+            TPostResult(r1.ctx, Some(o2(parameters = r0.resultOpt.getOrElse(o2.parameters), comments = r1.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r1.ctx, None())
+        case o2: Parameter =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: BinarySemaphore =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Semaphore =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: Mutex =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
+        case o2: TODO =>
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
+          else
+            TPostResult(r0.ctx, None())
       }
       rOpt
     } else if (preR.resultOpt.nonEmpty) {
@@ -757,10 +1356,11 @@ import Transformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: TPostResult[Context, IS[Z, Configuration]] = transformISZ(preR.ctx, o2.configuration, transformConfiguration _)
       val r1: TPostResult[Context, Composition] = transformComposition(r0.ctx, o2.composition)
-      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-        TPostResult(r1.ctx, Some(o2(configuration = r0.resultOpt.getOrElse(o2.configuration), composition = r1.resultOpt.getOrElse(o2.composition))))
+      val r2: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r1.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
+        TPostResult(r2.ctx, Some(o2(configuration = r0.resultOpt.getOrElse(o2.configuration), composition = r1.resultOpt.getOrElse(o2.composition), comments = r2.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r1.ctx, None())
+        TPostResult(r2.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -787,10 +1387,11 @@ import Transformer._
       val r1: TPostResult[Context, IS[Z, TODO]] = transformISZ(r0.ctx, o2.exports, transformTODO _)
       val r2: TPostResult[Context, IS[Z, Instance]] = transformISZ(r1.ctx, o2.instances, transformInstance _)
       val r3: TPostResult[Context, IS[Z, Connection]] = transformISZ(r2.ctx, o2.connections, transformConnection _)
-      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty)
-        TPostResult(r3.ctx, Some(o2(groups = r0.resultOpt.getOrElse(o2.groups), exports = r1.resultOpt.getOrElse(o2.exports), instances = r2.resultOpt.getOrElse(o2.instances), connections = r3.resultOpt.getOrElse(o2.connections))))
+      val r4: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r3.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty)
+        TPostResult(r4.ctx, Some(o2(groups = r0.resultOpt.getOrElse(o2.groups), exports = r1.resultOpt.getOrElse(o2.exports), instances = r2.resultOpt.getOrElse(o2.instances), connections = r3.resultOpt.getOrElse(o2.connections), comments = r4.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r3.ctx, None())
+        TPostResult(r4.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -814,10 +1415,11 @@ import Transformer._
       val o2: Instance = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: TPostResult[Context, CamkesComponent] = transformCamkesComponent(preR.ctx, o2.component)
-      if (hasChanged || r0.resultOpt.nonEmpty)
-        TPostResult(r0.ctx, Some(o2(component = r0.resultOpt.getOrElse(o2.component))))
+      val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+        TPostResult(r1.ctx, Some(o2(component = r0.resultOpt.getOrElse(o2.component), comments = r1.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r0.ctx, None())
+        TPostResult(r1.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -851,15 +1453,17 @@ import Transformer._
           val r6: TPostResult[Context, IS[Z, Consumes]] = transformISZ(r5.ctx, o2.consumes, transformConsumes _)
           val r7: TPostResult[Context, IS[Z, Provides]] = transformISZ(r6.ctx, o2.provides, transformProvides _)
           val r8: TPostResult[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.attributes, transformTODO _)
-          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty)
-            TPostResult(r8.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), attributes = r8.resultOpt.getOrElse(o2.attributes))))
+          val r9: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r8.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
+            TPostResult(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), attributes = r8.resultOpt.getOrElse(o2.attributes), comments = r9.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(r8.ctx, None())
+            TPostResult(r9.ctx, None())
         case o2: LibraryComponent =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
       }
       rOpt
     } else if (preR.resultOpt.nonEmpty) {
@@ -893,10 +1497,11 @@ import Transformer._
       val r6: TPostResult[Context, IS[Z, Consumes]] = transformISZ(r5.ctx, o2.consumes, transformConsumes _)
       val r7: TPostResult[Context, IS[Z, Provides]] = transformISZ(r6.ctx, o2.provides, transformProvides _)
       val r8: TPostResult[Context, IS[Z, TODO]] = transformISZ(r7.ctx, o2.attributes, transformTODO _)
-      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty)
-        TPostResult(r8.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), attributes = r8.resultOpt.getOrElse(o2.attributes))))
+      val r9: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r8.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty || r3.resultOpt.nonEmpty || r4.resultOpt.nonEmpty || r5.resultOpt.nonEmpty || r6.resultOpt.nonEmpty || r7.resultOpt.nonEmpty || r8.resultOpt.nonEmpty || r9.resultOpt.nonEmpty)
+        TPostResult(r9.ctx, Some(o2(mutexes = r0.resultOpt.getOrElse(o2.mutexes), binarySemaphores = r1.resultOpt.getOrElse(o2.binarySemaphores), semaphores = r2.resultOpt.getOrElse(o2.semaphores), dataports = r3.resultOpt.getOrElse(o2.dataports), emits = r4.resultOpt.getOrElse(o2.emits), uses = r5.resultOpt.getOrElse(o2.uses), consumes = r6.resultOpt.getOrElse(o2.consumes), provides = r7.resultOpt.getOrElse(o2.provides), attributes = r8.resultOpt.getOrElse(o2.attributes), comments = r9.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r8.ctx, None())
+        TPostResult(r9.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -919,10 +1524,11 @@ import Transformer._
     val r: TPostResult[Context, LibraryComponent] = if (preR.continu) {
       val o2: LibraryComponent = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -947,30 +1553,35 @@ import Transformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val rOpt: TPostResult[Context, CAmkESFeature] = o2 match {
         case o2: Uses =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Provides =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Emits =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Consumes =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: Dataport =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
       }
       rOpt
     } else if (preR.resultOpt.nonEmpty) {
@@ -995,10 +1606,11 @@ import Transformer._
     val r: TPostResult[Context, Uses] = if (preR.continu) {
       val o2: Uses = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1021,10 +1633,11 @@ import Transformer._
     val r: TPostResult[Context, Provides] = if (preR.continu) {
       val o2: Provides = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1047,10 +1660,11 @@ import Transformer._
     val r: TPostResult[Context, Emits] = if (preR.continu) {
       val o2: Emits = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1073,10 +1687,11 @@ import Transformer._
     val r: TPostResult[Context, Consumes] = if (preR.continu) {
       val o2: Consumes = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1099,10 +1714,11 @@ import Transformer._
     val r: TPostResult[Context, Dataport] = if (preR.continu) {
       val o2: Dataport = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1127,10 +1743,11 @@ import Transformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: TPostResult[Context, IS[Z, ConnectionEnd]] = transformISZ(preR.ctx, o2.from_ends, transformConnectionEnd _)
       val r1: TPostResult[Context, IS[Z, ConnectionEnd]] = transformISZ(r0.ctx, o2.to_ends, transformConnectionEnd _)
-      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
-        TPostResult(r1.ctx, Some(o2(from_ends = r0.resultOpt.getOrElse(o2.from_ends), to_ends = r1.resultOpt.getOrElse(o2.to_ends))))
+      val r2: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r1.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty || r2.resultOpt.nonEmpty)
+        TPostResult(r2.ctx, Some(o2(from_ends = r0.resultOpt.getOrElse(o2.from_ends), to_ends = r1.resultOpt.getOrElse(o2.to_ends), comments = r2.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r1.ctx, None())
+        TPostResult(r2.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1153,10 +1770,11 @@ import Transformer._
     val r: TPostResult[Context, ConnectionEnd] = if (preR.continu) {
       val o2: ConnectionEnd = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1180,10 +1798,11 @@ import Transformer._
       val o2: Connector = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: TPostResult[Context, IS[Z, Attribute]] = transformISZ(preR.ctx, o2.attributes, transformAttribute _)
-      if (hasChanged || r0.resultOpt.nonEmpty)
-        TPostResult(r0.ctx, Some(o2(attributes = r0.resultOpt.getOrElse(o2.attributes))))
+      val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+        TPostResult(r1.ctx, Some(o2(attributes = r0.resultOpt.getOrElse(o2.attributes), comments = r1.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r0.ctx, None())
+        TPostResult(r1.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1207,10 +1826,11 @@ import Transformer._
       val o2: Procedure = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: TPostResult[Context, IS[Z, Method]] = transformISZ(preR.ctx, o2.methods, transformMethod _)
-      if (hasChanged || r0.resultOpt.nonEmpty)
-        TPostResult(r0.ctx, Some(o2(methods = r0.resultOpt.getOrElse(o2.methods))))
+      val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+        TPostResult(r1.ctx, Some(o2(methods = r0.resultOpt.getOrElse(o2.methods), comments = r1.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r0.ctx, None())
+        TPostResult(r1.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1234,10 +1854,11 @@ import Transformer._
       val o2: Method = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
       val r0: TPostResult[Context, IS[Z, Parameter]] = transformISZ(preR.ctx, o2.parameters, transformParameter _)
-      if (hasChanged || r0.resultOpt.nonEmpty)
-        TPostResult(r0.ctx, Some(o2(parameters = r0.resultOpt.getOrElse(o2.parameters))))
+      val r1: TPostResult[Context, IS[Z, AstComment]] = transformISZ(r0.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty || r1.resultOpt.nonEmpty)
+        TPostResult(r1.ctx, Some(o2(parameters = r0.resultOpt.getOrElse(o2.parameters), comments = r1.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(r0.ctx, None())
+        TPostResult(r1.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1260,10 +1881,11 @@ import Transformer._
     val r: TPostResult[Context, Parameter] = if (preR.continu) {
       val o2: Parameter = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1286,10 +1908,11 @@ import Transformer._
     val r: TPostResult[Context, BinarySemaphore] = if (preR.continu) {
       val o2: BinarySemaphore = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1312,10 +1935,11 @@ import Transformer._
     val r: TPostResult[Context, Semaphore] = if (preR.continu) {
       val o2: Semaphore = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1338,10 +1962,11 @@ import Transformer._
     val r: TPostResult[Context, Mutex] = if (preR.continu) {
       val o2: Mutex = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1364,10 +1989,11 @@ import Transformer._
     val r: TPostResult[Context, Attribute] = if (preR.continu) {
       val o2: Attribute = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1392,15 +2018,17 @@ import Transformer._
       val hasChanged: B = preR.resultOpt.nonEmpty
       val rOpt: TPostResult[Context, Configuration] = o2 match {
         case o2: GenericConfiguration =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
         case o2: DataPortAccessRestriction =>
-          if (hasChanged)
-            TPostResult(preR.ctx, Some(o2))
+          val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+          if (hasChanged || r0.resultOpt.nonEmpty)
+            TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
           else
-            TPostResult(preR.ctx, None())
+            TPostResult(r0.ctx, None())
       }
       rOpt
     } else if (preR.resultOpt.nonEmpty) {
@@ -1425,10 +2053,11 @@ import Transformer._
     val r: TPostResult[Context, GenericConfiguration] = if (preR.continu) {
       val o2: GenericConfiguration = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1451,10 +2080,11 @@ import Transformer._
     val r: TPostResult[Context, DataPortAccessRestriction] = if (preR.continu) {
       val o2: DataPortAccessRestriction = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {
@@ -1477,10 +2107,11 @@ import Transformer._
     val r: TPostResult[Context, TODO] = if (preR.continu) {
       val o2: TODO = preR.resultOpt.getOrElse(o)
       val hasChanged: B = preR.resultOpt.nonEmpty
-      if (hasChanged)
-        TPostResult(preR.ctx, Some(o2))
+      val r0: TPostResult[Context, IS[Z, AstComment]] = transformISZ(preR.ctx, o2.comments, transformAstComment _)
+      if (hasChanged || r0.resultOpt.nonEmpty)
+        TPostResult(r0.ctx, Some(o2(comments = r0.resultOpt.getOrElse(o2.comments))))
       else
-        TPostResult(preR.ctx, None())
+        TPostResult(r0.ctx, None())
     } else if (preR.resultOpt.nonEmpty) {
       TPostResult(preR.ctx, Some(preR.resultOpt.getOrElse(o)))
     } else {

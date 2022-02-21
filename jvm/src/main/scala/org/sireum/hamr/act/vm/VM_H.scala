@@ -63,7 +63,7 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
 */
 object VM_INIT_DEF {
   def semaphores(): ISZ[Semaphore] = {
-    val ret: ISZ[Semaphore] = ISZ(Semaphore(name = "vm_sem"))
+    val ret: ISZ[Semaphore] = ISZ(Semaphore(name = "vm_sem", comments = ISZ()))
     return ret
   }
 
@@ -115,19 +115,23 @@ object VM_INIT_DEF {
         Dataport(
           name = "cmu_cpu",
           typ = "Buf",
-          optional = F),
+          optional = F,
+          comments = ISZ()),
         Dataport(
           name = "cmu_top",
           typ = "Buf",
-          optional = F),
+          optional = F,
+          comments = ISZ()),
         Dataport(
           name = "gpio_right",
           typ = "Buf",
-          optional = F),
+          optional = F,
+          comments = ISZ()),
         Dataport(
           name = "cmu_core",
           typ = "Buf",
-          optional = F)
+          optional = F,
+          comments = ISZ())
       )
     }
     return ret
@@ -212,7 +216,7 @@ object VM_INIT_DEF {
   }
 }
 
-// expansion of objects in macro https://github.com/SEL4PROJ/camkes-arm-vm/blob/301f7bab6cd66b5cf34d904d19c36ee6f7d0ce27/components/VM/configurations/vm.h#L93-L95
+// expansion of objects in macro https://github.com/seL4/camkes-vm/blob/39734d70d38af597e459f4923c75db95508d9661/components/VM_Arm/configurations/vm.h#L87
 
 // #define VM_COMPONENT_CONNECTIONS_DEF(num) \
 //    connection seL4RPCDataport fs##num(from vm##num.fs, to fserv.fs_ctrl); \

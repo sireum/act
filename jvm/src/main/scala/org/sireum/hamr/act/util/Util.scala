@@ -478,7 +478,7 @@ object Util {
   }
 
   def createConnectionEnd(isFrom: B, componentName: String, featureName: String): ast.ConnectionEnd = {
-    return ast.ConnectionEnd(isFrom, componentName, featureName)
+    return ast.ConnectionEnd(isFrom, componentName, featureName, ISZ())
   }
 
   def createConnections(connectionCategory: CAmkESConnectionType.Type,
@@ -490,7 +490,8 @@ object Util {
       name = connectionName,
       connectionType = connectionType.string,
       from_ends = fromEnds,
-      to_ends = toEnds)
+      to_ends = toEnds,
+      comments = ISZ())
 
     ProofUtil.addCAmkESConnection(connectionCategory, ret)
 
@@ -549,8 +550,8 @@ object Util {
                                    ports: ISZ[String]): ast.LibraryComponent = {
     val ret = ast.LibraryComponent(
       name = name,
-      ports = ports
-    )
+      ports = ports,
+      comments = ISZ())
 
     ProofUtil.addCamkesComponent(ret, componentCategory)
 
@@ -592,7 +593,8 @@ object Util {
       attributes = attributes,
       preprocessorIncludes = preprocessorIncludes,
       imports = imports,
-      externalEntities = externalEntities)
+      externalEntities = externalEntities,
+      comments = ISZ())
 
     ProofUtil.addCamkesComponent(ret, componentCategory)
 
@@ -607,7 +609,8 @@ object Util {
     val ret = ast.Instance(
       address_space = address_space,
       name = name,
-      component = component)
+      component = component,
+      comments = ISZ())
 
     ProofUtil.addCAmkESInstance(originAadl, ret)
 
@@ -625,8 +628,8 @@ object Util {
     val ret: ast.Dataport = ast.Dataport(
       name = name,
       optional = optional,
-      typ = typ
-    )
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addVMPortRefinement(ret, aadlComponent, metaPort, symbolTable)
 
@@ -644,8 +647,8 @@ object Util {
     val ret: ast.Dataport = ast.Dataport(
       name = name,
       optional = optional,
-      typ = typ
-    )
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
@@ -662,8 +665,8 @@ object Util {
     val ret: ast.Uses = ast.Uses(
       name = name,
       typ = typ,
-      optional = optional
-    )
+      optional = optional,
+      comments = ISZ())
 
     ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
@@ -674,7 +677,7 @@ object Util {
                                     name: String,
                                     typ: String,
                                     optional: B): ast.Uses = {
-    val ret = ast.Uses(name = name, typ = typ, optional = optional)
+    val ret = ast.Uses(name = name, typ = typ, optional = optional, comments = ISZ())
     ProofUtil.addPortPeriodicDispatcher(ret)
     return ret
   }
@@ -684,7 +687,7 @@ object Util {
                        name: String,
                        typ: String,
                        optional: B): ast.Uses = {
-    val ret = ast.Uses(name = name, typ = typ, optional = optional)
+    val ret = ast.Uses(name = name, typ = typ, optional = optional, comments = ISZ())
     ProofUtil.addVMPortAux(ret, aadlProcess,symbolTable)
     return ret
   }
@@ -699,7 +702,8 @@ object Util {
     val ret: ast.Consumes = ast.Consumes(
       name = name,
       typ = typ,
-      optional = optional)
+      optional = optional,
+      comments = ISZ())
 
     ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
@@ -716,7 +720,8 @@ object Util {
     val ret: ast.Consumes = ast.Consumes(
       name = name,
       typ = typ,
-      optional = optional)
+      optional = optional,
+      comments = ISZ())
 
     ProofUtil.addVMPortRefinement(ret, aadlComponent, metaPort, symbolTable)
 
@@ -732,7 +737,8 @@ object Util {
     val ret: ast.Consumes = ast.Consumes(
       name = name,
       typ = typ,
-      optional = optional)
+      optional = optional,
+      comments = ISZ())
 
     ProofUtil.addVMPortAux(ret, aadlProcess, symbolTable)
 
@@ -747,7 +753,8 @@ object Util {
     val ret: ast.Consumes = ast.Consumes(
       name = name,
       typ = typ,
-      optional = optional)
+      optional = optional,
+      comments = ISZ())
 
     ProofUtil.addPortPeriodicDispatcher(ret)
 
@@ -763,7 +770,8 @@ object Util {
     val ret: ast.Consumes = ast.Consumes(
       name = name,
       typ = typ,
-      optional = optional)
+      optional = optional,
+      comments = ISZ())
 
     ProofUtil.addPortSelfPacing(aadlComponent, ret, symbolTable)
 
@@ -775,7 +783,8 @@ object Util {
                              typ: String): ast.Provides = {
     val ret = ast.Provides(
       name = name,
-      typ = typ)
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addPortMonitor(monitorName, ret)
 
@@ -788,7 +797,8 @@ object Util {
                            typ: String): ast.Provides = {
     val ret = ast.Provides(
       name = name,
-      typ = typ)
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addVMPortAux(ret, aadlProcess, symbolTable)
 
@@ -803,7 +813,8 @@ object Util {
                              typ: String): ast.Emits = {
     val ret: ast.Emits = ast.Emits(
       name = name,
-      typ = typ)
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addPortRefinement(ret, aadlComponent, aadlPort, symbolTable)
 
@@ -818,7 +829,8 @@ object Util {
                                typ: String): ast.Emits = {
     val ret: ast.Emits = ast.Emits(
       name = name,
-      typ = typ)
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addVMPortRefinement(ret, aadlComponent, metaPort, symbolTable)
 
@@ -832,7 +844,8 @@ object Util {
                         typ: String): ast.Emits = {
     val ret: ast.Emits = ast.Emits(
       name = name,
-      typ = typ)
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addVMPortAux(ret, aadlProcess, symbolTable)
 
@@ -843,7 +856,8 @@ object Util {
                           typ: String): ast.Emits = {
     val ret: ast.Emits = ast.Emits(
       name = name,
-      typ = typ)
+      typ = typ,
+      comments = ISZ())
 
     ProofUtil.addPortMonitor(monitorName, ret)
 
@@ -854,7 +868,7 @@ object Util {
                              symbolTable: SymbolTable,
                              name: String,
                              typ: String): ast.Emits = {
-    val ret = ast.Emits(name = name, typ = typ)
+    val ret = ast.Emits(name = name, typ = typ, comments = ISZ())
 
     ProofUtil.addPortSelfPacing(aadlComponent, ret, symbolTable)
 

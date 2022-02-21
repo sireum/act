@@ -141,8 +141,8 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
             dstFeature = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier())
 
           configurations = configurations :+
-            ast.DataPortAccessRestriction(PacerTemplate.PACER_IDENTIFIER, pacerDataportName, ast.AccessType.W) :+
-            ast.DataPortAccessRestriction(componentId, PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(), ast.AccessType.R)
+            ast.DataPortAccessRestriction(PacerTemplate.PACER_IDENTIFIER, pacerDataportName, ast.AccessType.W, ISZ()) :+
+            ast.DataPortAccessRestriction(componentId, PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(), ast.AccessType.R, ISZ())
 
           if(useCaseConnectors) {
             configurations = configurations :+
@@ -468,19 +468,22 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         consumes = consumes :+ ast.Consumes(
           name = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier(),
           typ = PacerTemplate.PACER_PERIOD_VM_TYPE,
-          optional = F)
+          optional = F,
+          comments = ISZ())
       }
 
       dataports = dataports :+ ast.Dataport(
         name = PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(),
         typ = queueType,
-        optional = F)
+        optional = F,
+        comments = ISZ())
 
     } else {
       consumes = consumes :+ ast.Consumes(
         name = PacerTemplate.pacerClientNotificationIdentifier(),
         typ = PacerTemplate.PACER_PERIOD_TYPE,
-        optional = F)
+        optional = F,
+        comments = ISZ())
     }
 
     val shell = ast.Component(
@@ -490,7 +493,8 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       // filler
       control = F, hardware = F, name = "", mutexes = ISZ(), binarySemaphores = ISZ(), semaphores = ISZ(),
       imports = ISZ(), emits = ISZ(), uses = ISZ(), provides = ISZ(), attributes = ISZ(),
-      preprocessorIncludes = ISZ(), externalEntities = ISZ()
+      preprocessorIncludes = ISZ(), externalEntities = ISZ(),
+      comments = ISZ()
     )
 
     val componentContributions = CamkesComponentContributions(shell)
@@ -511,20 +515,23 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
   def emitPeriod(id: String): Emits = {
     return Emits(
       name = id,
-      typ = PacerTemplate.PACER_PERIOD_TYPE)
+      typ = PacerTemplate.PACER_PERIOD_TYPE,
+      comments = ISZ())
   }
 
   def emitPeriodVM(id: String) : Emits = {
     return Emits(
       name = id,
-      typ = PacerTemplate.PACER_PERIOD_VM_TYPE)
+      typ = PacerTemplate.PACER_PERIOD_VM_TYPE,
+      comments = ISZ())
   }
 
   def dataportPeriod(id: String): Dataport = {
     return Dataport(
       name = id,
       typ = PacerTemplate.pacerDataportQueueType(),
-      optional = F
+      optional = F,
+      comments = ISZ()
     )
   }
 
@@ -544,12 +551,14 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
                               dataports: ISZ[Dataport]): ast.Instance = {
     val emits: Emits = Emits(
       name = PacerTemplate.PACER_TICK_IDENTIFIER,
-      typ = PacerTemplate.PACER_TICK_TOCK_TYPE)
+      typ = PacerTemplate.PACER_TICK_TOCK_TYPE,
+      comments = ISZ())
 
     val consumes: Consumes = Consumes(
       name = PacerTemplate.PACER_TOCK_IDENTIFIER,
       typ = PacerTemplate.PACER_TICK_TOCK_TYPE,
-      optional = F)
+      optional = F,
+      comments = ISZ())
 
     val instance: ast.Instance = Util.createCAmkESInstance(
       originAadl = None(),

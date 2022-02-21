@@ -212,7 +212,7 @@ object SMT2ProofGen {
         case a: ast.Assembly =>
           for(s <- a.configuration) {
             s match {
-              case ast.DataPortAccessRestriction(comp, port, v) =>
+              case ast.DataPortAccessRestriction(comp, port, v, _) =>
                 camkesDataPortAccessRestrictions = camkesDataPortAccessRestrictions :+
                   st"(assert (= ${v.name} (select CAmkESAccessRestrictions ${comp}_${port})))"
               case _ =>

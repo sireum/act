@@ -36,51 +36,53 @@ object MsgPack {
 
   object Constants {
 
-    val Assembly: Z = -32
+    val AstBasicComment: Z = -32
 
-    val Composition: Z = -31
+    val Assembly: Z = -31
 
-    val Instance: Z = -30
+    val Composition: Z = -30
 
-    val Component: Z = -29
+    val Instance: Z = -29
 
-    val LibraryComponent: Z = -28
+    val Component: Z = -28
 
-    val Uses: Z = -27
+    val LibraryComponent: Z = -27
 
-    val Provides: Z = -26
+    val Uses: Z = -26
 
-    val Emits: Z = -25
+    val Provides: Z = -25
 
-    val Consumes: Z = -24
+    val Emits: Z = -24
 
-    val Dataport: Z = -23
+    val Consumes: Z = -23
 
-    val Connection: Z = -22
+    val Dataport: Z = -22
 
-    val ConnectionEnd: Z = -21
+    val Connection: Z = -21
 
-    val Connector: Z = -20
+    val ConnectionEnd: Z = -20
 
-    val Procedure: Z = -19
+    val Connector: Z = -19
 
-    val Method: Z = -18
+    val Procedure: Z = -18
 
-    val Parameter: Z = -17
+    val Method: Z = -17
 
-    val BinarySemaphore: Z = -16
+    val Parameter: Z = -16
 
-    val Semaphore: Z = -15
+    val BinarySemaphore: Z = -15
 
-    val Mutex: Z = -14
+    val Semaphore: Z = -14
 
-    val Attribute: Z = -13
+    val Mutex: Z = -13
 
-    val GenericConfiguration: Z = -12
+    val Attribute: Z = -12
 
-    val DataPortAccessRestriction: Z = -11
+    val GenericConfiguration: Z = -11
 
-    val TODO: Z = -10
+    val DataPortAccessRestriction: Z = -10
+
+    val TODO: Z = -9
 
   }
 
@@ -93,6 +95,49 @@ object MsgPack {
   @msig trait Writer {
 
     def writer: MessagePack.Writer
+
+    def writeAstComment(o: AstComment): Unit = {
+      o match {
+        case o: AstBasicComment => writeAstBasicComment(o)
+      }
+    }
+
+    def writeCommentLocationType(o: CommentLocation.Type): Unit = {
+      writer.writeZ(o.ordinal)
+    }
+
+    def writeAstBasicComment(o: AstBasicComment): Unit = {
+      writer.writeZ(Constants.AstBasicComment)
+      writeCommentLocationType(o.location)
+      writer.writeString(o.comment)
+    }
+
+    def writeCommentProvider(o: CommentProvider): Unit = {
+      o match {
+        case o: Assembly => writeAssembly(o)
+        case o: Composition => writeComposition(o)
+        case o: Instance => writeInstance(o)
+        case o: Component => writeComponent(o)
+        case o: LibraryComponent => writeLibraryComponent(o)
+        case o: Uses => writeUses(o)
+        case o: Provides => writeProvides(o)
+        case o: Emits => writeEmits(o)
+        case o: Consumes => writeConsumes(o)
+        case o: Dataport => writeDataport(o)
+        case o: Connection => writeConnection(o)
+        case o: ConnectionEnd => writeConnectionEnd(o)
+        case o: Connector => writeConnector(o)
+        case o: Procedure => writeProcedure(o)
+        case o: Method => writeMethod(o)
+        case o: Parameter => writeParameter(o)
+        case o: BinarySemaphore => writeBinarySemaphore(o)
+        case o: Semaphore => writeSemaphore(o)
+        case o: Mutex => writeMutex(o)
+        case o: GenericConfiguration => writeGenericConfiguration(o)
+        case o: DataPortAccessRestriction => writeDataPortAccessRestriction(o)
+        case o: TODO => writeTODO(o)
+      }
+    }
 
     def writeASTObject(o: ASTObject): Unit = {
       o match {
@@ -119,6 +164,7 @@ object MsgPack {
       writer.writeISZ(o.configuration, writeConfiguration _)
       writer.writeISZ(o.configurationMacros, writer.writeString _)
       writeComposition(o.composition)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeComposition(o: Composition): Unit = {
@@ -128,6 +174,7 @@ object MsgPack {
       writer.writeISZ(o.instances, writeInstance _)
       writer.writeISZ(o.connections, writeConnection _)
       writer.writeISZ(o.externalEntities, writer.writeString _)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeInstance(o: Instance): Unit = {
@@ -135,6 +182,7 @@ object MsgPack {
       writer.writeString(o.address_space)
       writer.writeString(o.name)
       writeCamkesComponent(o.component)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeCamkesComponent(o: CamkesComponent): Unit = {
@@ -162,12 +210,14 @@ object MsgPack {
       writer.writeISZ(o.imports, writer.writeString _)
       writer.writeISZ(o.preprocessorIncludes, writer.writeString _)
       writer.writeISZ(o.externalEntities, writer.writeString _)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeLibraryComponent(o: LibraryComponent): Unit = {
       writer.writeZ(Constants.LibraryComponent)
       writer.writeString(o.name)
       writer.writeISZ(o.ports, writer.writeString _)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeCAmkESFeature(o: CAmkESFeature): Unit = {
@@ -185,18 +235,21 @@ object MsgPack {
       writer.writeString(o.name)
       writer.writeString(o.typ)
       writer.writeB(o.optional)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeProvides(o: Provides): Unit = {
       writer.writeZ(Constants.Provides)
       writer.writeString(o.name)
       writer.writeString(o.typ)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeEmits(o: Emits): Unit = {
       writer.writeZ(Constants.Emits)
       writer.writeString(o.name)
       writer.writeString(o.typ)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeConsumes(o: Consumes): Unit = {
@@ -204,6 +257,7 @@ object MsgPack {
       writer.writeString(o.name)
       writer.writeString(o.typ)
       writer.writeB(o.optional)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeDataport(o: Dataport): Unit = {
@@ -211,6 +265,7 @@ object MsgPack {
       writer.writeString(o.name)
       writer.writeString(o.typ)
       writer.writeB(o.optional)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeConnection(o: Connection): Unit = {
@@ -219,6 +274,7 @@ object MsgPack {
       writer.writeString(o.connectionType)
       writer.writeISZ(o.from_ends, writeConnectionEnd _)
       writer.writeISZ(o.to_ends, writeConnectionEnd _)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeConnectionEnd(o: ConnectionEnd): Unit = {
@@ -226,6 +282,7 @@ object MsgPack {
       writer.writeB(o.isFrom)
       writer.writeString(o.component)
       writer.writeString(o.end)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeConnectorTypeType(o: ConnectorType.Type): Unit = {
@@ -244,6 +301,7 @@ object MsgPack {
       writer.writeZ(o.to_threads)
       writer.writeB(o.to_hardware)
       writer.writeISZ(o.attributes, writeAttribute _)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeProcedure(o: Procedure): Unit = {
@@ -251,6 +309,7 @@ object MsgPack {
       writer.writeString(o.name)
       writer.writeISZ(o.methods, writeMethod _)
       writer.writeISZ(o.includes, writer.writeString _)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeMethod(o: Method): Unit = {
@@ -258,6 +317,7 @@ object MsgPack {
       writer.writeString(o.name)
       writer.writeISZ(o.parameters, writeParameter _)
       writer.writeOption(o.returnType, writer.writeString _)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeParameter(o: Parameter): Unit = {
@@ -266,6 +326,7 @@ object MsgPack {
       writeDirectionType(o.direction)
       writer.writeString(o.name)
       writer.writeString(o.typ)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeDirectionType(o: Direction.Type): Unit = {
@@ -275,16 +336,19 @@ object MsgPack {
     def writeBinarySemaphore(o: BinarySemaphore): Unit = {
       writer.writeZ(Constants.BinarySemaphore)
       writer.writeString(o.name)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeSemaphore(o: Semaphore): Unit = {
       writer.writeZ(Constants.Semaphore)
       writer.writeString(o.name)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeMutex(o: Mutex): Unit = {
       writer.writeZ(Constants.Mutex)
       writer.writeString(o.name)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeAttribute(o: Attribute): Unit = {
@@ -292,6 +356,7 @@ object MsgPack {
       writer.writeString(o.typ)
       writer.writeString(o.name)
       writer.writeString(o.value)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeAccessTypeType(o: AccessType.Type): Unit = {
@@ -308,6 +373,7 @@ object MsgPack {
     def writeGenericConfiguration(o: GenericConfiguration): Unit = {
       writer.writeZ(Constants.GenericConfiguration)
       writer.writeString(o.e)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeDataPortAccessRestriction(o: DataPortAccessRestriction): Unit = {
@@ -315,10 +381,12 @@ object MsgPack {
       writer.writeString(o.component)
       writer.writeString(o.port)
       writeAccessTypeType(o.accessType)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def writeTODO(o: TODO): Unit = {
       writer.writeZ(Constants.TODO)
+      writer.writeISZ(o.comments, writeAstComment _)
     }
 
     def result: ISZ[U8] = {
@@ -340,6 +408,70 @@ object MsgPack {
   @msig trait Reader {
 
     def reader: MessagePack.Reader
+
+    def readAstComment(): AstComment = {
+      val i = reader.curr
+      val t = reader.readZ()
+      t match {
+        case Constants.AstBasicComment => val r = readAstBasicCommentT(T); return r
+        case _ =>
+          reader.error(i, s"$t is not a valid type of AstComment.")
+          val r = readAstBasicCommentT(T)
+          return r
+      }
+    }
+
+    def readCommentLocationType(): CommentLocation.Type = {
+      val r = reader.readZ()
+      return CommentLocation.byOrdinal(r).get
+    }
+
+    def readAstBasicComment(): AstBasicComment = {
+      val r = readAstBasicCommentT(F)
+      return r
+    }
+
+    def readAstBasicCommentT(typeParsed: B): AstBasicComment = {
+      if (!typeParsed) {
+        reader.expectZ(Constants.AstBasicComment)
+      }
+      val location = readCommentLocationType()
+      val comment = reader.readString()
+      return AstBasicComment(location, comment)
+    }
+
+    def readCommentProvider(): CommentProvider = {
+      val i = reader.curr
+      val t = reader.readZ()
+      t match {
+        case Constants.Assembly => val r = readAssemblyT(T); return r
+        case Constants.Composition => val r = readCompositionT(T); return r
+        case Constants.Instance => val r = readInstanceT(T); return r
+        case Constants.Component => val r = readComponentT(T); return r
+        case Constants.LibraryComponent => val r = readLibraryComponentT(T); return r
+        case Constants.Uses => val r = readUsesT(T); return r
+        case Constants.Provides => val r = readProvidesT(T); return r
+        case Constants.Emits => val r = readEmitsT(T); return r
+        case Constants.Consumes => val r = readConsumesT(T); return r
+        case Constants.Dataport => val r = readDataportT(T); return r
+        case Constants.Connection => val r = readConnectionT(T); return r
+        case Constants.ConnectionEnd => val r = readConnectionEndT(T); return r
+        case Constants.Connector => val r = readConnectorT(T); return r
+        case Constants.Procedure => val r = readProcedureT(T); return r
+        case Constants.Method => val r = readMethodT(T); return r
+        case Constants.Parameter => val r = readParameterT(T); return r
+        case Constants.BinarySemaphore => val r = readBinarySemaphoreT(T); return r
+        case Constants.Semaphore => val r = readSemaphoreT(T); return r
+        case Constants.Mutex => val r = readMutexT(T); return r
+        case Constants.GenericConfiguration => val r = readGenericConfigurationT(T); return r
+        case Constants.DataPortAccessRestriction => val r = readDataPortAccessRestrictionT(T); return r
+        case Constants.TODO => val r = readTODOT(T); return r
+        case _ =>
+          reader.error(i, s"$t is not a valid type of CommentProvider.")
+          val r = readTODOT(T)
+          return r
+      }
+    }
 
     def readASTObject(): ASTObject = {
       val i = reader.curr
@@ -379,7 +511,8 @@ object MsgPack {
       val configuration = reader.readISZ(readConfiguration _)
       val configurationMacros = reader.readISZ(reader.readString _)
       val composition = readComposition()
-      return Assembly(configuration, configurationMacros, composition)
+      val comments = reader.readISZ(readAstComment _)
+      return Assembly(configuration, configurationMacros, composition, comments)
     }
 
     def readComposition(): Composition = {
@@ -396,7 +529,8 @@ object MsgPack {
       val instances = reader.readISZ(readInstance _)
       val connections = reader.readISZ(readConnection _)
       val externalEntities = reader.readISZ(reader.readString _)
-      return Composition(groups, exports, instances, connections, externalEntities)
+      val comments = reader.readISZ(readAstComment _)
+      return Composition(groups, exports, instances, connections, externalEntities, comments)
     }
 
     def readInstance(): Instance = {
@@ -411,7 +545,8 @@ object MsgPack {
       val address_space = reader.readString()
       val name = reader.readString()
       val component = readCamkesComponent()
-      return Instance(address_space, name, component)
+      val comments = reader.readISZ(readAstComment _)
+      return Instance(address_space, name, component, comments)
     }
 
     def readCamkesComponent(): CamkesComponent = {
@@ -452,7 +587,8 @@ object MsgPack {
       val imports = reader.readISZ(reader.readString _)
       val preprocessorIncludes = reader.readISZ(reader.readString _)
       val externalEntities = reader.readISZ(reader.readString _)
-      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities)
+      val comments = reader.readISZ(readAstComment _)
+      return Component(control, hardware, name, mutexes, binarySemaphores, semaphores, dataports, emits, uses, consumes, provides, includes, attributes, imports, preprocessorIncludes, externalEntities, comments)
     }
 
     def readLibraryComponent(): LibraryComponent = {
@@ -466,7 +602,8 @@ object MsgPack {
       }
       val name = reader.readString()
       val ports = reader.readISZ(reader.readString _)
-      return LibraryComponent(name, ports)
+      val comments = reader.readISZ(readAstComment _)
+      return LibraryComponent(name, ports, comments)
     }
 
     def readCAmkESFeature(): CAmkESFeature = {
@@ -497,7 +634,8 @@ object MsgPack {
       val name = reader.readString()
       val typ = reader.readString()
       val optional = reader.readB()
-      return Uses(name, typ, optional)
+      val comments = reader.readISZ(readAstComment _)
+      return Uses(name, typ, optional, comments)
     }
 
     def readProvides(): Provides = {
@@ -511,7 +649,8 @@ object MsgPack {
       }
       val name = reader.readString()
       val typ = reader.readString()
-      return Provides(name, typ)
+      val comments = reader.readISZ(readAstComment _)
+      return Provides(name, typ, comments)
     }
 
     def readEmits(): Emits = {
@@ -525,7 +664,8 @@ object MsgPack {
       }
       val name = reader.readString()
       val typ = reader.readString()
-      return Emits(name, typ)
+      val comments = reader.readISZ(readAstComment _)
+      return Emits(name, typ, comments)
     }
 
     def readConsumes(): Consumes = {
@@ -540,7 +680,8 @@ object MsgPack {
       val name = reader.readString()
       val typ = reader.readString()
       val optional = reader.readB()
-      return Consumes(name, typ, optional)
+      val comments = reader.readISZ(readAstComment _)
+      return Consumes(name, typ, optional, comments)
     }
 
     def readDataport(): Dataport = {
@@ -555,7 +696,8 @@ object MsgPack {
       val name = reader.readString()
       val typ = reader.readString()
       val optional = reader.readB()
-      return Dataport(name, typ, optional)
+      val comments = reader.readISZ(readAstComment _)
+      return Dataport(name, typ, optional, comments)
     }
 
     def readConnection(): Connection = {
@@ -571,7 +713,8 @@ object MsgPack {
       val connectionType = reader.readString()
       val from_ends = reader.readISZ(readConnectionEnd _)
       val to_ends = reader.readISZ(readConnectionEnd _)
-      return Connection(name, connectionType, from_ends, to_ends)
+      val comments = reader.readISZ(readAstComment _)
+      return Connection(name, connectionType, from_ends, to_ends, comments)
     }
 
     def readConnectionEnd(): ConnectionEnd = {
@@ -586,7 +729,8 @@ object MsgPack {
       val isFrom = reader.readB()
       val component = reader.readString()
       val end = reader.readString()
-      return ConnectionEnd(isFrom, component, end)
+      val comments = reader.readISZ(readAstComment _)
+      return ConnectionEnd(isFrom, component, end, comments)
     }
 
     def readConnectorTypeType(): ConnectorType.Type = {
@@ -613,7 +757,8 @@ object MsgPack {
       val to_threads = reader.readZ()
       val to_hardware = reader.readB()
       val attributes = reader.readISZ(readAttribute _)
-      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware, attributes)
+      val comments = reader.readISZ(readAstComment _)
+      return Connector(name, from_type, from_template, from_threads, from_hardware, to_type, to_template, to_threads, to_hardware, attributes, comments)
     }
 
     def readProcedure(): Procedure = {
@@ -628,7 +773,8 @@ object MsgPack {
       val name = reader.readString()
       val methods = reader.readISZ(readMethod _)
       val includes = reader.readISZ(reader.readString _)
-      return Procedure(name, methods, includes)
+      val comments = reader.readISZ(readAstComment _)
+      return Procedure(name, methods, includes, comments)
     }
 
     def readMethod(): Method = {
@@ -643,7 +789,8 @@ object MsgPack {
       val name = reader.readString()
       val parameters = reader.readISZ(readParameter _)
       val returnType = reader.readOption(reader.readString _)
-      return Method(name, parameters, returnType)
+      val comments = reader.readISZ(readAstComment _)
+      return Method(name, parameters, returnType, comments)
     }
 
     def readParameter(): Parameter = {
@@ -659,7 +806,8 @@ object MsgPack {
       val direction = readDirectionType()
       val name = reader.readString()
       val typ = reader.readString()
-      return Parameter(array, direction, name, typ)
+      val comments = reader.readISZ(readAstComment _)
+      return Parameter(array, direction, name, typ, comments)
     }
 
     def readDirectionType(): Direction.Type = {
@@ -677,7 +825,8 @@ object MsgPack {
         reader.expectZ(Constants.BinarySemaphore)
       }
       val name = reader.readString()
-      return BinarySemaphore(name)
+      val comments = reader.readISZ(readAstComment _)
+      return BinarySemaphore(name, comments)
     }
 
     def readSemaphore(): Semaphore = {
@@ -690,7 +839,8 @@ object MsgPack {
         reader.expectZ(Constants.Semaphore)
       }
       val name = reader.readString()
-      return Semaphore(name)
+      val comments = reader.readISZ(readAstComment _)
+      return Semaphore(name, comments)
     }
 
     def readMutex(): Mutex = {
@@ -703,7 +853,8 @@ object MsgPack {
         reader.expectZ(Constants.Mutex)
       }
       val name = reader.readString()
-      return Mutex(name)
+      val comments = reader.readISZ(readAstComment _)
+      return Mutex(name, comments)
     }
 
     def readAttribute(): Attribute = {
@@ -718,7 +869,8 @@ object MsgPack {
       val typ = reader.readString()
       val name = reader.readString()
       val value = reader.readString()
-      return Attribute(typ, name, value)
+      val comments = reader.readISZ(readAstComment _)
+      return Attribute(typ, name, value, comments)
     }
 
     def readAccessTypeType(): AccessType.Type = {
@@ -749,7 +901,8 @@ object MsgPack {
         reader.expectZ(Constants.GenericConfiguration)
       }
       val e = reader.readString()
-      return GenericConfiguration(e)
+      val comments = reader.readISZ(readAstComment _)
+      return GenericConfiguration(e, comments)
     }
 
     def readDataPortAccessRestriction(): DataPortAccessRestriction = {
@@ -764,7 +917,8 @@ object MsgPack {
       val component = reader.readString()
       val port = reader.readString()
       val accessType = readAccessTypeType()
-      return DataPortAccessRestriction(component, port, accessType)
+      val comments = reader.readISZ(readAstComment _)
+      return DataPortAccessRestriction(component, port, accessType, comments)
     }
 
     def readTODO(): TODO = {
@@ -776,7 +930,8 @@ object MsgPack {
       if (!typeParsed) {
         reader.expectZ(Constants.TODO)
       }
-      return TODO()
+      val comments = reader.readISZ(readAstComment _)
+      return TODO(comments)
     }
 
   }
@@ -789,6 +944,51 @@ object MsgPack {
       case Some(e) => return Either.Right(e)
       case _ => return Either.Left(r)
     }
+  }
+
+  def fromAstComment(o: AstComment, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeAstComment(o)
+    return w.result
+  }
+
+  def toAstComment(data: ISZ[U8]): Either[AstComment, MessagePack.ErrorMsg] = {
+    def fAstComment(reader: Reader): AstComment = {
+      val r = reader.readAstComment()
+      return r
+    }
+    val r = to(data, fAstComment _)
+    return r
+  }
+
+  def fromAstBasicComment(o: AstBasicComment, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeAstBasicComment(o)
+    return w.result
+  }
+
+  def toAstBasicComment(data: ISZ[U8]): Either[AstBasicComment, MessagePack.ErrorMsg] = {
+    def fAstBasicComment(reader: Reader): AstBasicComment = {
+      val r = reader.readAstBasicComment()
+      return r
+    }
+    val r = to(data, fAstBasicComment _)
+    return r
+  }
+
+  def fromCommentProvider(o: CommentProvider, pooling: B): ISZ[U8] = {
+    val w = Writer.Default(MessagePack.writer(pooling))
+    w.writeCommentProvider(o)
+    return w.result
+  }
+
+  def toCommentProvider(data: ISZ[U8]): Either[CommentProvider, MessagePack.ErrorMsg] = {
+    def fCommentProvider(reader: Reader): CommentProvider = {
+      val r = reader.readCommentProvider()
+      return r
+    }
+    val r = to(data, fCommentProvider _)
+    return r
   }
 
   def fromASTObject(o: ASTObject, pooling: B): ISZ[U8] = {

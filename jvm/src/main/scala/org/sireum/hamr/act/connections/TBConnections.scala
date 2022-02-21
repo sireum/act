@@ -161,8 +161,8 @@ import org.sireum.hamr.ir
     val srcFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(srcFeature.identifier))
     val dstFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(dstFeature.identifier))
 
-    camkesConfiguration = camkesConfiguration :+ ast.DataPortAccessRestriction(srcComponent, srcFeatureName, ast.AccessType.W)
-    camkesConfiguration = camkesConfiguration :+ ast.DataPortAccessRestriction(dstComponent, dstFeatureName, ast.AccessType.R)
+    camkesConfiguration = camkesConfiguration :+ ast.DataPortAccessRestriction(srcComponent, srcFeatureName, ast.AccessType.W, ISZ())
+    camkesConfiguration = camkesConfiguration :+ ast.DataPortAccessRestriction(dstComponent, dstFeatureName, ast.AccessType.R, ISZ())
 
     return Util.createConnectionC(
       CAmkESConnectionType.Refinement,

@@ -180,7 +180,9 @@ object VMGen {
             attributes = mergeISZs(a.attributes, b.attributes),
             imports = mergeISZs(a.imports, b.imports),
             preprocessorIncludes = mergeISZs(a.preprocessorIncludes, b.preprocessorIncludes),
-            externalEntities = mergeISZs(a.externalEntities, b.externalEntities)
+            externalEntities = mergeISZs(a.externalEntities, b.externalEntities),
+
+            comments = ISZ()
           )
         case _ => halt("Unexpected")
       }
@@ -203,12 +205,15 @@ object VMGen {
             Instance(
               address_space = assemblyA.composition.instances(0).address_space,
               name = assemblyA.composition.instances(0).name,
-              component = mergedComponent
+              component = mergedComponent,
+              comments = ISZ()
             )
           ),
           connections = assemblyA.composition.connections,
-          externalEntities = assemblyA.composition.externalEntities
-        )
+          externalEntities = assemblyA.composition.externalEntities,
+          comments = ISZ()
+        ),
+        comments = ISZ()
       )
 
       val newAssemblyB = Assembly(
@@ -221,12 +226,15 @@ object VMGen {
             Instance(
               address_space = assemblyB.composition.instances(0).address_space,
               name = assemblyB.composition.instances(0).name,
-              component = mergedComponent
+              component = mergedComponent,
+              comments = ISZ()
             )
           ),
           connections = assemblyB.composition.connections,
-          externalEntities = assemblyB.composition.externalEntities
-        )
+          externalEntities = assemblyB.composition.externalEntities,
+            comments = ISZ()
+        ),
+        comments = ISZ()
       )
 
       val nonVMassemblies: ISZ[Assembly] = assemblies.filter(_assembly =>

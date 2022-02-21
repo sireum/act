@@ -19,12 +19,12 @@ object ConnectionsSbTemplate {
 
   def caseConnectorConfig_with_signalling(connectionName: String, shouldSignal: B): ast.Configuration = {
     val text: String = if(shouldSignal) "true" else "false"
-    return ast.GenericConfiguration(s"${connectionName}.with_signalling = ${shouldSignal};")
+    return ast.GenericConfiguration(s"${connectionName}.with_signalling = ${shouldSignal};", ISZ())
   }
 
   def caseConnectorConfig_connection_type(componentName: String, featureName: String, isVMComponent: B) : ast.Configuration = {
     val typ: String = if(isVMComponent) "vm" else "native"
-    return ast.GenericConfiguration(st"""${componentName}.${featureName}_type = "${typ}";""".render)
+    return ast.GenericConfiguration(st"""${componentName}.${featureName}_type = "${typ}";""".render, ISZ())
   }
 
   def getCASE_AADL_EventDataport_From_Template(): ST = {

@@ -64,7 +64,8 @@ import org.sireum.hamr.codegen.common.symbols._
         // emit notification when component's period occurs
         periodicDispatcherNotifications = periodicDispatcherNotifications :+ Emits(
           name = dispatcherNotificationName,
-          typ = Util.NOTIFICATION_TYPE)
+          typ = Util.NOTIFICATION_TYPE,
+          comments = ISZ())
 
         // connect dispatcher to component
         connections = connections :+ Util.createConnection(
@@ -121,7 +122,7 @@ import org.sireum.hamr.codegen.common.symbols._
         PeriodicDispatcherTemplate.TIMER_INSTANCE, PeriodicDispatcherTemplate.TIMER_SERVER_NOTIFICATION_ID,
         PeriodicDispatcherTemplate.DISPATCH_PERIODIC_INSTANCE, PeriodicDispatcherTemplate.TIMER_NOTIFICATION_DISPATCHER_ID)
 
-      configurations = configurations :+ ast.GenericConfiguration(s"${PeriodicDispatcherTemplate.TIMER_INSTANCE}.timers_per_client = 1;")
+      configurations = configurations :+ ast.GenericConfiguration(s"${PeriodicDispatcherTemplate.TIMER_INSTANCE}.timers_per_client = 1;", ISZ())
 
       configurations = configurations :+ PeriodicDispatcherTemplate.configurationTimerAttribute(dispatchCamkesComponent.name,
         timerAttributeCounter.increment(), T)
@@ -199,7 +200,8 @@ import org.sireum.hamr.codegen.common.symbols._
       // filler
       control = F, hardware = F, name = "", mutexes = ISZ(), binarySemaphores = ISZ(), semaphores = ISZ(),
       dataports = ISZ(), emits = ISZ(), provides = ISZ(), includes = ISZ(), attributes = ISZ(),
-      preprocessorIncludes = ISZ(), externalEntities = ISZ()
+      preprocessorIncludes = ISZ(), externalEntities = ISZ(),
+      comments = ISZ()
     )
     val componentContributions = CamkesComponentContributions(shell)
 
@@ -239,11 +241,13 @@ import org.sireum.hamr.codegen.common.symbols._
         uses = ISZ(ast.Uses(
           name = DISPATCH_TIMER_ID,
           typ = TIMER_TYPE,
-          optional = F)),
+          optional = F,
+          comments = ISZ())),
         consumes = ISZ(ast.Consumes(
           name = TIMER_NOTIFICATION_DISPATCHER_ID,
           typ = Util.NOTIFICATION_TYPE,
-          optional = F)),
+          optional = F,
+          comments = ISZ())),
         provides = ISZ(),
         includes = ISZ(),
         attributes = ISZ(),
