@@ -45,7 +45,7 @@ object VM_Template {
 
   def vm_assembly_configuration_entries(vmProcessID: String): ISZ[ast.Configuration] = {
     val ret: ISZ[ast.Configuration] = ISZ(
-      ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 18;", ISZ()),
+      ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 23;", ISZ()),
       ast.GenericConfiguration(s"${vmProcessID}.simple_untyped21_pool = 12;", ISZ()),
       ast.GenericConfiguration(s"${vmProcessID}.simple_untyped12_pool = 12;", ISZ()),
       ast.GenericConfiguration(s"${vmProcessID}.num_extra_frame_caps = 0;", ISZ()),
@@ -258,29 +258,79 @@ object VM_Template {
                      |
                      |project(arm-vm C)
                      |
-                     |includeGlobalComponents()
-                     |find_package(camkes-vm REQUIRED)
-                     |find_package(camkes-vm-images REQUIRED)
-                     |find_package(camkes-arm-vm REQUIRED)
-                     |find_package(camkes-vm-linux REQUIRED)
-                     |camkes_arm_vm_import_project()
+                     |cmake_minimum_required(VERSION 3.8.2)
                      |
+                     |project(arm-vm C)
+                     |
+                     |# including https://github.com/seL4/camkes-vm/blob/master/arm_vm_helpers.cmake
+                     |include($${CAMKES_ARM_VM_HELPERS_PATH})
+                     |MESSAGE("CAMKES_ARM_VM_HELPERS_PATH = $${CAMKES_ARM_VM_HELPERS_PATH}")
+                     |
+                     |find_package(camkes-vm-linux REQUIRED)
+                     |
+                     |# including https://github.com/seL4/camkes-vm-linux/blob/master/vm-linux-helpers.cmake
                      |include($${CAMKES_VM_LINUX_HELPERS_PATH})
+                     |MESSAGE("CAMKES_VM_LINUX_HELPERS_PATH = $${CAMKES_VM_LINUX_HELPERS_PATH}")
+                     |
+                     |# including https://github.com/seL4/camkes-vm-linux/blob/master/linux-module-helpers.cmake
                      |include($${CAMKES_VM_LINUX_MODULE_HELPERS_PATH})
+                     |MESSAGE("CAMKES_VM_LINUX_MODULE_HELPERS_PATH = $${CAMKES_VM_LINUX_MODULE_HELPERS_PATH}")
+                     |
+                     |# including https://github.com/seL4/camkes-vm-linux/blob/master/linux-source-helpers.cmake
                      |include($${CAMKES_VM_LINUX_SOURCE_HELPERS_PATH})
+                     |MESSAGE("CAMKES_VM_LINUX_SOURCE_HELPERS_PATH = $${CAMKES_VM_LINUX_SOURCE_HELPERS_PATH}")
+                     |
+                     |
+                     |# This Project Depends on External Project(s)
+                     |# see https://cmake.org/cmake/help/latest/module/ExternalProject.html
                      |include(ExternalProject)
                      |include(external-project-helpers)
                      |
-                     |#MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
-                     |#MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
-                     |#MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
-                     |#MESSAGE("CAMKES_VM_LINUX_DIR = $${CAMKES_VM_LINUX_DIR}")
-                     |#MESSAGE("CMAKE_CURRENT_BINARY_DIR = $${CMAKE_CURRENT_BINARY_DIR}")
-                     |#MESSAGE("CMAKE_CURRENT_SOURCE_DIR = $${CMAKE_CURRENT_SOURCE_DIR}")
-                     |#MESSAGE("CMAKE_C_COMPILER = $${CMAKE_C_COMPILER}")
-                     |#MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
                      |
-                     |if("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt" AND (NOT ${USE_PRECONFIGURED_ROOTFS}))
+                     |find_package(camkes-vm-images REQUIRED)
+                     |find_package(camkes-arm-vm REQUIRED)
+                     |find_package(camkes-vm-linux REQUIRED)
+                     |
+                     |# causes build to break
+                     |#camkes_arm_vm_import_project()
+                     |
+                     |
+                     |MESSAGE("CAMKES_VM_LINUX_HELPERS_PATH = $${CAMKES_VM_LINUX_HELPERS_PATH}")
+                     |MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
+                     |MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
+                     |MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
+                     |MESSAGE("CAMKES_VM_LINUX_DIR = $${CAMKES_VM_LINUX_DIR}")
+                     |
+                     |MESSAGE("CMAKE_CURRENT_BINARY_DIR = $${CMAKE_CURRENT_BINARY_DIR}")
+                     |MESSAGE("CMAKE_CURRENT_SOURCE_DIR = $${CMAKE_CURRENT_SOURCE_DIR}")
+                     |MESSAGE("CMAKE_C_COMPILER = $${CMAKE_C_COMPILER}")
+                     |MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
+                     |
+                     |
+                     |
+                     |# Create our CPP Flags based on ARM VM config variables
+                     |if("$${KernelARMPlatform}" STREQUAL "exynos5422")
+                     |    set(cpp_flags "-DKERNELARMPLATFORM_EXYNOS5422")
+                     |    set(linux_repo "https://github.com/hardkernel/linux.git")
+                     |    set(linux_tag "4.14.87-153")
+                     |    set(linux_arch "arm")
+                     |    set(linux_cross_compile "arm-linux-gnueabi-")
+                     |elseif("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt")
+                     |    set(cpp_flags "-DKERNELARMPLATFORM_QEMU-ARM-VIRT")
+                     |    set(linux_repo "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git")
+                     |    set(linux_tag "v4.9.189")
+                     |    set(linux_arch "arm64")
+                     |    set(linux_cross_compile "aarch64-linux-gnu-")
+                     |    include(simulation)
+                     |    set(SIMULATION ON CACHE BOOL "Generate simulation script to run qemu with the proper arguments")
+                     |    if(SIMULATION)
+                     |        GenerateSimulateScript()
+                     |    endif()
+                     |endif()
+                     |
+                     |
+                     |
+                     |if("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt" AND (NOT USE_PRECONFIGURED_ROOTFS))
                      |    MESSAGE("Not using preconfigured rootfs, will download a vanilla linux image instead")
                      |
                      |    set(cpp_flags "-DKERNELARMPLATFORM_QEMU-ARM-VIRT")
@@ -360,6 +410,7 @@ object VM_Template {
                      |    set(rootfs_file "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/rootfs_crossvm.cpio.gz")
                      |endif()
                      |
+                     |
                      |# Complile CrossVM Event Apps ${(vmIDs, " and ")}
                      |foreach(item IN ITEMS ${(vmIDs, " ")})
                      |    ExternalProject_Add(
@@ -391,15 +442,6 @@ object VM_Template {
                      |
                      |Message("Done compiling CrossVM Event Apps for ${(vmIDs, " and ")}")
                      |
-                     |
-                     |# Overwrite inittab file for using the virtio console hvc0.
-                     |AddFileToOverlayDir(
-                     |    "inittab"
-                     |    $${CMAKE_CURRENT_SOURCE_DIR}/overlay_files/init_scripts/inittab_hvc0
-                     |    "etc"
-                     |    overlay
-                     |)
-                     |
                      |# Use initrd with crossvm kernel module and setup already included.
                      |# Construct new rootfs
                      |AddOverlayDirToRootfs(
@@ -412,7 +454,9 @@ object VM_Template {
                      |    GZIP
                      |)
                      |
-                     |AddToFileServer("linux-initrd-vm-client" $${output_overlayed_rootfs_location} DEPENDS rootfs_target)
+                     |AddToFileServer("linux-initrd"
+                     |                $${output_overlayed_rootfs_location}
+                     |                DEPENDS rootfs_target)
                      |
                      |# Add linux kernel image to file server
                      |AddToFileServer("linux" "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/linux")
@@ -442,22 +486,19 @@ object VM_Template {
           |  "linux_ram_offset" : VAR_STRINGIZE(VM_RAM_OFFSET),
           |  "dtb_addr" : VAR_STRINGIZE(${vmid}_DTB_ADDR),
           |  "initrd_max_size" : VAR_STRINGIZE(VM_INITRD_MAX_SIZE),
-          |  "initrd_addr" : VAR_STRINGIZE(${vmid}_INITRD_ADDR),
+          |  "initrd_addr" : VAR_STRINGIZE(${vmid}_INITRD_ADDR)
           |};
           |${componentID}.linux_image_config = {
-          |  "linux_bootcmdline" : "console=hvc0 nosmp rw debug loglevel=8 pci=nomsi,realloc=off,bios initcall_blacklist=clk_disable_unused",
-          |  "linux_stdout" : "hvc0",
-          |  "dtb_name" : "",
-          |  "initrd_name" : "linux-initrd-vm-client",
+          |  "linux_bootcmdline" : "pci=nomsi,realloc=off,bios initcall_blacklist=clk_disable_unused",
+          |  "linux_stdout" : "/pl011@9000000",
           |};
-          |${componentID}.mmios = [
-          |  "0x8040000:0x1000:12", // Interrupt Controller Virtual CPU interface (Virtual Machine view)
-          |];
+          |
+          |${componentID}.dtb = dtb([{"path": "/pl011@9000000"}]);
+          |
           |${componentID}.untyped_mmios = [
-          |  ${vmid}_RAM_MMIOS_BASE  // RAM
+          |  VM1_MMIOS_ICI, // Interrupt Controller Virtual CPU interface (Virtual Machine view)
+          |  VM1_MMIOS_LKMR, // Linux kernel memory regions
           |];
-          |${componentID}.irqs = [];
-          |${componentID}.dtb = dtb([{}]);
           |"""
     })
     val ret: ST = st"""/*
@@ -474,19 +515,23 @@ object VM_Template {
                       |
                       |#include <configurations/vm.h>
                       |#define VM_RAM_OFFSET      0x00000000
-                      |#define VM_INITRD_MAX_SIZE 0x3200000 // 50 MB
+                      |#define VM_INITRD_MAX_SIZE 0x1900000 //25 MB
                       |
-                      |#define VM1_RAM_BASE       0x48000000
-                      |#define VM1_RAM_MMIOS_BASE "0x48000000:27"
-                      |#define VM1_RAM_SIZE       0x8000000
-                      |#define VM1_DTB_ADDR       0x4f000000  // VM1_RAM_BASE + 0x7000000
-                      |#define VM1_INITRD_ADDR    0x4d700000  // VM1_DTB_ADDR - VM_INITRD_MAX_SIZE
+                      |#define VM1_RAM_BASE       0x40000000
+                      |#define VM1_RAM_SIZE       0x20000000
+                      |#define VM1_DTB_ADDR       0x4F000000
+                      |#define VM1_INITRD_ADDR    0x4D700000 // VM1_DTB_ADDR - VM_INITRD_MAX_SIZE
                       |
+                      |#define VM1_MMIOS_ICI      "0x8040000:12"
+                      |#define VM1_MMIOS_LKMR     "0x40000000:29"
+                      |
+                      |/*
                       |#define VM2_RAM_BASE       0x50000000
                       |#define VM2_RAM_MMIOS_BASE "0x50000000:27"
                       |#define VM2_RAM_SIZE       0x8000000
                       |#define VM2_DTB_ADDR       0x57000000  // VM2_RAM_BASE + 0x7000000
                       |#define VM2_INITRD_ADDR    0x55700000  // VM2_DTB_ADDR - VM_INITRD_MAX_SIZE
+                      |*/
                       |
                       |assembly {
                       |  composition {}

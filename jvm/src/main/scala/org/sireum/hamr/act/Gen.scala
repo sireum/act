@@ -68,6 +68,8 @@ import org.sireum.ops.ISZOps
   val useDomainScheduling: B = PeriodicUtil.useDomainScheduling(symbolTable, actOptions.platform)
 
   var sbConnectionContainer: Map[String, SBConnectionContainer] = Map.empty // connection_instance_path ~> refinements
+
+  var timeServerPlusQemuSupported: B = F
   var timeServerIntroduced: B = F
 
   def hasErrors: B = {
@@ -277,13 +279,52 @@ import org.sireum.ops.ISZOps
 
       connections = connections ++ VM_COMPONENT_CONNECTIONS_DEF.connections(processId, connectionCounter)
 
-      if(!timeServerIntroduced) {
+      // add passthrough
+      connections = connections :+ Util.createConnectionC(
+        connectionCategory = CAmkESConnectionType.VM,
+        connectionCounter = connectionCounter,
+        connectionType = Sel4ConnectorTypes.seL4VMDTBPassthrough,
+        srcComponent = processId, srcFeature = "dtb_self",
+        dstComponent = processId, dstFeature ="dtb"
+      )
+
+      val fileServer = LibraryComponents.FileServer.defaultFileServerInstance
+      if(!ops.ISZOps(instances).contains(fileServer)) {
+        instances = instances :+ fileServer
+      }
+
+
+      if(timeServerPlusQemuSupported) {
+        // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
+        connections = connections :+ Util.createConnectionC(
+          connectionCategory = CAmkESConnectionType.VM,
+          connectionCounter = connectionCounter,
+          connectionType = Sel4ConnectorTypes.seL4SerialServer,
+          srcComponent = processId,
+          srcFeature = "batch",
+          dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+          dstFeature = LibraryComponents.SerialServer.processed_batch_Port
+        )
+
+        // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
+        connections = connections :+ Util.createConnectionC(
+          connectionCategory = CAmkESConnectionType.VM,
+          connectionCounter = connectionCounter,
+          connectionType = Sel4ConnectorTypes.seL4SerialServer,
+          srcComponent = processId,
+          srcFeature = "serial_getchar",
+          dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+          dstFeature = LibraryComponents.SerialServer.getchar_Port
+        )
+      }
+
+      if(timeServerPlusQemuSupported && !timeServerIntroduced) {
         timeServerIntroduced = T
         val timeServer = LibraryComponents.TimeServer.defaultTimeServerInstance
         val serialServer = LibraryComponents.SerialServer.defaultSerialServerInstance
-        val fileServer = LibraryComponents.FileServer.defaultFileServerInstance
 
-        instances = instances :+ fileServer :+ serialServer :+ timeServer
+
+        instances = instances :+ serialServer :+ timeServer
 
         connections = connections :+ Util.createConnectionC(
           //connectionCategory = CAmkESConnectionType.TimeServer,
@@ -299,14 +340,15 @@ import org.sireum.ops.ISZOps
       globalImports = globalImports ++ VM_Template.vm_assembly_imports()
 
       camkesConfiguration = camkesConfiguration ++
-        VM_Template.vm_assembly_configuration_entries(processId)
-
-      camkesConfigurationMacros = camkesConfigurationMacros ++
+        VM_Template.vm_assembly_configuration_entries(processId) ++
         VM_GENERAL_CONFIGURATION_DEF.entries() ++
-        VM_CONFIGURATION_DEF.entries(processId) ++
-        VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF.entries() ++
-        PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF.entries(processId)
+        VM_CONFIGURATION_DEF.entries(processId)
 
+      if(timeServerPlusQemuSupported) {
+        camkesConfigurationMacros = camkesConfigurationMacros ++
+          VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF.entries() ++
+          PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF.entries(processId)
+      }
 
       settingsCmakeEntries = settingsCmakeEntries ++ VM_Template.settings_cmake_entries()
 

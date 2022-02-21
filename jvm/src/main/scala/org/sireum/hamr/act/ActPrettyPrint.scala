@@ -351,8 +351,9 @@ import org.sireum.ops.StringOps
       val froms = c.from_ends.map((m: ast.ConnectionEnd) => st"from ${m.component}.${m.end}")
       val tos = c.to_ends.map((m: ast.ConnectionEnd) => st"to ${m.component}.${m.end}")
 
-      connections = connections :+
-        st"""connection ${c.connectionType} ${c.name}(${(froms, ", ")}, ${(tos, ", ")});"""
+      connections = connections :+ processComments(
+        st"""connection ${c.connectionType} ${c.name}(${(froms, ", ")}, ${(tos, ", ")});""",
+        c)
     }
 
 
@@ -487,23 +488,24 @@ import org.sireum.ops.StringOps
 
       assert(inline.size < 1, "Can have at most 1 inline comment")
 
-      val optPres: Option[ST] = {
-        if(pres.isEmpty) None()
-        else Some(st"${(pres, "\n")}")
-      }
-      val optPosts: Option[ST] = {
-        if(posts.isEmpty) None()
-        else Some(st"${(posts, "\n")}")
-      }
-      val optInline: Option[ST] = {
-        if(inline.isEmpty) None()
-        else Some(st"${inline(0).comment}")
+      var ret: ST = st""
+
+      if(pres.nonEmpty) {
+        ret = st"""
+                  |${(pres.map((m: AstBasicComment) => m.comment), "\n")}
+                  |"""
       }
 
-      val ret: ST =
-        st"""${optPres}
-            |${st}${optInline}
-            |${optPosts}"""
+      if(inline.nonEmpty) {
+        ret = st"$ret${st} ${inline(0).comment}"
+      } else {
+        ret = st"$ret${st}"
+      }
+
+      if(posts.nonEmpty) {
+        ret = st"""$ret
+                  |${(posts.map((m: AstBasicComment) => m.comment), "\n")}"""
+      }
 
       return ret
     }

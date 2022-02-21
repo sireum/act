@@ -4,7 +4,7 @@ package org.sireum.hamr.act.util
 
 import org.sireum._
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.ast.{BinarySemaphore, Consumes, Dataport, Emits, Mutex, Provides, Semaphore, TODO, Uses}
+import org.sireum.hamr.act.ast.{AstBasicComment, AstComment, BinarySemaphore, CommentLocation, Consumes, Dataport, Emits, Mutex, Provides, Semaphore, TODO, Uses}
 import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.vm.MetaPort
@@ -873,5 +873,11 @@ object Util {
     ProofUtil.addPortSelfPacing(aadlComponent, ret, symbolTable)
 
     return ret
+  }
+
+
+
+  def createComment(comment: String): AstComment = {
+    return AstBasicComment(CommentLocation.PRE, comment)
   }
 }

@@ -7,8 +7,8 @@ import org.sireum.hamr.act.vm.VM_Template
 object ScriptTemplate {
 
   def runCamkesScript(hasVM: B): ST = {
-    val camkesDir: String = if(hasVM) { "camkes-arm-vm" } else { "camkes" }
-    val camkesGitLoc: String = if(hasVM) { "https://github.com/SEL4PROJ/camkes-arm-vm" } else { "https://docs.sel4.systems/projects/camkes" }
+    val camkesDir: String = if(hasVM) { "camkes-vm-examples" } else { "camkes" }
+    val camkesGitLoc: String = if(hasVM) { "https://github.com/camkes-vm-examples" } else { "https://docs.sel4.systems/projects/camkes" }
 
     val CAMKES_DIR: String = "CAMKES_DIR"
     val NON_INTERACTIVE: String = "NON_INTERACTIVE"
@@ -21,7 +21,7 @@ object ScriptTemplate {
       st"""../init-build.sh $${${CAMKES_OPTIONS}} ${bt}
           |    -DPLATFORM=qemu-arm-virt ${bt}
           |    -DARM_HYP=ON ${bt}
-          |    -DCAMKES_APP=$$HAMR_CAMKES_PROJ
+          |    -DCAMKES_VM_APP=$$HAMR_CAMKES_PROJ
           |
           |ninja"""
     } else {
@@ -34,7 +34,7 @@ object ScriptTemplate {
           |    -machine virt,virtualization=on,highmem=off,secure=off \\
           |    -cpu cortex-a53 \\
           |    -nographic \\
-          |    -m size=1024 \\
+          |    -m size=2048 \\
           |    -kernel images/capdl-loader-image-arm-qemu-arm-virt"""
     } else {
       st"""qemu-system-x86_64 \\
@@ -45,6 +45,10 @@ object ScriptTemplate {
           |    -kernel images/kernel-x86_64-pc99 \\
           |    -initrd images/capdl-loader-image-x86_64-pc99"""
     }
+
+    val CAMKES_APPS_DIR: ST =
+      if(hasVM) st"$${${CAMKES_DIR}}/projects/vm-examples/apps/Arm/$$HAMR_CAMKES_PROJ"
+      else st"$${${CAMKES_DIR}}/projects/camkes/apps/$$HAMR_CAMKES_PROJ"
 
     val ret: ST = st"""#!/usr/bin/env bash
                       |
@@ -127,7 +131,7 @@ object ScriptTemplate {
                       |HAMR_CAMKES_PROJ=$${PWD##*/}
                       |
                       |
-                      |CAMKES_APPS_DIR=$${${CAMKES_DIR}}/projects/camkes/apps/$$HAMR_CAMKES_PROJ
+                      |CAMKES_APPS_DIR=$CAMKES_APPS_DIR
                       |
                       |# create a sym-link to the project in the CAmkES app directory
                       |if [ -e "$${CAMKES_APPS_DIR}" ]; then

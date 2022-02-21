@@ -61,6 +61,15 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
         string linux_stdout = ""; \
     } linux_image_config; \
 */
+
+object VM_H {
+  val vmH_Location: String = "https://github.com/seL4/camkes-vm/blob/39734d70d38af597e459f4923c75db95508d9661/components/VM_Arm/configurations/vm.h"
+
+  def tag(lineNumber: Z): String = {
+    return s"${vmH_Location}#${lineNumber}"
+  }
+}
+
 object VM_INIT_DEF {
   def semaphores(): ISZ[Semaphore] = {
     val ret: ISZ[Semaphore] = ISZ(Semaphore(name = "vm_sem", comments = ISZ()))
@@ -226,19 +235,7 @@ object VM_COMPONENT_CONNECTIONS_DEF {
   def connections(processId: String, connectionCounter: Counter): ISZ[Connection] = {
     var connections: ISZ[Connection] = ISZ()
 
-    connections = connections :+ Util.createConnectionC(
-      connectionCategory = CAmkESConnectionType.VM,
-      connectionCounter = connectionCounter,
-      connectionType = Sel4ConnectorTypes.seL4VMDTBPassthrough,
-      srcComponent = processId, srcFeature = "dtb_self",
-      dstComponent = processId, dstFeature ="dtb"
-    )
-
-    // #define VM_COMPONENT_CONNECTIONS_DEF(num) \
-    //    connection seL4RPCDataport fs##num(from vm##num.fs, to fserv.fs_ctrl); \
-    //    connection seL4GlobalAsynch notify_ready_vm##num(from vm##num.notification_ready_connector, to vm##num.notification_ready); \
-
-    connections = connections :+ Util.createConnectionC(
+    val fsConnection = Util.createConnectionC(
       connectionCategory = CAmkESConnectionType.VM,
       connectionCounter = connectionCounter,
       connectionType = Sel4ConnectorTypes.seL4RPCDataport,
@@ -246,34 +243,17 @@ object VM_COMPONENT_CONNECTIONS_DEF {
       dstComponent = LibraryComponents.FileServer.defaultFileServerName,
       dstFeature = LibraryComponents.FileServer.fs_ctrl_port)
 
+    val comment = s"// Expansion of connections in macro VM_COMPONENT_CONNECTIONS_DEF. See ${VM_H.tag(87)}"
+    val fsConnectionWithComment = fsConnection(comments = ISZ(Util.createComment(comment)))
+
+    connections = connections :+ fsConnectionWithComment
+
     connections = connections :+ Util.createConnectionC(
       connectionCategory = CAmkESConnectionType.VM,
       connectionCounter = connectionCounter,
       connectionType = Sel4ConnectorTypes.seL4GlobalAsynch,
       srcComponent = processId, srcFeature = "notification_ready_connector",
       dstComponent = processId, dstFeature = "notification_ready")
-
-    // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
-    connections = connections :+ Util.createConnectionC(
-      connectionCategory = CAmkESConnectionType.VM,
-      connectionCounter = connectionCounter,
-      connectionType = Sel4ConnectorTypes.seL4SerialServer,
-      srcComponent = processId,
-      srcFeature = "batch",
-      dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
-      dstFeature = LibraryComponents.SerialServer.processed_batch_Port
-    )
-
-    // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
-    connections = connections :+ Util.createConnectionC(
-      connectionCategory = CAmkESConnectionType.VM,
-      connectionCounter = connectionCounter,
-      connectionType = Sel4ConnectorTypes.seL4SerialServer,
-      srcComponent = processId,
-      srcFeature = "serial_getchar",
-      dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
-      dstFeature = LibraryComponents.SerialServer.getchar_Port
-    )
 
     return connections
   }
@@ -284,8 +264,12 @@ object VM_COMPONENT_CONNECTIONS_DEF {
 // #define VM_GENERAL_CONFIGURATION_DEF() \
 //    fserv.heap_size = 165536; \
 object VM_GENERAL_CONFIGURATION_DEF {
-  def entries(): ISZ[String] = {
-    return ISZ("fserv.heap_size = 165536;")
+  //def entries(): ISZ[String] = {
+  //  return ISZ("fserv.heap_size = 165536;")
+  //}
+  def entries(): ISZ[Configuration] = {
+    val comment = s"// Expansion of configuration entries in macro VM_GENERAL_CONFIGURATION_DEF. See ${VM_H.tag(98)}"
+    return ISZ(GenericConfiguration("fserv.heap_size = 165536;", ISZ(Util.createComment(comment))))
   }
 }
 
@@ -301,9 +285,10 @@ object VM_GENERAL_CONFIGURATION_DEF {
 //    vm##num.sem_value = 0; \
 //    vm##num.heap_size = 0x300000;
 object VM_CONFIGURATION_DEF {
+  /*
   def entries(componentId: String): ISZ[String] = {
     return ISZ(
-        s"${componentId}.fs_shmem_size = 0x100000;",
+      s"${componentId}.fs_shmem_size = 0x100000;",
       s"${componentId}.global_endpoint_base = 1 << 27;",
       s"${componentId}.asid_pool = true;",
       s"${componentId}.simple = true;",
@@ -311,6 +296,19 @@ object VM_CONFIGURATION_DEF {
       s"${componentId}._priority = 101;",
       s"${componentId}.sem_value = 0;",
       s"${componentId}.heap_size = 0x300000;")
+  }
+  */
+  def entries(componentId: String): ISZ[Configuration] = {
+    val comment = s"// Expansion of configuration entries in macro VM_CONFIGURATION_DEF. See ${VM_H.tag(101)}"
+    return ISZ(
+      GenericConfiguration(s"${componentId}.fs_shmem_size = 0x100000;", ISZ(Util.createComment(comment))),
+      GenericConfiguration(s"${componentId}.global_endpoint_base = 1 << 27;", ISZ()),
+      GenericConfiguration(s"${componentId}.asid_pool = true;", ISZ()),
+      GenericConfiguration(s"${componentId}.simple = true;", ISZ()),
+      GenericConfiguration(s"${componentId}.base_prio = 100;", ISZ()),
+      GenericConfiguration(s"${componentId}._priority = 101;", ISZ()),
+      GenericConfiguration(s"${componentId}.sem_value = 0;", ISZ()),
+      GenericConfiguration(s"${componentId}.heap_size = 0x300000;", ISZ()))
   }
 }
 
