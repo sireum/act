@@ -643,21 +643,30 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         entries = entries :+ PacerTemplate.pacerScheduleEntry(pacerDomain, pacerLen / clockPeriod, 
           Some(st" // pacer ${pacerLen}ms.  Should always be in domain ${pacerDomain}"))
         
-        var threadComments: ISZ[ST] = ISZ()
+        var componentComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
         for(p <- allComponents) {
-          val (domain, computeExecutionTime, dispatchProtocol, period): (Z, Z, Dispatch_Protocol.Type, Option[Z]) = p match {
+          val (domain, computeExecutionTime, origin, dispatchProtocol, period, componentType): (Z, Z, String, Dispatch_Protocol.Type, Option[Z], String) = p match {
             case p: AadlProcess =>
               val dc = p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
-              (p.getDomain().get, -1, dc.dispatchProtocol, dc.period)
-            case t: AadlThread => (t.getDomain(symbolTable).get, t.getMaxComputeExecutionTime(), t.dispatchProtocol, t.period)
+
+              var maxComputeExecutionTime: Z = 0
+              var origin: String = ""
+              for(t <- p.getThreads() if t.getMaxComputeExecutionTime() > maxComputeExecutionTime) {
+                maxComputeExecutionTime = t.getMaxComputeExecutionTime()
+                origin = s"(from thread ${t.identifier})"
+              }
+
+              (p.getDomain().get, maxComputeExecutionTime, origin,  dc.dispatchProtocol, dc.period, "Process")
+            case t: AadlThread => (t.getDomain(symbolTable).get, t.getMaxComputeExecutionTime(), "", t.dispatchProtocol, t.period, "Thread")
+            case x => halt(s"Unexpected, only expecting threads or processes but encountered $x")
           }
 
-          val comment = Some(st" // ${p.identifier}  ${computeExecutionTime}ms")
+          val comment = Some(st" // ${p.identifier} ${computeExecutionTime} ms")
 
-          threadComments = threadComments :+ 
-            PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier,
-              domain, dispatchProtocol, computeExecutionTime, period)
+          componentComments = componentComments :+
+            PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier, componentType,
+              domain, dispatchProtocol, s"${computeExecutionTime} ms ${origin}", period)
 
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
           
@@ -667,7 +676,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         val pad: Z = (framePeriod - (otherLen + pacerLen + sumExecutionTime)) / clockPeriod
         entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", pad, Some(st" // pad rest of frame period"))
         
-        PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
+        PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, componentComments, entries)
     }
 
     return ISZ(ResourceUtil.createResource(path, contents, aadlProcessor.getScheduleSourceText().nonEmpty))

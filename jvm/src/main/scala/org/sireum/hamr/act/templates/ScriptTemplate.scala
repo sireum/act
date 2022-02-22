@@ -20,6 +20,7 @@ object ScriptTemplate {
     val buildSim: ST = if(hasVM) {
       st"""../init-build.sh $${${CAMKES_OPTIONS}} ${bt}
           |    -DPLATFORM=qemu-arm-virt ${bt}
+          |    -DQEMU_MEMORY=2048 ${bt}
           |    -DARM_HYP=ON ${bt}
           |    -DCAMKES_VM_APP=$$HAMR_CAMKES_PROJ
           |
@@ -157,7 +158,7 @@ object ScriptTemplate {
                       |
                       |if [ -e "$${BUILD_DIR}" ]; then
                       |  if [ "$${${NON_INTERACTIVE}}" = true ];then
-                      |    # if the project contains VMs and USE_PRECONFIGURED_ROOTFS=OFF then
+                      |    # if the project contains VMs and ${VM_Template.BUILD_CROSSVM}=ON then
                       |    # deleting the build directory would force the linux image to be
                       |    # re-downloaded, which can take a long time
                       |    echo "Non-interactive mode so not deleting existing $${BUILD_DIR}"

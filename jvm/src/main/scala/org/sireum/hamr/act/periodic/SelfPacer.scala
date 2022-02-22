@@ -204,11 +204,11 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
         for(p <- allThreads) {
           val domain = p.getDomain(symbolTable).get
           val computeExecutionTime = p.getMaxComputeExecutionTime()
-          val comment = Some(st" // ${p.identifier}  ${computeExecutionTime}ms")
+          val comment = Some(st" // ${p.identifier} ${computeExecutionTime}ms")
 
           threadComments = threadComments :+
-            PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier,
-              domain, p.dispatchProtocol, computeExecutionTime, p.period)
+            PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier, "Thread",
+              domain, p.dispatchProtocol, s"$computeExecutionTime} ms", p.period)
 
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
 

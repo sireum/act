@@ -8,12 +8,12 @@ import org.sireum.hamr.act.util.{CMakeOption, CMakeStandardOption}
 
 object VM_Template {
 
-  val USE_PRECONFIGURED_ROOTFS: String = "USE_PRECONFIGURED_ROOTFS"
+  val BUILD_CROSSVM: String = "BUILD_CROSSVM"
 
   val data61_VM_Macros_Location: String = "<configurations/vm.h>"
 
   val VM_CMAKE_OPTIONS: ISZ[CMakeOption] = ISZ(
-    CMakeStandardOption(USE_PRECONFIGURED_ROOTFS, F, "Use preconfigured rootfs rather than downloading a vanilla linux image")
+    CMakeStandardOption(BUILD_CROSSVM, F, "Checkout and configure linux to build crossvm module instead of using pre-configured rootfs")
   )
 
   def vm_assembly_preprocessor_includes(): ISZ[String] = {
@@ -45,11 +45,12 @@ object VM_Template {
 
   def vm_assembly_configuration_entries(vmProcessID: String): ISZ[ast.Configuration] = {
     val ret: ISZ[ast.Configuration] = ISZ(
-      ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 23;", ISZ()),
-      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped21_pool = 12;", ISZ()),
-      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped12_pool = 12;", ISZ()),
       ast.GenericConfiguration(s"${vmProcessID}.num_extra_frame_caps = 0;", ISZ()),
-      ast.GenericConfiguration(s"${vmProcessID}.extra_frame_map_address = 0;", ISZ())
+      ast.GenericConfiguration(s"${vmProcessID}.extra_frame_map_address = 0;", ISZ()),
+      ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 23;", ISZ()),
+      ast.GenericConfiguration(s"${vmProcessID}.simple_untyped24_pool = 12;", ISZ()),
+      //ast.GenericConfiguration(s"${vmProcessID}.simple_untyped21_pool = 12;", ISZ()),
+      //ast.GenericConfiguration(s"${vmProcessID}.simple_untyped12_pool = 12;", ISZ()),
     )
     return ret
   }
@@ -207,7 +208,7 @@ object VM_Template {
                       |set(VmInitRdFile ON CACHE BOOL "" FORCE)
                       |
                       |# Enable virtio console vmm module
-                      |set(VmVirtioConsole ON CACHE BOOL "" FORCE)
+                      |# set(VmVirtioConsole ON CACHE BOOL "" FORCE)
                       |
                       |# Make VTimers see absolute time rather than virtual time.
                       |set(KernelArmVtimerUpdateVOffset OFF CACHE BOOL "" FORCE)
@@ -216,12 +217,13 @@ object VM_Template {
                       |set(KernelArmDisableWFIWFETraps ON CACHE BOOL "" FORCE)
                       |
                       |if("$${PLATFORM}" STREQUAL "qemu-arm-virt")
+                      |
                       |    set(KernelArmCPU cortex-a53 CACHE STRING "" FORCE)
                       |    set(KernelArmExportPCNTUser ON CACHE BOOL "" FORCE)
                       |    set(KernelArmExportPTMRUser ON CACHE BOOL "" FORCE)
                       |
                       |    set(MIN_QEMU_VERSION "4.0.0")
-                      |    execute_process(COMMAND $${QEMU_BINARY} -version OUTPUT_VARIABLE QEMU_VERSION_STR)
+                      |    execute_process(COMMAND qemu-system-aarch64 -version OUTPUT_VARIABLE QEMU_VERSION_STR)
                       |    string(
                       |        REGEX
                       |            MATCH
@@ -264,21 +266,21 @@ object VM_Template {
                      |
                      |# including https://github.com/seL4/camkes-vm/blob/master/arm_vm_helpers.cmake
                      |include($${CAMKES_ARM_VM_HELPERS_PATH})
-                     |MESSAGE("CAMKES_ARM_VM_HELPERS_PATH = $${CAMKES_ARM_VM_HELPERS_PATH}")
+                     |#MESSAGE("CAMKES_ARM_VM_HELPERS_PATH = $${CAMKES_ARM_VM_HELPERS_PATH}")
                      |
                      |find_package(camkes-vm-linux REQUIRED)
                      |
                      |# including https://github.com/seL4/camkes-vm-linux/blob/master/vm-linux-helpers.cmake
                      |include($${CAMKES_VM_LINUX_HELPERS_PATH})
-                     |MESSAGE("CAMKES_VM_LINUX_HELPERS_PATH = $${CAMKES_VM_LINUX_HELPERS_PATH}")
+                     |#MESSAGE("CAMKES_VM_LINUX_HELPERS_PATH = $${CAMKES_VM_LINUX_HELPERS_PATH}")
                      |
                      |# including https://github.com/seL4/camkes-vm-linux/blob/master/linux-module-helpers.cmake
                      |include($${CAMKES_VM_LINUX_MODULE_HELPERS_PATH})
-                     |MESSAGE("CAMKES_VM_LINUX_MODULE_HELPERS_PATH = $${CAMKES_VM_LINUX_MODULE_HELPERS_PATH}")
+                     |#MESSAGE("CAMKES_VM_LINUX_MODULE_HELPERS_PATH = $${CAMKES_VM_LINUX_MODULE_HELPERS_PATH}")
                      |
                      |# including https://github.com/seL4/camkes-vm-linux/blob/master/linux-source-helpers.cmake
                      |include($${CAMKES_VM_LINUX_SOURCE_HELPERS_PATH})
-                     |MESSAGE("CAMKES_VM_LINUX_SOURCE_HELPERS_PATH = $${CAMKES_VM_LINUX_SOURCE_HELPERS_PATH}")
+                     |#MESSAGE("CAMKES_VM_LINUX_SOURCE_HELPERS_PATH = $${CAMKES_VM_LINUX_SOURCE_HELPERS_PATH}")
                      |
                      |
                      |# This Project Depends on External Project(s)
@@ -289,22 +291,18 @@ object VM_Template {
                      |
                      |find_package(camkes-vm-images REQUIRED)
                      |find_package(camkes-arm-vm REQUIRED)
-                     |find_package(camkes-vm-linux REQUIRED)
-                     |
-                     |# causes build to break
-                     |#camkes_arm_vm_import_project()
                      |
                      |
-                     |MESSAGE("CAMKES_VM_LINUX_HELPERS_PATH = $${CAMKES_VM_LINUX_HELPERS_PATH}")
-                     |MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
-                     |MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
-                     |MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
-                     |MESSAGE("CAMKES_VM_LINUX_DIR = $${CAMKES_VM_LINUX_DIR}")
+                     |#MESSAGE("CAMKES_VM_LINUX_HELPERS_PATH = $${CAMKES_VM_LINUX_HELPERS_PATH}")
+                     |#MESSAGE("KernelARMPlatform = $${KernelARMPlatform}")
+                     |#MESSAGE("CAMKES_ARM_VM_DIR = $${CAMKES_ARM_VM_DIR}")
+                     |#MESSAGE("CAMKES_VM_IMAGES_DIR = $${CAMKES_VM_IMAGES_DIR}")
+                     |#MESSAGE("CAMKES_VM_LINUX_DIR = $${CAMKES_VM_LINUX_DIR}")
                      |
-                     |MESSAGE("CMAKE_CURRENT_BINARY_DIR = $${CMAKE_CURRENT_BINARY_DIR}")
-                     |MESSAGE("CMAKE_CURRENT_SOURCE_DIR = $${CMAKE_CURRENT_SOURCE_DIR}")
-                     |MESSAGE("CMAKE_C_COMPILER = $${CMAKE_C_COMPILER}")
-                     |MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
+                     |#MESSAGE("CMAKE_CURRENT_BINARY_DIR = $${CMAKE_CURRENT_BINARY_DIR}")
+                     |#MESSAGE("CMAKE_CURRENT_SOURCE_DIR = $${CMAKE_CURRENT_SOURCE_DIR}")
+                     |#MESSAGE("CMAKE_C_COMPILER = $${CMAKE_C_COMPILER}")
+                     |#MESSAGE("BASE_C_FLAGS = $${BASE_C_FLAGS}")
                      |
                      |
                      |
@@ -330,30 +328,30 @@ object VM_Template {
                      |
                      |
                      |
-                     |if("$${KernelARMPlatform}" STREQUAL "qemu-arm-virt" AND (NOT USE_PRECONFIGURED_ROOTFS))
+                     |if(BUILD_CROSSVM)
                      |    MESSAGE("Not using preconfigured rootfs, will download a vanilla linux image instead")
                      |
-                     |    set(cpp_flags "-DKERNELARMPLATFORM_QEMU-ARM-VIRT")
-                     |    set(linux_repo "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git")
-                     |    set(linux_tag "v4.9.189")
-                     |    set(linux_arch "arm64")
-                     |    set(linux_cross_compile "aarch64-linux-gnu-")
                      |    set(rootfs_file "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/rootfs.cpio.gz")
                      |    # Checkout and configure linux to build crossvm module
                      |    ExternalProject_Add(
                      |        checkout_linux
-                     |        GIT_REPOSITORY $${linux_repo}
-                     |        GIT_TAG $${linux_tag}
-                     |        GIT_SHALLOW TRUE
-                     |        GIT_PROGRESS TRUE
-                     |        USES_TERMINAL_DOWNLOAD TRUE
-                     |        BUILD_COMMAND ""
-                     |        INSTALL_COMMAND ""
-                     |        CONFIGURE_COMMAND ""
-                     |        SOURCE_DIR $${CMAKE_CURRENT_BINARY_DIR}/linux_out
+                     |        GIT_REPOSITORY
+                     |        $${linux_repo}
+                     |        GIT_TAG
+                     |        $${linux_tag}
+                     |        GIT_SHALLOW
+                     |        1
+                     |        GIT_PROGRESS
+                     |        1
+                     |        BUILD_COMMAND
+                     |        ""
+                     |        INSTALL_COMMAND
+                     |        ""
+                     |        CONFIGURE_COMMAND
+                     |        ""
+                     |        SOURCE_DIR
+                     |        $${CMAKE_CURRENT_BINARY_DIR}/linux_out
                      |    )
-                     |    Message("Done cloning $${linux_repo}")
-                     |
                      |    # Linux config and symvers are to be copied to unpacked archive
                      |    set(linux_config "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/linux_configs/config")
                      |    set(linux_symvers "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/linux_configs/Module.symvers")
@@ -386,7 +384,6 @@ object VM_Template {
                      |        checkout_linux
                      |        configure_vm_linux
                      |    )
-                     |
                      |    AddFileToOverlayDir(
                      |        "connection.ko"
                      |        $${output_module}
@@ -394,6 +391,79 @@ object VM_Template {
                      |        overlay
                      |        DEPENDS
                      |        output_module_target
+                     |    )
+                     |
+                     |    # Complile CrossVM Dataport Apps
+                     |    ExternalProject_Add(
+                     |        dataport-apps
+                     |        URL
+                     |        file:///$${CAMKES_VM_LINUX_DIR}/camkes-linux-artifacts/camkes-linux-apps/camkes-connector-apps/pkgs/dataport
+                     |        BINARY_DIR
+                     |        $${CMAKE_CURRENT_BINARY_DIR}/dataport_apps
+                     |        INSTALL_COMMAND
+                     |        ""
+                     |        BUILD_ALWAYS
+                     |        ON
+                     |        EXCLUDE_FROM_ALL
+                     |        CMAKE_ARGS
+                     |        -DCMAKE_C_COMPILER=$${CMAKE_C_COMPILER}
+                     |    )
+                     |    AddExternalProjFilesToOverlay(
+                     |        dataport-apps
+                     |        $${CMAKE_CURRENT_BINARY_DIR}/dataport_apps
+                     |        overlay
+                     |        "usr/bin"
+                     |        FILES
+                     |        dataport_read
+                     |        dataport_write
+                     |    )
+                     |
+                     |    # Complile CrossVM Event Apps
+                     |    ExternalProject_Add(
+                     |        event-apps
+                     |        URL
+                     |        file:///$${CAMKES_VM_LINUX_DIR}/camkes-linux-artifacts/camkes-linux-apps/camkes-connector-apps/pkgs/emits_event
+                     |        BINARY_DIR
+                     |        $${CMAKE_CURRENT_BINARY_DIR}/emits_event_apps
+                     |        INSTALL_COMMAND
+                     |        ""
+                     |        BUILD_ALWAYS
+                     |        ON
+                     |        EXCLUDE_FROM_ALL
+                     |        CMAKE_ARGS
+                     |        -DCMAKE_C_COMPILER=$${CMAKE_C_COMPILER}
+                     |    )
+                     |    AddExternalProjFilesToOverlay(
+                     |        event-apps
+                     |        $${CMAKE_CURRENT_BINARY_DIR}/emits_event_apps
+                     |        overlay
+                     |        "usr/bin"
+                     |        FILES
+                     |        emits_event_emit
+                     |    )
+                     |
+                     |    # Complile CrossVM Consume Event Apps
+                     |    ExternalProject_Add(
+                     |        consume-event-apps
+                     |        URL
+                     |        file:///$${CAMKES_VM_LINUX_DIR}/camkes-linux-artifacts/camkes-linux-apps/camkes-connector-apps/pkgs/consumes_event
+                     |        BINARY_DIR
+                     |        $${CMAKE_CURRENT_BINARY_DIR}/consume_event_apps
+                     |        INSTALL_COMMAND
+                     |        ""
+                     |        BUILD_ALWAYS
+                     |        ON
+                     |        EXCLUDE_FROM_ALL
+                     |        CMAKE_ARGS
+                     |        -DCMAKE_C_COMPILER=$${CMAKE_C_COMPILER}
+                     |    )
+                     |    AddExternalProjFilesToOverlay(
+                     |        consume-event-apps
+                     |        $${CMAKE_CURRENT_BINARY_DIR}/consume_event_apps
+                     |        overlay
+                     |        "usr/bin"
+                     |        FILES
+                     |        consumes_event_wait
                      |    )
                      |
                      |    # Add script to initialise dataport module
@@ -440,9 +510,7 @@ object VM_Template {
                      |    )
                      |endforeach()
                      |
-                     |Message("Done compiling CrossVM Event Apps for ${(vmIDs, " and ")}")
                      |
-                     |# Use initrd with crossvm kernel module and setup already included.
                      |# Construct new rootfs
                      |AddOverlayDirToRootfs(
                      |    overlay
@@ -459,7 +527,19 @@ object VM_Template {
                      |                DEPENDS rootfs_target)
                      |
                      |# Add linux kernel image to file server
-                     |AddToFileServer("linux" "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/linux")
+                     |AddToFileServer("linux"
+                     |                "$${CAMKES_VM_IMAGES_DIR}/$${KernelARMPlatform}/linux")
+                     |
+                     |AddCamkesCPPFlag(
+                     |    cpp_flags
+                     |    CONFIG_VARS
+                     |    VmEmmc2NoDMA
+                     |    VmVUSB
+                     |    VmVchan
+                     |    Tk1DeviceFwd
+                     |    Tk1Insecure
+                     |    VmVirtioNetVirtqueue
+                     |)
                      |
                      |DefineCAmkESVMFileServer()
                      |

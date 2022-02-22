@@ -163,12 +163,14 @@ object PacerTemplate {
   }
 
   def pacerScheduleThreadPropertyComment(componentId: String,
+                                         componentType: String,
                                          domain: Z,
                                          dispatchProtocol: Dispatch_Protocol.Type,
-                                         computeExecutionTime: Z,
+                                         computeExecutionTime: String,
                                          period: Option[Z]): ST = {
+    val title = s"$componentId : $componentType"
     var dashes: String = s""
-    for(x <- 0 until componentId.size){ dashes = s"${dashes}-" }
+    for(x <- 0 until title.size){ dashes = s"${dashes}-" }
 
     val _period: Option[ST] =
       period match {
@@ -176,12 +178,12 @@ object PacerTemplate {
         case _ => None()
       }
 
-    val ret: ST = st"""${componentId}
+    val ret: ST = st"""${title}
                       |${dashes}
                       |
                       |  ${CaseSchedulingProperties.DOMAIN} : ${domain}
                       |  ${OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL} : ${dispatchProtocol}
-                      |  ${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime} ms
+                      |  ${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime}
                       |  ${_period}"""
     return ret
   }
