@@ -863,7 +863,7 @@ bool is_empty_${s.name}(${s.structName} *port) {
     }
 
     if(hasVM) {
-      hints = hints :+ st"""Your project contains VMs so consider passing '-o "-D${VM_Template.BUILD_CROSSVM}=ON"'"""
+      hints = hints :+ st"""Your project contains VMs. The pre-configured rootfs will be used unless '-o "-D${VM_Template.BUILD_CROSSVM}=ON"' is passed"""
     }
 
     val ret: ST =
