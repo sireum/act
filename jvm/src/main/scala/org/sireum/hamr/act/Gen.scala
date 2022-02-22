@@ -1024,7 +1024,7 @@ import org.sireum.ops.ISZOps
 
     PropertyUtil.getDiscreetPropertyValue(c.properties, "camkes::Binary_Semaphore") match {
       case Some(v: ir.ValueProp) =>
-        binarySemaphores = binarySemaphores :+ BinarySemaphore(v.value, comments = ISZ())
+        binarySemaphores = binarySemaphores :+ BinarySemaphore(name = v.value, comments = ISZ())
       case _ =>
     }
 
@@ -1036,7 +1036,7 @@ import org.sireum.ops.ISZOps
     var gcRunLoopEndStmts: ISZ[ST] = ISZ()
 
     if (!PeriodicUtil.requiresPacerArtifacts(aadlThread, symbolTable, useDomainScheduling)) {
-      semaphores = semaphores :+ Semaphore(StringTemplate.SEM_DISPATCH, comments = ISZ())
+      semaphores = semaphores :+ Semaphore(name = StringTemplate.SEM_DISPATCH, comments = ISZ())
 
       val semWait: ST = st"MUTEXOP(${StringTemplate.SEM_WAIT}())"
 
@@ -1530,7 +1530,7 @@ import org.sireum.ops.ISZOps
             hardware = F,
             name = monitorName,
 
-            mutexes = ISZ(Mutex("m", comments = ISZ())),
+            mutexes = ISZ(Mutex(name ="m", comments = ISZ())),
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
             dataports = ISZ(),
@@ -1563,7 +1563,7 @@ import org.sireum.ops.ISZOps
           val receiveMethod = Method(
             name = "dequeue",
             parameters = ISZ(
-              Parameter(F, Direction.Out, "m", paramTypeName, comments = ISZ())),
+              Parameter(array = F, direction = Direction.Out, name ="m", typ = paramTypeName, comments = ISZ())),
             returnType = Some("bool"),
             comments = ISZ())
 
@@ -1577,7 +1577,7 @@ import org.sireum.ops.ISZOps
           val sendMethod = Method(
             name = "enqueue",
             parameters = ISZ(
-              Parameter(F, Direction.Refin, "m", paramTypeName, comments = ISZ())),
+              Parameter(array = F, direction = Direction.Refin, name = "m", typ = paramTypeName, comments = ISZ())),
             returnType = Some("bool"),
             comments = ISZ())
 
@@ -1630,7 +1630,7 @@ import org.sireum.ops.ISZOps
             hardware = F,
             name = monitorName,
 
-            mutexes = ISZ(Mutex("m", comments = ISZ())),
+            mutexes = ISZ(Mutex(name = "m", comments = ISZ())),
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
             dataports = ISZ(),
@@ -1754,15 +1754,15 @@ import org.sireum.ops.ISZOps
   def createReadWriteMethods(typeName: String): ISZ[Method] = {
     return ISZ(
       Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool"), comments = ISZ()),
-      Method(name = "read", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()),
-      Method(name = "write", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
+      Method(name = "read", parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "m", typ = typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()),
+      Method(name = "write", parameters = ISZ(Parameter(array =F, direction = Direction.Refin, name = "m", typ = typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
   }
 
   def createQueueMethods(typeName: String): ISZ[Method] = {
     return ISZ(
       Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool"), comments = ISZ()),
-      Method(name = "enqueue", parameters = ISZ(Parameter(F, Direction.Refin, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()),
-      Method(name = "dequeue", parameters = ISZ(Parameter(F, Direction.Out, "m", typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
+      Method(name = "enqueue", parameters = ISZ(Parameter(array = F, direction = Direction.Refin, name = "m", typ = typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()),
+      Method(name = "dequeue", parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "m", typ = typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
   }
 
   def processDataTypes(values: ISZ[ir.Component]): ST = {
