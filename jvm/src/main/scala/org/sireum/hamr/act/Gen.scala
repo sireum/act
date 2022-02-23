@@ -49,7 +49,6 @@ import org.sireum.ops.ISZOps
   var camkesConnectorContainers: ISZ[ConnectorContainer] = ISZ()
 
   var camkesConfiguration: ISZ[ast.Configuration] = ISZ()
-  var camkesConfigurationMacros: Set[String] = Set.empty // same idea, just can't end with a semi-colon
 
   var auxCImplIncludes: ISZ[ST] = ISZ()
 
@@ -69,8 +68,7 @@ import org.sireum.ops.ISZOps
 
   var sbConnectionContainer: Map[String, SBConnectionContainer] = Map.empty // connection_instance_path ~> refinements
 
-  var timeServerPlusQemuSupported: B = F
-  var timeServerIntroduced: B = F
+  var vmArtifactsIntroduced: B = F
 
   def hasErrors: B = {
     return reporter.hasError
@@ -176,7 +174,7 @@ import org.sireum.ops.ISZOps
 
       astObjects = ISZ(Assembly(
         configuration = (Set.empty[ast.Configuration] ++ camkesConfiguration).elements,
-        configurationMacros = camkesConfigurationMacros.elements,
+        configurationMacros = ISZ(),
         composition = composition,
         comments = ISZ()))
 
@@ -288,67 +286,29 @@ import org.sireum.ops.ISZOps
         dstComponent = processId, dstFeature ="dtb"
       )
 
-      val fileServer = LibraryComponents.FileServer.defaultFileServerInstance
-      if(!ops.ISZOps(instances).contains(fileServer)) {
-        instances = instances :+ fileServer
+      if(!vmArtifactsIntroduced) {
+        vmArtifactsIntroduced = T
+
+        instances = instances ++ VM_GENERAL_COMPOSITION_DEF.instances()
+
+        // introduce time and serial servers
+        instances = instances ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.instances()
+
+        // add connection from serial server to time server
+        connections = connections ++ VM_VIRTUAL_SERIAL_COMPONENTS_DEF.connections(connectionCounter)
+
+        camkesConfiguration = camkesConfiguration ++ VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF.configurations()
       }
 
-
-      if(timeServerPlusQemuSupported) {
-        // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
-        connections = connections :+ Util.createConnectionC(
-          connectionCategory = CAmkESConnectionType.VM,
-          connectionCounter = connectionCounter,
-          connectionType = Sel4ConnectorTypes.seL4SerialServer,
-          srcComponent = processId,
-          srcFeature = "batch",
-          dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
-          dstFeature = LibraryComponents.SerialServer.processed_batch_Port
-        )
-
-        // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
-        connections = connections :+ Util.createConnectionC(
-          connectionCategory = CAmkESConnectionType.VM,
-          connectionCounter = connectionCounter,
-          connectionType = Sel4ConnectorTypes.seL4SerialServer,
-          srcComponent = processId,
-          srcFeature = "serial_getchar",
-          dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
-          dstFeature = LibraryComponents.SerialServer.getchar_Port
-        )
-      }
-
-      if(timeServerPlusQemuSupported && !timeServerIntroduced) {
-        timeServerIntroduced = T
-        val timeServer = LibraryComponents.TimeServer.defaultTimeServerInstance
-        val serialServer = LibraryComponents.SerialServer.defaultSerialServerInstance
-
-
-        instances = instances :+ serialServer :+ timeServer
-
-        connections = connections :+ Util.createConnectionC(
-          //connectionCategory = CAmkESConnectionType.TimeServer,
-          connectionCategory = CAmkESConnectionType.VM,
-          connectionCounter = connectionCounter,
-          connectionType = Sel4ConnectorTypes.seL4TimeServer,
-          srcComponent = serialServer.name,
-          srcFeature = LibraryComponents.SerialServer.timeout_Port,
-          dstComponent = timeServer.name,
-          dstFeature = LibraryComponents.TimeServer.the_timer_port)
-      }
+      connections = connections ++ PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF.connections(processId, connectionCounter)
 
       globalImports = globalImports ++ VM_Template.vm_assembly_imports()
 
       camkesConfiguration = camkesConfiguration ++
         VM_Template.vm_assembly_configuration_entries(processId) ++
-        VM_GENERAL_CONFIGURATION_DEF.entries() ++
-        VM_CONFIGURATION_DEF.entries(processId)
-
-      if(timeServerPlusQemuSupported) {
-        camkesConfigurationMacros = camkesConfigurationMacros ++
-          VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF.entries() ++
-          PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF.entries(processId)
-      }
+        VM_GENERAL_CONFIGURATION_DEF.configurations() ++
+        VM_CONFIGURATION_DEF.configurations(processId) ++
+        PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF.configurations(processId)
 
       settingsCmakeEntries = settingsCmakeEntries ++ VM_Template.settings_cmake_entries()
 

@@ -208,7 +208,7 @@ object VM_Template {
                       |set(VmInitRdFile ON CACHE BOOL "" FORCE)
                       |
                       |# Enable virtio console vmm module
-                      |# set(VmVirtioConsole ON CACHE BOOL "" FORCE)
+                      |set(VmVirtioConsole ON CACHE BOOL "" FORCE)
                       |
                       |# Make VTimers see absolute time rather than virtual time.
                       |set(KernelArmVtimerUpdateVOffset OFF CACHE BOOL "" FORCE)
@@ -257,6 +257,8 @@ object VM_Template {
                     cmakeVars: ISZ[ST]): ST = {
 
     val ret: ST =st"""${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+                     |
+                     |${StringTemplate.safeToEditCMakeComment()}
                      |
                      |project(arm-vm C)
                      |
@@ -510,6 +512,13 @@ object VM_Template {
                      |    )
                      |endforeach()
                      |
+                     |# Overwrite inittab file for using the virtio console hvc0.
+                     |AddFileToOverlayDir(
+                     |    "inittab"
+                     |    $${CMAKE_CURRENT_SOURCE_DIR}/overlay_files/init_scripts/inittab_hvc0
+                     |    "etc"
+                     |    overlay
+                     |)
                      |
                      |# Construct new rootfs
                      |AddOverlayDirToRootfs(
@@ -555,7 +564,7 @@ object VM_Template {
   def vm_qemu_arm_virt_devices_camkes(componentIDs: ISZ[String]): ST = {
     assert(componentIDs.size <= 2, "Currently only expecting two VMs (e.g. sender/receiver")
 
-    var i = 1
+    var i = 0
     val entries: ISZ[ST] = componentIDs.map(componentID => {
       val vmid = s"VM${i}"
       i = i + 1
@@ -568,50 +577,50 @@ object VM_Template {
           |  "initrd_max_size" : VAR_STRINGIZE(VM_INITRD_MAX_SIZE),
           |  "initrd_addr" : VAR_STRINGIZE(${vmid}_INITRD_ADDR)
           |};
+          |
           |${componentID}.linux_image_config = {
-          |  "linux_bootcmdline" : "pci=nomsi,realloc=off,bios initcall_blacklist=clk_disable_unused",
-          |  "linux_stdout" : "/pl011@9000000",
+          |  "linux_bootcmdline" : "console=hvc0 nosmp rw debug loglevel=8 pci=nomsi,realloc=off,bios initcall_blacklist=clk_disable_unused",
+          |  "linux_stdout" : "hvc0",
+          |  "dtb_name": "",
+          |  "initrd_name" : "linux-initrd"
           |};
           |
-          |${componentID}.dtb = dtb([{"path": "/pl011@9000000"}]);
+          |${componentID}.dtb = dtb([{}]);
+          |
+          |${componentID}.irq = [];
+          |
+          |${componentID}.mmios = [
+          |  ${vmid}_MMIOS_ICI, // Interrupt Controller Virtual CPU interface (Virtual Machine view)
+          |];
           |
           |${componentID}.untyped_mmios = [
-          |  VM1_MMIOS_ICI, // Interrupt Controller Virtual CPU interface (Virtual Machine view)
-          |  VM1_MMIOS_LKMR, // Linux kernel memory regions
+          |  ${vmid}_MMIOS_LKMR, // Linux kernel memory regions
           |];
           |"""
     })
-    val ret: ST = st"""/*
-                      | * Copyright 2020, Data61
-                      | * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
-                      | * ABN 41 687 119 230.
-                      | *
-                      | * This software may be distributed and modified according to the terms of
-                      | * the BSD 2-Clause license. Note that NO WARRANTY is provided.
-                      | * See "LICENSE_BSD2.txt" for details.
-                      | *
-                      | * @TAG(DATA61_BSD)
-                      | */
+    val ret: ST = st"""${StringTemplate.safeToEditComment()}
                       |
                       |#include <configurations/vm.h>
                       |#define VM_RAM_OFFSET      0x00000000
-                      |#define VM_INITRD_MAX_SIZE 0x1900000 //25 MB
+                      |#define VM_INITRD_MAX_SIZE 0x3200000 //50 MB
                       |
-                      |#define VM1_RAM_BASE       0x40000000
-                      |#define VM1_RAM_SIZE       0x20000000
-                      |#define VM1_DTB_ADDR       0x4F000000
-                      |#define VM1_INITRD_ADDR    0x4D700000 // VM1_DTB_ADDR - VM_INITRD_MAX_SIZE
+                      |#define VM0_RAM_BASE       0x40000000
+                      |#define VM0_RAM_SIZE       0x8000000
+                      |#define VM0_DTB_ADDR       0x47000000 //VM0_RAM_BASE + 0x7000000
+                      |#define VM0_INITRD_ADDR    0x43e00000 //VM0_DTB_ADDR - VM_INITRD_MAX_SIZE
                       |
-                      |#define VM1_MMIOS_ICI      "0x8040000:12"
-                      |#define VM1_MMIOS_LKMR     "0x40000000:29"
+                      |#define VM0_MMIOS_ICI      "0x8040000:0x1000:12"
+                      |#define VM0_MMIOS_LKMR     "0x40000000:27"
                       |
-                      |/*
-                      |#define VM2_RAM_BASE       0x50000000
-                      |#define VM2_RAM_MMIOS_BASE "0x50000000:27"
-                      |#define VM2_RAM_SIZE       0x8000000
-                      |#define VM2_DTB_ADDR       0x57000000  // VM2_RAM_BASE + 0x7000000
-                      |#define VM2_INITRD_ADDR    0x55700000  // VM2_DTB_ADDR - VM_INITRD_MAX_SIZE
-                      |*/
+                      |
+                      |#define VM1_RAM_BASE       0x48000000
+                      |#define VM1_RAM_SIZE       0x8000000
+                      |#define VM1_DTB_ADDR       0x4f000000 //VM1_RAM_BASE + 0x7000000
+                      |#define VM1_INITRD_ADDR    0x4be00000 //VM1_DTB_ADDR - VM_INITRD_MAX_SIZE
+                      |
+                      |#define VM1_MMIOS_ICI      "0x8040000:0x1000:12"
+                      |#define VM1_MMIOS_LKMR     "0x48000000:27"
+                      |
                       |
                       |assembly {
                       |  composition {}
@@ -625,7 +634,7 @@ object VM_Template {
   def vm_exynos5422_devices_camkes(componentIDs: ISZ[String]): ST = {
     assert(componentIDs.size <= 2, "Currently only expecting two VMs (e.g. sender/receiver")
 
-    var i = 1
+    var i = 0
     val entries: ISZ[ST] = componentIDs.map((componentId: String) => {
       val vmid = s"VM${i}"
       i = i + 1
@@ -638,51 +647,48 @@ object VM_Template {
           |  "initrd_max_size" : VAR_STRINGIZE(VM_INITRD_MAX_SIZE),
           |  "initrd_addr" : VAR_STRINGIZE(${vmid}_INITRD_ADDR),
           |};
+          |
           |${componentId}.linux_image_config = {
           |  "linux_bootcmdline" : "console=hvc0 root=/dev/ram0 nosmp rw debug loglevel=8 pci=nomsi initcall_blacklist=clk_disable_unused",
           |  "linux_stdout" : "hvc0",
           |  "dtb_name" : "",
-          |  "initrd_name" : "linux-initrd-vm-client",
+          |  "initrd_name" : "linux-initrd",
           |};
+          |
           |${componentId}.mmios = [
           |  "0x10000000:0x1000:12", // CHIP ID
           |  "0x10486000:0x1000:12"  // VCPU
           |];
+          |
           |${componentId}.untyped_mmios = [
           |  ${vmid}_RAM_MMIOS_BASE  // RAM
           |];
+          |
           |${componentId}.irqs = [];
+          |
           |${componentId}.dtb = dtb([{}]);"""
     })
-    val ret: ST = st"""/*
-                      | * Copyright 2020, Data61
-                      | * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
-                      | * ABN 41 687 119 230.
-                      | *
-                      | * This software may be distributed and modified according to the terms of
-                      | * the BSD 2-Clause license. Note that NO WARRANTY is provided.
-                      | * See "LICENSE_BSD2.txt" for details.
-                      | *
-                      | * @TAG(DATA61_BSD)
-                      | */
+
+    val ret: ST = st"""${StringTemplate.safeToEditComment()}
                       |
                       |#include <configurations/vm.h>
                       |
                       |#define VM_RAM_OFFSET 0
                       |#define VM_INITRD_MAX_SIZE 0x1900000 // 25 MB
                       |
+                      |#define VM0_RAM_BASE       0x40000000
+                      |#define VM0_RAM_SIZE       0x8000000
+                      |#define VM0_DTB_ADDR       0x47000000  // VM0_RAM_BASE + 0x7000000
+                      |#define VM0_INITRD_ADDR    0x45700000  // VM0_DTB_ADDR - VM_INITRD_MAX_SIZE
                       |
-                      |#define VM1_RAM_BASE       0x48000000
-                      |#define VM1_RAM_MMIOS_BASE "0x48000000:27"
+                      |#define VM0_RAM_MMIOS_BASE "0x40000000:27"
+                      |
+                      |#define VM1_RAM_BASE       0x50000000
                       |#define VM1_RAM_SIZE       0x8000000
-                      |#define VM1_DTB_ADDR       0x4f000000  // VM1_RAM_BASE + 0x7000000
-                      |#define VM1_INITRD_ADDR    0x4d700000  // VM1_DTB_ADDR - VM_INITRD_MAX_SIZE
+                      |#define VM1_DTB_ADDR       0x57000000  // VM1_RAM_BASE + 0x7000000
+                      |#define VM1_INITRD_ADDR    0x55700000  // VM1_DTB_ADDR - VM_INITRD_MAX_SIZE
                       |
-                      |#define VM2_RAM_BASE       0x50000000
-                      |#define VM2_RAM_MMIOS_BASE "0x50000000:27"
-                      |#define VM2_RAM_SIZE       0x8000000
-                      |#define VM2_DTB_ADDR       0x57000000  // VM2_RAM_BASE + 0x7000000
-                      |#define VM2_INITRD_ADDR    0x55700000  // VM2_DTB_ADDR - VM_INITRD_MAX_SIZE
+                      |#define VM1_RAM_MMIOS_BASE "0x48000000:27"
                       |
                       |assembly {
                       |  composition {}
@@ -695,17 +701,8 @@ object VM_Template {
 
   def vm_overlay_scripts__init_scripts__cross_vm_module_init(): ST = {
     val ret: ST = st"""#!/bin/sh
-                      |#
-                      |# Copyright 2020, Data61
-                      |# Commonwealth Scientific and Industrial Research Organisation (CSIRO)
-                      |# ABN 41 687 119 230.
-                      |#
-                      |# This software may be distributed and modified according to the terms of
-                      |# the BSD 2-Clause license. Note that NO WARRANTY is provided.
-                      |# See "LICENSE_BSD2.txt" for details.
-                      |#
-                      |# @TAG(DATA61_BSD)
-                      |#
+                      |
+                      |${StringTemplate.doNotEditCmakeComment()}
                       |
                       |insmod /lib/modules/4.14.87/kernel/drivers/vmm/connection.ko"""
     return ret
@@ -715,7 +712,7 @@ object VM_Template {
     val ret: ST = st"""# @TAG(CUSTOM)
                       |# /etc/inittab
                       |#
-                      |${StringTemplate.safeToEditCamkeComment()}
+                      |${StringTemplate.safeToEditCMakeComment()}
                       |#
                       |# Copyright (C) 2001 Erik Andersen <andersen@codepoet.org>
                       |#
@@ -764,6 +761,8 @@ object VM_Template {
                         addSubDirs: ISZ[ST]): ST = {
 
     val ret: ST = st"""${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+                      |
+                      |${StringTemplate.safeToEditCMakeComment()}
                       |
                       |project(${processID} C)
                       |

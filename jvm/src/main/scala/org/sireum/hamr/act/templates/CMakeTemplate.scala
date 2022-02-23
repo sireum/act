@@ -187,7 +187,7 @@ object CMakeTemplate {
   }
 
   def genSettingsCmake(settingsCmakeEntries: ISZ[ST]): ST = {
-    val ret: ST = st"""${StringTemplate.safeToEditCamkeComment()}
+    val ret: ST = st"""${StringTemplate.safeToEditCMakeComment()}
                       |
                       |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
                       |

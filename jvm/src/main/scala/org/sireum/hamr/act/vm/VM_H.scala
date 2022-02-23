@@ -65,8 +65,8 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
 object VM_H {
   val vmH_Location: String = "https://github.com/seL4/camkes-vm/blob/39734d70d38af597e459f4923c75db95508d9661/components/VM_Arm/configurations/vm.h"
 
-  def tag(lineNumber: Z): String = {
-    return s"${vmH_Location}#${lineNumber}"
+  def tag(macroName: String, lineNumber: Z): String = {
+    return s"// expansion of macro ${macroName}. See ${vmH_Location}#L${lineNumber}"
   }
 }
 
@@ -243,19 +243,93 @@ object VM_COMPONENT_CONNECTIONS_DEF {
       dstComponent = LibraryComponents.FileServer.defaultFileServerName,
       dstFeature = LibraryComponents.FileServer.fs_ctrl_port)
 
-    val comment = s"// Expansion of connections in macro VM_COMPONENT_CONNECTIONS_DEF. See ${VM_H.tag(87)}"
-    val fsConnectionWithComment = fsConnection(comments = ISZ(Util.createComment(comment)))
-
-    connections = connections :+ fsConnectionWithComment
-
-    connections = connections :+ Util.createConnectionC(
+    val notificationConnection = Util.createConnectionC(
       connectionCategory = CAmkESConnectionType.VM,
       connectionCounter = connectionCounter,
       connectionType = Sel4ConnectorTypes.seL4GlobalAsynch,
       srcComponent = processId, srcFeature = "notification_ready_connector",
       dstComponent = processId, dstFeature = "notification_ready")
 
+    val comment = VM_H.tag("VM_COMPONENT_CONNECTIONS_DEF", 87)
+    val fsConnectionWithComment = fsConnection(comments = ISZ(Util.createPreComment(comment)))
+
+    connections = connections :+ fsConnectionWithComment :+ notificationConnection(comments = ISZ(Util.createPostComment("")))
+
     return connections
+  }
+}
+
+object VM_GENERAL_COMPOSITION_DEF {
+  val name: String = "VM_GENERAL_COMPOSITION_DEF"
+  val fileServer: Instance = LibraryComponents.FileServer.defaultFileServerInstance
+
+  def instances(): ISZ[Instance] = {
+    val ret: ISZ[Instance] = ISZ(
+      fileServer(comments = ISZ(Util.createInlineComment(VM_H.tag(name, 91))))
+    )
+    return ret
+  }
+}
+
+object PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF {
+  val name: String = "PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF"
+
+  def connections(processId: String, connectionCounter: Counter): ISZ[Connection] = {
+    // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
+    val batchConnection = Util.createConnectionC(
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4SerialServer,
+      srcComponent = processId,
+      srcFeature = "batch",
+      dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+      dstFeature = LibraryComponents.SerialServer.processed_batch_Port
+    )
+
+    // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
+    val getCharConnection = Util.createConnectionC(
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4SerialServer,
+      srcComponent = processId,
+      srcFeature = "serial_getchar",
+      dstComponent = LibraryComponents.SerialServer.defaultSerialServerName,
+      dstFeature = LibraryComponents.SerialServer.getchar_Port
+    )
+
+    return ISZ(batchConnection(comments = ISZ(Util.createPreComment(VM_H.tag(name, 121)))),
+      getCharConnection(comments = ISZ(Util.createPostComment(""))))
+  }
+}
+
+object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
+  val name: String = "VM_VIRTUAL_SERIAL_COMPONENTS_DEF"
+  val timeServer: Instance = LibraryComponents.TimeServer.defaultTimeServerInstance
+  val serialServer: Instance = LibraryComponents.SerialServer.defaultSerialServerInstance
+
+  def instances(): ISZ[Instance] = {
+    val ret: ISZ[Instance] = ISZ(
+      timeServer(comments = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 116)))),
+      serialServer(comments = ISZ(Util.createPostComment("")))
+    )
+
+    return ret
+  }
+
+  def connections(connectionCounter: Counter): ISZ[Connection] = {
+    val connection: Connection = Util.createConnectionC(
+      //connectionCategory = CAmkESConnectionType.TimeServer,
+      connectionCategory = CAmkESConnectionType.VM,
+      connectionCounter = connectionCounter,
+      connectionType = Sel4ConnectorTypes.seL4TimeServer,
+      srcComponent = serialServer.name,
+      srcFeature = LibraryComponents.SerialServer.timeout_Port,
+      dstComponent = timeServer.name,
+      dstFeature = LibraryComponents.TimeServer.the_timer_port)
+
+    return ISZ(connection(comments = ISZ(
+      Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 119)),
+        Util.createPostComment(""))))
   }
 }
 
@@ -264,12 +338,11 @@ object VM_COMPONENT_CONNECTIONS_DEF {
 // #define VM_GENERAL_CONFIGURATION_DEF() \
 //    fserv.heap_size = 165536; \
 object VM_GENERAL_CONFIGURATION_DEF {
-  //def entries(): ISZ[String] = {
-  //  return ISZ("fserv.heap_size = 165536;")
-  //}
-  def entries(): ISZ[Configuration] = {
-    val comment = s"// Expansion of configuration entries in macro VM_GENERAL_CONFIGURATION_DEF. See ${VM_H.tag(98)}"
-    return ISZ(GenericConfiguration("fserv.heap_size = 165536;", ISZ(Util.createComment(comment))))
+  val name: String = "VM_GENERAL_CONFIGURATION_DEF"
+
+  def configurations(): ISZ[Configuration] = {
+    val comment = VM_H.tag(name, 98)
+    return ISZ(GenericConfiguration("fserv.heap_size = 165536;", ISZ(Util.createInlineComment(comment))))
   }
 }
 
@@ -285,30 +358,19 @@ object VM_GENERAL_CONFIGURATION_DEF {
 //    vm##num.sem_value = 0; \
 //    vm##num.heap_size = 0x300000;
 object VM_CONFIGURATION_DEF {
-  /*
-  def entries(componentId: String): ISZ[String] = {
+  val name: String = "VM_CONFIGURATION_DEF"
+
+  def configurations(componentId: String): ISZ[Configuration] = {
+    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 101)))
     return ISZ(
-      s"${componentId}.fs_shmem_size = 0x100000;",
-      s"${componentId}.global_endpoint_base = 1 << 27;",
-      s"${componentId}.asid_pool = true;",
-      s"${componentId}.simple = true;",
-      s"${componentId}.base_prio = 100;",
-      s"${componentId}._priority = 101;",
-      s"${componentId}.sem_value = 0;",
-      s"${componentId}.heap_size = 0x300000;")
-  }
-  */
-  def entries(componentId: String): ISZ[Configuration] = {
-    val comment = s"// Expansion of configuration entries in macro VM_CONFIGURATION_DEF. See ${VM_H.tag(101)}"
-    return ISZ(
-      GenericConfiguration(s"${componentId}.fs_shmem_size = 0x100000;", ISZ(Util.createComment(comment))),
+      GenericConfiguration(s"${componentId}.fs_shmem_size = 0x100000;", comments),
       GenericConfiguration(s"${componentId}.global_endpoint_base = 1 << 27;", ISZ()),
       GenericConfiguration(s"${componentId}.asid_pool = true;", ISZ()),
       GenericConfiguration(s"${componentId}.simple = true;", ISZ()),
       GenericConfiguration(s"${componentId}.base_prio = 100;", ISZ()),
       GenericConfiguration(s"${componentId}._priority = 101;", ISZ()),
       GenericConfiguration(s"${componentId}.sem_value = 0;", ISZ()),
-      GenericConfiguration(s"${componentId}.heap_size = 0x300000;", ISZ()))
+      GenericConfiguration(s"${componentId}.heap_size = 0x300000;", ISZ(Util.createPostComment(""))))
   }
 }
 
@@ -319,11 +381,14 @@ object VM_CONFIGURATION_DEF {
 ////    time_server.priority = 255; \
 ////    time_server.simple = true;
 object VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF{
-  def entries(): ISZ[String]= {
+  val name: String = "VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF"
+
+  def configurations(): ISZ[Configuration]= {
+    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 129)))
     return ISZ(
-      "time_server.timers_per_client = 1;",
-      "time_server.priority = 255;",
-      "time_server.simple = true;"
+      GenericConfiguration("time_server.timers_per_client = 1;", comments),
+      GenericConfiguration("time_server.priority = 255;", ISZ()),
+      GenericConfiguration("time_server.simple = true;", ISZ(Util.createPostComment("")))
     )
   }
 }
@@ -334,10 +399,13 @@ object VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF{
 //    vm##num.serial_getchar_shmem_size = 0x1000; \
 ////    vm##num.batch_shmem_size = 0x1000; \
 object PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF {
-  def entries(componentId: String): ISZ[String]= {
+  val name: String = "PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF"
+
+  def configurations(componentId: String): ISZ[Configuration] = {
+    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 121)))
     return ISZ(
-      s"${componentId}.serial_getchar_shmem_size = 0x1000;",
-      s"${componentId}.batch_shmem_size = 0x1000;"
+      GenericConfiguration(s"${componentId}.serial_getchar_shmem_size = 0x1000;", comments),
+      GenericConfiguration(s"${componentId}.batch_shmem_size = 0x1000;", ISZ(Util.createPostComment("")))
     )
   }
 }

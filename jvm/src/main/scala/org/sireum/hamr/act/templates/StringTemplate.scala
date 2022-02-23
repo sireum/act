@@ -833,7 +833,7 @@ bool is_empty_${s.name}(${s.structName} *port) {
 
   def doNotEditCmakeComment(): ST = { return st"# This file will be regenerated, do not edit" }
 
-  def safeToEditCamkeComment(): ST = { return st"# This file will not be overwritten so is safe to edit" }
+  def safeToEditCMakeComment(): ST = { return st"# This file will not be overwritten so is safe to edit" }
 
   def postGenInstructionsMessage(camkesProjDirectory: String,
                                  camkesArmVmScript: Option[String],

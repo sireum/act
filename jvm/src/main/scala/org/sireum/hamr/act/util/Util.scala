@@ -877,7 +877,15 @@ object Util {
 
 
 
-  def createComment(comment: String): AstComment = {
+  def createPreComment(comment: String): AstComment = {
     return AstBasicComment(CommentLocation.PRE, comment)
+  }
+
+  def createInlineComment(comment: String): AstComment = {
+    return AstBasicComment(CommentLocation.INLINE, comment)
+  }
+
+  def createPostComment(comment: String): AstComment = {
+    return AstBasicComment(CommentLocation.POST, comment)
   }
 }

@@ -344,7 +344,7 @@ import org.sireum.ops.StringOps
 
     for(i <- o.instances) {
       visitCamkesComponent(i.component)
-      instances = instances :+ st"""component ${i.component.name} ${i.name};"""
+      instances = instances :+ processComments(st"""component ${i.component.name} ${i.name};""", i)
     }
 
     for(c <- o.connections) {
@@ -486,13 +486,12 @@ import org.sireum.ops.StringOps
       val posts: ISZ[AstBasicComment] = basicComments.filter((c: AstBasicComment) => c.location == CommentLocation.POST)
       val inline: ISZ[AstBasicComment] = basicComments.filter((c: AstBasicComment) => c.location == CommentLocation.INLINE)
 
-      assert(inline.size < 1, "Can have at most 1 inline comment")
+      assert(inline.size <= 1, "Can have at most 1 inline comment")
 
       var ret: ST = st""
 
       if(pres.nonEmpty) {
-        ret = st"""
-                  |${(pres.map((m: AstBasicComment) => m.comment), "\n")}
+        ret = st"""${(pres.map((m: AstBasicComment) => m.comment), "\n")}
                   |"""
       }
 

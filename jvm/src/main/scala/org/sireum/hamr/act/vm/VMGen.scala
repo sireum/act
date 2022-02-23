@@ -78,17 +78,17 @@ object VMGen {
     auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/CMakeLists.txt",
       content = VM_Template.vm_cmakelists(vmProcessIds, declareCamkesArmVMs, vmVars),
-      overwrite = T)
+      overwrite = F)
 
     auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/${DIR_VM_EXYNOS5422}/devices.camkes",
       content = VM_Template.vm_exynos5422_devices_camkes(vmProcessIds),
-      overwrite = T)
+      overwrite = F)
 
     auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/${DIR_VM_QEMU_ARM_VIRT}/devices.camkes",
       content = VM_Template.vm_qemu_arm_virt_devices_camkes(vmProcessIds),
-      overwrite = T)
+      overwrite = F)
 
     auxResourceFiles = auxResourceFiles :+ ResourceUtil.createResource(
       path = s"${getRootVMDir()}/${DIR_VM_OVERLAY_FILES_INIT_SCRIPT}/cross_vm_module_init",
