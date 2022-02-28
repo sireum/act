@@ -80,7 +80,7 @@ object ScriptTemplate {
                       |  echo "Available Options:"
                       |  echo "-c, --camkes-dir       Location of CAmkES project"
                       |  echo "-n, --non-interactive  Non-interactive mode.  Symlink in apps directory will be replaced"
-                      |  echo "                         if present, CAmkES build directory will not be deleted"
+                      |  echo "                         if present"
                       |  echo "-o, --camkes-options   CAmkES options (e.g -o ${bt}"-DWITH_LOC=ON -DCapDLLoaderMaxObjects=40000${bt}")"
                       |  echo "-s, --simulate         Simulate via QEMU"
                       |  echo "-h, --help             Display this information"
@@ -158,10 +158,8 @@ object ScriptTemplate {
                       |
                       |if [ -e "$${BUILD_DIR}" ]; then
                       |  if [ "$${${NON_INTERACTIVE}}" = true ];then
-                      |    # if the project contains VMs and ${VM_Template.BUILD_CROSSVM}=ON then
-                      |    # deleting the build directory would force the linux image to be
-                      |    # re-downloaded, which can take a long time
-                      |    echo "Non-interactive mode so not deleting existing $${BUILD_DIR}"
+                      |    rm -rf $${BUILD_DIR}
+                      |    mkdir $${BUILD_DIR}
                       |  else
                       |    read -p "The following build directory already exists, replace $${BUILD_DIR} [Y|y]? " -n 1 -r; echo
                       |    if [[ $$REPLY =~ ^[Yy]$$ ]]; then
