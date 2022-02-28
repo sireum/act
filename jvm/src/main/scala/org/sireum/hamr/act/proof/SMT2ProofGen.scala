@@ -127,20 +127,20 @@ object SMT2ProofGen {
 
     val camkesComponents: ISZ[ST] = {
       var ret: ISZ[ST] = ISZ()
-      for(i <- camkesInstances){
-        ret = ret :+ st"(${i.name})"
+      for(instance <- camkesInstances){
+        ret = ret :+ st"(${instance.name})"
 
-        proofContainer.camkesComponentTypes.get(i.component) match {
-          case Some(CAmkESComponentCategory.SerialServer) => serialServer = Some(st"(= _component ${i.name})")
-          case Some(CAmkESComponentCategory.FileServer) => fileServer = Some(st"(= _component ${i.name})")
-          case Some(CAmkESComponentCategory.TimeServer) => timeServer = Some(st"(= _component ${i.name})")
-          case Some(CAmkESComponentCategory.PeriodicDispatcher) => periodicDispatcher = Some(st"(= _component ${i.name})")
-          case Some(CAmkESComponentCategory.Pacer) => pacer = Some(st"(= _component ${i.name})")
-          case Some(CAmkESComponentCategory.Monitor) => monitors = monitors :+ st"(= _component ${i.name})"
+        proofContainer.camkesComponentTypes.get(instance.component) match {
+          case Some(CAmkESComponentCategory.SerialServer) => serialServer = Some(st"(= _component ${instance.name})")
+          case Some(CAmkESComponentCategory.FileServer) => fileServer = Some(st"(= _component ${instance.name})")
+          case Some(CAmkESComponentCategory.TimeServer) => timeServer = Some(st"(= _component ${instance.name})")
+          case Some(CAmkESComponentCategory.PeriodicDispatcher) => periodicDispatcher = Some(st"(= _component ${instance.name})")
+          case Some(CAmkESComponentCategory.Pacer) => pacer = Some(st"(= _component ${instance.name})")
+          case Some(CAmkESComponentCategory.Monitor) => monitors = monitors :+ st"(= _component ${instance.name})"
           case Some(CAmkESComponentCategory.Refinement) =>
           case Some(CAmkESComponentCategory.VM_Refinement) =>
-          case _ =>
-            eprintln(s"What is ${i.component}")
+          case x =>
+            eprintln(s"What is ${instance.component} -- ${x} -- ${instance}")
         }
       }
       ret

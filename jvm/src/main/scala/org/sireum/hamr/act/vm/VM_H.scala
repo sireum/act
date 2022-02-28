@@ -261,13 +261,11 @@ object VM_COMPONENT_CONNECTIONS_DEF {
 
 object VM_GENERAL_COMPOSITION_DEF {
   val name: String = "VM_GENERAL_COMPOSITION_DEF"
-  val fileServer: Instance = LibraryComponents.FileServer.defaultFileServerInstance
 
   def instances(): ISZ[Instance] = {
-    val ret: ISZ[Instance] = ISZ(
-      fileServer(comments = ISZ(Util.createInlineComment(VM_H.tag(name, 91))))
+    return ISZ(
+      LibraryComponents.FileServer.defaultFileServerInstance(comments = ISZ(Util.createInlineComment(VM_H.tag(name, 91))))
     )
-    return ret
   }
 }
 
@@ -304,16 +302,12 @@ object PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF {
 
 object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
   val name: String = "VM_VIRTUAL_SERIAL_COMPONENTS_DEF"
-  val timeServer: Instance = LibraryComponents.TimeServer.defaultTimeServerInstance
-  val serialServer: Instance = LibraryComponents.SerialServer.defaultSerialServerInstance
 
   def instances(): ISZ[Instance] = {
-    val ret: ISZ[Instance] = ISZ(
-      timeServer(comments = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 116)))),
-      serialServer(comments = ISZ(Util.createPostComment("")))
+    return ISZ(
+      LibraryComponents.TimeServer.defaultTimeServerInstance(comments = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 116)))),
+      LibraryComponents.SerialServer.defaultSerialServerInstance(comments = ISZ(Util.createPostComment("")))
     )
-
-    return ret
   }
 
   def connections(connectionCounter: Counter): ISZ[Connection] = {
@@ -322,9 +316,9 @@ object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
       connectionCategory = CAmkESConnectionType.VM,
       connectionCounter = connectionCounter,
       connectionType = Sel4ConnectorTypes.seL4TimeServer,
-      srcComponent = serialServer.name,
+      srcComponent = LibraryComponents.SerialServer.defaultSerialServerName,
       srcFeature = LibraryComponents.SerialServer.timeout_Port,
-      dstComponent = timeServer.name,
+      dstComponent = LibraryComponents.TimeServer.defaultTimeServerName,
       dstFeature = LibraryComponents.TimeServer.the_timer_port)
 
     return ISZ(connection(comments = ISZ(

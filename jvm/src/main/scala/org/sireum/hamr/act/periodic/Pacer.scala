@@ -585,7 +585,8 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         preprocessorIncludes = ISZ(),
         imports = ISZ(),
         externalEntities = ISZ()
-      )
+      ),
+      comments = ISZ()
     )
     return instance
   }

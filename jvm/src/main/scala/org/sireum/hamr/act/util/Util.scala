@@ -605,12 +605,14 @@ object Util {
 
                            address_space: String,
                            name: String,
-                           component: ast.CamkesComponent): ast.Instance = {
+                           component: ast.CamkesComponent,
+
+                           comments: ISZ[AstComment]): ast.Instance = {
     val ret = ast.Instance(
       address_space = address_space,
       name = name,
       component = component,
-      comments = ISZ())
+      comments = comments)
 
     ProofUtil.addCAmkESInstance(originAadl, ret)
 

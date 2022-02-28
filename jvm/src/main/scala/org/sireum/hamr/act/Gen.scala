@@ -270,7 +270,8 @@ import org.sireum.ops.ISZOps
         originAadl = Some(aadlProcess),
         address_space = "",
         name = processId,
-        component = component
+        component = component,
+        comments = ISZ()
       )
 
       auxResourceFiles = auxResourceFiles ++ auxResources
@@ -339,7 +340,8 @@ import org.sireum.ops.ISZOps
 
               address_space = "",
               name = camkesComponentId,
-              component = genThread(aadlThread)
+              component = genThread(aadlThread),
+              comments = ISZ()
             )
 
             PropertyUtil.getStackSizeInBytes(sc.component) match {

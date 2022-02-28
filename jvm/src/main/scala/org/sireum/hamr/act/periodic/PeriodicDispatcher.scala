@@ -254,7 +254,9 @@ import org.sireum.hamr.codegen.common.symbols._
         preprocessorIncludes = ISZ(),
         imports = ISZ(Util.camkesGlobalConnectors),
         externalEntities = ISZ()
-      ))
+      ),
+      comments = ISZ()
+    )
     return i
   }
 
@@ -269,7 +271,8 @@ import org.sireum.hamr.codegen.common.symbols._
 
         name = TIMER_SERVER_CLASSIFIER,
         ports = ISZ(TIMER_SERVER_NOTIFICATION_ID, TIMER_SERVER_TIMER_ID)
-      )
+      ),
+      comments = ISZ()
     )
     return i
   }
