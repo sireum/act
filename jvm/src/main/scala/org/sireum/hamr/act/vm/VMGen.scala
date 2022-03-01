@@ -419,14 +419,7 @@ object VMGen {
       externalEntities = externalEntities
     )
 
-    auxResources = auxResources :+ ResourceUtil.createExeResource(
-      path = PathUtil.CAMKES_ARM_VM_SCRIPT_PATH,
-      content = VM_Template.setup_camkes_vm_Script(),
-      overwrite = T)
-
     return (c, auxResources)
-
-
   }
 
   def handleDataPort(port: MetaPort, aadlProcess: AadlProcess, symbolTable: SymbolTable): Unit = {

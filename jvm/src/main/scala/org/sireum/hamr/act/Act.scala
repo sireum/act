@@ -81,12 +81,6 @@ object Act {
 
     if (!reporter.hasError) {
 
-      val camkesArmVmScript: Option[String] = {
-        val c = resources.filter(p => ops.StringOps(p.dstPath).endsWith(PathUtil.CAMKES_ARM_VM_SCRIPT_PATH))
-        if (c.nonEmpty) Some(c(0).dstPath)
-        else None()
-      }
-
       val runCamkesScript: String = {
         val c = resources.filter(p => ops.StringOps(p.dstPath).endsWith(PathUtil.RUN_CAMKES_SCRIPT_PATH))
         if (c.nonEmpty) c(0).dstPath
@@ -99,7 +93,6 @@ object Act {
       reporter.info(None(), Util.ACT_INSTRUCTIONS_MESSAGE_KIND,
         StringTemplate.postGenInstructionsMessage(
           camkesProjDirectory = options.outputDir,
-          camkesArmVmScript = camkesArmVmScript,
           cakeMLAssemblyLocations = cakeMLAssemblyLocations,
           runCamkesScript = runCamkesScript,
           hasVM = symbolTable.hasVM()).render)

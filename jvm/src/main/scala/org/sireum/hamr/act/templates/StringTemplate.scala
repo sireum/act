@@ -836,19 +836,9 @@ bool is_empty_${s.name}(${s.structName} *port) {
   def safeToEditCMakeComment(): ST = { return st"# This file will not be overwritten so is safe to edit" }
 
   def postGenInstructionsMessage(camkesProjDirectory: String,
-                                 camkesArmVmScript: Option[String],
                                  cakeMLAssemblyLocations: ISZ[String],
                                  runCamkesScript: String,
                                  hasVM: B): ST = {
-
-    val installCamkesArmInstructions: Option[ST] = camkesArmVmScript match {
-      case Some(s) => Some(
-        st"""Execute the following to install the CAmkES-ARM-VM project:
-            |
-            |  $s
-            |""")
-      case _ => None()
-    }
 
     var hints: ISZ[ST] = ISZ()
     var cakeMLLocs: Option[ST] = None()
@@ -872,7 +862,6 @@ bool is_empty_${s.name}(${s.structName} *port) {
           |  CAmkES Project Directory: ${camkesProjDirectory}
           |  ${cakeMLLocs}
           |
-          |  $installCamkesArmInstructions
           |  Execute the following to simulate the system via QEMU. Pass '-h' to see the available options.
           |
           |    ${runCamkesScript} -s

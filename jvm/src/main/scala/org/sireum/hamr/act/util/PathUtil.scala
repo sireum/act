@@ -8,8 +8,6 @@ import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 object PathUtil {
   val DIR_BIN: String = "bin"
 
-  val CAMKES_ARM_VM_SCRIPT_PATH: String = s"${DIR_BIN}/setup-camkes-arm-vm.sh"
-
   val RUN_CAMKES_SCRIPT_PATH: String = s"${DIR_BIN}/run-camkes.sh"
 
   def getComponentSourcePath(aadlThread: AadlThread, symbolTable: SymbolTable): String = {
