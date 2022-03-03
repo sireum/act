@@ -82,18 +82,15 @@ object CakeML {
 
     val sourceText: ISZ[String] = PropertyUtil.getSourceText(aadlThread.component.properties)
 
-      if(sourceText.nonEmpty) {
-        if(sourceText.size > 1) {
-          val msg = s"Expecting a single entry for ${OsateProperties.PROGRAMMING_PROPERTIES__SOURCE_TEXT} but found ${sourceText.size}."
-          reporter.error(aadlThread.component.identifier.pos, Util.toolName, msg)
-        }
-        var cand = Os.path(sourceText(0))
-        if(!cand.exists && aadlRoot.nonEmpty) {
-          cand = Os.path(aadlRoot.get) / sourceText(0)
+    if(sourceText.nonEmpty) {
+      for (candidate <- sourceText) {
+        var cand = Os.path(candidate)
+        if (!cand.exists && aadlRoot.nonEmpty) {
+          cand = Os.path(aadlRoot.get) / candidate
         }
 
-        if(!cand.exists) {
-          val msg = s"Couldn't locate ${sourceText(0)}"
+        if (!cand.exists) {
+          val msg = s"Couldn't locate ${candidate}"
           reporter.error(aadlThread.component.identifier.pos, Util.toolName, msg)
         } else {
           ret = ret :+ ResourceUtil.createExternalResource(
@@ -101,13 +98,14 @@ object CakeML {
             dstPath = s"${path}/${cand.name}",
             symlink = F)
         }
-      } else {
-        val assemblyFilename = Util.brand(s"${classifierName}.S")
-        ret = ret :+ ResourceUtil.createResource(
-          path = s"${path}/${assemblyFilename}",
-          content = CakeMLTemplate.emptyAssemblyFile(),
-          overwrite = F)
       }
+    } else {
+      val assemblyFilename = Util.brand(s"${classifierName}.S")
+      ret = ret :+ ResourceUtil.createResource(
+        path = s"${path}/${assemblyFilename}",
+        content = CakeMLTemplate.emptyAssemblyFile(),
+        overwrite = F)
+    }
 
     return ret
   }
