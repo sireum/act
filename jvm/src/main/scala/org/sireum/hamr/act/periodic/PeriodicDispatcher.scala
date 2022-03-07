@@ -178,18 +178,21 @@ import org.sireum.hamr.codegen.common.symbols._
 
     gcMainPreInitStatements = gcMainPreInitStatements :+ PeriodicDispatcherTemplate.registerPeriodicCallback()
 
-    Util.getComputeEntrypointSourceText(component.properties) match {
-      case Some(handler) =>
-        gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t *);"
+    if(aadlComponent.isInstanceOf[AadlThread]) {
+      val t = aadlComponent.asInstanceOf[AadlThread]
+      t.getComputeEntrypointSourceText() match {
+        case Some(handler) =>
+          gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t *);"
 
-        val drains = PeriodicDispatcherTemplate.drainPeriodicQueue(classifier, handler)
+          val drains = PeriodicDispatcherTemplate.drainPeriodicQueue(classifier, handler)
 
-        gcMethods = gcMethods :+ drains._1
+          gcMethods = gcMethods :+ drains._1
 
-        gcMainLoopStms = gcMainLoopStms :+ drains._2
+          gcMainLoopStms = gcMainLoopStms :+ drains._2
 
-      case _ => 
-        reporter.warn(None(), Util.toolName, s"Periodic thread ${classifier} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
+        case _ =>
+          reporter.warn(None(), Util.toolName, s"Periodic thread ${classifier} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
+      }
     }
 
     val shell = ast.Component(

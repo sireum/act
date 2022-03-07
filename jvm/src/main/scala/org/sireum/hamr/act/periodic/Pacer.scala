@@ -441,9 +441,10 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     // pacer/period wait at start of loop
     gcMainLoopStartStms = gcMainLoopStartStms :+ PacerTemplate.pacerWait()
 
-    if(!performHamrIntegration) {
-      // get user defined time triggered method 
-      Util.getComputeEntrypointSourceText(component.properties) match {
+    if(!performHamrIntegration && aadlComponent.isInstanceOf[AadlThread]) {
+      // get user defined time triggered method
+      val t = aadlComponent.asInstanceOf[AadlThread]
+      t.getComputeEntrypointSourceText() match {
         case Some(handler) =>
           // header method so developer knows required signature
           gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t * in_arg);"

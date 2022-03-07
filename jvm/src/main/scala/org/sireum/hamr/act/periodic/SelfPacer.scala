@@ -99,9 +99,10 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     // self pacer/period emit at end of loop
     gcMainLoopEndStms = gcMainLoopEndStms :+ SelfPacerTemplate.selfPacerEmit()
 
-    if(!performHamrIntegration) {
+    if(!performHamrIntegration && aadlComponent.isInstanceOf[AadlThread]) {
       // get user defined time triggered method
-      Util.getComputeEntrypointSourceText(aadlComponent.component.properties) match {
+      val t = aadlComponent.asInstanceOf[AadlThread]
+      t.getComputeEntrypointSourceText() match {
         case Some(handler) =>
           // header method so developer knows required signature
           gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t * in_arg);"

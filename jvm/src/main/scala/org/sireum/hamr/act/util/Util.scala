@@ -274,46 +274,6 @@ object Util {
     return brand(s"${s}_container")
   }
 
-  def getComputeEntrypointSourceText(properties: ISZ[ir.Property]): Option[String] = {
-    val PROP_sb = PROP_SB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
-    val PROP_tb = PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT
-    val PROP_pp = OsateProperties.PROGRAMMING_PROPERTIES__COMPUTE_ENTRYPOINT_SOURCE_TEXT
-
-    val sbcest = PropertyUtil.getProperty(properties, PROP_sb)
-    val tbcest = PropertyUtil.getProperty(properties, PROP_tb)
-    val ppcest = PropertyUtil.getProperty(properties, PROP_pp)
-
-    if ((sbcest.nonEmpty && tbcest.nonEmpty) || (sbcest.nonEmpty && ppcest.nonEmpty) || (tbcest.nonEmpty && ppcest.nonEmpty)) {
-      val props = st"${PROP_sb}, ${PROP_tb}, ${PROP_pp}"
-      reporter.warn(sbcest.get.name.pos, Util.toolName, s"Only one of the following properties should be set for a component: ${props}")
-    }
-
-    val ret: Option[String] = if (sbcest.nonEmpty) {
-      val values = sbcest.get.propertyValues.map((m: ir.PropertyValue) => m.asInstanceOf[ir.ValueProp])
-      assert(values.size > 0)
-      if (values.size > 1) {
-        reporter.warn(None(), Util.toolName, s"${Util.toolName} only supports a single compute entry point for property ${PROP_sb}")
-      }
-      Some(values(0).value)
-    } else if (tbcest.nonEmpty) {
-      val values = tbcest.get.propertyValues.map((m: ir.PropertyValue) => m.asInstanceOf[ir.ValueProp])
-      assert(values.size > 0)
-      reporter.warn(None(), Util.toolName, s"Property ${PROP_tb} is deprecated, use ${PROP_sb} or ${PROP_pp} instead.")
-      if (values.size > 1) {
-        reporter.warn(None(), Util.toolName, s"${Util.toolName} only supports a single compute entry point for property ${PROP_tb}")
-      }
-      Some(values(0).value)
-    } else if (ppcest.nonEmpty) {
-      val values = ppcest.get.propertyValues.map((m: ir.PropertyValue) => m.asInstanceOf[ir.ValueProp])
-      assert(values.size == 1)
-      Some(values(0).value)
-    } else {
-      None()
-    }
-
-    return ret
-  }
-
   def getCamkesOwnerThread(p: ISZ[ir.Property]): Option[String] = {
     var ret: Option[String] = PropertyUtil.getDiscreetPropertyValue(p, PROP_SB_SYS__CAmkES_Owner_Thread) match {
       case Some(ir.ValueProp(v)) => Some(v)

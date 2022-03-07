@@ -18,7 +18,6 @@ import org.sireum.hamr.ir
 object VMGen {
 
   val VM_COMPONENT_TYPE_NAME: String = "VM"
-  val VM_ID_PREFIX: String = "vm" // has to be 'vm' as per data61 macros in https://github.com/SEL4PROJ/camkes-arm-vm/blob/6c77a2734ea4c77035f2c3cca5ca7fa72f1f2890/components/VM/configurations/vm.h#L93
 
   val DIR_VM: String = VM_COMPONENT_TYPE_NAME
   val DIR_VM_APPS: String = "apps"

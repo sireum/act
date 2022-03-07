@@ -721,7 +721,7 @@ import org.sireum.ops.ISZOps
             f.direction match {
               case ir.Direction.In =>
 
-                val incorporateEntrypointSource = Util.getComputeEntrypointSourceText(f.feature.properties).nonEmpty && aadlThread.isSporadic()
+                val incorporateEntrypointSource = a.getComputeEntrypointSourceText().nonEmpty && aadlThread.isSporadic()
 
                 if (incorporateEntrypointSource || performHamrIntegration) {
                   val name = Util.genSeL4NotificationName(a.identifier, T)
@@ -1814,7 +1814,7 @@ import org.sireum.ops.ISZOps
 
     val component = aadlThread.component
 
-    def handleDataPort(): Option[C_SimpleContainer] = {
+    def handleDataPort(dataPort: AadlDataPort): Option[C_SimpleContainer] = {
 
       def dataport_TB_Profile(): Option[C_SimpleContainer] = {
         val (suffix, mod): (String, String) = p.direction match {
@@ -1932,7 +1932,7 @@ import org.sireum.ops.ISZOps
       return ret
     }
 
-    def handleEventDataPort(): Option[C_SimpleContainer] = {
+    def handleEventDataPort(eventDataPort: AadlEventDataPort): Option[C_SimpleContainer] = {
 
       def handleEventData_SB_GlueCode_Profile(): Option[C_SimpleContainer] = {
         assert(!useCaseConnectors)
@@ -2018,7 +2018,7 @@ import org.sireum.ops.ISZOps
               postInits = postInits :+ StringTemplate.cRegCallback(handlerName, regCallback, p)
 
               if (!performHamrIntegration) {
-                Util.getComputeEntrypointSourceText(p.feature.properties) match {
+                eventDataPort.getComputeEntrypointSourceText() match {
                   case Some(userEntrypointMethodName) =>
 
                     val varName = featureName
@@ -2226,7 +2226,7 @@ import org.sireum.ops.ISZOps
               postInits = postInits :+ StringTemplate.cRegCallback(handlerName, regCallback, p)
 
               if (!performHamrIntegration) {
-                Util.getComputeEntrypointSourceText(p.feature.properties) match {
+                eventDataPort.getComputeEntrypointSourceText() match {
                   case Some(userEntrypointMethodName) =>
 
                     val varName = featureName
@@ -2406,7 +2406,7 @@ import org.sireum.ops.ISZOps
             interfaces = interfaces :+ st"${methodSig};"
 
             if (aadlThread.isSporadic() && !performHamrIntegration) {
-              val eventDataEntryPointCode: Option[ST] = Util.getComputeEntrypointSourceText(p.feature.properties) match {
+              val eventDataEntryPointCode: Option[ST] = eventDataPort.getComputeEntrypointSourceText() match {
                 case Some(userEventHandlerMethodName) =>
                   val varName = Util.brand(p.identifier)
                   val userEntrypointName = Util.getUserEventEntrypointMethodName(component, p)
@@ -2462,7 +2462,7 @@ import org.sireum.ops.ISZOps
       return ret
     }
 
-    def handleEventPort(): Option[C_SimpleContainer] = {
+    def handleEventPort(eventPort: AadlEventPort): Option[C_SimpleContainer] = {
 
       def handleEventPort_TB_Profile(): Option[C_SimpleContainer] = {
 
@@ -2502,7 +2502,7 @@ import org.sireum.ops.ISZOps
                     |}"""
 
               if (!performHamrIntegration) {
-                Util.getComputeEntrypointSourceText(p.feature.properties) match {
+                eventPort.getComputeEntrypointSourceText() match {
 
                   case Some(computeEntryPointSourceText) =>
                     val entrypointMethodName = s"${Util.brand("entrypoint")}_${Util.getClassifier(component.classifier.get)}_${p.identifier}"
@@ -2689,7 +2689,7 @@ import org.sireum.ops.ISZOps
               postInits = postInits :+ StringTemplate.cRegCallback(callback, callback_reg, p)
 
               if (!performHamrIntegration) {
-                Util.getComputeEntrypointSourceText(p.feature.properties) match {
+                eventPort.getComputeEntrypointSourceText() match {
                   case Some(computeEntrypointSourceText) =>
 
                     drainQueues = drainQueues :+
@@ -2786,9 +2786,9 @@ import org.sireum.ops.ISZOps
     }
 
     val ret: Option[C_SimpleContainer] = p match {
-      case a: AadlDataPort => handleDataPort()
-      case a: AadlEventPort => handleEventPort()
-      case a: AadlEventDataPort => handleEventDataPort()
+      case a: AadlDataPort => handleDataPort(a)
+      case a: AadlEventPort => handleEventPort(a)
+      case a: AadlEventDataPort => handleEventDataPort(a)
       case _ => None[C_SimpleContainer]()
     }
     return ret
