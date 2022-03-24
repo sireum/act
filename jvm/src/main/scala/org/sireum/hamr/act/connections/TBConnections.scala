@@ -7,13 +7,14 @@ import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
+import org.sireum.hamr.codegen.common.CommonUtil.IdPath
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.ir
 
-@record class TBConnections(monitors: HashSMap[String, Monitor],
+@record class TBConnections(monitors: HashSMap[IdPath, Monitor],
                           sharedData: HashMap[String, SharedData],
-                          srcQueues: Map[String, Map[String, QueueObject]],
+                          srcQueues: Map[IdPath, Map[IdPath, QueueObject]],
                           symbolTable: SymbolTable,
                           aadlTypes: AadlTypes,
                           actOptions: ActOptions) {
@@ -36,7 +37,7 @@ import org.sireum.hamr.ir
     }
 
     for(conn <- handledConns) {
-      val dstPath: String = CommonUtil.getName(conn.dst.feature.get)
+      val dstPath = conn.dst.feature.get.name
       val fdst: ir.Feature = symbolTable.airFeatureMap.get(dstPath).get
 
       val dstFeatureName: String = CommonUtil.getLastName(conn.dst.feature.get)
@@ -86,7 +87,7 @@ import org.sireum.hamr.ir
 
             case ir.FeatureCategory.DataAccess =>
               val sd = sharedData.get(CommonUtil.getName(conn.src.component)).get
-              val dstComp = symbolTable.airComponentMap.get(CommonUtil.getName(conn.dst.component)).get
+              val dstComp = symbolTable.airComponentMap.get(conn.dst.component.name).get
 
               val ownerId = accessComponentId(sd.owner.identifier)
               val dstId = accessComponentId(dstComp.identifier)
@@ -153,10 +154,10 @@ import org.sireum.hamr.ir
   def createSharedDataCounterConnection(connectionCounter: Counter,
                                         conn: ir.ConnectionInstance) : ast.Connection = {
     val srcComponent = CommonUtil.getLastName(conn.src.component)
-    val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
+    val srcFeature = symbolTable.airFeatureMap.get(conn.src.feature.get.name).get
 
     val dstComponent = CommonUtil.getLastName(conn.dst.component)
-    val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
+    val dstFeature = symbolTable.airFeatureMap.get(conn.dst.feature.get.name).get
 
     val srcFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(srcFeature.identifier))
     val dstFeatureName = Util.getEventSBCounterName(CommonUtil.getLastName(dstFeature.identifier))
@@ -176,10 +177,10 @@ import org.sireum.hamr.ir
   def createSharedDataConnection(connectionCounter: Counter,
                                  conn: ir.ConnectionInstance) : ast.Connection = {
     val srcComponent = CommonUtil.getLastName(conn.src.component)
-    val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
+    val srcFeature = symbolTable.airFeatureMap.get(conn.src.feature.get.name).get
 
     val dstComponent = CommonUtil.getLastName(conn.dst.component)
-    val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
+    val dstFeature = symbolTable.airFeatureMap.get(conn.dst.feature.get.name).get
 
     val srcFeatureName = Util.brand(CommonUtil.getLastName(srcFeature.identifier))
     val dstFeatureName = Util.brand(CommonUtil.getLastName(dstFeature.identifier))
@@ -203,8 +204,8 @@ import org.sireum.hamr.ir
     val srcCamkesComponentId: String = Util.getCamkesComponentIdentifier(srcAadlThread, symbolTable)
     val dstCamkesComponentId: String = Util.getCamkesComponentIdentifier(dstAadlThread, symbolTable)
 
-    val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
-    val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
+    val srcFeature = symbolTable.airFeatureMap.get(conn.src.feature.get.name).get
+    val dstFeature = symbolTable.airFeatureMap.get(conn.dst.feature.get.name).get
 
     val srcFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(srcFeature.identifier), Some(monitor.index))
     val dstFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(dstFeature.identifier), None[Z]())
@@ -247,8 +248,8 @@ import org.sireum.hamr.ir
     val srcCamkesComponentId: String = Util.getCamkesComponentIdentifier(srcAadlThread, symbolTable)
     val dstCamkesComponentId: String = Util.getCamkesComponentIdentifier(dstAadlThread, symbolTable)
 
-    val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.src.feature.get)).get
-    val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(conn.dst.feature.get)).get
+    val srcFeature = symbolTable.airFeatureMap.get(conn.src.feature.get.name).get
+    val dstFeature = symbolTable.airFeatureMap.get(conn.dst.feature.get.name).get
 
     val srcFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(srcFeature.identifier), Some(monitor.index))
     val dstFeatureName = Util.genMonitorFeatureName(CommonUtil.getLastName(dstFeature.identifier), None[Z]())

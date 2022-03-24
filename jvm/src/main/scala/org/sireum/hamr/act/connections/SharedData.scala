@@ -53,10 +53,10 @@ object SharedDataUtil {
       f.filter(p => Connections.isHandledConnection(p, symbolTable)))
 
     val dataConnections = handledConnections.filter(f => f.kind == ir.ConnectionKind.Access).filter(
-      f => symbolTable.airFeatureMap.get(CommonUtil.getName(f.dst.feature.get)).get.category == ir.FeatureCategory.DataAccess)
+      f => symbolTable.airFeatureMap.get(f.dst.feature.get.name).get.category == ir.FeatureCategory.DataAccess)
 
     for(conn <- dataConnections) {
-      val srcComp = symbolTable.airComponentMap.get(CommonUtil.getName(conn.src.component)).get
+      val srcComp = symbolTable.airComponentMap.get(conn.src.component.name).get
 
       if(srcComp.category != ir.ComponentCategory.Data) {
         reporter.error(None(), Util.toolName, s"${CommonUtil.getLastName(conn.src.component)} is not a data component")
@@ -66,12 +66,12 @@ object SharedDataUtil {
 
       sharedData.get(dataKey) match {
         case Some(sd) =>
-          val dstComp = symbolTable.airComponentMap.get(CommonUtil.getName(conn.dst.component)).get
+          val dstComp = symbolTable.airComponentMap.get(conn.dst.component.name).get
           val ownerId = CommonUtil.getName(sd.owner.identifier)
           val dstId = CommonUtil.getName(dstComp.identifier)
 
           if(ownerId == dstId) {
-            val _f = dstComp.features.filter(f => CommonUtil.getName(f.identifier) == CommonUtil.getName(conn.dst.feature.get))
+            val _f = dstComp.features.filter(f => f.identifier.name == conn.dst.feature.get.name)
             if(_f.size != 1) {
               reporter.error(None(), Util.toolName, s"There are ${_f.size} matching features for ${CommonUtil.getName(conn.dst.feature.get)}, expecting only 1.")
             } else if(!_f(0).isInstanceOf[ir.FeatureAccess]) {

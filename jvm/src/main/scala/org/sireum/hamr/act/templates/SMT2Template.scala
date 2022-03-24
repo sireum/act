@@ -10,6 +10,8 @@ import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDispatchableCo
 import org.sireum.hamr.ir.{ComponentCategory, Direction, FeatureCategory}
 
 object SMT2Template {
+  val pathSep: String = "_"
+
   def portRefinement(aadlPort: String, camkesPort: String): ST = {
     return st"(and (= ap ${aadlPort}) (= cp ${camkesPort}))"
   }
@@ -27,11 +29,11 @@ object SMT2Template {
   }
 
   def aadlComponentCategory(aadlComponent: AadlComponent): ST = {
-    return st"(assert (= (Some ${aadlComponent.component.category.name}) (select AadlComponentCategory ${aadlComponent.path})))"
+    return st"(assert (= (Some ${aadlComponent.component.category.name}) (select AadlComponentCategory ${aadlComponent.pathAsString(pathSep)})))"
   }
 
   def aadlBoundProcessor(aadlComponent: AadlComponent, processor: Processor): ST = {
-    return st"(assert (= (Some ${processor.path}) (select ProcessorBindings ${aadlComponent.path})))"
+    return st"(assert (= (Some ${processor.pathAsString(pathSep)}) (select ProcessorBindings ${aadlComponent.pathAsString(pathSep)})))"
   }
 
   def aadlDispatchProtocol(componentPath: String, aadlDispatchableComponent: AadlDispatchableComponent): ST = {

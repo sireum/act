@@ -8,6 +8,7 @@ import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.proof.ProofContainer.CAmkESComponentCategory
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.util._
+import org.sireum.hamr.codegen.common.CommonUtil.IdPath
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlPort, AadlProcess, AadlThread, AadlVirtualProcessor, Dispatch_Protocol, SymbolTable}
@@ -254,7 +255,7 @@ object VMGen {
 @record class VMGen(useDomainScheduling: B,
                     typeMap: HashSMap[String, ir.Component],
                     samplingPorts: HashMap[String, SamplingPortInterface],
-                    srcQueues: Map[String, Map[String, QueueObject]],
+                    srcQueues: Map[IdPath, Map[IdPath, QueueObject]],
                     actOptions: ActOptions) {
 
   val platform: ActPlatform.Type = actOptions.platform

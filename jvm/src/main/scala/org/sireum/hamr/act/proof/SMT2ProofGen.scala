@@ -15,6 +15,8 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
 object SMT2ProofGen {
   var resources: ISZ[Resource] = ISZ()
 
+  var pathSep: String = "_"
+
   def genSmt2Proof(proofContainer: ProofContainer,
                    astObjects: ISZ[ast.ASTObject],
                    sbConnectionContainer: Map[String, SBConnectionContainer],
@@ -40,18 +42,18 @@ object SMT2ProofGen {
             case Some(pos) => Some(st" declared at ${pos.uriOpt} (${pos.beginLine}, ${pos.beginColumn})")
             case _ => None()
           }
-        aadlComps = aadlComps :+ st"(${t.path})"
+        aadlComps = aadlComps :+ st"(${t.pathAsString(pathSep)})"
         aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(t)
 
         t match {
           case a: AadlThread =>
-            aadlDPs=  aadlDPs :+ SMT2Template.aadlDispatchProtocol(t.path, a)
+            aadlDPs=  aadlDPs :+ SMT2Template.aadlDispatchProtocol(t.pathAsString(pathSep), a)
 
             a.getParent(symbolTable).getBoundProcessor(symbolTable) match {
               case Some(boundProcessor) =>
                 assert(boundProcessor.isInstanceOf[AadlProcessor])
 
-                aadlComps = aadlComps :+ st"(${boundProcessor.path})"
+                aadlComps = aadlComps :+ st"(${boundProcessor.pathAsString(pathSep)})"
                 aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(boundProcessor)
                 aadlBPs = aadlBPs :+ SMT2Template.aadlBoundProcessor(a, boundProcessor)
               case _ =>
@@ -61,8 +63,8 @@ object SMT2ProofGen {
 
             val boundProcessor = p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
 
-            aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(boundProcessor.path, boundProcessor)
-            aadlComps = aadlComps :+ st"(${boundProcessor.path})"
+            aadlDPs = aadlDPs :+ SMT2Template.aadlDispatchProtocol(boundProcessor.pathAsString(pathSep), boundProcessor)
+            aadlComps = aadlComps :+ st"(${boundProcessor.pathAsString(pathSep)})"
             aadlCategories = aadlCategories :+ SMT2Template.aadlComponentCategory(boundProcessor)
             aadlBPs = aadlBPs :+ SMT2Template.aadlBoundProcessor(p, boundProcessor)
 
@@ -91,20 +93,20 @@ object SMT2ProofGen {
         }
 
         for (port <- connectedPorts) {
-          ports = ports :+ s"(${port.path})"
-          portComponents = portComponents :+ SMT2Template.aadlPortComponents(aadlInstance.path, port.path)
+          ports = ports :+ s"(${port.pathAsString(pathSep)})"
+          portComponents = portComponents :+ SMT2Template.aadlPortComponents(aadlInstance.pathAsString(pathSep), port.pathAsString(pathSep))
 
           val portType: String = port.feature.category.name
-          portFeaturesCats = portFeaturesCats :+ SMT2Template.aadlFeatureCategory(port.path, portType)
+          portFeaturesCats = portFeaturesCats :+ SMT2Template.aadlFeatureCategory(port.pathAsString(pathSep), portType)
           val dir: String = port.feature.direction.name
-          portDirs = portDirs :+ SMT2Template.aadlPortDirection(port.path, dir)
+          portDirs = portDirs :+ SMT2Template.aadlPortDirection(port.pathAsString(pathSep), dir)
         }
       }
       (ports, portComponents, portFeaturesCats, portDirs)
     }
 
     val aadlConnectionFlowTos: ISZ[ST] = {
-      sbConnectionContainer.values.map((m: SBConnectionContainer) => SMT2Template.flowsTo(m.srcPort.path, m.dstPort.path))
+      sbConnectionContainer.values.map((m: SBConnectionContainer) => SMT2Template.flowsTo(m.srcPort.pathAsString(pathSep), m.dstPort.pathAsString(pathSep)))
     }
 
     var fileServer: Option[ST] = None()
@@ -165,9 +167,9 @@ object SMT2ProofGen {
 
                   featureMap.get(f) match {
                     case Some(pf: PortRefinement) =>
-                      portRefinements = portRefinements :+ SMT2Template.portRefinement(pf.aadlPort.path, portName)
+                      portRefinements = portRefinements :+ SMT2Template.portRefinement(pf.aadlPort.pathAsString(pathSep), portName)
                     case Some(vmpf: PortVMRefinement) =>
-                      portRefinements = portRefinements :+ SMT2Template.portRefinement(vmpf.metaPort.aadlPort.path, portName)
+                      portRefinements = portRefinements :+ SMT2Template.portRefinement(vmpf.metaPort.aadlPort.pathAsString(pathSep), portName)
                     case Some(pvma: PortVMAux) =>
                       var entries = portVMAuxsEntries.getOrElse(i.name, ISZ[ST]())
                       entries = entries :+ st"(= cp ${portName})"
@@ -278,7 +280,7 @@ object SMT2ProofGen {
     }
 
     val componentRefinements: ISZ[ST] = proofContainer.camkesInstances.filter((f: (Option[AadlComponent], ast.Instance)) => f._1.nonEmpty).
-      map((r: (Option[AadlComponent], ast.Instance)) => SMT2Template.componentRefinement(r._1.get.path, r._2.name))
+      map((r: (Option[AadlComponent], ast.Instance)) => SMT2Template.componentRefinement(r._1.get.pathAsString(pathSep), r._2.name))
 
 
     def uniquiIfy(sts: ISZ[ST]): ISZ[ST] = {

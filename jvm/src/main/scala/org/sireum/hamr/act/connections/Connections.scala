@@ -64,19 +64,19 @@ object Connections {
       }
       return ret
     }
-    val src = symbolTable.airComponentMap.get(CommonUtil.getName(c.src.component)).get
-    val dst = symbolTable.airComponentMap.get(CommonUtil.getName(c.dst.component)).get
+    val src = symbolTable.airComponentMap.get(c.src.component.name).get
+    val dst = symbolTable.airComponentMap.get(c.dst.component.name).get
 
     val ret : B = (src.category, dst.category) match {
       case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
 
-        val srcFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(c.src.feature.get)).get
-        val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(c.dst.feature.get)).get
+        val srcFeature = symbolTable.airFeatureMap.get(c.src.feature.get.name).get
+        val dstFeature = symbolTable.airFeatureMap.get(c.dst.feature.get.name).get
 
         validFeature(srcFeature) && validFeature(dstFeature)
 
       case (ir.ComponentCategory.Data, ir.ComponentCategory.Thread) =>
-        val dstFeature = symbolTable.airFeatureMap.get(CommonUtil.getName(c.dst.feature.get)).get
+        val dstFeature = symbolTable.airFeatureMap.get(c.dst.feature.get.name).get
         validFeature(dstFeature)
 
       case _ =>
@@ -89,8 +89,8 @@ object Connections {
 
   def getPortConnectionNames(c: ir.ConnectionInstance,
                              symbolTable: SymbolTable): (String, String) = {
-    val src = symbolTable.airComponentMap.get(CommonUtil.getName(c.src.component)).get
-    val dst = symbolTable.airComponentMap.get(CommonUtil.getName(c.dst.component)).get
+    val src = symbolTable.airComponentMap.get(c.src.component.name).get
+    val dst = symbolTable.airComponentMap.get(c.dst.component.name).get
 
     val ret: (String, String) = (src.category, dst.category) match {
       case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>

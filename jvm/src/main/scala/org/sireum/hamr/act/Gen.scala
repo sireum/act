@@ -14,6 +14,7 @@ import org.sireum.hamr.act.templates._
 import org.sireum.hamr.act.util.PathUtil
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.vm._
+import org.sireum.hamr.codegen.common.CommonUtil.IdPath
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
@@ -37,10 +38,10 @@ import org.sireum.ops.ISZOps
 
   var sharedData: HashMap[String, SharedData] = HashMap.empty
   var samplingPorts: HashMap[String, SamplingPortInterface] = HashMap.empty
-  var srcQueues: Map[String, Map[String, QueueObject]] = Map.empty // {dstFeatureId -> {srcFeatureId -> queueobj}}
+  var srcQueues: Map[IdPath, Map[IdPath, QueueObject]] = Map.empty // {dstFeatureId -> {srcFeatureId -> queueobj}}
 
   var astObjects: ISZ[ASTObject] = ISZ()
-  var monitors: HashSMap[String, Monitor] = HashSMap.empty // conn instname -> monitor
+  var monitors: HashSMap[IdPath, Monitor] = HashSMap.empty // conn instname -> monitor
   var containers: ISZ[C_Container] = ISZ()
   var auxResourceFiles: ISZ[Resource] = ISZ()
 
@@ -634,7 +635,7 @@ import org.sireum.ops.ISZOps
                   case Some(outs) =>
                     var i: Z = 0
                     for (o <- outs) {
-                      val monitor = monitors.get(CommonUtil.getName(o.name)).get.asInstanceOf[TB_Monitor]
+                      val monitor = monitors.get(o.name.name).get.asInstanceOf[TB_Monitor]
                       imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
                       uses = uses :+ Util.createUses_Refinement(
@@ -697,7 +698,7 @@ import org.sireum.ops.ISZOps
                   case Some(outs) =>
                     var i: Z = 0
                     for (o <- outs) {
-                      val monitor = monitors.get(CommonUtil.getName(o.name)).get.asInstanceOf[TB_Monitor]
+                      val monitor = monitors.get(o.name.name).get.asInstanceOf[TB_Monitor]
                       imports = imports + Util.getInterfaceFilename(monitor.interface.name)
 
                       uses = uses :+ Util.createUses_Refinement(
@@ -788,7 +789,7 @@ import org.sireum.ops.ISZOps
 
               case ir.Direction.Out =>
 
-                val dsts: Map[String, QueueObject] = srcQueues.get(f.path).get // dstId -> queueObject
+                val dsts: Map[IdPath, QueueObject] = srcQueues.get(f.path).get // dstId -> queueObject
 
                 for (qo <- dsts.valueSet.elements) {
                   val queueSize = qo.queueSize
@@ -1067,17 +1068,17 @@ import org.sireum.ops.ISZOps
       gcImplMethods = gcImplMethods ++ outgoingPorts.map((f: AadlPort) => hamrSendOutgoingPort(names, f, typeMap, uri))
 
       val unconnectedOutgoingPorts: ISZ[ir.FeatureEnd] = CommonUtil.getOutPorts(c).filter(f =>
-        !symbolTable.outConnections.contains(CommonUtil.getName(f.identifier)))
+        !symbolTable.outConnections.contains(f.identifier.name))
 
       gcImplMethods = gcImplMethods ++ unconnectedOutgoingPorts.map((f: ir.FeatureEnd) => hamrSendUnconnectedOutgoingPort(names, f, uri))
 
       val inPorts: ISZ[ir.FeatureEnd] = CommonUtil.getInPorts(c).filter(f =>
-        symbolTable.inConnections.contains(CommonUtil.getName(f.identifier)))
+        symbolTable.inConnections.contains(f.identifier.name))
 
       gcImplMethods = gcImplMethods ++ inPorts.map((f: ir.FeatureEnd) => hamrReceiveIncomingPort(names, f, typeMap, uri))
 
       val unconnectedInPorts: ISZ[ir.FeatureEnd] = CommonUtil.getInPorts(c).filter(f =>
-        !symbolTable.inConnections.contains(CommonUtil.getName(f.identifier)))
+        !symbolTable.inConnections.contains(f.identifier.name))
 
       val freezeInEventPorts: ISZ[ST] = {
         aadlThread.getPorts().filter((p: AadlPort) => p.direction == ir.Direction.In && p.isInstanceOf[AadlEventPort])
@@ -1300,7 +1301,7 @@ import org.sireum.ops.ISZOps
     for (portPath <- symbolTable.outConnections.keys.filter(p => symbolTable.outConnections.get(p).get.size > 0)) {
 
       for (connInst <- symbolTable.outConnections.get(portPath).get()) {
-        val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.dst.feature.get)).get
+        val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(connInst.dst.feature.get.name).get
 
         connInst.kind match {
           case ir.ConnectionKind.Port =>
@@ -1383,8 +1384,8 @@ import org.sireum.ops.ISZOps
       var i: Z = 0
       for (connInst <- symbolTable.outConnections.get(portPath).get()) {
 
-        val dst: ir.Component = symbolTable.airComponentMap.get(CommonUtil.getName(connInst.dst.component)).get
-        val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(CommonUtil.getName(connInst.dst.feature.get)).get
+        val dst: ir.Component = symbolTable.airComponentMap.get(connInst.dst.component.name).get
+        val dstFeature: ir.Feature = symbolTable.airFeatureMap.get(connInst.dst.feature.get.name).get
 
         def handleDataPort(f: ir.FeatureEnd): Unit = {
           val monitorName = Util.getMonitorName(dst, f)
@@ -1447,7 +1448,7 @@ import org.sireum.ops.ISZOps
             includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
             comments = ISZ())
 
-          val connInstName = CommonUtil.getName(connInst.name)
+          val connInstName = connInst.name.name
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
@@ -1550,7 +1551,7 @@ import org.sireum.ops.ISZOps
             comments = ISZ()
           )
 
-          val connInstName = CommonUtil.getName(connInst.name)
+          val connInstName = connInst.name.name
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
@@ -1646,7 +1647,7 @@ import org.sireum.ops.ISZOps
             includes = ISZ(Util.getSbTypeHeaderFilenameForIncludes()),
             comments = ISZ())
 
-          val connInstName = CommonUtil.getName(connInst.name)
+          val connInstName = connInst.name.name
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
           val cimplementation: Resource =
@@ -2082,7 +2083,7 @@ import org.sireum.ops.ISZOps
           }
           case ir.Direction.Out => {
 
-            val dsts: Map[String, QueueObject] = srcQueues.get(p.path).get
+            val dsts: Map[IdPath, QueueObject] = srcQueues.get(p.path).get
 
             var cIncludes: ISZ[ST] = ISZ()
 
@@ -2289,7 +2290,7 @@ import org.sireum.ops.ISZOps
           }
           case ir.Direction.Out => {
 
-            val dsts: Map[String, QueueObject] = srcQueues.get(p.path).get
+            val dsts: Map[IdPath, QueueObject] = srcQueues.get(p.path).get
 
             var cIncludes: ISZ[ST] = ISZ()
 
