@@ -233,6 +233,7 @@ import org.sireum.ops.StringOps
           IResource(
             dstPath = dstPath,
             content = i.content,
+            markers = i.markers,
             overwrite = i.overwrite,
             makeExecutable = i.makeExecutable,
             makeCRLF = i.makeCRLF)
