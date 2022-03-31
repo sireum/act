@@ -84,7 +84,7 @@ def cloneProjects(): Unit = {
  * strange as hamr-codgen has ACT as a sub-module, though it isn't
  * recursively cloned
  */
-  for (m <- ISZ("air", "hamr-codegen", "runtime")) {
+  for (m <- ISZ("air", "hamr-codegen", "runtime", "slang")) {
     clone(m)
   }
 }
@@ -120,7 +120,7 @@ def test(): Unit = {
 
 def clean(): Unit = {
   println(s"Cleaning ${home}")
-  val homeResources: ISZ[Os.Path] = ISZ("air", "common", "hamr_codegen", "lib", "out", "runtime", "versions.properties").map(m => home / m)
+  val homeResources: ISZ[Os.Path] = ISZ("air", "common", "hamr_codegen", "lib", "out", "runtime", "slang", "versions.properties").map(m => home / m)
   val homeBinResources: ISZ[Os.Path] = ISZ("sireum.jar", "sireum").map(m => homeBin / m)
   for(r <- (homeResources ++ homeBinResources) if r.exists) {
     println(s"Deleting ${r}")

@@ -44,7 +44,8 @@ val projects = ISZ(
   homeDir,
   homeDir / "air",
   homeDir / "hamr_codegen" / "common",
-  homeDir / "runtime"
+  homeDir / "runtime",
+  homeDir / "slang"
 )
 
 loadFromBaseDirs(projects) match {
