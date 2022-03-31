@@ -20,6 +20,7 @@ target
 /common
 /hamr_codegen
 /runtime
+/slang
 *.cmd.jar
 *.cmd.com
 project.json
