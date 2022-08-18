@@ -127,7 +127,9 @@ object PacerTemplate {
   def pacerExampleSchedule(clock_period: Z,
                            frame_period: Z,
                            threadProperties: ISZ[ST],
-                           entries: ISZ[ST]): ST = {
+                           entries: ISZ[ST],
+                           usesPacerComponent: B): ST = {
+    val pacerOpt: Option[ST] = if(usesPacerComponent) Some(st"Pacer runs at highest rate and should always be in domain 1") else None()
     val ret: ST = st"""#include <config.h>
                       |#include <object/structures.h>
                       |#include <model/statedata.h>
@@ -141,7 +143,7 @@ object PacerTemplate {
                       |   This schedule should be generated from the AADL model
                       |   using execution time and data flow latency specifications.
                       |
-                      |   Pacer runs at highest rate and should always be in domain 1
+                      |   ${pacerOpt}
                       |
                       |   Properties from AADL Model
                       |   --------------------------

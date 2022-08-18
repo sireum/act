@@ -198,28 +198,38 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
         entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", otherLen / clockPeriod,
           Some(st" // all other seL4 threads, init, ${otherLen}ms"))
 
-        val pacerLen = z"10"
+        val domainZeroLen: Z = z"10"
+        val domainZeroEntry = PacerTemplate.pacerScheduleEntry(z"0", domainZeroLen / clockPeriod,
+          Some(st" // switch to domain 0 to allow seL4 to deliver messages"))
 
         var threadComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(p <- allThreads) {
+        for(index <- 0 until allThreads.size) {
+          val p = allThreads(index)
+          val threadName = Util.getCamkesComponentIdentifier(p, symbolTable)
+
           val domain = p.getDomain(symbolTable).get
           val computeExecutionTime = p.getMaxComputeExecutionTime()
-          val comment = Some(st" // ${p.identifier} ${computeExecutionTime} ms")
+          val comment = Some(st" // ${threadName} ${computeExecutionTime} ms")
 
           threadComments = threadComments :+
-            PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier, "Thread",
+            PacerTemplate.pacerScheduleThreadPropertyComment(threadName, "Thread",
               domain, p.dispatchProtocol, s"${computeExecutionTime} ms", p.period)
 
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
 
           sumExecutionTime = sumExecutionTime + computeExecutionTime
+
+          if (index < allThreads.size - 1) {
+            entries = entries :+ domainZeroEntry
+            sumExecutionTime = sumExecutionTime + domainZeroLen
+          }
         }
 
-        val pad: Z = (framePeriod - (otherLen + pacerLen + sumExecutionTime)) / clockPeriod
+        val pad: Z = (framePeriod - (otherLen + sumExecutionTime)) / clockPeriod
         entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", pad, Some(st" // pad rest of frame period"))
 
-        PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries)
+        PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, threadComments, entries, F)
     }
 
     return ISZ(ResourceUtil.createResource(path, contents, F))

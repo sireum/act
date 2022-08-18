@@ -644,10 +644,17 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         val pacerDomain = PacerTemplate.PACER_DOMAIN
         entries = entries :+ PacerTemplate.pacerScheduleEntry(pacerDomain, pacerLen / clockPeriod, 
           Some(st" // pacer ${pacerLen}ms.  Should always be in domain ${pacerDomain}"))
-        
+
+        val domainZeroLen: Z = z"10"
+        val domainZeroEntry = PacerTemplate.pacerScheduleEntry(z"0", domainZeroLen / clockPeriod,
+          Some(st" // switch to domain 0 to allow seL4 to deliver messages"))
+
         var componentComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(p <- allComponents) {
+        for(index <- 0 until allComponents.size) {
+          val p = allComponents(index)
+          val componentName = Util.getCamkesComponentName(p, symbolTable)
+
           val (domain, computeExecutionTime, origin, dispatchProtocol, period, componentType): (Z, Z, String, Dispatch_Protocol.Type, Option[Z], String) = p match {
             case p: AadlProcess =>
               val dc = p.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
@@ -656,29 +663,34 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
               var origin: String = ""
               for(t <- p.getThreads() if t.getMaxComputeExecutionTime() > maxComputeExecutionTime) {
                 maxComputeExecutionTime = t.getMaxComputeExecutionTime()
-                origin = s"(from thread ${t.identifier})"
+                origin = s"(from thread ${componentName})"
               }
 
-              (p.getDomain().get, maxComputeExecutionTime, origin,  dc.dispatchProtocol, dc.period, "Process")
+              (p.getDomain(symbolTable).get, maxComputeExecutionTime, origin,  dc.dispatchProtocol, dc.period, "Process")
             case t: AadlThread => (t.getDomain(symbolTable).get, t.getMaxComputeExecutionTime(), "", t.dispatchProtocol, t.period, "Thread")
             case x => halt(s"Unexpected, only expecting threads or processes but encountered $x")
           }
 
-          val comment = Some(st" // ${p.identifier} ${computeExecutionTime} ms")
+          val comment = Some(st" // ${componentName} ${computeExecutionTime} ms")
 
           componentComments = componentComments :+
-            PacerTemplate.pacerScheduleThreadPropertyComment(p.identifier, componentType,
+            PacerTemplate.pacerScheduleThreadPropertyComment(componentName, componentType,
               domain, dispatchProtocol, s"${computeExecutionTime} ms ${origin}", period)
 
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
           
           sumExecutionTime = sumExecutionTime + computeExecutionTime
+
+          if (index < allComponents.size - 1) {
+            entries = entries :+ domainZeroEntry
+            sumExecutionTime = sumExecutionTime + domainZeroLen
+          }
         }
         
         val pad: Z = (framePeriod - (otherLen + pacerLen + sumExecutionTime)) / clockPeriod
         entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", pad, Some(st" // pad rest of frame period"))
         
-        PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, componentComments, entries)
+        PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, componentComments, entries, T)
     }
 
     return ISZ(ResourceUtil.createResource(path, contents, aadlProcessor.getScheduleSourceText().nonEmpty))

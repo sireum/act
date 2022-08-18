@@ -276,7 +276,7 @@ object SBConnections {
 
                   if(dstToVM) {
 
-                    conn.dstComponent.asInstanceOf[AadlProcess].getDomain() match {
+                    conn.dstComponent.asInstanceOf[AadlProcess].getDomain(symbolTable) match {
                       case Some(d) =>
                         // add the notification to the same domain as the component or will get an error like
                         // 'handle_event_bar_fault@cross_vm_connection.c:126 Connection is not configured with an emit function'

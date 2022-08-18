@@ -324,7 +324,7 @@ import org.sireum.ops.ISZOps
       }
 
       if (useDomainScheduling && (platform == ActPlatform.SeL4_Only || platform == ActPlatform.SeL4)) {
-        aadlProcess.getDomain() match {
+        aadlProcess.getDomain(symbolTable) match {
           case Some(domain) =>
             camkesConfiguration = camkesConfiguration :+ PacerTemplate.domainConfiguration(camkesComponentId, domain)
           case _ =>
