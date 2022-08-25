@@ -3,7 +3,7 @@ package org.sireum.hamr.act.templates
 
 import org.sireum._
 
-object AlloyTemplate{
+object AlloyTemplate {
 
   def als(base: ST,
           proof: ST): ST = {

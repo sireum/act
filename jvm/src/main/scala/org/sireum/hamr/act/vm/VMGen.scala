@@ -9,11 +9,11 @@ import org.sireum.hamr.act.proof.ProofContainer.CAmkESComponentCategory
 import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil.IdPath
+import org.sireum.hamr.codegen.common.DirectoryUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDataPort, AadlEventDataPort, AadlPort, AadlProcess, AadlThread, AadlVirtualProcessor, Dispatch_Protocol, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
-import org.sireum.hamr.codegen.common.{CommonUtil, DirectoryUtil}
 import org.sireum.hamr.ir
 
 object VMGen {
@@ -34,10 +34,10 @@ object VMGen {
     return s"${Util.DIR_COMPONENTS}/${DIR_VM}"
   }
 
-  def getAuxResources(//threadsToVMs: ISZ[AadlThread],
-                      processesToVMs: ISZ[AadlProcess],
-                      platform: ActPlatform.Type,
-                      symbolTable: SymbolTable): ISZ[Resource] = {
+  def getAuxResources( //threadsToVMs: ISZ[AadlThread],
+                       processesToVMs: ISZ[AadlProcess],
+                       platform: ActPlatform.Type,
+                       symbolTable: SymbolTable): ISZ[Resource] = {
     assert(processesToVMs.nonEmpty, "Expecting 1 or more processes going to VMs")
     var auxResourceFiles: ISZ[Resource] = ISZ()
 
@@ -232,7 +232,7 @@ object VMGen {
           ),
           connections = assemblyB.composition.connections,
           externalEntities = assemblyB.composition.externalEntities,
-            comments = ISZ()
+          comments = ISZ()
         ),
         comments = ISZ()
       )
@@ -309,8 +309,8 @@ object VMGen {
     )
 
     var connectedPorts: ISZ[MetaPort] = ISZ()
-    for(conn <- sbConnections) {
-      if(conn.srcComponent == aadlProcess) {
+    for (conn <- sbConnections) {
+      if (conn.srcComponent == aadlProcess) {
         connectedPorts = connectedPorts :+ MetaPort(conn.srcPort, conn, conn.srcVMInfo.get)
       } else if (conn.dstComponent == aadlProcess) {
         connectedPorts = connectedPorts :+ MetaPort(conn.dstPort, conn, conn.dstVMInfo.get)

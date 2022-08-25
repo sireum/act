@@ -14,10 +14,10 @@ object SharedDataUtil {
   def buildSharedData(symbolTable: SymbolTable): HashMap[String, SharedData] = {
     var sharedData: HashMap[String, SharedData] = HashMap.empty
 
-    for(aadlProcess <- symbolTable.getProcesses()) {
+    for (aadlProcess <- symbolTable.getProcesses()) {
       val dataComponents: ISZ[AadlComponent] = aadlProcess.subComponents.filter(p => p.component.category == ir.ComponentCategory.Data)
 
-      for(dc <- dataComponents) {
+      for (dc <- dataComponents) {
         val sc = dc.component
         Util.getCamkesOwnerThread(sc.properties) match {
           case Some(owner) =>
@@ -55,10 +55,10 @@ object SharedDataUtil {
     val dataConnections = handledConnections.filter(f => f.kind == ir.ConnectionKind.Access).filter(
       f => symbolTable.airFeatureMap.get(f.dst.feature.get.name).get.category == ir.FeatureCategory.DataAccess)
 
-    for(conn <- dataConnections) {
+    for (conn <- dataConnections) {
       val srcComp = symbolTable.airComponentMap.get(conn.src.component.name).get
 
-      if(srcComp.category != ir.ComponentCategory.Data) {
+      if (srcComp.category != ir.ComponentCategory.Data) {
         reporter.error(None(), Util.toolName, s"${CommonUtil.getLastName(conn.src.component)} is not a data component")
       }
 
@@ -70,11 +70,11 @@ object SharedDataUtil {
           val ownerId = CommonUtil.getName(sd.owner.identifier)
           val dstId = CommonUtil.getName(dstComp.identifier)
 
-          if(ownerId == dstId) {
+          if (ownerId == dstId) {
             val _f = dstComp.features.filter(f => f.identifier.name == conn.dst.feature.get.name)
-            if(_f.size != 1) {
+            if (_f.size != 1) {
               reporter.error(None(), Util.toolName, s"There are ${_f.size} matching features for ${CommonUtil.getName(conn.dst.feature.get)}, expecting only 1.")
-            } else if(!_f(0).isInstanceOf[ir.FeatureAccess]) {
+            } else if (!_f(0).isInstanceOf[ir.FeatureAccess]) {
               reporter.error(None(), Util.toolName, s"${CommonUtil.getName(conn.dst.feature.get)} is not a FeatureAccess.")
             } else {
               // add the owner's feature

@@ -82,6 +82,7 @@ import org.sireum._
 
 @sig trait CAmkESFeature extends CommentProvider {
   def name: String
+
   def typ: String
 }
 
@@ -115,14 +116,14 @@ import org.sireum._
                          val comments: ISZ[AstComment]) extends CAmkESFeature
 
 
-@datatype class Connection(val name : String,
+@datatype class Connection(val name: String,
                            val connectionType: String,
                            val from_ends: ISZ[ConnectionEnd],
                            val to_ends: ISZ[ConnectionEnd],
 
                            val comments: ISZ[AstComment]) extends ASTObject
 
-@datatype class ConnectionEnd(val isFrom : B,
+@datatype class ConnectionEnd(val isFrom: B,
                               val component: String,
                               val end: String,
 
@@ -142,7 +143,7 @@ import org.sireum._
                           val from_type: ConnectorType.Type,
                           val from_template: Option[String],
                           val from_threads: Z,
-                          val from_hardware : B,
+                          val from_hardware: B,
 
                           val to_type: ConnectorType.Type,
                           val to_template: Option[String],
@@ -159,7 +160,7 @@ import org.sireum._
 
                           val comments: ISZ[AstComment]) extends ASTObject
 
-@datatype class Method(val name : String,
+@datatype class Method(val name: String,
                        val parameters: ISZ[Parameter],
                        val returnType: Option[String],
 
@@ -203,11 +204,10 @@ import org.sireum._
 @datatype class GenericConfiguration(val e: String,
                                      val comments: ISZ[AstComment]) extends Configuration
 
-@datatype class DataPortAccessRestriction (val component: String,
-                                           val port: String,
-                                           val accessType: AccessType.Type,
-                                           val comments: ISZ[AstComment]) extends Configuration
+@datatype class DataPortAccessRestriction(val component: String,
+                                          val port: String,
+                                          val accessType: AccessType.Type,
+                                          val comments: ISZ[AstComment]) extends Configuration
 
 
-
-@datatype class TODO (val comments: ISZ[AstComment]) extends ASTObject
+@datatype class TODO(val comments: ISZ[AstComment]) extends ASTObject

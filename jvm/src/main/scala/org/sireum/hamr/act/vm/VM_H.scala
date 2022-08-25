@@ -323,7 +323,7 @@ object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
 
     return ISZ(connection(comments = ISZ(
       Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 119)),
-        Util.createPostComment(""))))
+      Util.createPostComment(""))))
   }
 }
 
@@ -374,10 +374,10 @@ object VM_CONFIGURATION_DEF {
 //    time_server.timers_per_client = 1; \
 ////    time_server.priority = 255; \
 ////    time_server.simple = true;
-object VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF{
+object VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF {
   val name: String = "VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF"
 
-  def configurations(): ISZ[Configuration]= {
+  def configurations(): ISZ[Configuration] = {
     val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 129)))
     return ISZ(
       GenericConfiguration("time_server.timers_per_client = 1;", comments),

@@ -17,10 +17,14 @@ object LibraryComponents {
 
     val ports: ISZ[String] = ISZ(getchar_Port, processed_batch_Port, timeout_Port)
 
-    def defaultSerialServerInstance(comments: ISZ[AstComment]): ast.Instance = { return createInstance(defaultSerialServerName, comments) }
+    def defaultSerialServerInstance(comments: ISZ[AstComment]): ast.Instance = {
+      return createInstance(defaultSerialServerName, comments)
+    }
 
-    def libraryComponent: LibraryComponent = { return Util.createCAmkESLibraryComponent(
-      componentCategory = CAmkESComponentCategory.SerialServer, name = "SerialServer", ports = ports) }
+    def libraryComponent: LibraryComponent = {
+      return Util.createCAmkESLibraryComponent(
+        componentCategory = CAmkESComponentCategory.SerialServer, name = "SerialServer", ports = ports)
+    }
 
     def createInstance(instanceName: String, comments: ISZ[AstComment]): ast.Instance = {
       return Util.createCAmkESInstance(
@@ -40,10 +44,14 @@ object LibraryComponents {
 
     val ports: ISZ[String] = ISZ(the_timer_port)
 
-    def defaultTimeServerInstance(comments: ISZ[AstComment]): ast.Instance = { return createInstance(defaultTimeServerName, comments) }
+    def defaultTimeServerInstance(comments: ISZ[AstComment]): ast.Instance = {
+      return createInstance(defaultTimeServerName, comments)
+    }
 
-    def libraryComponent: LibraryComponent = { return Util.createCAmkESLibraryComponent(
-      componentCategory = CAmkESComponentCategory.TimeServer, name = "TimeServer", ports = ports) }
+    def libraryComponent: LibraryComponent = {
+      return Util.createCAmkESLibraryComponent(
+        componentCategory = CAmkESComponentCategory.TimeServer, name = "TimeServer", ports = ports)
+    }
 
     def createInstance(instanceName: String, comments: ISZ[AstComment]): ast.Instance = {
       return Util.createCAmkESInstance(
@@ -64,10 +72,14 @@ object LibraryComponents {
 
     val ports: ISZ[String] = ISZ(fs_ctrl_port)
 
-    def defaultFileServerInstance(comments: ISZ[AstComment]): ast.Instance = { return createInstance(defaultFileServerName, comments) }
+    def defaultFileServerInstance(comments: ISZ[AstComment]): ast.Instance = {
+      return createInstance(defaultFileServerName, comments)
+    }
 
-    def libraryComponent: LibraryComponent = { return Util.createCAmkESLibraryComponent(
-      componentCategory = CAmkESComponentCategory.FileServer, name = "FileServer", ports = ports) }
+    def libraryComponent: LibraryComponent = {
+      return Util.createCAmkESLibraryComponent(
+        componentCategory = CAmkESComponentCategory.FileServer, name = "FileServer", ports = ports)
+    }
 
     def createInstance(instanceName: String, comments: ISZ[AstComment]): ast.Instance = {
       return Util.createCAmkESInstance(

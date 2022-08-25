@@ -60,7 +60,9 @@ object SMT2Template {
     return st"(and (= _conn ${connName}) (= _p1 ${src}) (= _p2 ${dst}))"
   }
 
-  def camkesConnection(connName: String): ST = { return st"(${connName})" }
+  def camkesConnection(connName: String): ST = {
+    return st"(${connName})"
+  }
 
   def proof(mode: ActPlatform.Type,
 
@@ -106,7 +108,7 @@ object SMT2Template {
 
     val dispatchProtocols = Dispatch_Protocol.elements.map((m: Dispatch_Protocol.Type) => st"(${m.name})")
     val featureCategories = FeatureCategory.elements.map((m: FeatureCategory.Type) => st"(${m.name})")
-    val directions = Direction.elements.filter((f:Direction.Type) => f != Direction.None).map((m: Direction.Type) => st"(${m.name})")
+    val directions = Direction.elements.filter((f: Direction.Type) => f != Direction.None).map((m: Direction.Type) => st"(${m.name})")
 
     val portMatches = FeatureCategory.elements.map((m: FeatureCategory.Type) =>
       st"(and (= ${m.name} (select AadlFeatureCategory src)) (= ${m.name} (select AadlFeatureCategory dst)))")

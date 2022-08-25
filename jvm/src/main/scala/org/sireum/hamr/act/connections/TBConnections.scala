@@ -13,11 +13,11 @@ import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.ir
 
 @record class TBConnections(monitors: HashSMap[IdPath, Monitor],
-                          sharedData: HashMap[String, SharedData],
-                          srcQueues: Map[IdPath, Map[IdPath, QueueObject]],
-                          symbolTable: SymbolTable,
-                          aadlTypes: AadlTypes,
-                          actOptions: ActOptions) {
+                            sharedData: HashMap[String, SharedData],
+                            srcQueues: Map[IdPath, Map[IdPath, QueueObject]],
+                            symbolTable: SymbolTable,
+                            aadlTypes: AadlTypes,
+                            actOptions: ActOptions) {
 
   val platform: ActPlatform.Type = actOptions.platform
 
@@ -32,11 +32,11 @@ import org.sireum.hamr.ir
     val unhandledConns = c.connectionInstances.filter(conn => Connections.isHandledConnection(conn, symbolTable))
 
     val missingFeatures = sharedData.values.filter((f: SharedData) => f.ownerFeature.isEmpty)
-    if(missingFeatures.nonEmpty) {
+    if (missingFeatures.nonEmpty) {
       reporter.error(None(), Util.toolName, s"Could not find the owner for the following data subcomponents: ${(missingFeatures.map((f: SharedData) => f.subcomponentId), ", ")}")
     }
 
-    for(conn <- handledConns) {
+    for (conn <- handledConns) {
       val dstPath = conn.dst.feature.get.name
       val fdst: ir.Feature = symbolTable.airFeatureMap.get(dstPath).get
 
@@ -117,7 +117,6 @@ import org.sireum.hamr.ir
   }
 
 
-
   def createSeL4GlobalAsynchConnection(connectionCounter: Counter,
                                        srcComponent: String, srcFeature: String,
                                        dstComponent: String, dstFeature: String): ast.Connection = {
@@ -142,7 +141,7 @@ import org.sireum.hamr.ir
 
   def createRPCConnection(connectionCounter: Counter,
                           srcComponent: String, srcFeature: String,
-                          dstComponent: String, dstFeature: String) : ast.Connection = {
+                          dstComponent: String, dstFeature: String): ast.Connection = {
     return Util.createConnectionC(
       CAmkESConnectionType.Refinement,
       connectionCounter,
@@ -152,7 +151,7 @@ import org.sireum.hamr.ir
   }
 
   def createSharedDataCounterConnection(connectionCounter: Counter,
-                                        conn: ir.ConnectionInstance) : ast.Connection = {
+                                        conn: ir.ConnectionInstance): ast.Connection = {
     val srcComponent = CommonUtil.getLastName(conn.src.component)
     val srcFeature = symbolTable.airFeatureMap.get(conn.src.feature.get.name).get
 
@@ -175,7 +174,7 @@ import org.sireum.hamr.ir
   }
 
   def createSharedDataConnection(connectionCounter: Counter,
-                                 conn: ir.ConnectionInstance) : ast.Connection = {
+                                 conn: ir.ConnectionInstance): ast.Connection = {
     val srcComponent = CommonUtil.getLastName(conn.src.component)
     val srcFeature = symbolTable.airFeatureMap.get(conn.src.feature.get.name).get
 
@@ -195,7 +194,7 @@ import org.sireum.hamr.ir
   }
 
   def createDataConnection(connectionCounter: Counter,
-                           conn: ir.ConnectionInstance) : ISZ[ast.Connection] = {
+                           conn: ir.ConnectionInstance): ISZ[ast.Connection] = {
     val monitor = Monitors.getMonitorForConnectionInstance(conn, monitors).get.asInstanceOf[TB_Monitor]
 
     val srcAadlThread: AadlThread = symbolTable.getThreadByName(conn.src.component)
@@ -239,7 +238,7 @@ import org.sireum.hamr.ir
   }
 
   def createDataConnection_Ihor(connectionCounter: Counter,
-                                conn: ir.ConnectionInstance) :ISZ[ast.Connection] = {
+                                conn: ir.ConnectionInstance): ISZ[ast.Connection] = {
     val monitor = Monitors.getMonitorForConnectionInstance(conn, monitors).get.asInstanceOf[Ihor_Monitor]
 
     val srcAadlThread: AadlThread = symbolTable.getThreadByName(conn.src.component)

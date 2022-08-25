@@ -12,10 +12,10 @@ object Dispatcher {
 
                                symbolTable: SymbolTable,
                                actOptions: ActOptions,
-                              
+
                                connectionCounter: Counter,
                                timerAttributeCounter: Counter,
-                              
+
                                headerInclude: String): CamkesAssemblyContribution = {
 
     val ret: CamkesAssemblyContribution = PeriodicUtil.getDispatchingType(symbolTable, useDomainScheduling) match {
@@ -48,7 +48,7 @@ object Dispatcher {
                               actOptions: ActOptions,
 
                               aadlComponent: AadlComponent): (CamkesComponentContributions, CamkesGlueCodeContributions) = {
-    
+
     val ret: (CamkesComponentContributions, CamkesGlueCodeContributions) =
       PeriodicUtil.getDispatchingType(symbolTable, useDomainScheduling) match {
         case PeriodicDispatchingType.Pacer =>

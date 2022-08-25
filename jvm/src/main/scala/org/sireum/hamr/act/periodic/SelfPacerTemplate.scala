@@ -38,17 +38,19 @@ object SelfPacerTemplate {
     val methodName = periodicEntrypointMethodName(classifier)
     val IN_ARG_VAR: String = "in_arg"
 
-    return st"""void ${methodName}(int64_t *${IN_ARG_VAR}) {
-               |  ${userEntrypoint}((int64_t *) ${IN_ARG_VAR});
-               |}"""
+    return (
+      st"""void ${methodName}(int64_t *${IN_ARG_VAR}) {
+          |  ${userEntrypoint}((int64_t *) ${IN_ARG_VAR});
+          |}""")
   }
 
   def callPeriodicComputEntrypoint(classifier: String, handler: String): ST = {
     val methodName = periodicEntrypointMethodName(classifier)
     val dummyVarName = Util.brand("dummy")
-    return st"""{
-               |  int64_t ${dummyVarName} = 0;
-               |  ${methodName}(&${dummyVarName});
-               |}"""
+    return (
+      st"""{
+          |  int64_t ${dummyVarName} = 0;
+          |  ${methodName}(&${dummyVarName});
+          |}""")
   }
 }

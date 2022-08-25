@@ -8,10 +8,10 @@ import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlDispatchableComponent, AadlProcess, AadlThread, AadlVirtualProcessor, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 
-@datatype class SelfPacer (val actOptions: ActOptions) extends PeriodicImpl {
+@datatype class SelfPacer(val actOptions: ActOptions) extends PeriodicImpl {
 
   val performHamrIntegration: B = Util.hamrIntegration(actOptions.platform)
 
@@ -26,13 +26,13 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     var connections: ISZ[ast.Connection] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
 
-    if(threads.nonEmpty) {
+    if (threads.nonEmpty) {
       auxResources = auxResources ++ getSchedule(threads, symbolTable)
     }
 
     val periodicThreads = symbolTable.getPeriodicThreads()
 
-    for(aadlThread <- periodicThreads) {
+    for (aadlThread <- periodicThreads) {
       val componentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
 
       configurations = configurations :+ PacerTemplate.domainConfiguration(componentId, aadlThread.getDomain(symbolTable).get)
@@ -87,7 +87,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     var gcMethods: ISZ[ST] = ISZ()
     var gcMainPreLoopStms: ISZ[ST] = ISZ()
     var gcMainLoopStartStms: ISZ[ST] = ISZ()
-    var gcMainLoopStms: ISZ[ST]= ISZ()
+    var gcMainLoopStms: ISZ[ST] = ISZ()
     var gcMainLoopEndStms: ISZ[ST] = ISZ()
 
     // initial self pacer/period emit
@@ -99,7 +99,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     // self pacer/period emit at end of loop
     gcMainLoopEndStms = gcMainLoopEndStms :+ SelfPacerTemplate.selfPacerEmit()
 
-    if(!performHamrIntegration && aadlComponent.isInstanceOf[AadlThread]) {
+    if (!performHamrIntegration && aadlComponent.isInstanceOf[AadlThread]) {
       // get user defined time triggered method
       val t = aadlComponent.asInstanceOf[AadlThread]
       t.getComputeEntrypointSourceText() match {
@@ -166,14 +166,14 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
 
     val contents: ST = aadlProcessor.getScheduleSourceText() match {
       case Some(path) =>
-        if(Os.path(path).exists) {
+        if (Os.path(path).exists) {
           val p = Os.path(path)
           st"${p.read}"
         } else {
           actOptions.aadlRootDirectory match {
             case Some(root) =>
               val candidate = Os.path(root) / path
-              if(candidate.exists) {
+              if (candidate.exists) {
                 st"${candidate.read}"
               } else {
                 halt(s"Could not locate Schedule_Source_Text ${candidate}")
@@ -204,7 +204,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
 
         var threadComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(index <- 0 until allThreads.size) {
+        for (index <- 0 until allThreads.size) {
           val p = allThreads(index)
           val threadName = Util.getCamkesComponentIdentifier(p, symbolTable)
 

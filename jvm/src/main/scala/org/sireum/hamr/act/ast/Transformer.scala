@@ -975,7 +975,7 @@ object Transformer {
 
 }
 
-import Transformer._
+import org.sireum.hamr.act.ast.Transformer._
 
 @datatype class Transformer[Context](val pp: PrePost[Context]) {
 

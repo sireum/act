@@ -6,7 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.connections.{ConnectorContainer, ConnectorTemplate}
 import org.sireum.hamr.act.periodic.{PacerTemplate, PeriodicDispatcherTemplate}
-import org.sireum.hamr.act.templates.{CMakeTemplate, CakeMLTemplate, ScriptTemplate, SlangEmbeddedTemplate, StringTemplate}
+import org.sireum.hamr.act.templates._
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
@@ -18,7 +18,7 @@ import org.sireum.ops.StringOps
 
 @record class ActPrettyPrint {
 
-  var resources : ISZ[Resource] = ISZ()
+  var resources: ISZ[Resource] = ISZ()
   var rootServer: String = ""
   var actContainer: Option[ActContainer] = None[ActContainer]()
 
@@ -38,7 +38,7 @@ import org.sireum.ops.StringOps
 
     prettyPrint(container.models)
 
-    if(ExperimentalOptions.generateDotGraphs(options.experimentalOptions)){
+    if (ExperimentalOptions.generateDotGraphs(options.experimentalOptions)) {
       val assembly = container.models(0).asInstanceOf[Assembly]
       val dot = org.sireum.hamr.act.dot.HTMLDotGenerator.dotty(assembly, F)
       add(s"graph.dot", dot)
@@ -51,23 +51,23 @@ import org.sireum.ops.StringOps
       var sourcePaths: ISZ[String] = ISZ()
       var includePaths: ISZ[String] = ISZ()
 
-      if(c.sourceText.nonEmpty) {
+      if (c.sourceText.nonEmpty) {
         val dir = s"${Util.DIR_COMPONENTS}/${c.componentId}/"
         val rootDestDir = dir
 
-        for(st <- c.sourceText) {
+        for (st <- c.sourceText) {
           val path = s"${aadlRootDir}/${st}"
           val p = Os.path(path)
 
-          if(p.exists) {
-            if(StringOps(st).endsWith(".c")) {
+          if (p.exists) {
+            if (StringOps(st).endsWith(".c")) {
               val fname = s"${rootDestDir}/src/${p.name}"
               addString(fname, p.read)
 
               sourcePaths = sourcePaths :+ fname
 
             }
-            else if(StringOps(st).endsWith(".h")) {
+            else if (StringOps(st).endsWith(".h")) {
               val fname = s"${rootDestDir}/includes/${p.name}"
               addString(fname, p.read)
             }
@@ -103,7 +103,7 @@ import org.sireum.ops.StringOps
         case i: Ihor_Monitor => prettyPrint(ISZ(i.interfaceReceiver, i.interfaceSender))
       }
 
-      val slangLib: Option[String] = if(platform == ActPlatform.SeL4) Some(Util.SlangTypeLibrary) else None()
+      val slangLib: Option[String] = if (platform == ActPlatform.SeL4) Some(Util.SlangTypeLibrary) else None()
 
       cmakeComponents = cmakeComponents :+ CMakeTemplate.cmake_DeclareCamkesComponent(
         componentName = m.i.component.name,
@@ -120,7 +120,7 @@ import org.sireum.ops.StringOps
       //add(s"${m.cinclude.path}", m.cinclude.content)
     }
 
-    if(container.samplingPorts.nonEmpty) {
+    if (container.samplingPorts.nonEmpty) {
 
       val seqNumFile = s"${Util.getTypeRootPath()}/includes/${Util.genCHeaderFilename(StringTemplate.SeqNumName)}"
       add(seqNumFile, StringTemplate.seqNumHeader())
@@ -136,12 +136,12 @@ import org.sireum.ops.StringOps
 
     var cmakeEntries: ISZ[ST] = ISZ()
 
-    if(actContainer.get.requiresTimeServer) {
+    if (actContainer.get.requiresTimeServer) {
       cmakeEntries = cmakeEntries :+ st"includeGlobalComponents()"
     }
 
-    if(Util.hamrIntegration(platform) && slangLibInstanceNames.nonEmpty) {
-      for(slangLib <- slangLibInstanceNames){
+    if (Util.hamrIntegration(platform) && slangLibInstanceNames.nonEmpty) {
+      for (slangLib <- slangLibInstanceNames) {
         val path = s"$${CMAKE_CURRENT_LIST_DIR}/${DirectoryUtil.DIR_SLANG_LIBRARIES}/${slangLib}"
         cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_add_subdirectory(path)
       }
@@ -151,34 +151,36 @@ import org.sireum.ops.StringOps
     cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_TypeLibrary()
 
     // hmm, not sure when this should be added
-    if(symbolTable.hasVM()) {
+    if (symbolTable.hasVM()) {
       cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_VM()
     }
 
     var auxResources: ISZ[Resource] = ISZ()
 
-    if(container.connectors.nonEmpty) {
+    if (container.connectors.nonEmpty) {
 
-      cmakeEntries = cmakeEntries :+ st"""# add path to connector templates
-                                         |CAmkESAddTemplatesPath($${CMAKE_CURRENT_LIST_DIR}/templates)"""
+      cmakeEntries = cmakeEntries :+
+        st"""# add path to connector templates
+            |CAmkESAddTemplatesPath($${CMAKE_CURRENT_LIST_DIR}/templates)"""
 
-      for(conn <- container.connectors) {
+      for (conn <- container.connectors) {
         val connTemplate: ConnectorTemplate = conn.connectorTemplate
-        cmakeEntries = cmakeEntries :+ st"""DeclareCAmkESConnector(${conn.connectorName}
-                                           |  FROM ${connTemplate.fromTemplateName}
-                                           |  FROM_LIBS SB_Type_Library
-                                           |  TO ${connTemplate.toTemplateName}
-                                           |  TO_LIBS SB_Type_Library
-                                           |)"""
+        cmakeEntries = cmakeEntries :+
+          st"""DeclareCAmkESConnector(${conn.connectorName}
+              |  FROM ${connTemplate.fromTemplateName}
+              |  FROM_LIBS SB_Type_Library
+              |  TO ${connTemplate.toTemplateName}
+              |  TO_LIBS SB_Type_Library
+              |)"""
 
-        if(connTemplate.fromTemplate.nonEmpty) {
+        if (connTemplate.fromTemplate.nonEmpty) {
           auxResources = auxResources :+ ResourceUtil.createResource(
             path = s"templates/${connTemplate.fromTemplateName}",
             content = connTemplate.fromTemplate.get,
             overwrite = T)
         }
 
-        if(connTemplate.toTemplate.nonEmpty) {
+        if (connTemplate.toTemplate.nonEmpty) {
           auxResources = auxResources :+ ResourceUtil.createResource(
             path = s"templates/${connTemplate.toTemplateName}",
             content = connTemplate.toTemplate.get,
@@ -187,7 +189,7 @@ import org.sireum.ops.StringOps
       }
     }
 
-    if(cFiles.nonEmpty) {
+    if (cFiles.nonEmpty) {
       cmakeEntries = cmakeEntries :+ CMakeTemplate.cmakeAuxSources(cFiles, cHeaderDirectories)
     }
 
@@ -195,21 +197,21 @@ import org.sireum.ops.StringOps
 
     var preludes: ISZ[ST] = ISZ(CMakeTemplate.cmake_add_definitions(ISZ("CAMKES")))
 
-    if(symbolTable.hasCakeMLComponents()) {
+    if (symbolTable.hasCakeMLComponents()) {
       val filename = "CMake_CakeMLOptions.cmake"
       add(filename, CMakeTemplate.cmake_add_options(CakeMLTemplate.CAKEML_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
-    if(platform == ActPlatform.SeL4) {
-      val filename= "CMake_TranspilerOptions.cmake"
+    if (platform == ActPlatform.SeL4) {
+      val filename = "CMake_TranspilerOptions.cmake"
       add(filename, CMakeTemplate.cmake_add_options(SlangEmbeddedTemplate.TRANSPILER_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
 
-    if((platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only) &&
+    if ((platform == ActPlatform.SeL4 || platform == ActPlatform.SeL4_Only) &&
       symbolTable.hasVM()) {
-      val filename= "CMake_CAmkES_VM_Options.cmake"
+      val filename = "CMake_CAmkES_VM_Options.cmake"
       add(filename, CMakeTemplate.cmake_add_options(VM_Template.VM_CMAKE_OPTIONS))
       preludes = preludes :+ CMakeTemplate.include(s"$${CMAKE_CURRENT_LIST_DIR}/${filename}")
     }
@@ -243,18 +245,19 @@ import org.sireum.ops.StringOps
             dstPath = dstPath,
             symlink = e.symlink
           )
-      }})
+      }
+    })
 
     return ret
   }
 
   def prettyPrint(objs: ISZ[ASTObject]): Unit = {
-    for(a <- objs) {
+    for (a <- objs) {
       visit(a)
     }
   }
 
-  def visit(a: ASTObject) : Option[ST] = {
+  def visit(a: ASTObject): Option[ST] = {
     a match {
       case o: Assembly => visitAssembly(o)
       case o: Procedure => visitProcedure(o)
@@ -264,7 +267,7 @@ import org.sireum.ops.StringOps
     return None()
   }
 
-  def visitAssembly(a: Assembly) : Option[ST] = {
+  def visitAssembly(a: Assembly): Option[ST] = {
     var children: ISZ[ST] = ISZ()
 
     val comp = visitComposition(a.composition)
@@ -278,16 +281,18 @@ import org.sireum.ops.StringOps
     val connectors: ISZ[ST] = actContainer.get.connectors.map((c: ConnectorContainer) => {
       val conn = c.assemblyEntry
 
-      val srcWithThreads: Option[ST] = if(conn.from_threads >= 0) Some(st" with ${conn.from_threads} threads") else None()
-      val dstWithThreads: Option[ST] = if(conn.to_threads >= 0) Some(st" with ${conn.to_threads} threads") else None()
+      val srcWithThreads: Option[ST] = if (conn.from_threads >= 0) Some(st" with ${conn.from_threads} threads") else None()
+      val dstWithThreads: Option[ST] = if (conn.to_threads >= 0) Some(st" with ${conn.to_threads} threads") else None()
 
-      val fromType: Option[ST] = if(conn.from_template.nonEmpty) Some(st""" template "${conn.from_template.get}"""") else None()
-      val toType: Option[ST] = if(conn.from_template.nonEmpty) Some(st""" template "${conn.to_template.get}"""") else None()
+      val fromType: Option[ST] = if (conn.from_template.nonEmpty) Some(st""" template "${conn.from_template.get}"""") else None()
+      val toType: Option[ST] = if (conn.from_template.nonEmpty) Some(st""" template "${conn.to_template.get}"""") else None()
 
-      val attributes: Option[ST] = if(conn.attributes.nonEmpty) {
+      val attributes: Option[ST] = if (conn.attributes.nonEmpty) {
         val i = conn.attributes.map((m: ast.Attribute) => st"attribute ${m.typ} ${m.name} = ${m.value};")
         Some(st"${(i, "\n")}")
-      } else { None() }
+      } else {
+        None()
+      }
 
       st"""connector ${conn.name} {
           |  from ${conn.from_type.name}${fromType}${srcWithThreads};
@@ -299,13 +304,15 @@ import org.sireum.ops.StringOps
 
     val configuration: Option[ST] = {
       val configs = a.configuration.map((m: Configuration) => visitConfiguration(m))
-      if(configs.nonEmpty || a.configurationMacros.nonEmpty) {
+      if (configs.nonEmpty || a.configurationMacros.nonEmpty) {
         Some(
           st"""configuration {
               |  ${(configs, "\n")}
               |  ${(a.configurationMacros, "\n")}
               |}""")
-      } else { None()}
+      } else {
+        None()
+      }
     }
 
     val st =
@@ -336,19 +343,19 @@ import org.sireum.ops.StringOps
     return ret
   }
 
-  def visitComposition(o: Composition) : Option[ST] = {
+  def visitComposition(o: Composition): Option[ST] = {
     assert(o.groups.isEmpty)
     assert(o.exports.isEmpty)
 
     var instances: ISZ[ST] = ISZ()
     var connections: ISZ[ST] = ISZ()
 
-    for(i <- o.instances) {
+    for (i <- o.instances) {
       visitCamkesComponent(i.component)
       instances = instances :+ processComments(st"""component ${i.component.name} ${i.name};""", i)
     }
 
-    for(c <- o.connections) {
+    for (c <- o.connections) {
       val froms = c.from_ends.map((m: ast.ConnectionEnd) => st"from ${m.component}.${m.end}")
       val tos = c.to_ends.map((m: ast.ConnectionEnd) => st"to ${m.component}.${m.end}")
 
@@ -379,7 +386,7 @@ import org.sireum.ops.StringOps
               |${(c.preprocessorIncludes.map((i: String) => s"#include ${i}"), "\n")}
               |component ${name} {
               |  ${(c.includes.map((i: String) => s"include ${i};"), "\n")}
-              |  ${if(c.control) "control;" else ""}
+              |  ${if (c.control) "control;" else ""}
               |  ${(c.provides.map((p: Provides) => StringTemplate.provides(p)), "\n")}
               |  ${(c.uses.map((u: Uses) => StringTemplate.uses(u)), "\n")}
               |  ${(c.emits.map((e: Emits) => StringTemplate.emits(e)), "\n")}
@@ -392,7 +399,7 @@ import org.sireum.ops.StringOps
               |}
               |"""
 
-        if(Util.isMonitor(name)) {
+        if (Util.isMonitor(name)) {
           add(s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${name}/${name}.camkes", st)
         } else {
           add(s"${Util.DIR_COMPONENTS}/${name}/${name}.camkes", st)
@@ -406,7 +413,7 @@ import org.sireum.ops.StringOps
 
   def visitProcedure(o: Procedure): Option[ST] = {
     var methods: ISZ[ST] = ISZ()
-    for(m <- o.methods) {
+    for (m <- o.methods) {
       methods = methods :+ visitMethod(m).get
     }
 
@@ -421,9 +428,9 @@ import org.sireum.ops.StringOps
     return None()
   }
 
-  def visitMethod(o: Method) : Option[ST] = {
+  def visitMethod(o: Method): Option[ST] = {
     var params: ISZ[ST] = ISZ()
-    for(p <- o.parameters) {
+    for (p <- o.parameters) {
       val dir: String = p.direction match {
         case Direction.In => "in"
         case Direction.Out => "out"
@@ -441,32 +448,32 @@ import org.sireum.ops.StringOps
     return Some(st)
   }
 
-  def addString(path: String, content: String) : Unit = {
+  def addString(path: String, content: String): Unit = {
     add(path, st"${content}")
   }
 
-  def addResource(r: Resource) : Unit = {
+  def addResource(r: Resource): Unit = {
     //resources = resources :+ ResourceUtil.createResource(path, content, T)
     resources = resources :+ r
   }
 
-  def add(path: String, content: ST) : Unit = {
+  def add(path: String, content: ST): Unit = {
     resources = resources :+ ResourceUtil.createResource(path, content, T)
   }
 
-  def addExeResource(path: String, content: ST) : Unit = {
+  def addExeResource(path: String, content: ST): Unit = {
     resources = resources :+ ResourceUtil.createExeResource(path, content, T)
   }
 
   def getSlangLibrary(componentName: String, platform: ActPlatform.Type): Option[String] = {
     val libName: String =
-      if(componentName == PacerTemplate.PACER_COMPONENT_TYPE ||
+      if (componentName == PacerTemplate.PACER_COMPONENT_TYPE ||
         componentName == PeriodicDispatcherTemplate.DISPATCH_CLASSIFIER) {
         Util.SlangTypeLibrary
       } else {
         componentName
       }
-    return if(platform == ActPlatform.SeL4) Some(libName) else None()
+    return if (platform == ActPlatform.SeL4) Some(libName) else None()
   }
 
   def processCommentsString(s: String, commentProvider: CommentProvider): ST = {
@@ -474,7 +481,7 @@ import org.sireum.ops.StringOps
   }
 
   def processComments(st: ST, commentProvider: CommentProvider): ST = {
-    if(commentProvider.comments.isEmpty) {
+    if (commentProvider.comments.isEmpty) {
       return st
     } else {
       val comments = commentProvider.comments
@@ -491,20 +498,22 @@ import org.sireum.ops.StringOps
 
       var ret: ST = st""
 
-      if(pres.nonEmpty) {
-        ret = st"""${(pres.map((m: AstBasicComment) => m.comment), "\n")}
-                  |"""
+      if (pres.nonEmpty) {
+        ret =
+          st"""${(pres.map((m: AstBasicComment) => m.comment), "\n")}
+              |"""
       }
 
-      if(inline.nonEmpty) {
+      if (inline.nonEmpty) {
         ret = st"$ret${st} ${inline(0).comment}"
       } else {
         ret = st"$ret${st}"
       }
 
-      if(posts.nonEmpty) {
-        ret = st"""$ret
-                  |${(posts.map((m: AstBasicComment) => m.comment), "\n")}"""
+      if (posts.nonEmpty) {
+        ret =
+          st"""$ret
+              |${(posts.map((m: AstBasicComment) => m.comment), "\n")}"""
       }
 
       return ret

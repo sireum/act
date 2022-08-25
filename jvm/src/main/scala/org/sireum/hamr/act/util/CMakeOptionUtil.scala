@@ -12,9 +12,9 @@ import org.sireum._
   def description: String
 }
 
-@datatype class CMakeStandardOption (val name: String,
-                                     val defaultValue: B,
-                                     val description: String) extends CMakeOption
+@datatype class CMakeStandardOption(val name: String,
+                                    val defaultValue: B,
+                                    val description: String) extends CMakeOption
 
 @datatype class CMakePreprocessorOption(val name: String,
                                         val preprocessorName: String,

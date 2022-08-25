@@ -25,7 +25,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
                                timerAttributeCounter: Counter,
                                headerInclude: String,
                                symbolTable: SymbolTable): CamkesAssemblyContribution = {
-    if(useCaseConnectors) {
+    if (useCaseConnectors) {
       return handlePeriodicComponents_CASE_Connector(connectionCounter, timerAttributeCounter, headerInclude, symbolTable)
     }
 
@@ -34,18 +34,18 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
-    var configurations: ISZ[ast.Configuration]= ISZ()
+    var configurations: ISZ[ast.Configuration] = ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
 
     imports = imports :+ PacerTemplate.pacerImport()
 
     val periodicComponents = VMUtil.getPeriodicComponents(symbolTable)
-    
-    if(periodicComponents.nonEmpty) {
+
+    if (periodicComponents.nonEmpty) {
 
       auxResources = auxResources ++ getSchedule(periodicComponents, symbolTable)
-      
+
       // TODO handle components with different periods
       var emits: ISZ[ast.Emits] = ISZ()
       var dataports: ISZ[ast.Dataport] = ISZ()
@@ -58,7 +58,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
       // add pacer domain configuration
       configurations = configurations :+ PacerTemplate.domainConfiguration(PacerTemplate.PACER_IDENTIFIER, PacerTemplate.PACER_DOMAIN)
-      
+
       // tick/tock connection
       connections = connections :+ Util.createConnection(
         CAmkESConnectionType.Pacing,
@@ -78,21 +78,21 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         requiresDataportVMs = requiresDataportVMs | isVM
         requiresEmits = requiresEmits | !isVM
 
-        if(isVM) {
+        if (isVM) {
 
           val pacerDataportName = PacerTemplate.pacerVM_PacerPeriodDataportIdentifier(componentId)
           val pacerEmitName = PacerTemplate.pacerVM_PacerPeriodEmitsIdentifier(componentId)
 
           dataports = dataports :+ dataportPeriod(pacerDataportName)
 
-          if(!useCaseConnectors) {
+          if (!useCaseConnectors) {
             emits = emits :+ emitPeriodVM(pacerEmitName)
           }
 
           gcPacerImplEntries = gcPacerImplEntries :+ gcSendPeriodToVM(componentId)
 
           val pacerNotificationName: String =
-            if(useCaseConnectors) {
+            if (useCaseConnectors) {
               val sig = s"${pacerDataportName}_emit_underlying"
               gcPacerMethods = gcPacerMethods :+ st"extern void ${sig}(void);"
               sig
@@ -112,7 +112,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
               PacerTemplate.pacerDataportQueueElemType(),
               PacerTemplate.pacerDataportQueueSize())
 
-          if(!useCaseConnectors) {
+          if (!useCaseConnectors) {
             // connect notification to client
             connections = connections :+ Util.createConnection(
               connectionCategory = CAmkESConnectionType.Pacing,
@@ -125,7 +125,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
           }
 
           val dataportConnectorType: Sel4ConnectorTypes.Type =
-            if(useCaseConnectors) Sel4ConnectorTypes.CASE_AADL_EventDataport
+            if (useCaseConnectors) Sel4ConnectorTypes.CASE_AADL_EventDataport
             else Sel4ConnectorTypes.seL4SharedDataWithCaps
 
           val connectionName: String = Util.getConnectionName(connectionCounter.increment())
@@ -144,7 +144,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
             ast.DataPortAccessRestriction(PacerTemplate.PACER_IDENTIFIER, pacerDataportName, ast.AccessType.W, ISZ()) :+
             ast.DataPortAccessRestriction(componentId, PacerTemplate.pacerVM_ClientPeriodDataportIdentifier(), ast.AccessType.R, ISZ())
 
-          if(useCaseConnectors) {
+          if (useCaseConnectors) {
             configurations = configurations :+
               ConnectionsSbTemplate.caseConnectorConfig_with_signalling(connectionName, T)
 
@@ -170,12 +170,12 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
       gcPacerMethods = gcPacerMethods :+ PacerTemplate.pacerVM_PacerGcInitMethod(gcPacerInitEntries)
 
-      if(requiresEmits) {
+      if (requiresEmits) {
         emits = emits :+ emitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
         gcPacerImplEntries = gcPacerImplEntries :+ gcEmitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
       }
 
-      if(requiresDataportVMs) {
+      if (requiresDataportVMs) {
 
         includes = includes :+ PacerTemplate.pacerDataportFilenameForIncludes()
 
@@ -183,9 +183,9 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       }
 
       val pacerComponent: ast.Instance = genPacerCamkesComponent(includes, emits, dataports)
-      
+
       instances = instances :+ pacerComponent
-      
+
       val pacerCCode: Resource = genPacerGlueCode(gcPacerIncludes, gcPacerMethods, gcPacerImplEntries)
 
       val externalLibs: ISZ[String] = ISZ(Util.SBTypeLibrary)
@@ -222,7 +222,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
-    var configurations: ISZ[ast.Configuration]= ISZ()
+    var configurations: ISZ[ast.Configuration] = ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
 
@@ -245,7 +245,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       map = map + (end ~> holder)
     }
 
-    if(periodicComponents.nonEmpty) {
+    if (periodicComponents.nonEmpty) {
 
       auxResources = auxResources ++ getSchedule(periodicComponents, symbolTable)
 
@@ -287,7 +287,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         requiresDataportVMs = requiresDataportVMs | isVM
         requiresEmits = requiresEmits | !isVM
 
-        if(isVM) {
+        if (isVM) {
           // CASE eventdata port connector
           hasPeriodicVMComponents = T
 
@@ -333,7 +333,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         }
       }
 
-      if(hasPeriodicVMComponents) {
+      if (hasPeriodicVMComponents) {
         dataports = dataports + dataportPeriod(srcCamkesVMFeatureQueueName)
 
         val sendMethodName = s"send_${srcCamkesVMFeatureQueueName}"
@@ -358,12 +358,12 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
       gcPacerMethods = gcPacerMethods :+ PacerTemplate.pacerVM_PacerGcInitMethod(gcPacerInitEntries)
 
-      if(requiresEmits) {
+      if (requiresEmits) {
         emits = emits :+ emitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
         gcPacerImplEntries = gcPacerImplEntries :+ gcEmitPeriod(PacerTemplate.PACER_PERIOD_EMIT_IDENTIFIER)
       }
 
-      if(requiresDataportVMs) {
+      if (requiresDataportVMs) {
 
         includes = includes :+ PacerTemplate.pacerDataportFilenameForIncludes()
 
@@ -420,7 +420,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     }
 
     assert(dispatchableComponent.isPeriodic())
-    
+
     val component = aadlComponent.component
     val classifier = Util.getClassifier(component.classifier.get)
 
@@ -433,7 +433,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     var gcMethods: ISZ[ST] = ISZ()
     var gcMainPreLoopStms: ISZ[ST] = ISZ()
     var gcMainLoopStartStms: ISZ[ST] = ISZ()
-    var gcMainLoopStms: ISZ[ST]= ISZ()
+    var gcMainLoopStms: ISZ[ST] = ISZ()
 
     // initial pacer/period wait
     gcMainPreLoopStms = gcMainPreLoopStms :+ PacerTemplate.pacerWait()
@@ -441,31 +441,31 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     // pacer/period wait at start of loop
     gcMainLoopStartStms = gcMainLoopStartStms :+ PacerTemplate.pacerWait()
 
-    if(!performHamrIntegration && aadlComponent.isInstanceOf[AadlThread]) {
+    if (!performHamrIntegration && aadlComponent.isInstanceOf[AadlThread]) {
       // get user defined time triggered method
       val t = aadlComponent.asInstanceOf[AadlThread]
       t.getComputeEntrypointSourceText() match {
         case Some(handler) =>
           // header method so developer knows required signature
           gcHeaderMethods = gcHeaderMethods :+ st"void ${handler}(const int64_t * in_arg);"
-                     
-          gcMethods = gcMethods :+ PacerTemplate.wrapPeriodicComputeEntrypoint(classifier, handler) 
-          
+
+          gcMethods = gcMethods :+ PacerTemplate.wrapPeriodicComputeEntrypoint(classifier, handler)
+
           gcMainLoopStms = gcMainLoopStms :+ PacerTemplate.callPeriodicComputEntrypoint(classifier, handler)
-  
+
         case _ =>
           reporter.warn(None(), Util.toolName, s"Periodic thread ${classifier} is missing property ${Util.PROP_TB_SYS__COMPUTE_ENTRYPOINT_SOURCE_TEXT} and will not be dispatched")
       }
     }
 
-    if(aadlComponent.isInstanceOf[AadlProcess]) {
+    if (aadlComponent.isInstanceOf[AadlProcess]) {
 
       // TODO: any reason not to use int8 with size 1 ??
       val queueType = Util.getEventDataSBQueueTypeName(
         PacerTemplate.pacerDataportQueueElemType(),
         PacerTemplate.pacerDataportQueueSize())
 
-      if(!useCaseConnectors) {
+      if (!useCaseConnectors) {
         consumes = consumes :+ ast.Consumes(
           name = PacerTemplate.pacerVM_ClientPeriodNotificationIdentifier(),
           typ = PacerTemplate.PACER_PERIOD_VM_TYPE,
@@ -520,7 +520,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
       comments = ISZ())
   }
 
-  def emitPeriodVM(id: String) : Emits = {
+  def emitPeriodVM(id: String): Emits = {
     return Emits(
       name = id,
       typ = PacerTemplate.PACER_PERIOD_VM_TYPE,
@@ -536,7 +536,9 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     )
   }
 
-  def gcEmitPeriod(id: String): ST = { return st"${id}_emit()" }
+  def gcEmitPeriod(id: String): ST = {
+    return st"${id}_emit()"
+  }
 
   def gcSendPeriodToVM_Case_Connector(sendMethodName: String): ST = {
     return st"${sendMethodName}(&${PacerTemplate.PACER_TICK_COUNT_IDENTIFIER})"
@@ -570,7 +572,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
         aadlThread = None(),
         componentCategory = CAmkESComponentCategory.Pacer,
 
-        control =  T,
+        control = T,
         hardware = F,
         name = PacerTemplate.PACER_COMPONENT_TYPE,
         mutexes = ISZ(),
@@ -596,10 +598,10 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
                        gcMethods: ISZ[ST],
                        gcLoopEntries: ISZ[ST]): Resource = {
     val glueCode = PacerTemplate.pacerGlueCode(gcIncludes, gcMethods, gcLoopEntries)
- 
+
     return ResourceUtil.createResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
   }
-  
+
   def getSchedule(allComponents: ISZ[AadlComponent], symbolTable: SymbolTable): ISZ[Resource] = {
 
     val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
@@ -608,14 +610,14 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
     val contents: ST = aadlProcessor.getScheduleSourceText() match {
       case Some(path) =>
-        if(Os.path(path).exists) {
+        if (Os.path(path).exists) {
           val p = Os.path(path)
           st"${p.read}"
         } else {
           actOptions.aadlRootDirectory match {
             case Some(root) =>
               val candidate = Os.path(root) / path
-              if(candidate.exists) {
+              if (candidate.exists) {
                 st"${candidate.read}"
               } else {
                 halt(s"Could not locate Schedule_Source_Text ${candidate}")
@@ -623,26 +625,26 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
             case _ => halt(s"Unexpected: Couldn't locate Schedule_Source_Text ${path}")
           }
         }
-      case _ => 
+      case _ =>
         var entries: ISZ[ST] = ISZ()
 
         val clockPeriod: Z = aadlProcessor.getClockPeriod() match {
           case Some(z) => z
           case _ => halt("Unexpected: Clock_Period not specified")
         }
-        
+
         val framePeriod: Z = aadlProcessor.getFramePeriod() match {
           case Some(z) => z
           case _ => halt("Unexpected: Frame_Period not specified")
         }
-        
+
         val otherLen = z"200"
-        entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", otherLen / clockPeriod, 
+        entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", otherLen / clockPeriod,
           Some(st" // all other seL4 threads, init, ${otherLen}ms"))
-        
-        val pacerLen = z"10" 
+
+        val pacerLen = z"10"
         val pacerDomain = PacerTemplate.PACER_DOMAIN
-        entries = entries :+ PacerTemplate.pacerScheduleEntry(pacerDomain, pacerLen / clockPeriod, 
+        entries = entries :+ PacerTemplate.pacerScheduleEntry(pacerDomain, pacerLen / clockPeriod,
           Some(st" // pacer ${pacerLen}ms.  Should always be in domain ${pacerDomain}"))
 
         val domainZeroLen: Z = z"10"
@@ -651,7 +653,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
         var componentComments: ISZ[ST] = ISZ()
         var sumExecutionTime = z"0"
-        for(index <- 0 until allComponents.size) {
+        for (index <- 0 until allComponents.size) {
           val p = allComponents(index)
           val componentName = Util.getCamkesComponentName(p, symbolTable)
 
@@ -661,12 +663,12 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
               var maxComputeExecutionTime: Z = 0
               var origin: String = ""
-              for(t <- p.getThreads() if t.getMaxComputeExecutionTime() > maxComputeExecutionTime) {
+              for (t <- p.getThreads() if t.getMaxComputeExecutionTime() > maxComputeExecutionTime) {
                 maxComputeExecutionTime = t.getMaxComputeExecutionTime()
                 origin = s"(from thread ${componentName})"
               }
 
-              (p.getDomain(symbolTable).get, maxComputeExecutionTime, origin,  dc.dispatchProtocol, dc.period, "Process")
+              (p.getDomain(symbolTable).get, maxComputeExecutionTime, origin, dc.dispatchProtocol, dc.period, "Process")
             case t: AadlThread => (t.getDomain(symbolTable).get, t.getMaxComputeExecutionTime(), "", t.dispatchProtocol, t.period, "Thread")
             case x => halt(s"Unexpected, only expecting threads or processes but encountered $x")
           }
@@ -678,7 +680,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
               domain, dispatchProtocol, s"${computeExecutionTime} ms ${origin}", period)
 
           entries = entries :+ PacerTemplate.pacerScheduleEntry(domain, computeExecutionTime / clockPeriod, comment)
-          
+
           sumExecutionTime = sumExecutionTime + computeExecutionTime
 
           if (index < allComponents.size - 1) {
@@ -686,10 +688,10 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
             sumExecutionTime = sumExecutionTime + domainZeroLen
           }
         }
-        
+
         val pad: Z = (framePeriod - (otherLen + pacerLen + sumExecutionTime)) / clockPeriod
         entries = entries :+ PacerTemplate.pacerScheduleEntry(z"0", pad, Some(st" // pad rest of frame period"))
-        
+
         PacerTemplate.pacerExampleSchedule(clockPeriod, framePeriod, componentComments, entries, T)
     }
 

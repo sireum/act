@@ -1,16 +1,14 @@
 package org.sireum.hamr.act
 
 import org.sireum._
-import org.sireum.hamr.act.periodic.PeriodicUtil
-import org.sireum.hamr.act.proof.{ProofUtil, SMT2ProofGen}
+import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
-import org.sireum.hamr.codegen.common.Names
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 import org.sireum.hamr.codegen.common.types.AadlTypes
-import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
+import org.sireum.hamr.codegen.common.util.ResourceUtil
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -24,7 +22,7 @@ object Act {
     return results
   }
 
-  private def runInternal(model: ir.Aadl, options: ActOptions, aadlTypes: AadlTypes, symbolTable: SymbolTable) : ActResult = {
+  private def runInternal(model: ir.Aadl, options: ActOptions, aadlTypes: AadlTypes, symbolTable: SymbolTable): ActResult = {
 
     var resources: ISZ[Resource] = ISZ()
 
@@ -55,7 +53,7 @@ object Act {
 
     val slangLibInstanceNames: ISZ[String] = options.platform match {
       case ActPlatform.SeL4 =>
-        symbolTable.getThreads().map(m => Names(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
+        symbolTable.getThreads().map(m => Util.nameProvider(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
       case _ => ISZ()
     }
 

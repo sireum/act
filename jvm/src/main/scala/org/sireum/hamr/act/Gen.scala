@@ -4,15 +4,14 @@ package org.sireum.hamr.act
 
 import org.sireum._
 import org.sireum.hamr.act.ast._
-import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.cakeml.CakeML
 import org.sireum.hamr.act.connections._
 import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.proof.{ProofUtil, SMT2ProofGen}
 import org.sireum.hamr.act.templates._
-import org.sireum.hamr.act.util.PathUtil
-import org.sireum.hamr.act.util.Util.reporter
+import org.sireum.hamr.act.util.Util.{nameProvider, reporter}
+import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm._
 import org.sireum.hamr.codegen.common.CommonUtil.IdPath
 import org.sireum.hamr.codegen.common.containers.Resource
@@ -21,7 +20,7 @@ import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil}
 import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil, PathUtil => CommonPathUtil}
-import org.sireum.hamr.codegen.common.{CommonUtil, Names, StringUtil}
+import org.sireum.hamr.codegen.common.{CommonUtil, NameProvider, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
 import org.sireum.ops.ISZOps
@@ -265,7 +264,7 @@ import org.sireum.ops.ISZOps
       val processId = Util.getCamkesComponentIdentifier(aadlProcess, symbolTable)
 
       val vmGen = VMGen(useDomainScheduling, typeMap, samplingPorts, srcQueues, actOptions)
-      val (component, auxResources): (Component, ISZ[Resource])  = vmGen.genProcess(aadlProcess, symbolTable, sbConnectionContainer.values)
+      val (component, auxResources): (Component, ISZ[Resource]) = vmGen.genProcess(aadlProcess, symbolTable, sbConnectionContainer.values)
 
       instances = instances :+ Util.createCAmkESInstance(
         originAadl = Some(aadlProcess),
@@ -285,10 +284,10 @@ import org.sireum.ops.ISZOps
         connectionCounter = connectionCounter,
         connectionType = Sel4ConnectorTypes.seL4VMDTBPassthrough,
         srcComponent = processId, srcFeature = "dtb_self",
-        dstComponent = processId, dstFeature ="dtb"
+        dstComponent = processId, dstFeature = "dtb"
       )
 
-      if(!vmArtifactsIntroduced) {
+      if (!vmArtifactsIntroduced) {
         vmArtifactsIntroduced = T
 
         instances = instances ++ VM_GENERAL_COMPOSITION_DEF.instances()
@@ -1035,7 +1034,7 @@ import org.sireum.ops.ISZOps
 
     }
 
-    val names: Names = Names(c, hamrBasePackageName.get)
+    val names: NameProvider = nameProvider(c, hamrBasePackageName.get)
 
     if (!performHamrIntegration) {
       PropertyUtil.getInitializeEntryPoint(c.properties) match {
@@ -1162,7 +1161,7 @@ import org.sireum.ops.ISZOps
     return comp
   }
 
-  def hamrSendUnconnectedOutgoingPort(names: Names,
+  def hamrSendUnconnectedOutgoingPort(names: NameProvider,
                                       srcPort: ir.FeatureEnd,
                                       uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
@@ -1175,7 +1174,7 @@ import org.sireum.ops.ISZOps
     return SlangEmbeddedTemplate.hamrSendUnconnectedOutgoingDataPort(methodName, declNewStackFrame)
   }
 
-  def hamrSendOutgoingPort(names: Names,
+  def hamrSendOutgoingPort(names: NameProvider,
                            srcPort: AadlPort,
                            typeMap: HashSMap[String, ir.Component],
                            uri: String): ST = {
@@ -1212,7 +1211,7 @@ import org.sireum.ops.ISZOps
     return ret
   }
 
-  def hamrReceiveUnconnectedIncomingPort(names: Names,
+  def hamrReceiveUnconnectedIncomingPort(names: NameProvider,
                                          srcPort: ir.FeatureEnd,
                                          uri: String): ST = {
     val portName = CommonUtil.getLastName(srcPort.identifier)
@@ -1235,7 +1234,7 @@ import org.sireum.ops.ISZOps
     return ret
   }
 
-  def hamrReceiveIncomingPort(names: Names,
+  def hamrReceiveIncomingPort(names: NameProvider,
                               srcPort: ir.FeatureEnd,
                               typeMap: HashSMap[String, ir.Component],
                               uri: String): ST = {
@@ -1493,7 +1492,7 @@ import org.sireum.ops.ISZOps
             hardware = F,
             name = monitorName,
 
-            mutexes = ISZ(Mutex(name ="m", comments = ISZ())),
+            mutexes = ISZ(Mutex(name = "m", comments = ISZ())),
             binarySemaphores = ISZ(),
             semaphores = ISZ(),
             dataports = ISZ(),
@@ -1526,7 +1525,7 @@ import org.sireum.ops.ISZOps
           val receiveMethod = Method(
             name = "dequeue",
             parameters = ISZ(
-              Parameter(array = F, direction = Direction.Out, name ="m", typ = paramTypeName, comments = ISZ())),
+              Parameter(array = F, direction = Direction.Out, name = "m", typ = paramTypeName, comments = ISZ())),
             returnType = Some("bool"),
             comments = ISZ())
 
@@ -1718,7 +1717,7 @@ import org.sireum.ops.ISZOps
     return ISZ(
       Method(name = "is_empty", parameters = ISZ(), returnType = Some("bool"), comments = ISZ()),
       Method(name = "read", parameters = ISZ(Parameter(array = F, direction = Direction.Out, name = "m", typ = typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()),
-      Method(name = "write", parameters = ISZ(Parameter(array =F, direction = Direction.Refin, name = "m", typ = typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
+      Method(name = "write", parameters = ISZ(Parameter(array = F, direction = Direction.Refin, name = "m", typ = typeName, comments = ISZ())), returnType = Some("bool"), comments = ISZ()))
   }
 
   def createQueueMethods(typeName: String): ISZ[Method] = {

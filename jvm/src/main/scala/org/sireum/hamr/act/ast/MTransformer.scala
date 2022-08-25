@@ -151,7 +151,7 @@ object MTransformer {
 
 }
 
-import MTransformer._
+import org.sireum.hamr.act.ast.MTransformer._
 
 @msig trait MTransformer {
 

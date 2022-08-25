@@ -13,7 +13,7 @@ import org.sireum.hamr.ir
 
 object StringTemplate {
   val SEM_DISPATCH: String = Util.brand("dispatch_sem")
-  
+
   val SB_VERIFY: String = Util.cbrand("VERIFY")
 
   val MON_READ_ACCESS: String = Util.cbrand("MONITOR_READ_ACCESS")
@@ -29,92 +29,104 @@ object StringTemplate {
                   entries: ISZ[ST]): ST = {
     val macroName = StringUtil.macroize(filename)
 
-    val _includes: Option[ST] = if(includes.nonEmpty) {
+    val _includes: Option[ST] = if (includes.nonEmpty) {
       Some(st"${(includes.map((m: String) => st"#include ${m}"), "\n")}\n")
-    } else {None()}
+    } else {
+      None()
+    }
 
-    val _entries: Option[ST] = if(entries.nonEmpty) {
+    val _entries: Option[ST] = if (entries.nonEmpty) {
       Some(st"${(entries, "\n\n")}")
-    } else { None() }
+    } else {
+      None()
+    }
 
-    val ret: ST = st"""${StringTemplate.doNotEditComment()}
-                      |
-                      |#ifndef ${macroName}
-                      |#define ${macroName}
-                      |
-                      |${_includes}
-                      |${_entries}
-                      |
-                      |#endif // ${macroName}
-                      |"""
+    val ret: ST =
+      st"""${StringTemplate.doNotEditComment()}
+          |
+          |#ifndef ${macroName}
+          |#define ${macroName}
+          |
+          |${_includes}
+          |${_entries}
+          |
+          |#endif // ${macroName}
+          |"""
     return ret
   }
 
   def tbTypeHeaderFile(filename: String,
                        includes: Option[ST],
-                       defs: ISZ[ST], 
+                       defs: ISZ[ST],
                        preventBadging: B): ST = {
 
-    val badges: ST = if(preventBadging) {st""} else {st"""
-                                                         |#define $MON_READ_ACCESS 111
-                                                         |#define $MON_WRITE_ACCESS 222"""}
+    val badges: ST = if (preventBadging) {
+      st""
+    } else {
+      st"""
+          |#define $MON_READ_ACCESS 111
+          |#define $MON_WRITE_ACCESS 222"""
+    }
 
     val macroName = StringUtil.macroize(filename)
 
-    val body = st"""#ifndef ${macroName}
-                   |#define ${macroName}
-                   |
-                   |#include <stdio.h>
-                   |#include <stdbool.h>
-                   |#include <stdint.h>
-                   |${includes}
-                   |
-                   |#ifndef ${SB_VERIFY}
-                   |#include <stddef.h>
-                   |#endif // ${SB_VERIFY}
-                   |
-                   |#define __${Util.cbrand("OS")}_CAMKES__${badges}
-                   |
-                   |#ifndef ${SB_VERIFY}
-                   |#define MUTEXOP(OP)${bt}
-                   |if((OP) != 0) {${bt}
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);${bt}
-                   |  *((int*)0)=0xdeadbeef;${bt}
-                   |}
-                   |#else
-                   |#define MUTEXOP(OP) OP
-                   |#endif // ${SB_VERIFY}
-                   |#ifndef ${SB_VERIFY}
-                   |#define CALLBACKOP(OP)${bt}
-                   |if((OP) != 0) {${bt}
-                   |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);${bt}
-                   |  *((int*)0)=0xdeadbeef;${bt}
-                   |}
-                   |#else
-                   |#define CALLBACKOP(OP) OP
-                   |#endif // ${SB_VERIFY}
-                   |
-                   |${(defs, "\n\n")}
-                   |
-                   |#endif // ${macroName}
-                   |"""
+    val body =
+      st"""#ifndef ${macroName}
+          |#define ${macroName}
+          |
+          |#include <stdio.h>
+          |#include <stdbool.h>
+          |#include <stdint.h>
+          |${includes}
+          |
+          |#ifndef ${SB_VERIFY}
+          |#include <stddef.h>
+          |#endif // ${SB_VERIFY}
+          |
+          |#define __${Util.cbrand("OS")}_CAMKES__${badges}
+          |
+          |#ifndef ${SB_VERIFY}
+          |#define MUTEXOP(OP)${bt}
+          |if((OP) != 0) {${bt}
+          |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);${bt}
+          |  *((int*)0)=0xdeadbeef;${bt}
+          |}
+          |#else
+          |#define MUTEXOP(OP) OP
+          |#endif // ${SB_VERIFY}
+          |#ifndef ${SB_VERIFY}
+          |#define CALLBACKOP(OP)${bt}
+          |if((OP) != 0) {${bt}
+          |  fprintf(stderr,"Operation " #OP " failed in %s at %d.\n",__FILE__,__LINE__);${bt}
+          |  *((int*)0)=0xdeadbeef;${bt}
+          |}
+          |#else
+          |#define CALLBACKOP(OP) OP
+          |#endif // ${SB_VERIFY}
+          |
+          |${(defs, "\n\n")}
+          |
+          |#endif // ${macroName}
+          |"""
     return body
   }
 
-  def tbMissingType() : ST = {
-    return st"""// placeholder for unspecified types in the AADL model
-               |typedef bool ${Util.MISSING_AADL_TYPE};"""
+  def tbMissingType(): ST = {
+    return (
+      st"""// placeholder for unspecified types in the AADL model
+          |typedef bool ${Util.MISSING_AADL_TYPE};""")
   }
 
   val receivedDataVar: String = "receivedData"
-  
+
   def tbMonReadWrite(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
                      preventBadging: B): ST = {
-    val read: ST = st"""*m = contents;
-                       |return ${receivedDataVar};"""
-    
-    val mon_read: ST = if(preventBadging) { 
-      read 
+    val read: ST =
+      st"""*m = contents;
+          |return ${receivedDataVar};"""
+
+    val mon_read: ST = if (preventBadging) {
+      read
     } else {
       st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
           |  return false;
@@ -123,12 +135,13 @@ object StringTemplate {
           |}"""
     }
 
-    val write: ST = st"""${receivedDataVar} = true;
-                        |contents = *m;
-                        |monsig_emit();
-                        |return ${receivedDataVar};"""
-    val mon_write: ST = if(preventBadging) { 
-      write 
+    val write: ST =
+      st"""${receivedDataVar} = true;
+          |contents = *m;
+          |monsig_emit();
+          |return ${receivedDataVar};"""
+    val mon_write: ST = if (preventBadging) {
+      write
     } else {
       st"""bool mon_write(const $typeName * m) {
           |  if (mon_get_sender_id() != $MON_WRITE_ACCESS)  {
@@ -139,9 +152,13 @@ object StringTemplate {
           |}"""
     }
 
-    val senderSig: ST = if(preventBadging) { st"" } else { st"""
-                                                               |int mon_get_sender_id(void);""" }
-    val r : ST =
+    val senderSig: ST = if (preventBadging) {
+      st""
+    } else {
+      st"""
+                                                               |int mon_get_sender_id(void);"""
+    }
+    val r: ST =
       st"""#include ${typeHeaderFilename}
           |#include <${monitorTypeHeaderFilename}.h>
           |
@@ -161,20 +178,24 @@ object StringTemplate {
           |bool mon_write(const $typeName * m) {
           |  ${mon_write}
           |}"""
-    
+
     return r
   }
 
   def tbEnqueueDequeue(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
                        preventBadging: B): ST = {
 
-    val mon_dequeue: ST = if(preventBadging) { st"" } else {
+    val mon_dequeue: ST = if (preventBadging) {
+      st""
+    } else {
       st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
           |  return false;
           |} else """
     }
 
-    val mon_enqueue: ST = if(preventBadging) { st"" } else {
+    val mon_enqueue: ST = if (preventBadging) {
+      st""
+    } else {
       st"""if (mon_get_sender_id() != $MON_WRITE_ACCESS) {
           |    return false;
           |} else """
@@ -228,62 +249,66 @@ object StringTemplate {
     return r
   }
 
-  def tbRaiseGetEvents(queueSize: Z, monitorTypeHeaderFilename: String, 
+  def tbRaiseGetEvents(queueSize: Z, monitorTypeHeaderFilename: String,
                        preventBadging: B): ST = {
-  var r: ST = 
-    st"""#include <camkes.h>
-        |#include <stdio.h>
-        |#include <string.h>
-        |
-        |int32_t num_events = 0;
-        |
-        |static inline void ignore_result(long long int unused_result) { (void) unused_result; }
-        |
-        |// Send interfaces
-        |bool mon_send_enqueue(void) {
-        |  int do_emit = 0;
-        |  ignore_result(m_lock());
-        |  if (num_events < ${queueSize}) {
-        |    num_events++;
-        |    do_emit = 1;
-        |  }
-        |  ignore_result(m_unlock());
-        |  if (do_emit) {
-        |    monsig_emit();
-        |  }
-        |  return true;
-        |}
-        |
-        |// Receive interfaces 
-        |bool mon_receive_is_empty(void) {
-        |  return num_events == 0;
-        |}
-        |
-        |bool mon_receive_dequeue(void) {
-        |  ignore_result(m_lock());
-        |  bool ret = false;
-        |  if(num_events > 0){
-        |    num_events--;
-        |    ret = true;
-        |  }
-        |  ignore_result(m_unlock());
-        |  return ret;
-        |}
-        |"""
-    
+    var r: ST =
+      st"""#include <camkes.h>
+          |#include <stdio.h>
+          |#include <string.h>
+          |
+          |int32_t num_events = 0;
+          |
+          |static inline void ignore_result(long long int unused_result) { (void) unused_result; }
+          |
+          |// Send interfaces
+          |bool mon_send_enqueue(void) {
+          |  int do_emit = 0;
+          |  ignore_result(m_lock());
+          |  if (num_events < ${queueSize}) {
+          |    num_events++;
+          |    do_emit = 1;
+          |  }
+          |  ignore_result(m_unlock());
+          |  if (do_emit) {
+          |    monsig_emit();
+          |  }
+          |  return true;
+          |}
+          |
+          |// Receive interfaces
+          |bool mon_receive_is_empty(void) {
+          |  return num_events == 0;
+          |}
+          |
+          |bool mon_receive_dequeue(void) {
+          |  ignore_result(m_lock());
+          |  bool ret = false;
+          |  if(num_events > 0){
+          |    num_events--;
+          |    ret = true;
+          |  }
+          |  ignore_result(m_unlock());
+          |  return ret;
+          |}
+          |"""
+
     return r
   }
-  
+
   def tbEnqueueDequeueIhor(typeName: String, dim: Z, monitorTypeHeaderFilename: String, typeHeaderFilename: String,
                            preventBadging: B): ST = {
 
-    val mon_dequeue: ST = if(preventBadging) { st"" } else {
+    val mon_dequeue: ST = if (preventBadging) {
+      st""
+    } else {
       st"""if (mon_get_sender_id() != $MON_READ_ACCESS) {
           |  return false;
           |} else """
     }
 
-    val mon_enqueue: ST = if(preventBadging) { st"" } else {
+    val mon_enqueue: ST = if (preventBadging) {
+      st""
+    } else {
       st"""if (mon_get_sender_id() != $MON_WRITE_ACCESS) {
           |    return false;
           |} else """
@@ -341,29 +366,30 @@ object StringTemplate {
           |"""
     return r
   }
-  
+
   def seqNumHeader(): ST = {
-    return st"""#ifndef _SEQNUM_H_
-               |#define _SEQNUM_H_
-               |
-               |// Typedef for seqNum to make it easy to change the type. Keep these consistent!
-               |typedef uintmax_t seqNum_t;
-               |#define SEQNUM_MAX UINTMAX_MAX
-               |#define PRIseqNum PRIuMAX
-               |
-               |// DIRTY_SEQ_NUM is used to mark a sampling port message as dirty while it is
-               |// being writen. DIRTY_SEQ_NUM is not a valid sequence number. Valid sequence
-               |// numbers are from 0 to DIRTY_SEQ_NUM-1 is never a valid sequence number.
-               |static const seqNum_t DIRTY_SEQ_NUM = SEQNUM_MAX;
-               |
-               |#endif"""
+    return (
+      st"""#ifndef _SEQNUM_H_
+          |#define _SEQNUM_H_
+          |
+          |// Typedef for seqNum to make it easy to change the type. Keep these consistent!
+          |typedef uintmax_t seqNum_t;
+          |#define SEQNUM_MAX UINTMAX_MAX
+          |#define PRIseqNum PRIuMAX
+          |
+          |// DIRTY_SEQ_NUM is used to mark a sampling port message as dirty while it is
+          |// being writen. DIRTY_SEQ_NUM is not a valid sequence number. Valid sequence
+          |// numbers are from 0 to DIRTY_SEQ_NUM-1 is never a valid sequence number.
+          |static const seqNum_t DIRTY_SEQ_NUM = SEQNUM_MAX;
+          |
+          |#endif""")
   }
-  
+
   def sbSamplingPortGlobalVar(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
     val globalVarName = s"${Util.brand(aadlPort.identifier)}_seqNum"
     return st"$globalVarName"
   }
-  
+
   def sbSamplingPortGlobalVarDecl(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
     return st"${StringTemplate.SeqNumType} ${sbSamplingPortGlobalVar(spi, aadlPort)};"
   }
@@ -375,7 +401,7 @@ object StringTemplate {
 
     return ret
   }
-  
+
   def sbSamplingPortSetterInterface(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
     val methodNamePrefix = Util.brand(aadlPort.identifier)
 
@@ -383,7 +409,7 @@ object StringTemplate {
 
     return ret
   }
-  
+
   def sbSamplingPortInterface(spi: SamplingPortInterface, f: ir.FeatureEnd): ST = {
     assert(f.category == ir.FeatureCategory.DataPort)
 
@@ -404,26 +430,27 @@ object StringTemplate {
 
     val isEmptyMethodName = s"${sharedDataVarName}_is_empty"
 
-    val ret: ST = st"""/*****************************************************************
-                          | * ${isEmptyMethodName}:
-                          | *
-                          | * Helper method to determine if the data infrastructure port has
-                          | * received data
-                          | *
-                          | ****************************************************************/
-                          |bool ${isEmptyMethodName}() {
-                          |  return is_empty_${spi.name}(${sharedDataVarName});
-                          |}
-                          |
-                          |bool ${sharedDataVarName}_read(${spi.sel4TypeName} * value) {
-                          |  ${StringTemplate.SeqNumType} new_seqNum;
-                          |  if ( read_${spi.name}(${sharedDataVarName}, value, &new_seqNum) ) {
-                          |    ${globalVarName} = new_seqNum;
-                          |    return true;
-                          |  } else {
-                          |    return false;
-                          |  } 
-                          |}"""
+    val ret: ST =
+      st"""/*****************************************************************
+          | * ${isEmptyMethodName}:
+          | *
+          | * Helper method to determine if the data infrastructure port has
+          | * received data
+          | *
+          | ****************************************************************/
+          |bool ${isEmptyMethodName}() {
+          |  return is_empty_${spi.name}(${sharedDataVarName});
+          |}
+          |
+          |bool ${sharedDataVarName}_read(${spi.sel4TypeName} * value) {
+          |  ${StringTemplate.SeqNumType} new_seqNum;
+          |  if ( read_${spi.name}(${sharedDataVarName}, value, &new_seqNum) ) {
+          |    ${globalVarName} = new_seqNum;
+          |    return true;
+          |  } else {
+          |    return false;
+          |  }
+          |}"""
     return ret
   }
 
@@ -431,22 +458,22 @@ object StringTemplate {
     val featureName = aadlPort.identifier
     val sharedDataVarName = Util.brand(aadlPort.identifier)
     val globalVarName = sbSamplingPortGlobalVar(spi, aadlPort)
-    
+
     val initMethodName = s"init_${spi.name}"
-    
-    return st"""// initialise data structure for data port ${featureName}
-               |${initMethodName}(${sharedDataVarName}, &${globalVarName});"""
+
+    return (
+      st"""// initialise data structure for data port ${featureName}
+          |${initMethodName}(${sharedDataVarName}, &${globalVarName});""")
   }
-  
+
   def sbSamplingPortSetterImplementation(spi: SamplingPortInterface, aadlPort: AadlDataPort): ST = {
     val sharedDataVarName = Util.brand(aadlPort.identifier)
     val globalVarName = sbSamplingPortGlobalVar(spi, aadlPort)
 
-    val ret: ST = st"""bool ${sharedDataVarName}_write(const ${spi.sel4TypeName} * value) {
-                      |  return write_${spi.name}(${sharedDataVarName}, value, &${globalVarName});
-                      |}"""
-    
-    return ret
+    return (
+      st"""bool ${sharedDataVarName}_write(const ${spi.sel4TypeName} * value) {
+          |  return write_${spi.name}(${sharedDataVarName}, value, &${globalVarName});
+          |}""")
   }
 
   def sbAccessRestrictionEntry(componentName: String, varName: String, permission: String): ast.Configuration = {
@@ -470,40 +497,52 @@ object StringTemplate {
 
   def componentPreInitGlueCode(preInits: ISZ[ST], isSeL4: B, fileUri: String): Option[ST] = {
 
-  val preInit: Option[ST] = if(preInits.nonEmpty) {
-    val methodName = "pre_init"
+    val preInit: Option[ST] = if (preInits.nonEmpty) {
+      val methodName = "pre_init"
 
-    val declNewStackFrame: Option[ST] = if(isSeL4) {
-      val d = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
-      Some(st"""${d};
-               |""")
-    } else { None() }
+      val declNewStackFrame: Option[ST] = if (isSeL4) {
+        val d = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
+        Some(
+          st"""${d};
+              |""")
+      } else {
+        None()
+      }
 
-      Some(st"""
-               |void ${methodName}(void) {
-               |  ${declNewStackFrame}
-               |  ${(preInits, "\n\n")}
-               |}""")
-    } else { None() }
+      Some(
+        st"""
+            |void ${methodName}(void) {
+            |  ${declNewStackFrame}
+            |  ${(preInits, "\n\n")}
+            |}""")
+    } else {
+      None()
+    }
     return preInit
   }
 
   def componentPostInitGlueCode(postInits: ISZ[ST], isSeL4: B, fileUri: String): Option[ST] = {
     val methodName = "post_init"
 
-    val declNewStackFrame: Option[ST] = if(isSeL4) {
+    val declNewStackFrame: Option[ST] = if (isSeL4) {
       val d = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
-      Some(st"""${d};
-               |""")
-    } else { None() }
+      Some(
+        st"""${d};
+            |""")
+    } else {
+      None()
+    }
 
-    val postInit: Option[ST] = if(postInits.nonEmpty) {
-      Some(st"""
-               |void ${methodName}(void) {
-               |  ${declNewStackFrame}
-               |  ${(postInits, "\n\n")}
-               |}""")
-    } else { None() }
+    val postInit: Option[ST] = if (postInits.nonEmpty) {
+      Some(
+        st"""
+            |void ${methodName}(void) {
+            |  ${declNewStackFrame}
+            |  ${(postInits, "\n\n")}
+            |}""")
+    } else {
+      None()
+    }
     return postInit
   }
 
@@ -517,39 +556,46 @@ object StringTemplate {
                 containsFFIs: B,
                 isSeL4: B,
                 fileUri: String): ST = {
-    
-    def flatten(i: ISZ[ST]): Option[ST] = { return if(i.nonEmpty) Some(st"""${(i, "\n")}""") else None() }
+
+    def flatten(i: ISZ[ST]): Option[ST] = {
+      return if (i.nonEmpty) Some(st"""${(i, "\n")}""") else None()
+    }
 
     val methodName = "run"
 
-    val declNewStackFrame: Option[ST] = if(isSeL4) {
+    val declNewStackFrame: Option[ST] = if (isSeL4) {
       val d = StackFrameTemplate.DeclNewStackFrame(F, fileUri, "", methodName, 0)
-      Some(st"""${d};
-               |""")
-    } else { None() }
+      Some(
+        st"""${d};
+            |""")
+    } else {
+      None()
+    }
 
-      val ret: ST = st"""/************************************************************************
-                      | * int run(void)
-                      | * Main active thread function.
-                      | ************************************************************************/
-                      |int ${methodName}(void) {
-                      |  ${declNewStackFrame}
-                      |  ${flatten(locals)}
-                      |  ${flatten(initStmts)}
-                      |  ${flatten(preLoopStmts)}
-                      |  for(;;) {
-                      |    ${flatten(loopStartStmts)}
-                      |    ${flatten(loopBodyStmts)}
-                      |    ${flatten(loopEndStmts)}
-                      |  }
-                      |  ${flatten(postLoopStmts)}
-                      |  return 0;
-                      |}"""
+    val ret: ST =
+      st"""/************************************************************************
+          | * int run(void)
+          | * Main active thread function.
+          | ************************************************************************/
+          |int ${methodName}(void) {
+          |  ${declNewStackFrame}
+          |  ${flatten(locals)}
+          |  ${flatten(initStmts)}
+          |  ${flatten(preLoopStmts)}
+          |  for(;;) {
+          |    ${flatten(loopStartStmts)}
+          |    ${flatten(loopBodyStmts)}
+          |    ${flatten(loopEndStmts)}
+          |  }
+          |  ${flatten(postLoopStmts)}
+          |  return 0;
+          |}"""
 
-    if(containsFFIs) {
-      return st"""#ifndef ${CakeMLTemplate.PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT}
-                 |${ret}
-                 |#endif"""
+    if (containsFFIs) {
+      return (
+        st"""#ifndef ${CakeMLTemplate.PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT}
+            |${ret}
+            |#endif""")
     } else {
       return ret
     }
@@ -566,19 +612,20 @@ object StringTemplate {
 
     val filteredIncludes: Set[String] = Set.empty[String] ++ includes.map((s: ST) => s.render)
 
-    val ret:ST = st"""${StringTemplate.doNotEditComment()}
-                     |
-                     |#include <${componentHeaderFilename}>
-                     |${(filteredIncludes.elements, "\n")}
-                     |#include <string.h>
-                     |#include <camkes.h>
-                     |
-                     |${(blocks, "\n\n")}
-                     |${preInit}
-                     |${postInit}
-                     |
-                     |${runMethod}
-                     |"""
+    val ret: ST =
+      st"""${StringTemplate.doNotEditComment()}
+          |
+          |#include <${componentHeaderFilename}>
+          |${(filteredIncludes.elements, "\n")}
+          |#include <string.h>
+          |#include <camkes.h>
+          |
+          |${(blocks, "\n\n")}
+          |${preInit}
+          |${postInit}
+          |
+          |${runMethod}
+          |"""
     return ret
   }
 
@@ -597,10 +644,11 @@ object StringTemplate {
           |  ${methodName}((int64_t *) in_arg);
           |}"""
     val dummy = Util.brand("dummy")
-    val runEntry: ST = st"""{
-                           |  int64_t ${dummy};
-                           |  ${init}(&${dummy});
-                           |}"""
+    val runEntry: ST =
+      st"""{
+          |  int64_t ${dummy};
+          |  ${init}(&${dummy});
+          |}"""
     return (ret, runEntry)
   }
 
@@ -625,19 +673,21 @@ object StringTemplate {
   def cRegCallback(handlerName: String, regCallback: String, aadlPort: AadlPort): ST = {
     val portType = aadlPort.feature.category.string
     val featureName = aadlPort.identifier
-    val ret: ST = st"""// register callback for ${portType} port ${featureName}
-                      |CALLBACKOP(${regCallback}(${handlerName}, NULL));"""
+    val ret: ST =
+      st"""// register callback for ${portType} port ${featureName}
+          |CALLBACKOP(${regCallback}(${handlerName}, NULL));"""
     return ret
   }
 
   def samplingPortFreezeMethodName(aadlPort: AadlPort): String = {
     return Util.brand(s"freeze_event_port_${aadlPort.identifier}")
   }
-  
+
   def samplingPortHeader(s: SamplingPortInterface): ST = {
     val macroName = StringUtil.toUpperCase(s"${s.name}_h")
-        
-    val ret = st"""#ifndef ${macroName}
+
+    val ret =
+      st"""#ifndef ${macroName}
 #define ${macroName}
 
 #include ${Util.getSbTypeHeaderFilenameForIncludes()}
@@ -679,10 +729,11 @@ bool is_empty_${s.name}(${s.structName} *port);
 """
     return ret
   }
-  
+
   def samplingPortImpl(s: SamplingPortInterface): ST = {
-    
-    val ret = st"""
+
+    val ret =
+      st"""
 
 #include <${s.name}.h>
 
@@ -767,10 +818,18 @@ bool is_empty_${s.name}(${s.structName} *port) {
 """
     return ret
   }
-  
+
   def ifEsleHelper(options: ISZ[(ST, ST)], optElse: Option[ST]): ST = {
-    val first: Option[(ST, ST)] = if(options.size > 0) { Some(options(0)) } else { None() }
-    val rest: ISZ[(ST, ST)] = if(options.size > 1) { org.sireum.ops.ISZOps(options).drop(1) } else { ISZ() }
+    val first: Option[(ST, ST)] = if (options.size > 0) {
+      Some(options(0))
+    } else {
+      None()
+    }
+    val rest: ISZ[(ST, ST)] = if (options.size > 1) {
+      org.sireum.ops.ISZOps(options).drop(1)
+    } else {
+      ISZ()
+    }
     return ifElseST(first, rest, optElse)
   }
 
@@ -778,24 +837,27 @@ bool is_empty_${s.name}(${s.structName} *port) {
 
     var body = st""
 
-    if(ifbranch.nonEmpty) {
-      body = st"""if(${ifbranch.get._1}) {
-                 |  ${ifbranch.get._2}
-                 |} """
+    if (ifbranch.nonEmpty) {
+      body =
+        st"""if(${ifbranch.get._1}) {
+            |  ${ifbranch.get._2}
+            |} """
     }
 
-    if(elsifs.nonEmpty) {
-      val ei = elsifs.map((x: (ST, ST)) => st"""else if(${x._1}) {
-                                               |  ${x._2}
-                                               |} """)
+    if (elsifs.nonEmpty) {
+      val ei = elsifs.map((x: (ST, ST)) =>
+        st"""else if(${x._1}) {
+            |  ${x._2}
+            |} """)
       body = st"""${body}${ei}"""
     }
 
-    if(els.nonEmpty) {
-      if(ifbranch.nonEmpty) {
-        body = st"""${body}else {
-                   |  ${els.get}
-                   |}"""
+    if (els.nonEmpty) {
+      if (ifbranch.nonEmpty) {
+        body =
+          st"""${body}else {
+              |  ${els.get}
+              |}"""
       } else {
         body = els.get
       }
@@ -803,17 +865,17 @@ bool is_empty_${s.name}(${s.structName} *port) {
 
     return body
   }
-  
+
   def consumes(c: ast.Consumes): ST = {
-    val maybe: String = if(c.optional) "maybe " else ""
+    val maybe: String = if (c.optional) "maybe " else ""
     return st"${maybe}consumes ${c.typ} ${c.name};"
   }
 
   def dataport(d: ast.Dataport): ST = {
-    val maybe: String = if(d.optional) "maybe " else ""
+    val maybe: String = if (d.optional) "maybe " else ""
     return st"${maybe}dataport ${d.typ} ${d.name};"
   }
-  
+
   def emits(e: ast.Emits): ST = {
     return st"emits ${e.typ} ${e.name};"
   }
@@ -823,17 +885,25 @@ bool is_empty_${s.name}(${s.structName} *port) {
   }
 
   def uses(u: ast.Uses): ST = {
-    val maybe: String = if(u.optional) "maybe " else ""
+    val maybe: String = if (u.optional) "maybe " else ""
     return st"${maybe}uses ${u.typ} ${u.name};"
   }
 
-  def doNotEditComment(): ST = { return st"// This file will be regenerated, do not edit" }
+  def doNotEditComment(): ST = {
+    return st"// This file will be regenerated, do not edit"
+  }
 
-  def safeToEditComment(): ST = { return st"// This file will not be overwritten so is safe to edit" }
+  def safeToEditComment(): ST = {
+    return st"// This file will not be overwritten so is safe to edit"
+  }
 
-  def doNotEditCmakeComment(): ST = { return st"# This file will be regenerated, do not edit" }
+  def doNotEditCmakeComment(): ST = {
+    return st"# This file will be regenerated, do not edit"
+  }
 
-  def safeToEditCMakeComment(): ST = { return st"# This file will not be overwritten so is safe to edit" }
+  def safeToEditCMakeComment(): ST = {
+    return st"# This file will not be overwritten so is safe to edit"
+  }
 
   def postGenInstructionsMessage(camkesProjDirectory: String,
                                  cakeMLAssemblyLocations: ISZ[String],
@@ -843,16 +913,17 @@ bool is_empty_${s.name}(${s.structName} *port) {
     var hints: ISZ[ST] = ISZ()
     var cakeMLLocs: Option[ST] = None()
 
-    if(cakeMLAssemblyLocations.nonEmpty) {
+    if (cakeMLAssemblyLocations.nonEmpty) {
       hints = hints :+
         st"""Pass '-o "-D${CakeMLTemplate.PREPROCESSOR_CAKEML_ASSEMBLIES_PRESENT}=ON"' when the CAkeML assemblies are in place."""
 
-      cakeMLLocs = Some(st"""
-                            |Location of CakeML assemblies:
-                            |  ${(cakeMLAssemblyLocations, "\n")}""")
+      cakeMLLocs = Some(
+        st"""
+            |Location of CakeML assemblies:
+            |  ${(cakeMLAssemblyLocations, "\n")}""")
     }
 
-    if(hasVM) {
+    if (hasVM) {
       hints = hints :+ st"""Your project contains VMs. The pre-configured rootfs will be used unless '-o "-D${VM_Template.BUILD_CROSSVM}=ON"' is passed"""
     }
 

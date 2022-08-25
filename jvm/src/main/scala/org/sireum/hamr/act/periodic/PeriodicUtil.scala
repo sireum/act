@@ -7,15 +7,15 @@ import org.sireum.hamr.act.proof.ProofContainer.SchedulingType
 import org.sireum.hamr.act.util.{ActPlatform, Util}
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
-import org.sireum.hamr.codegen.common.symbols.{AadlDispatchableComponent, AadlProcessor, AadlVirtualProcessor, PacerUtil, SymbolTable}
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.CodeGenPlatform
 
 object PeriodicUtil {
 
   def getDispatchingType(symbolTable: SymbolTable, usingPacer: B): PeriodicDispatchingType.Type = {
     val ret: PeriodicDispatchingType.Type =
-      if(usingPacer) {
-        if(symbolTable.hasVM()) {
+      if (usingPacer) {
+        if (symbolTable.hasVM()) {
           PeriodicDispatchingType.Pacer
         } else {
           symbolTable.getThreads()(0).getParent(symbolTable).getBoundProcessor(symbolTable).get.getPacingMethod() match {
@@ -55,7 +55,7 @@ object PeriodicUtil {
 
   def getSchedulingType(symbolTable: SymbolTable, platform: ActPlatform.Type): SchedulingType.Type = {
     val ret: SchedulingType.Type =
-      if(useDomainScheduling(symbolTable, platform)) {
+      if (useDomainScheduling(symbolTable, platform)) {
         var cand: Set[PacingMethod.Type] = Set.empty
         for (b <- symbolTable.getAllBoundProcessors() if b.getPacingMethod().nonEmpty) {
           cand = cand + b.getPacingMethod().get

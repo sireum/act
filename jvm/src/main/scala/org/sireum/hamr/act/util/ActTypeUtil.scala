@@ -28,7 +28,7 @@ object ActTypeUtil {
   def getArrayBaseType(c: ir.Component): Option[String] = {
     PropertyUtil.getDiscreetPropertyValue(c.properties, OsateProperties.DATA_MODEL__BASE_TYPE) match {
       case Some(i: ir.ClassifierProp) =>
-        if(isBaseTypeString(i.name)) {
+        if (isBaseTypeString(i.name)) {
           return translateBaseType(i.name)
         } else {
           return Some(Util.getClassifierFullyQualified(ir.Classifier(i.name)))
@@ -45,17 +45,17 @@ object ActTypeUtil {
     c match {
       case "Base_Types::Boolean" => Some("bool")
 
-      case "Base_Types::Integer_8"  => Some(s"int8_t")
+      case "Base_Types::Integer_8" => Some(s"int8_t")
       case "Base_Types::Integer_16" => Some(s"int16_t")
       case "Base_Types::Integer_32" => Some(s"int32_t")
       case "Base_Types::Integer_64" => Some(s"int64_t")
 
-      case "Base_Types::Unsigned_8"  => Some(s"uint8_t")
+      case "Base_Types::Unsigned_8" => Some(s"uint8_t")
       case "Base_Types::Unsigned_16" => Some(s"uint16_t")
       case "Base_Types::Unsigned_32" => Some(s"uint32_t")
       case "Base_Types::Unsigned_64" => Some(s"uint64_t")
 
-      case "Base_Types::Float"    => Some("float")
+      case "Base_Types::Float" => Some("float")
       case "Base_Types::Float_32" => Some("double")
       case "Base_Types::Float_64" => Some("double")
 

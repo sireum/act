@@ -4,15 +4,15 @@ package org.sireum.hamr.act.util
 
 import org.sireum._
 import org.sireum.hamr.act.ast
-import org.sireum.hamr.act.ast.{AstBasicComment, AstComment, BinarySemaphore, CommentLocation, Consumes, Dataport, Emits, Mutex, Provides, Semaphore, TODO, Uses}
+import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.vm.MetaPort
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
-import org.sireum.hamr.codegen.common.symbols.{AadlComponent, AadlPort, AadlProcess, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.properties.PropertyUtil
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
-import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
+import org.sireum.hamr.codegen.common.{CommonUtil, DefaultNameProvider, NameProvider, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -81,6 +81,11 @@ object Util {
 
   val camkesStdConnectors: String = "<std_connector.camkes>"
   val camkesGlobalConnectors: String = "<global-connectors.camkes>"
+
+  def nameProvider(component: ir.Component,
+                   basePackage: String): NameProvider = {
+    return DefaultNameProvider(component, basePackage)
+  }
 
   @pure def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"
@@ -580,12 +585,12 @@ object Util {
   }
 
   def createDataport_VMRefinement(aadlComponent: AadlProcess,
-                        metaPort: MetaPort,
-                        symbolTable: SymbolTable,
+                                  metaPort: MetaPort,
+                                  symbolTable: SymbolTable,
 
-                        name: String,
-                        optional: B,
-                        typ: String): ast.Dataport = {
+                                  name: String,
+                                  optional: B,
+                                  typ: String): ast.Dataport = {
 
     val ret: ast.Dataport = ast.Dataport(
       name = name,
@@ -650,7 +655,7 @@ object Util {
                        typ: String,
                        optional: B): ast.Uses = {
     val ret = ast.Uses(name = name, typ = typ, optional = optional, comments = ISZ())
-    ProofUtil.addVMPortAux(ret, aadlProcess,symbolTable)
+    ProofUtil.addVMPortAux(ret, aadlProcess, symbolTable)
     return ret
   }
 
@@ -813,6 +818,7 @@ object Util {
 
     return ret
   }
+
   def createEmits_Monitor(monitorName: String,
                           name: String,
                           typ: String): ast.Emits = {
@@ -836,7 +842,6 @@ object Util {
 
     return ret
   }
-
 
 
   def createPreComment(comment: String): AstComment = {

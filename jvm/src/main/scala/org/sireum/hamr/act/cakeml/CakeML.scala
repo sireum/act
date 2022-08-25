@@ -4,13 +4,14 @@ package org.sireum.hamr.act.cakeml
 
 import org.sireum._
 import org.sireum.hamr.act.templates.CakeMLTemplate
+import org.sireum.hamr.act.util.Util.nameProvider
 import org.sireum.hamr.act.util._
+import org.sireum.hamr.codegen.common.NixSeL4NameUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
-import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
-import org.sireum.hamr.codegen.common.symbols.{AadlDataPort, AadlEventDataPort, AadlFeatureData, AadlPort, AadlThread, SymbolTable}
+import org.sireum.hamr.codegen.common.properties.PropertyUtil
+import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
-import org.sireum.hamr.codegen.common.{CommonUtil, Names, NixSeL4NameUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -22,7 +23,7 @@ object CakeML {
                     aadlRoot: Option[String],
                     reporter: Reporter): ISZ[Resource] = {
 
-    val names = Names(aadlThread.component, basePackageName)
+    val names = nameProvider(aadlThread.component, basePackageName)
 
     assert(aadlThread.isCakeMLComponent(), s"${aadlThread.identifier} is not a CakeML component")
     val path: String = PathUtil.getComponentSourcePath(aadlThread, symbolTable)
@@ -41,7 +42,7 @@ object CakeML {
     globals = globals ++ CakeMLTemplate.portIdsGlobalVars()
     globals = globals :+ CakeMLTemplate.initializedGlobalVar()
 
-    val _includes: ISZ[String] = includes.map((m : String) => s"#include <${m}>")
+    val _includes: ISZ[String] = includes.map((m: String) => s"#include <${m}>")
 
     val logInfo = NixSeL4NameUtil.apiHelperLoggerMethodName("logInfo", names.cComponentType)
 
@@ -82,7 +83,7 @@ object CakeML {
 
     val sourceText: ISZ[String] = PropertyUtil.getSourceText(aadlThread.component.properties)
 
-    if(sourceText.nonEmpty) {
+    if (sourceText.nonEmpty) {
       for (candidate <- sourceText) {
         var cand = Os.path(candidate)
         if (!cand.exists && aadlRoot.nonEmpty) {
@@ -113,7 +114,7 @@ object CakeML {
 
   def processPorts(aadlThread: AadlThread, basePackageName: String, fileUri: String): ISZ[ST] = {
     var methods: ISZ[ST] = ISZ()
-    val names = Names(aadlThread.component, basePackageName)
+    val names = nameProvider(aadlThread.component, basePackageName)
 
     val _ports: ISZ[ST] = aadlThread.getPorts().map((p: AadlPort) => {
       val portName = p.identifier

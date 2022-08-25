@@ -64,10 +64,11 @@ object Connections {
       }
       return ret
     }
+
     val src = symbolTable.airComponentMap.get(c.src.component.name).get
     val dst = symbolTable.airComponentMap.get(c.dst.component.name).get
 
-    val ret : B = (src.category, dst.category) match {
+    val ret: B = (src.category, dst.category) match {
       case (ir.ComponentCategory.Thread, ir.ComponentCategory.Thread) =>
 
         val srcFeature = symbolTable.airFeatureMap.get(c.src.feature.get.name).get

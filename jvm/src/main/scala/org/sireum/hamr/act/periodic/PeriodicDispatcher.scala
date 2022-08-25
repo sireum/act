@@ -16,7 +16,7 @@ import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
 
 @datatype class PeriodicDispatcher(val actOptions: ActOptions) extends PeriodicImpl {
-  
+
   val hookupPeriodicComponentsToTimeServer: B = F
 
   def handlePeriodicComponents(connectionCounter: Counter,
@@ -25,25 +25,25 @@ import org.sireum.hamr.codegen.common.symbols._
                                symbolTable: SymbolTable): CamkesAssemblyContribution = {
 
     val components: ISZ[AadlComponent] = symbolTable.componentMap.values
-    
+
     var imports: ISZ[String] = ISZ()
     var instances: ISZ[ast.Instance] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
-    var configurations: ISZ[ast.Configuration]= ISZ()
+    var configurations: ISZ[ast.Configuration] = ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
     var auxResources: ISZ[Resource] = ISZ()
-    
+
     val periodicComponents: ISZ[AadlThread] = symbolTable.getThreads().filter(c => CommonUtil.isPeriodic(c)).map(m => m)
 
-    if(periodicComponents.nonEmpty) {
+    if (periodicComponents.nonEmpty) {
       var periodicDispatcherNotifications: ISZ[ast.Emits] = ISZ()
       var periodicDispatcherCalendars: ISZ[ST] = ISZ()
 
-      for(aadlThread <- periodicComponents) {
+      for (aadlThread <- periodicComponents) {
         val camkesComponentId = Util.getCamkesComponentIdentifier(aadlThread, symbolTable)
         val classifier = Util.getClassifier(aadlThread.component.classifier.get)
 
-        if(hookupPeriodicComponentsToTimeServer) {
+        if (hookupPeriodicComponentsToTimeServer) {
           // connect camkes component to time server
           connections = connections :+ Util.createConnection(
             CAmkESConnectionType.PeriodicDispatching,
@@ -153,12 +153,12 @@ import org.sireum.hamr.codegen.common.symbols._
     var gcMainPreInitStatements: ISZ[ST] = ISZ()
 
     var gcMainPreLoopStms: ISZ[ST] = ISZ()
-    var gcMainLoopStms: ISZ[ST]= ISZ()
+    var gcMainLoopStms: ISZ[ST] = ISZ()
 
     // import Timer.idl4
     imports = imports :+ Util.camkesStdConnectors
 
-    if(hookupPeriodicComponentsToTimeServer) {
+    if (hookupPeriodicComponentsToTimeServer) {
       // uses Timer tb_timer;
       uses = uses :+ Util.createUses_PeriodicDispatcher(
         aadlComponent = aadlComponent,
@@ -178,7 +178,7 @@ import org.sireum.hamr.codegen.common.symbols._
 
     gcMainPreInitStatements = gcMainPreInitStatements :+ PeriodicDispatcherTemplate.registerPeriodicCallback()
 
-    if(aadlComponent.isInstanceOf[AadlThread]) {
+    if (aadlComponent.isInstanceOf[AadlThread]) {
       val t = aadlComponent.asInstanceOf[AadlThread]
       t.getComputeEntrypointSourceText() match {
         case Some(handler) =>
@@ -212,7 +212,7 @@ import org.sireum.hamr.codegen.common.symbols._
       CamkesGlueCodeHeaderContributions(includes = ISZ(), methods = gcHeaderMethods),
       CamkesGlueCodeImplContributions(includes = ISZ(), globals = ISZ(), methods = gcMethods,
         preInitStatements = gcMainPreInitStatements,
-        postInitStatements = ISZ(), 
+        postInitStatements = ISZ(),
 
         mainPreLoopStatements = gcMainPreLoopStms,
         mainLoopStartStatements = ISZ(),

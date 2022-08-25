@@ -22,31 +22,35 @@ import org.sireum.hamr.ir
 
 @sig trait Monitor {
   def i: ast.Instance
+
   def cimplementation: Resource
+
   def cinclude: Resource
+
   def index: Z
+
   def ci: ir.ConnectionInstance
 }
 
-@datatype class TB_Monitor (i: ast.Instance,           // camkes monitor
-                            interface: ast.Procedure,  // camkes interface
-                            providesVarName: String,
-                            cimplementation: Resource,
-                            cinclude: Resource,
-                            index: Z,                  // fan-out index
-                            ci: ir.ConnectionInstance  // aadl connection
-                           ) extends Monitor
+@datatype class TB_Monitor(i: ast.Instance, // camkes monitor
+                           interface: ast.Procedure, // camkes interface
+                           providesVarName: String,
+                           cimplementation: Resource,
+                           cinclude: Resource,
+                           index: Z, // fan-out index
+                           ci: ir.ConnectionInstance // aadl connection
+                          ) extends Monitor
 
-@datatype class Ihor_Monitor (i: ast.Instance,           // camkes monitor
-                              interfaceReceiver: ast.Procedure,  // camkes interface
-                              interfaceSender: ast.Procedure,  // camkes interface
-                              providesReceiverVarName: String,
-                              providesSenderVarName: String,
-                              cimplementation: Resource,
-                              cinclude: Resource,
-                              index: Z,                  // fan-out index
-                              ci: ir.ConnectionInstance // aadl connection
-                             ) extends Monitor
+@datatype class Ihor_Monitor(i: ast.Instance, // camkes monitor
+                             interfaceReceiver: ast.Procedure, // camkes interface
+                             interfaceSender: ast.Procedure, // camkes interface
+                             providesReceiverVarName: String,
+                             providesSenderVarName: String,
+                             cimplementation: Resource,
+                             cinclude: Resource,
+                             index: Z, // fan-out index
+                             ci: ir.ConnectionInstance // aadl connection
+                            ) extends Monitor
 
 
 @datatype class C_Container(instanceName: String,
@@ -108,9 +112,13 @@ import org.sireum.hamr.ir
                                       headerFilename: String,
                                       implFilename: String) {
 
-  def headerPath: String = { return s"${Util.getTypeRootPath()}/includes/${headerFilename}" }
+  def headerPath: String = {
+    return s"${Util.getTypeRootPath()}/includes/${headerFilename}"
+  }
 
-  def implPath: String = { return s"${Util.getTypeRootPath()}/src/${implFilename}" }
+  def implPath: String = {
+    return s"${Util.getTypeRootPath()}/src/${implFilename}"
+  }
 }
 
 @datatype class SharedData(owner: ir.Component,
@@ -139,7 +147,7 @@ import org.sireum.hamr.ir
 
 @datatype class ActResult(val resources: ISZ[Resource])
 
-@enum object ReportKind{
+@enum object ReportKind {
   'Info
   'Warning
   'Error

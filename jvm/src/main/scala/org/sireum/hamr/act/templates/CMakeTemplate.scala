@@ -10,15 +10,15 @@ object CMakeTemplate {
 
   val CMAKE_VERSION: String = "3.8.2"
 
-  val CMAKE_MINIMUM_REQUIRED_VERSION : String = s"cmake_minimum_required(VERSION ${CMAKE_VERSION})"
+  val CMAKE_MINIMUM_REQUIRED_VERSION: String = s"cmake_minimum_required(VERSION ${CMAKE_VERSION})"
 
   val CMAKE_SET_CMAKE_C_STANDARD: String = "set(CMAKE_C_STANDARD 99)"
 
   def addLibrary(target: String, isTargetInterface: B, filenames: ISZ[String]): ST = {
-    val INTERFACE: Option[String] = if(isTargetInterface) Some("INTERFACE") else None()
+    val INTERFACE: Option[String] = if (isTargetInterface) Some("INTERFACE") else None()
 
     val fopt: Option[ST] =
-      if(filenames.isEmpty) None()
+      if (filenames.isEmpty) None()
       else Some(st"${(filenames, "\n")}")
 
     val ret: ST =
@@ -30,28 +30,33 @@ object CMakeTemplate {
   }
 
   def target_link_libraries(target: String, isTargetInterface: B, filenames: ISZ[String]): ST = {
-    val INTERFACE: Option[String] = if(isTargetInterface) Some("INTERFACE") else None()
+    val INTERFACE: Option[String] = if (isTargetInterface) Some("INTERFACE") else None()
     val fopt: Option[ST] =
-      if(filenames.isEmpty) None()
+      if (filenames.isEmpty) None()
       else Some(st"${(filenames, "\n")}")
 
-    val ret: ST = st"""target_link_libraries(${target}
-                      |                      ${INTERFACE}
-                      |                      ${fopt})"""
+    val ret: ST =
+      st"""target_link_libraries(${target}
+          |                      ${INTERFACE}
+          |                      ${fopt})"""
     return ret
   }
 
   def target_include_directories(target: String, isTargetInterface: B, paths: ISZ[String]): ST = {
-    val INTERFACE: Option[String] = if(isTargetInterface) Some("INTERFACE") else None()
+    val INTERFACE: Option[String] = if (isTargetInterface) Some("INTERFACE") else None()
     val fopt: Option[ST] =
-      if(paths.isEmpty) { None() }
+      if (paths.isEmpty) {
+        None()
+      }
       else {
-        val public: String = if(isTargetInterface) "" else "PUBLIC "
-        Some(st"${(paths.map((m: String) => st"${public}${m}"), "\n")}") }
+        val public: String = if (isTargetInterface) "" else "PUBLIC "
+        Some(st"${(paths.map((m: String) => st"${public}${m}"), "\n")}")
+      }
 
-    val ret: ST = st"""target_include_directories(${target}
-                      |                           ${INTERFACE}
-                      |                           ${fopt})"""
+    val ret: ST =
+      st"""target_include_directories(${target}
+          |                           ${INTERFACE}
+          |                           ${fopt})"""
     return ret
   }
 
@@ -65,14 +70,16 @@ object CMakeTemplate {
 
   def cmakeHamrIncludes(instanceName: String, hamrIncludeDirs: ISZ[String]): ST = {
     val includesName = cmakeHamrIncludesName(instanceName)
-    return st"""set(${includesName}
-               |  ${(hamrIncludeDirs, "\n")}
-               |)"""
+    return (
+      st"""set(${includesName}
+          |  ${(hamrIncludeDirs, "\n")}
+          |)""")
   }
 
   def cmakeAuxSources(auxCSources: ISZ[String], auxHDirectories: ISZ[String]): ST = {
-    return st"""set(${AUX_C_SOURCES} ${(auxCSources, " ")})
-               |set(${AUX_C_INCLUDES} ${(auxHDirectories, " ")})"""
+    return (
+      st"""set(${AUX_C_SOURCES} ${(auxCSources, " ")})
+          |set(${AUX_C_INCLUDES} ${(auxHDirectories, " ")})""")
   }
 
   def cmakeHamrLibName(instanceName: String): String = {
@@ -92,8 +99,12 @@ object CMakeTemplate {
                                    hasAux: B,
                                    slangLib: Option[String]): ST = {
     var srcs: ISZ[ST] = ISZ()
-    if(hasAux) { srcs = srcs :+ st"$${${AUX_C_SOURCES}} " }
-    if(sources.nonEmpty) { srcs = srcs :+ st"""${(sources, " ")}""" }
+    if (hasAux) {
+      srcs = srcs :+ st"$${${AUX_C_SOURCES}} "
+    }
+    if (sources.nonEmpty) {
+      srcs = srcs :+ st"""${(sources, " ")}"""
+    }
 
     val _includes: Option[ST] = {
       var incls: ISZ[String] = ISZ()
@@ -102,27 +113,28 @@ object CMakeTemplate {
       }
       incls = incls ++ includes
 
-      if(incls.nonEmpty) Some(st"INCLUDES ${(incls, " ")}") else None()
+      if (incls.nonEmpty) Some(st"INCLUDES ${(incls, " ")}") else None()
     }
 
     val _libs: Option[ST] = {
       var candidates: ISZ[String] = libs
-      if(slangLib.nonEmpty) {
+      if (slangLib.nonEmpty) {
         candidates = candidates :+ slangLib.get
       }
 
-      if(candidates.nonEmpty) {
+      if (candidates.nonEmpty) {
         Some(st"LIBS ${(candidates, " ")}")
       } else {
         None()
       }
     }
 
-    val ret: ST = st"""DeclareCAmkESComponent(${componentName}
-                      |  SOURCES $srcs
-                      |  ${_includes}
-                      |  ${_libs}
-                      |)"""
+    val ret: ST =
+      st"""DeclareCAmkESComponent(${componentName}
+          |  SOURCES $srcs
+          |  ${_includes}
+          |  ${_libs}
+          |)"""
 
     return ret
   }
@@ -134,35 +146,36 @@ object CMakeTemplate {
     val filtered = Set.empty[String] ++ filenames // remove duplicates
     val isInterfaceTypeLib = filtered.isEmpty
 
-    val ret: ST = st"""${StringTemplate.doNotEditCmakeComment()}
-                      |
-                      |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
-                      |
-                      |project(${Util.SBTypeLibrary})
-                      |
-                      |${CMakeTemplate.CMAKE_SET_CMAKE_C_STANDARD}
-                      |
-                      |add_compile_options(-Werror)
-                      |
-                      |${CMakeTemplate.addStackUsageOption()}
-                      |
-                      |${CMakeTemplate.addLibrary(Util.SBTypeLibrary, isInterfaceTypeLib, filtered.elements)}
-                      |
-                      |# Assume that if the muslc target exists then this project is in an seL4 native
-                      |# component build environment, otherwise it is in a linux userlevel environment.
-                      |# In the linux userlevel environment, the C library will be linked automatically.
-                      |if(TARGET muslc)
-                      |  ${CMakeTemplate.target_link_libraries(Util.SBTypeLibrary, isInterfaceTypeLib, ISZ("muslc"))}
-                      |endif()
-                      |
-                      |add_definitions(-DCAMKES)
-                      |
-                      |if(TARGET ${Util.SlangTypeLibrary})
-                      |  ${CMakeTemplate.target_link_libraries(Util.SBTypeLibrary, isInterfaceTypeLib, ISZ(Util.SlangTypeLibrary))}
-                      |endif()
-                      |
-                      |${CMakeTemplate.target_include_directories(Util.SBTypeLibrary, isInterfaceTypeLib, includes)}
-                      |"""
+    val ret: ST =
+      st"""${StringTemplate.doNotEditCmakeComment()}
+          |
+          |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+          |
+          |project(${Util.SBTypeLibrary})
+          |
+          |${CMakeTemplate.CMAKE_SET_CMAKE_C_STANDARD}
+          |
+          |add_compile_options(-Werror)
+          |
+          |${CMakeTemplate.addStackUsageOption()}
+          |
+          |${CMakeTemplate.addLibrary(Util.SBTypeLibrary, isInterfaceTypeLib, filtered.elements)}
+          |
+          |# Assume that if the muslc target exists then this project is in an seL4 native
+          |# component build environment, otherwise it is in a linux userlevel environment.
+          |# In the linux userlevel environment, the C library will be linked automatically.
+          |if(TARGET muslc)
+          |  ${CMakeTemplate.target_link_libraries(Util.SBTypeLibrary, isInterfaceTypeLib, ISZ("muslc"))}
+          |endif()
+          |
+          |add_definitions(-DCAMKES)
+          |
+          |if(TARGET ${Util.SlangTypeLibrary})
+          |  ${CMakeTemplate.target_link_libraries(Util.SBTypeLibrary, isInterfaceTypeLib, ISZ(Util.SlangTypeLibrary))}
+          |endif()
+          |
+          |${CMakeTemplate.target_include_directories(Util.SBTypeLibrary, isInterfaceTypeLib, includes)}
+          |"""
     return ret
   }
 
@@ -170,33 +183,35 @@ object CMakeTemplate {
                  entries: ISZ[ST],
                  preludes: ISZ[ST]): ST = {
 
-    return st"""${StringTemplate.doNotEditCmakeComment()}
-               |
-               |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
-               |
-               |project (${rootServer} C)
-               |
-               |${(preludes, "\n\n")}
-               |
-               |${CMakeTemplate.addStackUsageOption()}
-               |
-               |${(entries, "\n\n")}
-               |
-               |DeclareCAmkESRootserver(${rootServer}.camkes)
-               |"""
+    return (
+      st"""${StringTemplate.doNotEditCmakeComment()}
+          |
+          |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+          |
+          |project (${rootServer} C)
+          |
+          |${(preludes, "\n\n")}
+          |
+          |${CMakeTemplate.addStackUsageOption()}
+          |
+          |${(entries, "\n\n")}
+          |
+          |DeclareCAmkESRootserver(${rootServer}.camkes)
+          |""")
   }
 
   def genSettingsCmake(settingsCmakeEntries: ISZ[ST]): ST = {
-    val ret: ST = st"""${StringTemplate.safeToEditCMakeComment()}
-                      |
-                      |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
-                      |
-                      |${(settingsCmakeEntries, "\n")}"""
+    val ret: ST =
+      st"""${StringTemplate.safeToEditCMakeComment()}
+          |
+          |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
+          |
+          |${(settingsCmakeEntries, "\n")}"""
     return ret
   }
 
   def cmake_add_subdirectory_binned(path: String, binDir: Option[String]): ST = {
-    val bin: ST = if(binDir.nonEmpty) st" ${binDir.get}"else st""
+    val bin: ST = if (binDir.nonEmpty) st" ${binDir.get}" else st""
     return st"add_subdirectory(${path}${bin})"
   }
 
@@ -218,25 +233,28 @@ object CMakeTemplate {
   }
 
   def cmake_add_option(option: CMakeOption): ST = {
-    val _default: String = if(option.defaultValue) "ON" else "OFF"
+    val _default: String = if (option.defaultValue) "ON" else "OFF"
 
-    val s: ST = st"""option(${option.name}
-                    |       "${option.description}"
-                    |       ${_default})"""
+    val s: ST =
+      st"""option(${option.name}
+          |       "${option.description}"
+          |       ${_default})"""
 
     val ret: ST = option match {
       case c: CMakePreprocessorOption =>
-        return st"""${s}
-                   |
-                   |if(${c.name} OR "$$ENV{${c.name}}" STREQUAL "ON")
-                   |   add_definitions(-D${c.preprocessorName})
-                   |endif()"""
+        return (
+          st"""${s}
+              |
+              |if(${c.name} OR "$$ENV{${c.name}}" STREQUAL "ON")
+              |   add_definitions(-D${c.preprocessorName})
+              |endif()""")
       case c: CMakeStandardOption =>
-        return st"""${s}
-                   |
-                   |if("$$ENV{${c.name}}" STREQUAL "ON")
-                   |   set(${c.name} ON)
-                   |endif()"""
+        return (
+          st"""${s}
+              |
+              |if("$$ENV{${c.name}}" STREQUAL "ON")
+              |   set(${c.name} ON)
+              |endif()""")
       case _ => s
     }
 
@@ -244,19 +262,22 @@ object CMakeTemplate {
   }
 
   def cmake_add_options(options: ISZ[CMakeOption]): ST = {
-    val ret: ISZ[ST] = options.map((m : CMakeOption) => CMakeTemplate.cmake_add_option(m))
+    val ret: ISZ[ST] = options.map((m: CMakeOption) => CMakeTemplate.cmake_add_option(m))
 
     return st"${(ret, "\n\n")}"
   }
 
   def addStackUsageOption(): ST = {
-    return st"""if ("$${CMAKE_CXX_COMPILER_ID}" MATCHES "(C|c?)lang")
-               |  add_compile_options("$$<$$<CONFIG:Release>:-Oz>")
-               |elseif ("$${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-               |  add_compile_options(-fstack-usage)
-               |  add_compile_options("$$<$$<CONFIG:Release>:-Os>")
-               |endif()"""
+    return (
+      st"""if ("$${CMAKE_CXX_COMPILER_ID}" MATCHES "(C|c?)lang")
+          |  add_compile_options("$$<$$<CONFIG:Release>:-Oz>")
+          |elseif ("$${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+          |  add_compile_options(-fstack-usage)
+          |  add_compile_options("$$<$$<CONFIG:Release>:-Os>")
+          |endif()""")
   }
 
-  def include(filename: String): ST = { return st"include(${filename})" }
+  def include(filename: String): ST = {
+    return st"include(${filename})"
+  }
 }

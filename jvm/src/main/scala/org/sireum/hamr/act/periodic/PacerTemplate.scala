@@ -40,7 +40,7 @@ object PacerTemplate {
     return PACER_PERIOD_EMIT_IDENTIFIER
   }
 
-  def pacerComponentDir(): String= {
+  def pacerComponentDir(): String = {
     return s"${Util.DIR_COMPONENTS}/${PACER_COMPONENT_TYPE}"
   }
 
@@ -63,19 +63,21 @@ object PacerTemplate {
   def callPeriodicComputEntrypoint(classifier: String, handler: String): ST = {
     val methodName = periodicEntrypointMethodName(classifier)
     val dummyVarName = Util.brand("dummy")
-    return st"""{
-               |  int64_t ${dummyVarName} = 0;
-               |  ${methodName}(&${dummyVarName});
-               |}"""
+    return (
+      st"""{
+          |  int64_t ${dummyVarName} = 0;
+          |  ${methodName}(&${dummyVarName});
+          |}""")
   }
 
   def wrapPeriodicComputeEntrypoint(classifier: String, userEntrypoint: String): ST = {
     val methodName = periodicEntrypointMethodName(classifier)
     val IN_ARG_VAR: String = "in_arg"
 
-    return st"""void ${methodName}(int64_t *${IN_ARG_VAR}) {
-               |  ${userEntrypoint}((int64_t *) ${IN_ARG_VAR});
-               |}"""
+    return (
+      st"""void ${methodName}(int64_t *${IN_ARG_VAR}) {
+          |  ${userEntrypoint}((int64_t *) ${IN_ARG_VAR});
+          |}""")
   }
 
   def pacerGlueCode(includes: ISZ[String],
@@ -83,33 +85,34 @@ object PacerTemplate {
                     loopEntries: ISZ[ST]): ST = {
     val _includes: ISZ[ST] = includes.map(m => st"#include ${m}")
     val _entries: ISZ[ST] = loopEntries.map(m => st"${m};")
-    val ret: ST = st"""// Copyright 2019 Adventium Labs
-                      |
-                      |#include <camkes.h>
-                      |#include <stdio.h>
-                      |#include <sel4/sel4.h>
-                      |${(_includes, "\n")}
-                      |
-                      |${(methods, "\n\n")}
-                      |
-                      |int run(void) {
-                      |
-                      |  ${pacerDataportQueueElemType()} ${PACER_TICK_COUNT_IDENTIFIER} = 0;
-                      |
-                      |  while (1) {
-                      |    //printf("%s: Period tick %d\n", get_instance_name(), ${PACER_TICK_COUNT_IDENTIFIER});
-                      |
-                      |    ${PACER_TICK_COUNT_IDENTIFIER}++;
-                      |
-                      |    ${PACER_TICK_IDENTIFIER}_emit();
-                      |
-                      |    ${(_entries, "\n")}
-                      |
-                      |    ${PACER_TOCK_IDENTIFIER}_wait();
-                      |  }
-                      |
-                      |  return 0;
-                      |}"""
+    val ret: ST =
+      st"""// Copyright 2019 Adventium Labs
+          |
+          |#include <camkes.h>
+          |#include <stdio.h>
+          |#include <sel4/sel4.h>
+          |${(_includes, "\n")}
+          |
+          |${(methods, "\n\n")}
+          |
+          |int run(void) {
+          |
+          |  ${pacerDataportQueueElemType()} ${PACER_TICK_COUNT_IDENTIFIER} = 0;
+          |
+          |  while (1) {
+          |    //printf("%s: Period tick %d\n", get_instance_name(), ${PACER_TICK_COUNT_IDENTIFIER});
+          |
+          |    ${PACER_TICK_COUNT_IDENTIFIER}++;
+          |
+          |    ${PACER_TICK_IDENTIFIER}_emit();
+          |
+          |    ${(_entries, "\n")}
+          |
+          |    ${PACER_TOCK_IDENTIFIER}_wait();
+          |  }
+          |
+          |  return 0;
+          |}"""
     return ret
   }
 
@@ -129,38 +132,39 @@ object PacerTemplate {
                            threadProperties: ISZ[ST],
                            entries: ISZ[ST],
                            usesPacerComponent: B): ST = {
-    val pacerOpt: Option[ST] = if(usesPacerComponent) Some(st"Pacer runs at highest rate and should always be in domain 1") else None()
-    val ret: ST = st"""#include <config.h>
-                      |#include <object/structures.h>
-                      |#include <model/statedata.h>
-                      |
-                      |// this file will not be overwritten and is safe to edit
-                      |
-                      |/************************************************************
-                      |
-                      |   This is a kernel data structure containing an example schedule.
-                      |   The length is in seL4 ticks (${clock_period} ms).
-                      |   This schedule should be generated from the AADL model
-                      |   using execution time and data flow latency specifications.
-                      |
-                      |   ${pacerOpt}
-                      |
-                      |   Properties from AADL Model
-                      |   --------------------------
-                      |
-                      |     Timing_Properties::Clock_Period : ${clock_period} ms
-                      |     Timing_Properties::Frame_Period : ${frame_period} ms
-                      |
-                      |     ${(threadProperties, "\n\n")}
-                      |
-                      | *********************************************************/
-                      |
-                      |const dschedule_t ksDomSchedule[] = {
-                      |  ${(entries, "\n")}
-                      |};
-                      |
-                      |const word_t ksDomScheduleLength = sizeof(ksDomSchedule) / sizeof(dschedule_t);
-                      |"""
+    val pacerOpt: Option[ST] = if (usesPacerComponent) Some(st"Pacer runs at highest rate and should always be in domain 1") else None()
+    val ret: ST =
+      st"""#include <config.h>
+          |#include <object/structures.h>
+          |#include <model/statedata.h>
+          |
+          |// this file will not be overwritten and is safe to edit
+          |
+          |/************************************************************
+          |
+          |   This is a kernel data structure containing an example schedule.
+          |   The length is in seL4 ticks (${clock_period} ms).
+          |   This schedule should be generated from the AADL model
+          |   using execution time and data flow latency specifications.
+          |
+          |   ${pacerOpt}
+          |
+          |   Properties from AADL Model
+          |   --------------------------
+          |
+          |     Timing_Properties::Clock_Period : ${clock_period} ms
+          |     Timing_Properties::Frame_Period : ${frame_period} ms
+          |
+          |     ${(threadProperties, "\n\n")}
+          |
+          | *********************************************************/
+          |
+          |const dschedule_t ksDomSchedule[] = {
+          |  ${(entries, "\n")}
+          |};
+          |
+          |const word_t ksDomScheduleLength = sizeof(ksDomSchedule) / sizeof(dschedule_t);
+          |"""
     return ret
   }
 
@@ -172,7 +176,9 @@ object PacerTemplate {
                                          period: Option[Z]): ST = {
     val title = s"$componentId : $componentType"
     var dashes: String = s""
-    for(x <- 0 until title.size){ dashes = s"${dashes}-" }
+    for (x <- 0 until title.size) {
+      dashes = s"${dashes}-"
+    }
 
     val _period: Option[ST] =
       period match {
@@ -180,13 +186,14 @@ object PacerTemplate {
         case _ => None()
       }
 
-    val ret: ST = st"""${title}
-                      |${dashes}
-                      |
-                      |  ${CaseSchedulingProperties.DOMAIN} : ${domain}
-                      |  ${OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL} : ${dispatchProtocol}
-                      |  ${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime}
-                      |  ${_period}"""
+    val ret: ST =
+      st"""${title}
+          |${dashes}
+          |
+          |  ${CaseSchedulingProperties.DOMAIN} : ${domain}
+          |  ${OsateProperties.THREAD_PROPERTIES__DISPATCH_PROTOCOL} : ${dispatchProtocol}
+          |  ${OsateProperties.TIMING_PROPERTIES__COMPUTE_EXECUTION_TIME} : ${computeExecutionTime}
+          |  ${_period}"""
     return ret
   }
 
@@ -269,9 +276,10 @@ object PacerTemplate {
   }
 
   def pacerVM_PacerGcInitMethod(entries: ISZ[ST]): ST = {
-    val ret: ST = st"""void pre_init(void) {
-                      |  ${(entries, "\n")}
-                      |}"""
+    val ret: ST =
+      st"""void pre_init(void) {
+          |  ${(entries, "\n")}
+          |}"""
     return ret
   }
 
@@ -282,8 +290,9 @@ object PacerTemplate {
                                                queueSize: Z): ST = {
     val enqueueMethodName = EventDataQueueTemplate.getQueueEnqueueMethodName(queueElementTypeName, queueSize)
 
-    val ret: ST = st"""${enqueueMethodName}(${dataportName}, &${payloadName});
-                      |${emitMethodName}();"""
+    val ret: ST =
+      st"""${enqueueMethodName}(${dataportName}, &${payloadName});
+          |${emitMethodName}();"""
     return ret
   }
 
@@ -293,10 +302,11 @@ object PacerTemplate {
                                                      queueSize: Z): ST = {
     val enqueueMethodName = EventDataQueueTemplate.getQueueEnqueueMethodName(queueElementTypeName, queueSize)
 
-    val ret: ST = st"""void ${methodName}(${pacerDataportQueueElemType()} *data) {
-                      |  ${enqueueMethodName}(${dataportName}, data);
-                      |                      |  ${dataportName}_emit_underlying();
-                      |}"""
+    val ret: ST =
+      st"""void ${methodName}(${pacerDataportQueueElemType()} *data) {
+          |  ${enqueueMethodName}(${dataportName}, data);
+          |                      |  ${dataportName}_emit_underlying();
+          |}"""
     return ret
   }
 
@@ -306,18 +316,20 @@ object PacerTemplate {
                                       notificationName: String): ST = {
     val enqueueMethodName = EventDataQueueTemplate.getQueueEnqueueMethodName(queueElementTypeName, queueSize)
 
-    val ret: ST = st"""void ${pacerVM_PacerSendPeriodToVmMethodName(vmID)}(${pacerDataportQueueElemType()} *data) {
-                      |  ${enqueueMethodName}(${pacerVM_PacerPeriodDataportIdentifier(vmID)}, data);
-                      |  ${notificationName}();
-                      |}"""
+    val ret: ST =
+      st"""void ${pacerVM_PacerSendPeriodToVmMethodName(vmID)}(${pacerDataportQueueElemType()} *data) {
+          |  ${enqueueMethodName}(${pacerVM_PacerPeriodDataportIdentifier(vmID)}, data);
+          |  ${notificationName}();
+          |}"""
     return ret
   }
 
 
   def settings_cmake_entries(numDomains: Z): ST = {
-    val ret: ST = st"""set(KernelDomainSchedule "$${CMAKE_CURRENT_LIST_DIR}/kernel/domain_schedule.c" CACHE INTERNAL "")
-                      |set(KernelNumDomains ${numDomains} CACHE STRING "" FORCE)
-                      |"""
+    val ret: ST =
+      st"""set(KernelDomainSchedule "$${CMAKE_CURRENT_LIST_DIR}/kernel/domain_schedule.c" CACHE INTERNAL "")
+          |set(KernelNumDomains ${numDomains} CACHE STRING "" FORCE)
+          |"""
     return ret
   }
 }

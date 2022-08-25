@@ -62,13 +62,15 @@ object ProofContainer {
   }
 }
 
-import ProofContainer._
+import org.sireum.hamr.act.proof.ProofContainer._
 
 object ProofUtil {
 
   var proofContainer: ProofContainer = ProofContainer.empty()
 
-  def reset(): Unit = { proofContainer = ProofContainer.empty() }
+  def reset(): Unit = {
+    proofContainer = ProofContainer.empty()
+  }
 
   def addCAmkESInstance(aadlOrigin: Option[AadlComponent], component: ast.Instance): Unit = {
     proofContainer.camkesInstances = proofContainer.camkesInstances :+ ((aadlOrigin, component))
@@ -84,14 +86,14 @@ object ProofUtil {
 
 
   def addPortPeriodicDispatcher(p: ast.CAmkESFeature): Unit = {
-    if(!proofContainer.portRefinementTypes.contains(DISPATCH_PERIODIC_INSTANCE)) {
+    if (!proofContainer.portRefinementTypes.contains(DISPATCH_PERIODIC_INSTANCE)) {
       proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (DISPATCH_PERIODIC_INSTANCE ~> Map.empty)
     }
   }
 
   def addPortMonitor(monitorName: String,
                      port: ast.CAmkESFeature): Unit = {
-    if(!proofContainer.portRefinementTypes.contains(monitorName)) {
+    if (!proofContainer.portRefinementTypes.contains(monitorName)) {
       proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (monitorName ~> Map.empty)
     }
   }
@@ -100,7 +102,7 @@ object ProofUtil {
                         port: ast.CAmkESFeature,
                         symbolTable: SymbolTable): Unit = {
     val ci = Util.getCamkesComponentIdentifier(aadlComponent, symbolTable)
-    if(!proofContainer.portRefinementTypes.contains(ci)) {
+    if (!proofContainer.portRefinementTypes.contains(ci)) {
       proofContainer.portRefinementTypes = proofContainer.portRefinementTypes + (ci ~> Map.empty)
     }
   }
@@ -150,11 +152,11 @@ object ProofUtil {
 
 @sig trait PortInfo
 
-@datatype class PortRefinement (aadlComponent: AadlComponent,
-                                aadlPort: AadlPort) extends PortInfo
+@datatype class PortRefinement(aadlComponent: AadlComponent,
+                               aadlPort: AadlPort) extends PortInfo
 
-@datatype class PortVMRefinement (aadlProcess: AadlProcess,
-                                  metaPort: MetaPort) extends PortInfo
+@datatype class PortVMRefinement(aadlProcess: AadlProcess,
+                                 metaPort: MetaPort) extends PortInfo
 
 @datatype class PortVMAux(aadlProcess: AadlProcess) extends PortInfo
 
