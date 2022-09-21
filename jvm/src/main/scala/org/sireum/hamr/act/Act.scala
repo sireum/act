@@ -8,7 +8,7 @@ import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 import org.sireum.hamr.codegen.common.types.AadlTypes
-import org.sireum.hamr.codegen.common.util.ResourceUtil
+import org.sireum.hamr.codegen.common.util.{NameUtil, ResourceUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -53,7 +53,7 @@ object Act {
 
     val slangLibInstanceNames: ISZ[String] = options.platform match {
       case ActPlatform.SeL4 =>
-        symbolTable.getThreads().map(m => Util.nameProvider(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
+        symbolTable.getThreads().map(m => NameUtil.getAirNameProvider(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
       case _ => ISZ()
     }
 

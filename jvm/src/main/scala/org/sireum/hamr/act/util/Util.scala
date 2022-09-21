@@ -12,7 +12,7 @@ import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
-import org.sireum.hamr.codegen.common.{CommonUtil, DefaultNameProvider, NameProvider, StringUtil}
+import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -81,11 +81,6 @@ object Util {
 
   val camkesStdConnectors: String = "<std_connector.camkes>"
   val camkesGlobalConnectors: String = "<global-connectors.camkes>"
-
-  def nameProvider(component: ir.Component,
-                   basePackage: String): NameProvider = {
-    return DefaultNameProvider(component, basePackage)
-  }
 
   @pure def brand(s: String): String = {
     return s"${Util.GEN_ARTIFACT_PREFIX}_${s}"

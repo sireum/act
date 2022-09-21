@@ -10,17 +10,18 @@ import org.sireum.hamr.act.periodic.{Dispatcher, PacerTemplate, PeriodicUtil}
 import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.proof.{ProofUtil, SMT2ProofGen}
 import org.sireum.hamr.act.templates._
-import org.sireum.hamr.act.util.Util.{nameProvider, reporter}
+import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm._
 import org.sireum.hamr.codegen.common.CommonUtil.IdPath
+import org.sireum.hamr.codegen.common.util.NameUtil.NameProvider
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
 import org.sireum.hamr.codegen.common.types.{AadlTypes, TypeUtil}
-import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil, PathUtil => CommonPathUtil}
-import org.sireum.hamr.codegen.common.{CommonUtil, NameProvider, StringUtil}
+import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, NameUtil, ResourceUtil, PathUtil => CommonPathUtil}
+import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 import org.sireum.hamr.ir.{Aadl, FeatureEnd}
 import org.sireum.ops.ISZOps
@@ -1034,7 +1035,7 @@ import org.sireum.ops.ISZOps
 
     }
 
-    val names: NameProvider = nameProvider(c, hamrBasePackageName.get)
+    val names: NameProvider = NameUtil.getAirNameProvider (c, hamrBasePackageName.get)
 
     if (!performHamrIntegration) {
       PropertyUtil.getInitializeEntryPoint(c.properties) match {

@@ -4,14 +4,13 @@ package org.sireum.hamr.act.cakeml
 
 import org.sireum._
 import org.sireum.hamr.act.templates.CakeMLTemplate
-import org.sireum.hamr.act.util.Util.nameProvider
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.NixSeL4NameUtil
 import org.sireum.hamr.codegen.common.containers.Resource
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
-import org.sireum.hamr.codegen.common.util.ResourceUtil
+import org.sireum.hamr.codegen.common.util.{NameUtil, ResourceUtil}
 import org.sireum.hamr.ir
 import org.sireum.message.Reporter
 
@@ -23,7 +22,7 @@ object CakeML {
                     aadlRoot: Option[String],
                     reporter: Reporter): ISZ[Resource] = {
 
-    val names = nameProvider(aadlThread.component, basePackageName)
+    val names = NameUtil.getAirNameProvider(aadlThread.component, basePackageName)
 
     assert(aadlThread.isCakeMLComponent(), s"${aadlThread.identifier} is not a CakeML component")
     val path: String = PathUtil.getComponentSourcePath(aadlThread, symbolTable)
@@ -114,7 +113,7 @@ object CakeML {
 
   def processPorts(aadlThread: AadlThread, basePackageName: String, fileUri: String): ISZ[ST] = {
     var methods: ISZ[ST] = ISZ()
-    val names = nameProvider(aadlThread.component, basePackageName)
+    val names = NameUtil.getAirNameProvider(aadlThread.component, basePackageName)
 
     val _ports: ISZ[ST] = aadlThread.getPorts().map((p: AadlPort) => {
       val portName = p.identifier
