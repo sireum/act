@@ -68,38 +68,6 @@ val sireum: Os.Path = homeBin / (if (Os.isWin) "sireum.bat" else "sireum")
 val proyekName: String = "sireum-proyek"
 val project: Os.Path = homeBin / "project4testing.cmd"
 
-val versions = (home / "versions.properties").properties
-
-val cache: Os.Path = Os.env("SIREUM_CACHE") match {
-  case Some(p) =>
-    val d = Os.path(p)
-    if (!d.exists) {
-      d.mkdirAll()
-    }
-    d
-  case _ => Os.home / "Downloads" / "sireum"
-}
-
-def installCoursier(): Unit = {
-  val version = versions.get("org.sireum.version.coursier").get
-  val ver = home / "lib" / "coursier.jar.ver"
-  if (ver.exists && ver.read == version) {
-    return
-  }
-
-  val drop = cache / s"coursier-$version.jar"
-  if (!drop.exists) {
-    println(s"Downloading Coursier $version ...")
-    val url = s"https://github.com/coursier/coursier/releases/download/v$version/coursier.jar"
-    drop.downloadFrom(url)
-    println()
-  }
-
-  val coursierJar = home / "lib" / "coursier.jar"
-  drop.copyOverTo(coursierJar)
-
-  ver.writeOver(version)
-}
 
 def clone(repo: String): Unit = {
   val clean = ops.StringOps(repo).replaceAllChars('-', '_')
@@ -149,7 +117,21 @@ def test(): Unit = {
   println()
 }
 
-installCoursier()
+def installToolsViaKekinian(): Unit = {
+  val builtIn = home / "runtime" / "library" / "shared" / "src" / "main" / "scala" / "org" / "sireum" / "BuiltInTypes.slang"
+  if(!builtIn.exists) {
+    builtIn.write(".")
+  }
+  val kbuild = homeBin / "kbuild.cmd"
+  kbuild.downloadFrom("https://raw.githubusercontent.com/sireum/kekinian/master/bin/build.cmd")
+  proc"$sireum slang run $kbuild --help".at(homeBin).runCheck()
+  kbuild.remove()
+  if(builtIn.size == 1) {
+    (home / "runtime").removeAll()
+  }
+}
+
+installToolsViaKekinian()
 
 for (i <- 0 until Os.cliArgs.size) {
   Os.cliArgs(i) match {
