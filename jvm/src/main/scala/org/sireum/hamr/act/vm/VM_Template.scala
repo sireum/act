@@ -23,34 +23,12 @@ object VM_Template {
     return ret
   }
 
-
-  /*
-  def vm_composition_macros_expanded(processID: String): ISZ[String] = {
-    val ret: ISZ[String] = ISZ(
-      st"""// expanding: VM_GENERAL_COMPOSITION_DEF()
-          |component FileServer fserv;""".render,
-      st"""// expanding: VM_COMPONENT_CONNECTIONS_DEF(${processID})
-          |connection seL4RPCDataport fs${processID}(from vm${processID}.fs, to fserv.fs_ctrl);
-          |connection seL4GlobalAsynch notify_ready_vm${processID}(from vm${processID}.notification_ready_connector, to vm${processID}.notification_ready);""".render,
-      st"""// expanding: VM_VIRTUAL_SERIAL_COMPONENTS_DEF()
-          |component SerialServer serial;
-          |component TimeServer time_server;
-          |connection seL4TimeServer serialserver_timer(from serial.timeout, to time_server.the_timer);""".render,
-      st"""// expanding: PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF(${processID})
-          |connection seL4SerialServer serial_vm${processID}(from vm${processID}.batch, to serial.processed_batch);
-          |connection seL4SerialServer serial_input_vm${processID}(from vm${processID}.serial_getchar, to serial.getchar);""".render)
-    return ret
-  }
-   */
-
   def vm_assembly_configuration_entries(vmProcessID: String): ISZ[ast.Configuration] = {
     val ret: ISZ[ast.Configuration] = ISZ(
       ast.GenericConfiguration(s"${vmProcessID}.num_extra_frame_caps = 0;", ISZ()),
       ast.GenericConfiguration(s"${vmProcessID}.extra_frame_map_address = 0;", ISZ()),
       ast.GenericConfiguration(s"${vmProcessID}.cnode_size_bits = 23;", ISZ()),
       ast.GenericConfiguration(s"${vmProcessID}.simple_untyped24_pool = 12;", ISZ()),
-      //ast.GenericConfiguration(s"${vmProcessID}.simple_untyped21_pool = 12;", ISZ()),
-      //ast.GenericConfiguration(s"${vmProcessID}.simple_untyped12_pool = 12;", ISZ()),
     )
     return ret
   }
@@ -64,31 +42,6 @@ object VM_Template {
     )
     return ret
   }
-
-  /*
-  def vm_assembly_configuration_macros_expanded(vmProcessId: String): ISZ[String] = {
-    val ret: ISZ[String] = ISZ(
-      st"""// expanding: VM_GENERAL_CONFIGURATION_DEF()
-          |fserv.heap_size = 165536;""".render,
-      st"""// expanding: VM_CONFIGURATION_DEF(${vmProcessId})
-          |vm${vmProcessId}.fs_shmem_size = 0x100000;
-          |vm${vmProcessId}.global_endpoint_base = 1 << 27;
-          |vm${vmProcessId}.asid_pool = true; \
-          |vm${vmProcessId}.simple = true; \
-          |vm${vmProcessId}.base_prio = 100; \
-          |vm${vmProcessId}._priority = 101; \
-          |vm${vmProcessId}.sem_value = 0; \
-          |vm${vmProcessId}.heap_size = 0x300000;""".render,
-      st"""// expanding: VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF()
-          |time_server.timers_per_client = 1; \
-          |time_server.priority = 255; \
-          |time_server.simple = true;""".render,
-      st"""// expanding: PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(${vmProcessId})
-          |vm${vmProcessId}.serial_getchar_shmem_size = 0x1000;
-          |vm${vmProcessId}.batch_shmem_size = 0x1000;""".render)
-    return ret
-  }
-  */
 
   def vm_assembly_imports(): ISZ[String] = {
     val ret: ISZ[String] = ISZ(
@@ -821,32 +774,5 @@ object VM_Template {
 
   def cmakeReferenceVar(s: String): String = {
     return s"$${${s}}"
-  }
-
-  def vm_init_macro_expansion(): ST = {
-    val ret: ST =
-      st"""// expanding: VM_INIT_DEF()
-          |attribute int base_prio;
-          |attribute int num_vcpus = 1;
-          |attribute int num_extra_frame_caps;
-          |attribute int extra_frame_map_address;
-          |attribute {
-          |  string linux_ram_base;
-          |  string linux_ram_paddr_base;
-          |  string linux_ram_size;
-          |  string linux_ram_offset;
-          |  string dtb_addr;
-          |  string initrd_max_size;
-          |  string initrd_addr;
-          |} linux_address_config;
-          |attribute {
-          |  string linux_name = "linux";
-          |  string dtb_name = "linux-dtb";
-          |  string initrd_name = "linux-initrd";
-          |  string linux_bootcmdline = "";
-          |  string linux_stdout = "";
-          |} linux_image_config;
-          |// end of expansion: VM_INIT_DEF()"""
-    return ret
   }
 }

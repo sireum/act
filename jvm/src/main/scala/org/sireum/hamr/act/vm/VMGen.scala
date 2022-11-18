@@ -276,8 +276,8 @@ object VMGen {
   var externalCSources: ISZ[String] = ISZ()
   var externalCIncludeDirs: ISZ[String] = ISZ()
 
-  var preprocessorIncludes: ISZ[String] = ISZ() //ISZ(VMGen.CAMKES_PREPROCESSOR_INCLUDES)
-  var externalEntities: ISZ[String] = ISZ(VM_Template.vm_init_macro_expansion().render)
+  var preprocessorIncludes: ISZ[String] = ISZ()
+  var externalEntities: ISZ[String] = ISZ(VM_INIT_DEF.attributes().render)
 
   var auxResources: ISZ[Resource] = ISZ()
 
