@@ -134,9 +134,11 @@ object Util {
 
   def getShortPath(aadlComponent: AadlComponent): String = {
     val componentName = aadlComponent.component.identifier.name
-    assert(ops.StringOps(componentName(0)).endsWith("Instance"))
-    val p = ops.ISZOps(componentName).tail
-    return st"${(p, "_")}".render
+    // drop the '_Instance' segment from OSATE generated models
+    val path: ISZ[String] =
+      if (ops.StringOps(componentName(0)).endsWith("_Instance")) ops.ISZOps(componentName).tail
+      else componentName
+    return st"${(path, "_")}".render
   }
 
   def getCamkesComponentName(aadlComponent: AadlComponent, symbolTable: SymbolTable): String = {
