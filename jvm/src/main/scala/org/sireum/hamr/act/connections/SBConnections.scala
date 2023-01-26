@@ -162,7 +162,7 @@ object SBConnections {
 
                 if (aadlTypes.rawConnections) {
                   val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
-                    case Some(z) =>
+                    case Some((z, _)) =>
                       if (z % z"4096" == z"0") z
                       else (z / z"4096" + 1) * z"4096"
                     case _ => z"4096" // TODO or throw error?
@@ -195,7 +195,7 @@ object SBConnections {
 
                 if (aadlTypes.rawConnections) {
                   val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
-                    case Some(z) =>
+                    case Some((z, _)) =>
                       if (z % z"4096" == z"0") z
                       else (z / z"4096" + 1) * z"4096"
                     case _ => z"4096" // TODO or throw error?
@@ -257,7 +257,7 @@ object SBConnections {
 
                 if (aadlTypes.rawConnections) {
                   val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
-                    case Some(z) =>
+                    case Some((z, _)) =>
                       if (z % z"4096" == z"0") z
                       else (z / z"4096" + 1) * z"4096"
                     case _ => z"4096" // TODO or throw error?
@@ -311,7 +311,7 @@ object SBConnections {
 
                 if (aadlTypes.rawConnections) {
                   val size: Z = CommonTypeUtil.getMaxBitsSize(symbolTable) match {
-                    case Some(z) =>
+                    case Some((z, _)) =>
                       if (z % z"4096" == z"0") z
                       else (z / z"4096" + 1) * z"4096"
                     case _ => z"4096" // TODO or throw error?
