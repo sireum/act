@@ -69,12 +69,19 @@ val proyekName: String = "sireum-proyek"
 val project: Os.Path = homeBin / "project4testing.cmd"
 
 
-def clone(repo: String): Unit = {
+def clone(repo: String, branch: String): Unit = {
   val clean = ops.StringOps(repo).replaceAllChars('-', '_')
+  var atDir = home
   if (!(home / clean).exists) {
-    Os.proc(ISZ("git", "clone", "--depth=1", s"https://github.com/sireum/$repo", clean)).at(home).console.runCheck()
+    proc"git clone https://github.com/sireum/$repo $clean".at(atDir).console.runCheck()
   } else {
-    Os.proc(ISZ("git", "pull")).at(home / clean).console.runCheck()
+    atDir = home / clean
+    proc"git pull".at(atDir).console.runCheck()
+  }
+  // checkout same branch in the external repo if it exists
+  if (ops.StringOps(proc"git ls-remote origin $branch".console.run().out).trim.size > 0) {
+    println(s"Checking out $branch")
+    proc"git checkout $branch".at(atDir).run()
   }
   println()
 }
@@ -84,8 +91,9 @@ def cloneProjects(): Unit = {
  * strange as hamr-codgen has ACT as a sub-module, though it isn't
  * recursively cloned
  */
+  val branch = ops.StringOps(proc"git rev-parse --abbrev-ref HEAD".at(home).run().out).trim
   for (m <- ISZ("air", "hamr-codegen", "runtime", "slang")) {
-    clone(m)
+    clone(m, branch)
   }
 }
 
