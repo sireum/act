@@ -45,18 +45,18 @@ object CakeMLTemplate {
 
   def portIdsGlobalVars(): ISZ[ST] = {
     return ISZ(
-      st"IS_SFB9DD ${GLOBAL_VAR__EVENT_IN_PORT_IDS};",
-      st"IS_SFB9DD ${GLOBAL_VAR__DATA_IN_PORT_IDS};",
-      st"IS_SFB9DD ${GLOBAL_VAR__EVENT_OUT_PORT_IDS};",
-      st"IS_SFB9DD ${GLOBAL_VAR__DATA_OUT_PORT_IDS};")
+      st"IS_2FB9DD ${GLOBAL_VAR__EVENT_IN_PORT_IDS};",
+      st"IS_2FB9DD ${GLOBAL_VAR__DATA_IN_PORT_IDS};",
+      st"IS_2FB9DD ${GLOBAL_VAR__EVENT_OUT_PORT_IDS};",
+      st"IS_2FB9DD ${GLOBAL_VAR__DATA_OUT_PORT_IDS};")
   }
 
   def initializePortIds(entryPoints: String): ST = {
     val ret: ST =
-      st"""${GLOBAL_VAR__EVENT_IN_PORT_IDS} = (IS_SFB9DD) ${entryPoints}_eventInPortIds_(${GLOBAL_VAR__ENTRY_POINTS});
-          |${GLOBAL_VAR__DATA_IN_PORT_IDS} = (IS_SFB9DD) ${entryPoints}_dataInPortIds_(${GLOBAL_VAR__ENTRY_POINTS});
-          |${GLOBAL_VAR__EVENT_OUT_PORT_IDS} = (IS_SFB9DD) ${entryPoints}_eventOutPortIds_(${GLOBAL_VAR__ENTRY_POINTS});
-          |${GLOBAL_VAR__DATA_OUT_PORT_IDS} = (IS_SFB9DD) ${entryPoints}_dataOutPortIds_(${GLOBAL_VAR__ENTRY_POINTS});"""
+      st"""${GLOBAL_VAR__EVENT_IN_PORT_IDS} = (IS_2FB9DD) ${entryPoints}_eventInPortIds_(${GLOBAL_VAR__ENTRY_POINTS});
+          |${GLOBAL_VAR__DATA_IN_PORT_IDS} = (IS_2FB9DD) ${entryPoints}_dataInPortIds_(${GLOBAL_VAR__ENTRY_POINTS});
+          |${GLOBAL_VAR__EVENT_OUT_PORT_IDS} = (IS_2FB9DD) ${entryPoints}_eventOutPortIds_(${GLOBAL_VAR__ENTRY_POINTS});
+          |${GLOBAL_VAR__DATA_OUT_PORT_IDS} = (IS_2FB9DD) ${entryPoints}_dataOutPortIds_(${GLOBAL_VAR__ENTRY_POINTS});"""
     return ret
   }
 
