@@ -43,30 +43,30 @@ object ActTypeUtil {
 
   def translateBaseType(c: String): Option[String] = {
     c match {
-      case "Base_Types::Boolean" => Some("bool")
+      case "Base_Types::Boolean" => return Some("bool")
 
-      case "Base_Types::Integer_8" => Some(s"int8_t")
-      case "Base_Types::Integer_16" => Some(s"int16_t")
-      case "Base_Types::Integer_32" => Some(s"int32_t")
-      case "Base_Types::Integer_64" => Some(s"int64_t")
+      case "Base_Types::Integer_8" => return Some(s"int8_t")
+      case "Base_Types::Integer_16" => return Some(s"int16_t")
+      case "Base_Types::Integer_32" => return Some(s"int32_t")
+      case "Base_Types::Integer_64" => return Some(s"int64_t")
 
-      case "Base_Types::Unsigned_8" => Some(s"uint8_t")
-      case "Base_Types::Unsigned_16" => Some(s"uint16_t")
-      case "Base_Types::Unsigned_32" => Some(s"uint32_t")
-      case "Base_Types::Unsigned_64" => Some(s"uint64_t")
+      case "Base_Types::Unsigned_8" => return Some(s"uint8_t")
+      case "Base_Types::Unsigned_16" => return Some(s"uint16_t")
+      case "Base_Types::Unsigned_32" => return Some(s"uint32_t")
+      case "Base_Types::Unsigned_64" => return Some(s"uint64_t")
 
-      case "Base_Types::Float" => Some("float")
-      case "Base_Types::Float_32" => Some("double")
-      case "Base_Types::Float_64" => Some("double")
+      case "Base_Types::Float" => return Some("float")
+      case "Base_Types::Float_32" => return Some("double")
+      case "Base_Types::Float_64" => return Some("double")
 
-      case "Base_Types::Character" => Some("char")
-      case "Base_Types::String" => Some("char*")
+      case "Base_Types::Character" => return Some("char")
+      case "Base_Types::String" => return Some("char*")
 
       case "Base_Types::Integer" =>
         reporter.error(None(), Util.toolName, "Unbounded Base_Types::Integer is not supported")
-        None[String]()
+        return None[String]()
 
-      case _ => None[String]()
+      case _ => return None[String]()
     }
   }
 }
