@@ -38,6 +38,8 @@ object CakeML {
     includes = includes :+ Util.genCHeaderFilename(names.cEntryPointAdapterName)
 
     globals = globals :+ CakeMLTemplate.entryPointGlobalVar(names.cBridgeEntryPoints, names.cEntryPointAdapterQualifiedName)
+    globals = globals :+ st"""
+                             |// IS_D10119=IS[Z, art.Art.PortId]"""
     globals = globals ++ CakeMLTemplate.portIdsGlobalVars()
     globals = globals :+ CakeMLTemplate.initializedGlobalVar()
 
