@@ -1,3 +1,4 @@
+// #Sireum
 package org.sireum.hamr.act
 
 import org.sireum._
@@ -6,7 +7,7 @@ import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.containers.Resource
-import org.sireum.hamr.codegen.common.symbols.SymbolTable
+import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.codegen.common.util.{NameUtil, ResourceUtil}
 import org.sireum.hamr.ir
@@ -22,7 +23,7 @@ object Act {
     return results
   }
 
-  private def runInternal(model: ir.Aadl, options: ActOptions, aadlTypes: AadlTypes, symbolTable: SymbolTable): ActResult = {
+  def runInternal(model: ir.Aadl, options: ActOptions, aadlTypes: AadlTypes, symbolTable: SymbolTable): ActResult = {
 
     var resources: ISZ[Resource] = ISZ()
 
@@ -45,15 +46,15 @@ object Act {
       (relName, m._2)
     })
 
-    val auxCFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"c").map(m => m._1)
-    val auxHFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == string"h").map(m => m._1)
-    val auxHeaderDirectories = (Set.empty ++ auxHFiles.map(m => Os.path(m).up.value)).elements
+    val auxCFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == "c").map(m => m._1)
+    val auxHFiles: ISZ[String] = auxFiles.filter(f => Os.path(f._1).ext == "h").map(m => m._1)
+    val auxHeaderDirectories = (Set.empty[String] ++ auxHFiles.map((m: String) => Os.path(m).up.value)).elements
 
     val container = Gen(model, symbolTable, aadlTypes, options).process(auxHFiles)
 
     val slangLibInstanceNames: ISZ[String] = options.platform match {
       case ActPlatform.SeL4 =>
-        symbolTable.getThreads().map(m => NameUtil.getAirNameProvider(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
+        symbolTable.getThreads().map((m: AadlThread) => NameUtil.getAirNameProvider(m.component, basePackageName).componentSingletonType) :+ Util.SlangTypeLibrary
       case _ => ISZ()
     }
 
@@ -69,7 +70,7 @@ object Act {
           cFiles = auxCFiles,
           cHeaderDirectories = auxHeaderDirectories,
           aadlRootDir = rootDir,
-          slangLibInstanceNames: ISZ[String],
+          slangLibInstanceNames = slangLibInstanceNames,
           symbolTable = symbolTable,
           options = options
         )
@@ -99,7 +100,7 @@ object Act {
     return ActResult(resources)
   }
 
-  def error(msg: String): Nothing = {
-    throw new RuntimeException(msg.native)
+  def error(msg: String): Unit = {
+    halt(msg)
   }
 }
