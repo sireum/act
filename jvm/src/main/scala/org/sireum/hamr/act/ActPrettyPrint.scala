@@ -238,7 +238,8 @@ import org.sireum.ops.StringOps
             markers = i.markers,
             overwrite = i.overwrite,
             makeExecutable = i.makeExecutable,
-            makeCRLF = i.makeCRLF)
+            makeCRLF = i.makeCRLF,
+            isDatatype = F)
         case e: EResource =>
           EResource(
             srcPath = e.srcPath,
