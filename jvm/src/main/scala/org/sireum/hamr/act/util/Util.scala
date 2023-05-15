@@ -20,8 +20,6 @@ object Util {
 
   val reporter: Reporter = org.sireum.message.Reporter.create
 
-  var verbose: B = T
-
   val toolName: String = "HAMR Codegen - ACT"
 
   // special message 'kind' so instruction messages can be filtered
