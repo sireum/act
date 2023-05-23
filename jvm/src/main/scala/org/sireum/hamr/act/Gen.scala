@@ -84,7 +84,7 @@ import org.sireum.ops.ISZOps
     if (!hasErrors) {
       auxCImplIncludes = cSources.map(c => st"""#include "../../../${c}"""")
 
-      for (d <- model.dataComponents) {
+      for (d <- model.dataComponents.filter(p => p.classifier.get.name != "Base_Types::Integer")) {
         typeMap = typeMap + (Util.getClassifierFullyQualified(d.classifier.get) ~> d)
       }
       val sortedData: ISZ[ir.Component] =
