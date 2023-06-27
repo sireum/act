@@ -11,7 +11,7 @@ import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
 
@@ -31,7 +31,7 @@ import org.sireum.hamr.codegen.common.symbols._
     var connections: ISZ[ast.Connection] = ISZ()
     var configurations: ISZ[ast.Configuration] = ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
-    var auxResources: ISZ[Resource] = ISZ()
+    var auxResources: ISZ[FileResource] = ISZ()
 
     val periodicComponents: ISZ[AadlThread] = symbolTable.getThreads().filter(c => CommonUtil.isPeriodic(c)).map(m => m)
 

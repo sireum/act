@@ -7,7 +7,7 @@ import org.sireum.hamr.act._
 import org.sireum.hamr.act.proof.ProofContainer.CAmkESConnectionType
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 
@@ -24,7 +24,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
 
     var configurations: ISZ[ast.Configuration] = ISZ()
     var connections: ISZ[ast.Connection] = ISZ()
-    var auxResources: ISZ[Resource] = ISZ()
+    var auxResources: ISZ[FileResource] = ISZ()
 
     if (threads.nonEmpty) {
       auxResources = auxResources ++ getSchedule(threads, symbolTable)
@@ -158,7 +158,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
     return (componentContributions, glueCodeContributions)
   }
 
-  def getSchedule(allThreads: ISZ[AadlThread], symbolTable: SymbolTable): ISZ[Resource] = {
+  def getSchedule(allThreads: ISZ[AadlThread], symbolTable: SymbolTable): ISZ[FileResource] = {
 
     val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
 

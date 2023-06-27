@@ -11,14 +11,14 @@ import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.DirectoryUtil
-import org.sireum.hamr.codegen.common.containers.{EResource, IResource, Resource}
+import org.sireum.hamr.codegen.common.containers.{EResource, IResource, FileResource}
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
 import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 import org.sireum.ops.StringOps
 
 @record class ActPrettyPrint {
 
-  var resources: ISZ[Resource] = ISZ()
+  var resources: ISZ[FileResource] = ISZ()
   var rootServer: String = ""
   var actContainer: Option[ActContainer] = None[ActContainer]()
 
@@ -29,7 +29,7 @@ import org.sireum.ops.StringOps
                 aadlRootDir: String,
                 slangLibInstanceNames: ISZ[String],
                 symbolTable: SymbolTable,
-                options: ActOptions): ISZ[Resource] = {
+                options: ActOptions): ISZ[FileResource] = {
 
     val platform = options.platform
 
@@ -80,8 +80,8 @@ import org.sireum.ops.StringOps
         }
       }
 
-      sourcePaths = sourcePaths ++ c.cSources.map((r: Resource) => r.dstPath) ++ c.cmakeSOURCES
-      includePaths = includePaths ++ c.cIncludes.map((r: Resource) =>
+      sourcePaths = sourcePaths ++ c.cSources.map((r: FileResource) => r.dstPath) ++ c.cmakeSOURCES
+      includePaths = includePaths ++ c.cIncludes.map((r: FileResource) =>
         Util.getDirectory(r.dstPath)) ++ c.cmakeINCLUDES
 
       val slangLib: Option[String] = getSlangLibrary(c.componentId, platform)
@@ -155,7 +155,7 @@ import org.sireum.ops.StringOps
       cmakeEntries = cmakeEntries :+ CMakeTemplate.cmake_addSubDir_VM()
     }
 
-    var auxResources: ISZ[Resource] = ISZ()
+    var auxResources: ISZ[FileResource] = ISZ()
 
     if (container.connectors.nonEmpty) {
 
@@ -221,14 +221,14 @@ import org.sireum.ops.StringOps
     add("CMakeLists.txt", cmakelist)
 
 
-    val c: ISZ[Resource] = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)
+    val c: ISZ[FileResource] = container.cContainers.flatMap((x: C_Container) => x.cSources ++ x.cIncludes)
     auxResources = auxResources ++ container.auxFiles
 
 
     addExeResource(PathUtil.RUN_CAMKES_SCRIPT_PATH, ScriptTemplate.runCamkesScript(symbolTable.hasVM()))
 
     // add dest dir to path
-    val ret: ISZ[Resource] = (resources ++ c ++ auxResources).map((o: Resource) => {
+    val ret: ISZ[FileResource] = (resources ++ c ++ auxResources).map((o: FileResource) => {
       val dstPath = s"${destDir}/${o.dstPath}"
       o match {
         case i: IResource =>
@@ -277,7 +277,7 @@ import org.sireum.ops.StringOps
 
     var imports = Set.empty[String] ++ actContainer.get.globalImports.map((m: String) => s"import ${m};")
 
-    imports = imports ++ resources.map((o: Resource) => s"""import "${o.dstPath}";""")
+    imports = imports ++ resources.map((o: FileResource) => s"""import "${o.dstPath}";""")
 
     val connectors: ISZ[ST] = actContainer.get.connectors.map((c: ConnectorContainer) => {
       val conn = c.assemblyEntry
@@ -453,7 +453,7 @@ import org.sireum.ops.StringOps
     add(path, st"${content}")
   }
 
-  def addResource(r: Resource): Unit = {
+  def addResource(r: FileResource): Unit = {
     //resources = resources :+ ResourceUtil.createResource(path, content, T)
     resources = resources :+ r
   }

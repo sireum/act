@@ -8,7 +8,7 @@ import org.sireum.hamr.act.ast._
 import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnectionType}
 import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.vm.MetaPort
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
@@ -418,7 +418,7 @@ object Util {
   val SB_EVENT_COUNTER_TYPE: String = Util.brand("event_counter_t")
   val SB_COUNTER_HEADER_FILENAME: String = Util.brand(genCHeaderFilename("event_counter"))
 
-  def sbCounterTypeDeclResource(): Resource = {
+  def sbCounterTypeDeclResource(): FileResource = {
     val counter: ST =
       st"""#pragma once
           |

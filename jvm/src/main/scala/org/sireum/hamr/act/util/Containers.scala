@@ -5,7 +5,7 @@ package org.sireum.hamr.act.util
 import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.connections.ConnectorContainer
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.ir
 
 @datatype class ActContainer(rootServer: String,
@@ -14,7 +14,7 @@ import org.sireum.hamr.ir
                              monitors: ISZ[Monitor],
                              samplingPorts: ISZ[SamplingPortInterface],
                              cContainers: ISZ[C_Container],
-                             auxFiles: ISZ[Resource],
+                             auxFiles: ISZ[FileResource],
                              globalImports: ISZ[String],
                              globalPreprocessorIncludes: ISZ[String],
                              requiresTimeServer: B
@@ -23,9 +23,9 @@ import org.sireum.hamr.ir
 @sig trait Monitor {
   def i: ast.Instance
 
-  def cimplementation: Resource
+  def cimplementation: FileResource
 
-  def cinclude: Resource
+  def cinclude: FileResource
 
   def index: Z
 
@@ -35,8 +35,8 @@ import org.sireum.hamr.ir
 @datatype class TB_Monitor(i: ast.Instance, // camkes monitor
                            interface: ast.Procedure, // camkes interface
                            providesVarName: String,
-                           cimplementation: Resource,
-                           cinclude: Resource,
+                           cimplementation: FileResource,
+                           cinclude: FileResource,
                            index: Z, // fan-out index
                            ci: ir.ConnectionInstance // aadl connection
                           ) extends Monitor
@@ -46,8 +46,8 @@ import org.sireum.hamr.ir
                              interfaceSender: ast.Procedure, // camkes interface
                              providesReceiverVarName: String,
                              providesSenderVarName: String,
-                             cimplementation: Resource,
-                             cinclude: Resource,
+                             cimplementation: FileResource,
+                             cinclude: FileResource,
                              index: Z, // fan-out index
                              ci: ir.ConnectionInstance // aadl connection
                             ) extends Monitor
@@ -56,8 +56,8 @@ import org.sireum.hamr.ir
 @datatype class C_Container(instanceName: String,
                             componentId: String,
 
-                            cSources: ISZ[Resource],
-                            cIncludes: ISZ[Resource],
+                            cSources: ISZ[FileResource],
+                            cIncludes: ISZ[FileResource],
 
                             sourceText: ISZ[String],
 
@@ -79,7 +79,7 @@ import org.sireum.hamr.ir
                                            configurations: ISZ[ast.Configuration],
                                            cContainers: ISZ[C_Container],
                                            settingCmakeEntries: ISZ[ST],
-                                           auxResourceFiles: ISZ[Resource])
+                                           auxResourceFiles: ISZ[FileResource])
 
 @datatype class CamkesComponentContributions(shell: ast.Component)
 
@@ -145,7 +145,7 @@ import org.sireum.hamr.ir
 }
 
 
-@datatype class ActResult(val resources: ISZ[Resource])
+@datatype class ActResult(val resources: ISZ[FileResource])
 
 @enum object ReportKind {
   'Info

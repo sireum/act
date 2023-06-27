@@ -8,12 +8,12 @@ import org.sireum.hamr.act.connections.SBConnectionContainer
 import org.sireum.hamr.act.proof.ProofContainer.{CAmkESComponentCategory, CAmkESConnection, CAmkESConnectionType}
 import org.sireum.hamr.act.templates.SMT2Template
 import org.sireum.hamr.act.util.{ActPlatform, Sel4ConnectorTypes}
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object SMT2ProofGen {
-  var resources: ISZ[Resource] = ISZ()
+  var resources: ISZ[FileResource] = ISZ()
 
   var pathSep: String = "_"
 
@@ -22,7 +22,7 @@ object SMT2ProofGen {
                    sbConnectionContainer: Map[String, SBConnectionContainer],
                    symbolTable: SymbolTable,
                    outputDir: String,
-                   hamrPlatform: ActPlatform.Type): ISZ[Resource] = {
+                   hamrPlatform: ActPlatform.Type): ISZ[FileResource] = {
     resources = ISZ()
 
     val aadlInstances: ISZ[AadlComponent] = {

@@ -6,7 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util._
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object PeriodicDispatcherTemplate {
@@ -40,7 +40,7 @@ object PeriodicDispatcherTemplate {
     return st
   }
 
-  def dispatchComponentCSource(modelTypesHeader: String, calendars: ISZ[ST]): Resource = {
+  def dispatchComponentCSource(modelTypesHeader: String, calendars: ISZ[ST]): FileResource = {
     val THREAD_CALENDAR = Util.brand("thread_calendar")
     val st: ST =
       st"""#include <string.h>

@@ -10,7 +10,7 @@ import org.sireum.hamr.act.templates.{CMakeTemplate, EventDataQueueTemplate}
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.CommonUtil.IdPath
 import org.sireum.hamr.codegen.common.DirectoryUtil
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.ResourceUtil
@@ -37,9 +37,9 @@ object VMGen {
   def getAuxResources( //threadsToVMs: ISZ[AadlThread],
                        processesToVMs: ISZ[AadlProcess],
                        platform: ActPlatform.Type,
-                       symbolTable: SymbolTable): ISZ[Resource] = {
+                       symbolTable: SymbolTable): ISZ[FileResource] = {
     assert(processesToVMs.nonEmpty, "Expecting 1 or more processes going to VMs")
-    var auxResourceFiles: ISZ[Resource] = ISZ()
+    var auxResourceFiles: ISZ[FileResource] = ISZ()
 
     val projectRoot = s"$${CMAKE_CURRENT_SOURCE_DIR}/../.."
 
@@ -279,14 +279,14 @@ object VMGen {
   var preprocessorIncludes: ISZ[String] = ISZ()
   var externalEntities: ISZ[String] = ISZ(VM_INIT_DEF.attributes().render)
 
-  var auxResources: ISZ[Resource] = ISZ()
+  var auxResources: ISZ[FileResource] = ISZ()
 
   var crossConnGCMethods: ISZ[ST] = ISZ()
   var crossConnConnections: ISZ[ST] = ISZ()
 
   val useCaseConnectors: B = Connections.useCaseEventDataPortConnector(actOptions.experimentalOptions)
 
-  def genProcess(aadlProcess: AadlProcess, symbolTable: SymbolTable, sbConnections: ISZ[SBConnectionContainer]): (Component, ISZ[Resource]) = {
+  def genProcess(aadlProcess: AadlProcess, symbolTable: SymbolTable, sbConnections: ISZ[SBConnectionContainer]): (Component, ISZ[FileResource]) = {
     val boundProcessor: AadlVirtualProcessor = aadlProcess.getBoundProcessor(symbolTable).get.asInstanceOf[AadlVirtualProcessor]
 
     provides = VM_INIT_DEF.provides(aadlProcess, symbolTable)

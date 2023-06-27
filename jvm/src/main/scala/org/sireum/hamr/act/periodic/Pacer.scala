@@ -11,7 +11,7 @@ import org.sireum.hamr.act.templates.{CAmkESTemplate, ConnectionsSbTemplate}
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VMUtil
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
@@ -36,7 +36,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     var connections: ISZ[ast.Connection] = ISZ()
     var configurations: ISZ[ast.Configuration] = ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
-    var auxResources: ISZ[Resource] = ISZ()
+    var auxResources: ISZ[FileResource] = ISZ()
 
     imports = imports :+ PacerTemplate.pacerImport()
 
@@ -186,7 +186,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
       instances = instances :+ pacerComponent
 
-      val pacerCCode: Resource = genPacerGlueCode(gcPacerIncludes, gcPacerMethods, gcPacerImplEntries)
+      val pacerCCode: FileResource = genPacerGlueCode(gcPacerIncludes, gcPacerMethods, gcPacerImplEntries)
 
       val externalLibs: ISZ[String] = ISZ(Util.SBTypeLibrary)
 
@@ -224,7 +224,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
     var connections: ISZ[ast.Connection] = ISZ()
     var configurations: ISZ[ast.Configuration] = ISZ()
     var cContainers: ISZ[C_Container] = ISZ()
-    var auxResources: ISZ[Resource] = ISZ()
+    var auxResources: ISZ[FileResource] = ISZ()
 
     imports = imports :+ PacerTemplate.pacerImport()
 
@@ -374,7 +374,7 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
       instances = instances :+ pacerComponent
 
-      val pacerCCode: Resource = genPacerGlueCode(gcPacerIncludes, gcPacerMethods, gcPacerImplEntries)
+      val pacerCCode: FileResource = genPacerGlueCode(gcPacerIncludes, gcPacerMethods, gcPacerImplEntries)
 
       val externalLibs: ISZ[String] = ISZ(Util.SBTypeLibrary)
 
@@ -596,13 +596,13 @@ import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 
   def genPacerGlueCode(gcIncludes: ISZ[String],
                        gcMethods: ISZ[ST],
-                       gcLoopEntries: ISZ[ST]): Resource = {
+                       gcLoopEntries: ISZ[ST]): FileResource = {
     val glueCode = PacerTemplate.pacerGlueCode(gcIncludes, gcMethods, gcLoopEntries)
 
     return ResourceUtil.createResource(PacerTemplate.pacerGlueCodePath(), glueCode, T)
   }
 
-  def getSchedule(allComponents: ISZ[AadlComponent], symbolTable: SymbolTable): ISZ[Resource] = {
+  def getSchedule(allComponents: ISZ[AadlComponent], symbolTable: SymbolTable): ISZ[FileResource] = {
 
     val aadlProcessor = PeriodicUtil.getBoundProcessor(symbolTable)
 

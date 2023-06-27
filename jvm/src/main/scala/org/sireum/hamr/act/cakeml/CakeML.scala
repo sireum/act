@@ -6,7 +6,7 @@ import org.sireum._
 import org.sireum.hamr.act.templates.CakeMLTemplate
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.NixSeL4NameUtil
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
 import org.sireum.hamr.codegen.common.properties.PropertyUtil
 import org.sireum.hamr.codegen.common.symbols._
@@ -20,7 +20,7 @@ object CakeML {
                     basePackageName: String,
                     symbolTable: SymbolTable,
                     aadlRoot: Option[String],
-                    reporter: Reporter): ISZ[Resource] = {
+                    reporter: Reporter): ISZ[FileResource] = {
 
     val names = NameUtil.getAirNameProvider(aadlThread.component, basePackageName)
 
@@ -77,7 +77,7 @@ object CakeML {
 
     val content: ST = CakeMLTemplate.ffiTemplate(_includes, globals, methods)
 
-    var ret: ISZ[Resource] = ISZ(ResourceUtil.createResource(
+    var ret: ISZ[FileResource] = ISZ(ResourceUtil.createResource(
       path = s"${path}/${filename}",
       content = content,
       overwrite = T))

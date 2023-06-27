@@ -5,7 +5,7 @@ package org.sireum.hamr.act.templates
 import org.sireum._
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.codegen.common.StringUtil
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.util.ResourceUtil
 
 object EventDataQueueTemplate {
@@ -343,7 +343,7 @@ object EventDataQueueTemplate {
     return s"${queueName}_is_empty"
   }
 
-  def genSbQueueTypeFiles(portType: String, queueSize: Z): ISZ[Resource] = {
+  def genSbQueueTypeFiles(portType: String, queueSize: Z): ISZ[FileResource] = {
     val queueHeaderFilename = Util.getEventData_SB_QueueHeaderFileName(portType, queueSize)
     val queueImplFilename = Util.getEventData_SB_QueueImplFileName(portType, queueSize)
 

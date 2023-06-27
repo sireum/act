@@ -15,7 +15,7 @@ import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm._
 import org.sireum.hamr.codegen.common.CommonUtil.IdPath
 import org.sireum.hamr.codegen.common.util.NameUtil.NameProvider
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.properties.{OsateProperties, PropertyUtil}
 import org.sireum.hamr.codegen.common.symbols._
 import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
@@ -43,7 +43,7 @@ import org.sireum.ops.ISZOps
   var astObjects: ISZ[ASTObject] = ISZ()
   var monitors: HashSMap[IdPath, Monitor] = HashSMap.empty // conn instname -> monitor
   var containers: ISZ[C_Container] = ISZ()
-  var auxResourceFiles: ISZ[Resource] = ISZ()
+  var auxResourceFiles: ISZ[FileResource] = ISZ()
 
   var camkesComponents: ISZ[ast.Component] = ISZ()
   var camkesConnections: ISZ[ast.Connection] = ISZ()
@@ -184,7 +184,7 @@ import org.sireum.ops.ISZOps
       { // generate sb type library cmake
         val prefix: String = s"${Util.getTypeRootPath()}/"
 
-        val typeSrcs: ISZ[Resource] = auxResourceFiles.filter(p => ops.StringOps(p.dstPath).startsWith(Util.getTypeSrcPath()))
+        val typeSrcs: ISZ[FileResource] = auxResourceFiles.filter(p => ops.StringOps(p.dstPath).startsWith(Util.getTypeSrcPath()))
         var filenames: ISZ[String] = typeSrcs.map(m => {
           assert(ops.StringOps(m.dstPath).startsWith(prefix), s"Unexpected type path ${m.dstPath}")
           ops.StringOps(m.dstPath).substring(prefix.size, m.dstPath.size)
@@ -265,7 +265,7 @@ import org.sireum.ops.ISZOps
       val processId = Util.getCamkesComponentIdentifier(aadlProcess, symbolTable)
 
       val vmGen = VMGen(useDomainScheduling, typeMap, samplingPorts, srcQueues, actOptions)
-      val (component, auxResources): (Component, ISZ[Resource]) = vmGen.genProcess(aadlProcess, symbolTable, sbConnectionContainer.values)
+      val (component, auxResources): (Component, ISZ[FileResource]) = vmGen.genProcess(aadlProcess, symbolTable, sbConnectionContainer.values)
 
       instances = instances :+ Util.createCAmkESInstance(
         originAadl = Some(aadlProcess),
@@ -1092,10 +1092,10 @@ import org.sireum.ops.ISZOps
       gcImplMethods = gcImplMethods ++ unconnectedInPorts.map((f: ir.FeatureEnd) => hamrReceiveUnconnectedIncomingPort(names, f, uri))
     }
 
-    var cSources: ISZ[Resource] = ISZ()
+    var cSources: ISZ[FileResource] = ISZ()
 
     if (aadlThread.isCakeMLComponent()) {
-      val ffis: ISZ[Resource] = CakeML.processThread( //
+      val ffis: ISZ[FileResource] = CakeML.processThread( //
         aadlThread, //
         hamrBasePackageName.get, //
         symbolTable, //
@@ -1451,7 +1451,7 @@ import org.sireum.ops.ISZOps
           val connInstName = connInst.name.name
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
-          val cimplementation: Resource =
+          val cimplementation: FileResource =
             if (f.category == ir.FeatureCategory.DataPort) {
               ResourceUtil.createResource(implName, StringTemplate.tbMonReadWrite(
                 paramTypeName, PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, Util.getSbTypeHeaderFilenameForIncludes(), preventBadging), T)
@@ -1554,7 +1554,7 @@ import org.sireum.ops.ISZOps
           val connInstName = connInst.name.name
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
-          val cimplementation: Resource =
+          val cimplementation: FileResource =
             ResourceUtil.createResource(implName,
               StringTemplate.tbEnqueueDequeueIhor(paramTypeName,
                 PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE),
@@ -1650,7 +1650,7 @@ import org.sireum.ops.ISZOps
           val connInstName = connInst.name.name
 
           val implName = s"${Util.DIR_COMPONENTS}/${Util.DIR_MONITORS}/${monitorName}/src/${Util.genCImplFilename(monitorName)}"
-          val cimplementation: Resource =
+          val cimplementation: FileResource =
             ResourceUtil.createResource(
               implName,
               StringTemplate.tbRaiseGetEvents(PropertyUtil.getQueueSize(f, Util.DEFAULT_QUEUE_SIZE), monitorName, preventBadging),
@@ -2795,7 +2795,7 @@ import org.sireum.ops.ISZOps
     return ret
   }
 
-  def genComponentTypeInterfaceFile(aadlThread: AadlThread, sts: ISZ[ST]): Resource = {
+  def genComponentTypeInterfaceFile(aadlThread: AadlThread, sts: ISZ[ST]): FileResource = {
     val name = Util.getClassifier(aadlThread.component.classifier.get)
     val compTypeHeaderFilename = Util.genCHeaderFilename(Util.brand(name))
 
@@ -2824,7 +2824,7 @@ import org.sireum.ops.ISZOps
                                          gcRunLoopMidStmts: ISZ[ST],
                                          gcRunLoopEndStmts: ISZ[ST],
 
-                                         containsFFIs: B): Resource = {
+                                         containsFFIs: B): FileResource = {
 
     val path = PathUtil.getComponentSourcePath(aadlThread, symbolTable)
     val componentHeaderFilename = PathUtil.getComponentGlueCodeHeaderFilename(aadlThread)

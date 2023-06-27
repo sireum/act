@@ -6,7 +6,7 @@ import org.sireum.hamr.act.proof.ProofUtil
 import org.sireum.hamr.act.templates.StringTemplate
 import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
-import org.sireum.hamr.codegen.common.containers.Resource
+import org.sireum.hamr.codegen.common.containers.FileResource
 import org.sireum.hamr.codegen.common.symbols.{AadlThread, SymbolTable}
 import org.sireum.hamr.codegen.common.types.AadlTypes
 import org.sireum.hamr.codegen.common.util.{NameUtil, ResourceUtil}
@@ -25,7 +25,7 @@ object Act {
 
   def runInternal(model: ir.Aadl, options: ActOptions, aadlTypes: AadlTypes, symbolTable: SymbolTable): ActResult = {
 
-    var resources: ISZ[Resource] = ISZ()
+    var resources: ISZ[FileResource] = ISZ()
 
     if (model.components.isEmpty) {
       reporter.error(None(), Util.toolName, "Model is empty")
@@ -87,7 +87,7 @@ object Act {
       }
 
       val cakeMLAssemblyLocations = resources.filter(p => ops.StringOps(p.dstPath).endsWith(".S"))
-        .map((r: Resource) => r.dstPath)
+        .map((r: FileResource) => r.dstPath)
 
       reporter.info(None(), Util.ACT_INSTRUCTIONS_MESSAGE_KIND,
         StringTemplate.postGenInstructionsMessage(
