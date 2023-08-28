@@ -11,8 +11,9 @@ import org.sireum.hamr.act.util.Util.reporter
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.DirectoryUtil
-import org.sireum.hamr.codegen.common.containers.{EResource, IResource, FileResource}
+import org.sireum.hamr.codegen.common.containers.{EResource, FileResource, IResource}
 import org.sireum.hamr.codegen.common.symbols.SymbolTable
+import org.sireum.hamr.codegen.common.templates.CommentTemplate
 import org.sireum.hamr.codegen.common.util.{ExperimentalOptions, ResourceUtil}
 import org.sireum.ops.StringOps
 
@@ -317,7 +318,7 @@ import org.sireum.ops.StringOps
     }
 
     val st =
-      st"""${StringTemplate.doNotEditComment()}
+      st"""${CommentTemplate.doNotEditComment_c}
           |
           |${(preprocessorIncludes, "\n")}
           |${(imports.elements, "\n")}

@@ -7,7 +7,7 @@ import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.util._
 import org.sireum.hamr.act.vm.VM_Template
 import org.sireum.hamr.codegen.common.symbols.{AadlDataPort, AadlPort}
-import org.sireum.hamr.codegen.common.templates.StackFrameTemplate
+import org.sireum.hamr.codegen.common.templates.{CommentTemplate, StackFrameTemplate}
 import org.sireum.hamr.codegen.common.{CommonUtil, StringUtil}
 import org.sireum.hamr.ir
 
@@ -42,7 +42,7 @@ object StringTemplate {
     }
 
     val ret: ST =
-      st"""${StringTemplate.doNotEditComment()}
+      st"""${CommentTemplate.doNotEditComment_c}
           |
           |#ifndef ${macroName}
           |#define ${macroName}
@@ -613,7 +613,7 @@ object StringTemplate {
     val filteredIncludes: Set[String] = Set.empty[String] ++ includes.map((s: ST) => s.render)
 
     val ret: ST =
-      st"""${StringTemplate.doNotEditComment()}
+      st"""${CommentTemplate.doNotEditComment_c}
           |
           |#include <${componentHeaderFilename}>
           |${(filteredIncludes.elements, "\n")}
@@ -887,22 +887,6 @@ bool is_empty_${s.name}(${s.structName} *port) {
   def uses(u: ast.Uses): ST = {
     val maybe: String = if (u.optional) "maybe " else ""
     return st"${maybe}uses ${u.typ} ${u.name};"
-  }
-
-  def doNotEditComment(): ST = {
-    return st"// This file will be regenerated, do not edit"
-  }
-
-  def safeToEditComment(): ST = {
-    return st"// This file will not be overwritten so is safe to edit"
-  }
-
-  def doNotEditCmakeComment(): ST = {
-    return st"# This file will be regenerated, do not edit"
-  }
-
-  def safeToEditCMakeComment(): ST = {
-    return st"# This file will not be overwritten so is safe to edit"
   }
 
   def postGenInstructionsMessage(camkesProjDirectory: String,

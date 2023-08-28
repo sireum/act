@@ -5,6 +5,7 @@ package org.sireum.hamr.act.templates
 import org.sireum._
 import org.sireum.hamr.act.util.{CMakeOption, CMakePreprocessorOption, CMakeStandardOption, Util}
 import org.sireum.hamr.act.vm.VMGen
+import org.sireum.hamr.codegen.common.templates.CommentTemplate
 
 object CMakeTemplate {
 
@@ -147,7 +148,7 @@ object CMakeTemplate {
     val isInterfaceTypeLib = filtered.isEmpty
 
     val ret: ST =
-      st"""${StringTemplate.doNotEditCmakeComment()}
+      st"""${CommentTemplate.doNotEditComment_cmake}
           |
           |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
           |
@@ -184,7 +185,7 @@ object CMakeTemplate {
                  preludes: ISZ[ST]): ST = {
 
     return (
-      st"""${StringTemplate.doNotEditCmakeComment()}
+      st"""${CommentTemplate.doNotEditComment_cmake}
           |
           |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
           |
@@ -202,7 +203,7 @@ object CMakeTemplate {
 
   def genSettingsCmake(settingsCmakeEntries: ISZ[ST]): ST = {
     val ret: ST =
-      st"""${StringTemplate.safeToEditCMakeComment()}
+      st"""${CommentTemplate.safeToEditComment_cmake}
           |
           |${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
           |

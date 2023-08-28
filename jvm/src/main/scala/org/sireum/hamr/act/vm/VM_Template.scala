@@ -5,6 +5,7 @@ import org.sireum._
 import org.sireum.hamr.act.ast
 import org.sireum.hamr.act.templates._
 import org.sireum.hamr.act.util.{CMakeOption, CMakeStandardOption}
+import org.sireum.hamr.codegen.common.templates.CommentTemplate
 
 object VM_Template {
 
@@ -215,7 +216,7 @@ object VM_Template {
     val ret: ST =
       st"""${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
           |
-          |${StringTemplate.safeToEditCMakeComment()}
+          |${CommentTemplate.safeToEditComment_cmake}
           |
           |project(arm-vm C)
           |
@@ -556,7 +557,7 @@ object VM_Template {
           |"""
     })
     val ret: ST =
-      st"""${StringTemplate.safeToEditComment()}
+      st"""${CommentTemplate.safeToEditComment_c}
           |
           |#include <configurations/vm.h>
           |#define VM_RAM_OFFSET      0x00000000
@@ -628,7 +629,7 @@ object VM_Template {
     })
 
     val ret: ST =
-      st"""${StringTemplate.safeToEditComment()}
+      st"""${CommentTemplate.safeToEditComment_c}
           |
           |#include <configurations/vm.h>
           |
@@ -662,7 +663,7 @@ object VM_Template {
     val ret: ST =
       st"""#!/bin/sh
           |
-          |${StringTemplate.doNotEditCmakeComment()}
+          |${CommentTemplate.doNotEditComment_cmake}
           |
           |insmod /lib/modules/4.14.87/kernel/drivers/vmm/connection.ko"""
     return ret
@@ -673,7 +674,7 @@ object VM_Template {
       st"""# @TAG(CUSTOM)
           |# /etc/inittab
           |#
-          |${StringTemplate.safeToEditCMakeComment()}
+          |${CommentTemplate.safeToEditComment_cmake}
           |#
           |# Copyright (C) 2001 Erik Andersen <andersen@codepoet.org>
           |#
@@ -724,7 +725,7 @@ object VM_Template {
     val ret: ST =
       st"""${CMakeTemplate.CMAKE_MINIMUM_REQUIRED_VERSION}
           |
-          |${StringTemplate.safeToEditCMakeComment()}
+          |${CommentTemplate.safeToEditComment_cmake}
           |
           |project(${processID} C)
           |
@@ -759,7 +760,7 @@ object VM_Template {
           |
           |${(_includes, "\n")}
           |
-          |${StringTemplate.safeToEditComment()}
+          |${CommentTemplate.safeToEditComment_c}
           |
           |int main(int argc, char *argv[]) {
           |  printf("VM App ${vmProcessId} started\n");
