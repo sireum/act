@@ -66,7 +66,7 @@ val home: Os.Path = homeBin.up
 val sireum: Os.Path = homeBin / (if (Os.isWin) "sireum.bat" else "sireum")
 
 val proyekName: String = "sireum-proyek"
-val project: Os.Path = homeBin / "project4testing.cmd"
+val project: Os.Path = homeBin / "project-standalone.cmd"
 
 
 def clone(repo: String, branch: String): Unit = {
