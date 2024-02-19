@@ -156,7 +156,7 @@ object ScriptTemplate {
           |  fi
           |fi
           |
-          |ln -sv $$PROJECT_HOME $$CAMKES_APPS_DIR
+          |ln -svf $$PROJECT_HOME $$CAMKES_APPS_DIR
           |
           |########################
           |# run CAmkES/seL4 build
