@@ -12,18 +12,18 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
 * Original location of vm.h
 *   https://github.com/seL4/camkes-arm-vm/blob/e494a6eee46912fc0d89b5976c8e2d2e94dd6e6c/components/VM/configurations/vm.h
 *
-* Current location of vm.h as of 2022.11.18
-*   https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h
+* Current location of vm.h as of 2024.04.30
+*   https://github.com/seL4/camkes-vm/blob/64690e8db397f69ece88866e79a9f2942c3c7015/components/VM_Arm/configurations/vm.h
 *
-*   i.e. this was the version being pointed to via the camkes-arm-vm-manifest
-*     https://github.com/seL4/camkes-arm-vm-manifest/blob/91e741bbfd44bd028a6efbb633b7353e8be7fe81/default.xml#L21
+*   i.e. this was the version being pointed to via the camkes-vm-examples-manifest
+*     https://github.com/seL4/camkes-vm-examples-manifest/blob/f8ebf7a92fbe6ca60f9e9c1a10414b8efd14b037/default.xml#L23
 *
-*     after a "repo init -u https://github.com/SEL4PROJ/camkes-arm-vm-manifest.git --depth=1"
+*     after a "repo init -u https://github.com/seL4/camkes-vm-examples-manifest.git"
 */
 
 
 /** expansion of objects in macro
-* https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L50-L86
+* https://github.com/seL4/camkes-vm/blob/64690e8db397f69ece88866e79a9f2942c3c7015/components/VM_Arm/configurations/vm.h#L50-L111
 *
 * #define VM_INIT_DEF() \
     control; \
@@ -46,12 +46,33 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
     attribute int num_extra_frame_caps; \
     attribute int extra_frame_map_address; \
     attribute { \
+        string ram_base; \
+        string ram_paddr_base; \
+        string ram_size; \
+        string dtb_addr; \
+        string initrd_addr; \
+        string kernel_entry_addr = "-1"; \
+    } vm_address_config; \
+    attribute { \
+        string kernel_name = "linux"; \
+        string dtb_name = "linux-dtb"; \
+        string initrd_name = "linux-initrd"; \
+        string kernel_bootcmdline = ""; \
+        string kernel_stdout = ""; \
+        string dtb_base_name = ""; \
+        int provide_dtb = true; \
+        int generate_dtb = false; \
+        int provide_initrd = true; \
+        int clean_cache = false; \
+        int map_one_to_one = false; \
+    } vm_image_config; \
+    attribute { \
         string linux_ram_base; \
         string linux_ram_paddr_base; \
         string linux_ram_size; \
-        string linux_ram_offset; \
+        string linux_ram_offset = "0"; /* obsolete */ \
         string dtb_addr; \
-        string initrd_max_size; \
+        string initrd_max_size = "-1"; /* obsolete */ \
         string initrd_addr; \
     } linux_address_config; \
     attribute { \
@@ -62,10 +83,14 @@ import org.sireum.hamr.codegen.common.symbols.{AadlProcess, SymbolTable}
         string linux_stdout = ""; \
         string dtb_base_name = ""; \
     } linux_image_config; \
+    attribute { \
+        int send_id; \
+        int recv_id; \
+    } serial_layout[] = []; \
 */
 
 object VM_H {
-  val vmH_Location: String = "https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h"
+  val vmH_Location: String = "https://github.com/seL4/camkes-vm/blob/64690e8db397f69ece88866e79a9f2942c3c7015/components/VM_Arm/configurations/vm.h"
 
   def tag(macroName: String, lineNumber: Z): String = {
     return s"// expansion of macro ${macroName}. See ${vmH_Location}#L${lineNumber}"
@@ -74,13 +99,13 @@ object VM_H {
 
 object VM_INIT_DEF {
   def semaphores(): ISZ[Semaphore] = {
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L56
+    // has semaphore vm_sem; \
     val ret: ISZ[Semaphore] = ISZ(Semaphore(name = "vm_sem", comments = ISZ()))
     return ret
   }
 
   def provides(aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Provides] = {
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L65
+    // provides VMDTBPassthrough dtb; \
     val ret: ISZ[Provides] = ISZ(
       Util.createProvides_VMAux(
         aadlProcess = aadlProcess,
@@ -92,7 +117,7 @@ object VM_INIT_DEF {
   }
 
   def emits(aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Emits] = {
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L63
+    // emits HaveNotification notification_ready_connector; \
     val ret: ISZ[Emits] = ISZ(
       Util.createEmits_VMAux(
         aadlProcess = aadlProcess,
@@ -105,14 +130,14 @@ object VM_INIT_DEF {
 
   def consumes(aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Consumes] = {
     val ret: ISZ[Consumes] = ISZ(
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L55
+      // maybe consumes restart restart_event; \
       Util.createConsumes_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
         name = "restart_event",
         typ = "restart",
         optional = T),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L62
+      // consumes HaveNotification notification_ready; \
       Util.createConsumes_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
@@ -127,25 +152,25 @@ object VM_INIT_DEF {
     var ret: ISZ[Dataport] = ISZ()
     if (KERNELARMPLATFORM_EXYNOS5410) {
       ret = ret ++ ISZ(
-        // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L41
+        // dataport Buf cmu_cpu;
         Dataport(
           name = "cmu_cpu",
           typ = "Buf",
           optional = F,
           comments = ISZ()),
-        // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L42
+        // dataport Buf cmu_top; \
         Dataport(
           name = "cmu_top",
           typ = "Buf",
           optional = F,
           comments = ISZ()),
-        // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L43
+        // dataport Buf gpio_right; \
         Dataport(
           name = "gpio_right",
           typ = "Buf",
           optional = F,
           comments = ISZ()),
-        // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L44
+        // dataport Buf cmu_core; \
         Dataport(
           name = "cmu_core",
           typ = "Buf",
@@ -158,49 +183,49 @@ object VM_INIT_DEF {
 
   def uses(TK1DEVICEFWD: B, KERNELARMPLATFORM_EXYNOS5410: B, aadlProcess: AadlProcess, symbolTable: SymbolTable): ISZ[Uses] = {
     var ret: ISZ[Uses] = ISZ(
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L52
+      // uses FileServerInterface fs; \
       Util.createUses_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
         name = "fs",
         typ = "FileServerInterface",
         optional = F),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L57
+      // maybe uses Batch batch; \
       Util.createUses_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
         name = "batch",
         typ = "Batch",
         optional = T),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L58
+      // maybe uses PutChar guest_putchar; \
       Util.createUses_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
         name = "guest_putchar",
         typ = "PutChar",
         optional = T),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L59
+      // maybe uses GetChar serial_getchar; \
       Util.createUses_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
         name = "serial_getchar",
         typ = "GetChar",
         optional = T),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L60
+      // maybe uses VirtQueueDev recv; \
       Util.createUses_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
         name = "recv",
         typ = "VirtQueueDev",
         optional = T),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L61
+      // maybe uses VirtQueueDrv send; \
       Util.createUses_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
         name = "send",
         typ = "VirtQueueDrv",
         optional = T),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L64
+      // maybe uses VMDTBPassthrough dtb_self; \
       Util.createUses_VMAux(
         aadlProcess = aadlProcess,
         symbolTable = symbolTable,
@@ -211,14 +236,14 @@ object VM_INIT_DEF {
 
     if (TK1DEVICEFWD) {
       ret = ret ++ ISZ(
-        // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L31
+        // uses gen_fwd_inf uartfwd; \
         Util.createUses_VMAux(
           aadlProcess = aadlProcess,
           symbolTable = symbolTable,
           name = "uartfwd",
           typ = "gen_fwd_inf",
           optional = F),
-        // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L32
+        // uses gen_fwd_inf clkcarfwd; \
         Util.createUses_VMAux(
           aadlProcess = aadlProcess,
           symbolTable = symbolTable,
@@ -230,7 +255,7 @@ object VM_INIT_DEF {
 
     if (KERNELARMPLATFORM_EXYNOS5410) {
       ret = ret ++ ISZ(
-        // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L40
+        // uses pwm_inf pwm; \
         Util.createUses_VMAux(
           aadlProcess = aadlProcess,
           symbolTable = symbolTable,
@@ -243,21 +268,42 @@ object VM_INIT_DEF {
   }
 
   def attributes(): ST = {
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L66-L86
+    // https://github.com/seL4/camkes-vm/blob/64690e8db397f69ece88866e79a9f2942c3c7015/components/VM_Arm/configurations/vm.h#L70-111
     val ret: ST =
       st"""// expanding attributes in VM_INIT_DEF()
-          |// https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L66-L86
+          |// https://github.com/seL4/camkes-vm/blob/64690e8db397f69ece88866e79a9f2942c3c7015/components/VM_Arm/configurations/vm.h#L70-111
           |attribute int base_prio;
           |attribute int num_vcpus = 1;
           |attribute int num_extra_frame_caps;
           |attribute int extra_frame_map_address;
           |attribute {
+          |  string ram_base;
+          |  string ram_paddr_base;
+          |  string ram_size;
+          |  string dtb_addr;
+          |  string initrd_addr;
+          |  string kernel_entry_addr = "-1";
+          |} vm_address_config;
+          |attribute {
+          |  string kernel_name = "linux";
+          |  string dtb_name = "linux-dtb";
+          |  string initrd_name = "linux-initrd";
+          |  string kernel_bootcmdline = "";
+          |  string kernel_stdout = "";
+          |  string dtb_base_name = "";
+          |  int provide_dtb = true;
+          |  int generate_dtb = false;
+          |  int provide_initrd = true;
+          |  int clean_cache = false;
+          |  int map_one_to_one = false;
+          |} vm_image_config;
+          |attribute {
           |  string linux_ram_base;
           |  string linux_ram_paddr_base;
           |  string linux_ram_size;
-          |  string linux_ram_offset;
+          |  string linux_ram_offset = "0"; /* obsolete */
           |  string dtb_addr;
-          |  string initrd_max_size;
+          |  string initrd_max_size = "-1"; /* obsolete */
           |  string initrd_addr;
           |} linux_address_config;
           |attribute {
@@ -268,6 +314,10 @@ object VM_INIT_DEF {
           |  string linux_stdout = "";
           |  string dtb_base_name = "";
           |} linux_image_config;
+          |attribute {
+          |  int send_id;
+          |  int recv_id;
+          |} serial_layout[] = [];
           |// end of attribute expansion in VM_INIT_DEF()"""
     return ret
   }
@@ -284,7 +334,7 @@ object VM_COMPONENT_CONNECTIONS_DEF {
   def connections(processId: String, connectionCounter: Counter): ISZ[Connection] = {
     var connections: ISZ[Connection] = ISZ()
 
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L93
+    // connection seL4RPCDataport fs##num(from vm##num.fs, to fserv.fs_ctrl); \
     val fsConnection = Util.createConnectionC(
       connectionCategory = CAmkESConnectionType.VM,
       connectionCounter = connectionCounter,
@@ -293,7 +343,7 @@ object VM_COMPONENT_CONNECTIONS_DEF {
       dstComponent = LibraryComponents.FileServer.defaultFileServerName,
       dstFeature = LibraryComponents.FileServer.fs_ctrl_port)
 
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L94
+    // connection seL4GlobalAsynch notify_ready_vm##num(from vm##num.notification_ready_connector, to vm##num.notification_ready); \
     val notificationConnection = Util.createConnectionC(
       connectionCategory = CAmkESConnectionType.VM,
       connectionCounter = connectionCounter,
@@ -301,7 +351,7 @@ object VM_COMPONENT_CONNECTIONS_DEF {
       srcComponent = processId, srcFeature = "notification_ready_connector",
       dstComponent = processId, dstFeature = "notification_ready")
 
-    val comment = VM_H.tag("VM_COMPONENT_CONNECTIONS_DEF", 92)
+    val comment = VM_H.tag("VM_COMPONENT_CONNECTIONS_DEF", 117)
     val fsConnectionWithComment = fsConnection(comments = ISZ(Util.createPreComment(comment)))
 
     connections = connections :+ fsConnectionWithComment :+ notificationConnection(comments = ISZ(Util.createPostComment("")))
@@ -311,22 +361,19 @@ object VM_COMPONENT_CONNECTIONS_DEF {
 }
 
 object VM_GENERAL_COMPOSITION_DEF {
-  // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L96
   val name: String = "VM_GENERAL_COMPOSITION_DEF"
 
   def instances(): ISZ[Instance] = {
     return ISZ(
-      LibraryComponents.FileServer.defaultFileServerInstance(comments = ISZ(Util.createInlineComment(VM_H.tag(name, 96))))
+      LibraryComponents.FileServer.defaultFileServerInstance(comments = ISZ(Util.createInlineComment(VM_H.tag(name, 124))))
     )
   }
 }
 
 object PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF {
-  // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L126-L128
   val name: String = "PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF"
 
   def connections(processId: String, connectionCounter: Counter): ISZ[Connection] = {
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L127
     // connection seL4SerialServer serial_vm##num(from vm##num.batch, to serial.processed_batch); \
     val batchConnection = Util.createConnectionC(
       connectionCategory = CAmkESConnectionType.VM,
@@ -338,7 +385,6 @@ object PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF {
       dstFeature = LibraryComponents.SerialServer.processed_batch_Port
     )
 
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L128
     // connection seL4SerialServer serial_input_vm##num(from vm##num.serial_getchar, to serial.getchar);
     val getCharConnection = Util.createConnectionC(
       connectionCategory = CAmkESConnectionType.VM,
@@ -350,26 +396,25 @@ object PER_VM_VIRTUAL_SERIAL_CONNECTIONS_DEF {
       dstFeature = LibraryComponents.SerialServer.getchar_Port
     )
 
-    return ISZ(batchConnection(comments = ISZ(Util.createPreComment(VM_H.tag(name, 126)))),
+    return ISZ(batchConnection(comments = ISZ(Util.createPreComment(VM_H.tag(name, 151)))),
       getCharConnection(comments = ISZ(Util.createPostComment(""))))
   }
 }
 
 object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
-  // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L121-L124
   val name: String = "VM_VIRTUAL_SERIAL_COMPONENTS_DEF"
 
   def instances(): ISZ[Instance] = {
     return ISZ(
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L122
-      LibraryComponents.SerialServer.defaultSerialServerInstance(comments = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 122)))),
-      // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L123
+      // component SerialServer serial; \
+      LibraryComponents.SerialServer.defaultSerialServerInstance(comments = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 147)))),
+      // component TimeServer time_server; \
       LibraryComponents.TimeServer.defaultTimeServerInstance(comments = ISZ(Util.createPostComment("")))
     )
   }
 
   def connections(connectionCounter: Counter): ISZ[Connection] = {
-    // https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L124
+    // connection seL4TimeServer serialserver_timer(from serial.timeout, to time_server.the_timer); \
     val connection: Connection = Util.createConnectionC(
       //connectionCategory = CAmkESConnectionType.TimeServer,
       connectionCategory = CAmkESConnectionType.VM,
@@ -381,13 +426,10 @@ object VM_VIRTUAL_SERIAL_COMPONENTS_DEF {
       dstFeature = LibraryComponents.TimeServer.the_timer_port)
 
     return ISZ(connection(comments = ISZ(
-      Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 124)),
+      Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 149)),
       Util.createPostComment(""))))
   }
 }
-
-// expansion of configurations in
-// https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L103-L104
 
 // #define VM_GENERAL_CONFIGURATION_DEF() \
 //    fserv.heap_size = 0x30000; \
@@ -395,13 +437,10 @@ object VM_GENERAL_CONFIGURATION_DEF {
   val name: String = "VM_GENERAL_CONFIGURATION_DEF"
 
   def configurations(): ISZ[Configuration] = {
-    val comment = VM_H.tag(name, 104)
+    val comment = VM_H.tag(name, 128)
     return ISZ(GenericConfiguration("fserv.heap_size = 0x30000;", ISZ(Util.createInlineComment(comment))))
   }
 }
-
-// expansion of configurations in
-// https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L106-L114
 
 // #define VM_CONFIGURATION_DEF(num) \
 //    vm##num.fs_shmem_size = 0x100000; \
@@ -416,7 +455,7 @@ object VM_CONFIGURATION_DEF {
   val name: String = "VM_CONFIGURATION_DEF"
 
   def configurations(componentId: String): ISZ[Configuration] = {
-    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 106)))
+    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 131)))
     return ISZ(
       GenericConfiguration(s"${componentId}.fs_shmem_size = 0x100000;", comments),
       GenericConfiguration(s"${componentId}.global_endpoint_base = 1 << 27;", ISZ()),
@@ -429,9 +468,6 @@ object VM_CONFIGURATION_DEF {
   }
 }
 
-// expansion of configurations in
-// https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L134-L137
-
 // #define VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF() \
 //    time_server.timers_per_client = 1; \
 //    time_server.priority = 255; \
@@ -440,7 +476,7 @@ object VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF {
   val name: String = "VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF"
 
   def configurations(): ISZ[Configuration] = {
-    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 134)))
+    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 155)))
     return ISZ(
       GenericConfiguration("time_server.timers_per_client = 1;", comments),
       GenericConfiguration("time_server.priority = 255;", ISZ()),
@@ -449,9 +485,6 @@ object VM_VIRTUAL_SERIAL_GENERAL_CONFIGURATION_DEF {
   }
 }
 
-// expansion of configurations in
-// https://github.com/seL4/camkes-vm/blob/9e09ea46609ea7fadd8212ecf3d0e95f8553f2af/components/VM_Arm/configurations/vm.h#L139-L141
-
 // #define PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF(num) \
 //    vm##num.serial_getchar_shmem_size = 0x1000; \
 //    vm##num.batch_shmem_size = 0x1000; \
@@ -459,7 +492,7 @@ object PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF {
   val name: String = "PER_VM_VIRTUAL_SERIAL_CONFIGURATION_DEF"
 
   def configurations(componentId: String): ISZ[Configuration] = {
-    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 139)))
+    val comments: ISZ[AstComment] = ISZ(Util.createPreComment(""), Util.createPreComment(VM_H.tag(name, 164)))
     return ISZ(
       GenericConfiguration(s"${componentId}.serial_getchar_shmem_size = 0x1000;", comments),
       GenericConfiguration(s"${componentId}.batch_shmem_size = 0x1000;", ISZ(Util.createPostComment("")))
