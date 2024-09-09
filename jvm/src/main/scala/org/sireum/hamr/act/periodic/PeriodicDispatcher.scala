@@ -17,6 +17,8 @@ import org.sireum.hamr.codegen.common.symbols._
 
 @datatype class PeriodicDispatcher(val actOptions: ActOptions) extends PeriodicImpl {
 
+  val performHamrIntegration: B = Util.hamrIntegration(actOptions.platform)
+
   val hookupPeriodicComponentsToTimeServer: B = F
 
   def handlePeriodicComponents(connectionCounter: Counter,
@@ -178,7 +180,7 @@ import org.sireum.hamr.codegen.common.symbols._
 
     gcMainPreInitStatements = gcMainPreInitStatements :+ PeriodicDispatcherTemplate.registerPeriodicCallback()
 
-    if (aadlComponent.isInstanceOf[AadlThread]) {
+    if (!performHamrIntegration && aadlComponent.isInstanceOf[AadlThread]) {
       val t = aadlComponent.asInstanceOf[AadlThread]
       t.getComputeEntrypointSourceText() match {
         case Some(handler) =>
