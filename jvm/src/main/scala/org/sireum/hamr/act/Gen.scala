@@ -207,7 +207,7 @@ import org.sireum.ops.ISZOps
 
       if (ExperimentalOptions.generateRefinementProof(actOptions.experimentalOptions) && actOptions.platform != ActPlatform.SeL4_TB) {
         ProofUtil.proofContainer.modelSchedulingType = PeriodicUtil.getSchedulingType(symbolTable, actOptions.platform)
-        auxResourceFiles = auxResourceFiles ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, astObjects, sbConnectionContainer, symbolTable, actOptions.outputDir, actOptions.platform)
+        auxResourceFiles = auxResourceFiles ++ SMT2ProofGen.genSmt2Proof(ProofUtil.proofContainer, astObjects, sbConnectionContainer, symbolTable, actOptions.camkesOutputDir, actOptions.platform)
       }
 
       return Some(ActContainer(
@@ -1099,7 +1099,7 @@ import org.sireum.ops.ISZOps
         aadlThread, //
         hamrBasePackageName.get, //
         symbolTable, //
-        actOptions.aadlRootDirectory, //
+        actOptions.workspaceRootDir, //
         reporter)
       cSources = cSources ++ ffis
     }

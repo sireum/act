@@ -27,7 +27,7 @@ import org.sireum.ops.StringOps
                 container: ActContainer,
                 cFiles: ISZ[String],
                 cHeaderDirectories: ISZ[String],
-                aadlRootDir: String,
+                workspaceRootDir: String,
                 slangLibInstanceNames: ISZ[String],
                 symbolTable: SymbolTable,
                 options: ActOptions): ISZ[FileResource] = {
@@ -57,7 +57,7 @@ import org.sireum.ops.StringOps
         val rootDestDir = dir
 
         for (st <- c.sourceText) {
-          val path = s"${aadlRootDir}/${st}"
+          val path = s"${workspaceRootDir}/${st}"
           val p = Os.path(path)
 
           if (p.exists) {

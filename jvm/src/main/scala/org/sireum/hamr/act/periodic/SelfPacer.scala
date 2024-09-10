@@ -170,7 +170,7 @@ import org.sireum.hamr.codegen.common.util.ResourceUtil
           val p = Os.path(path)
           st"${p.read}"
         } else {
-          actOptions.aadlRootDirectory match {
+          actOptions.workspaceRootDir match {
             case Some(root) =>
               val candidate = Os.path(root) / path
               if (candidate.exists) {
