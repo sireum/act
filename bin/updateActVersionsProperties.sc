@@ -8,13 +8,13 @@ if [ -z ${SIREUM_HOME} ]; then                                #
   echo "Please set SIREUM_HOME env var"                       #
   exit -1                                                     #
 fi                                                            #
-exec ${SIREUM_HOME}/bin/sireum slang run -n "$0" "$@"         #
+"exec ${SIREUM_HOME}/bin/sireum" slang run -n "$0" "$@"       #
 :BOF
 if not defined SIREUM_HOME (
   echo Please set SIREUM_HOME env var
   exit /B -1
 )
-%SIREUM_HOME%\bin\sireum.bat slang run -n "%0" %*
+"%SIREUM_HOME%\bin\sireum.bat" slang run -n "%0" %*
 exit /B %errorlevel%
 ::!#*/
 // #Sireum
