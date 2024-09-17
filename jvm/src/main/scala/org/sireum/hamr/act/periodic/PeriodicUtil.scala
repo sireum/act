@@ -8,7 +8,7 @@ import org.sireum.hamr.act.util.{ActPlatform, Util}
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties
 import org.sireum.hamr.codegen.common.properties.CaseSchedulingProperties.PacingMethod
 import org.sireum.hamr.codegen.common.symbols._
-import org.sireum.hamr.codegen.common.util.CodeGenPlatform
+import org.sireum.hamr.codegen.common.util.HamrCli.CodegenHamrPlatform
 
 object PeriodicUtil {
 
@@ -82,10 +82,10 @@ object PeriodicUtil {
   }
 
   def useDomainScheduling(symbolTable: SymbolTable, platform: ActPlatform.Type): B = {
-    val _platform: CodeGenPlatform.Type = platform match {
-      case ActPlatform.SeL4_TB => CodeGenPlatform.SeL4_TB
-      case ActPlatform.SeL4 => CodeGenPlatform.SeL4
-      case ActPlatform.SeL4_Only => CodeGenPlatform.SeL4_Only
+    val _platform: CodegenHamrPlatform.Type = platform match {
+      case ActPlatform.SeL4_TB => CodegenHamrPlatform.SeL4_TB
+      case ActPlatform.SeL4 => CodegenHamrPlatform.SeL4
+      case ActPlatform.SeL4_Only => CodegenHamrPlatform.SeL4_Only
     }
     return PacerUtil.canUseDomainScheduling(symbolTable, _platform, Util.reporter)
   }
